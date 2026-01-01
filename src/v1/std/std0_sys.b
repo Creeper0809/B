@@ -6,19 +6,8 @@
 //   print_str/print_dec
 //
 // This file provides higher-level helpers needed by the bootstrap compiler.
-
-layout Slice {
-	ptr64 ptr;
-	ptr64 len;
-}
-
-layout Vec {
-	ptr64 ptr;
-	ptr64 len;
-	ptr64 cap;
-}
-
-var label_counter;
+//
+// Declarations (`layout`/`const`/`var`) live in src/v1/prelude.b.
 
 func panic() {
 	// Convention: input message pointer is passed in rdi.
@@ -52,6 +41,41 @@ func panic_at() {
 
 	rdi = 1;
 	sys_exit(1);
+}
+
+func die(msg) {
+	// Convention: rdi=msg (cstr)
+	asm {
+		"call panic\n"
+	};
+}
+
+func die_read_file_open_fail() {
+	die("read_file: open failed");
+}
+
+func die_read_file_fstat_fail() {
+	die("read_file: fstat failed");
+}
+
+func die_read_file_read_fail() {
+	die("read_file: read failed");
+}
+
+func die_read_file_oom() {
+	die("read_file: out of memory");
+}
+
+func die_emit_overflow() {
+	die("emit: buffer overflow");
+}
+
+func die_emit_open_fail() {
+	die("emit_to_file: open failed");
+}
+
+func die_emit_init_oom() {
+	die("emit_init: out of memory");
 }
 
 func sys_brk(addr) {

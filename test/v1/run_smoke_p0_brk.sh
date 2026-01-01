@@ -3,6 +3,7 @@ set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
+prelude="$root_dir/src/v1/prelude.b"
 std0="$root_dir/src/v1/std/std0_sys.b"
 main_src="$root_dir/test/v1/smoke/p0_brk_ok_main.b"
 out_dir="$root_dir/build"
@@ -12,7 +13,7 @@ obj="$out_dir/p0_brk_ok.o"
 bin="$out_dir/p0_brk_ok"
 
 mkdir -p "$out_dir"
-cat "$std0" "$main_src" > "$merged"
+cat "$prelude" "$std0" "$main_src" > "$merged"
 
 basm "$merged" -o "$asm" >/dev/null
 nasm -felf64 "$asm" -o "$obj"

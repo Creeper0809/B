@@ -1,0 +1,6 @@
+const A = 5;
+const B = 3;
+
+func main() {
+  return (A + B) << 0;
+}

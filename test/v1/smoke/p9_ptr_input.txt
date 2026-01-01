@@ -1,0 +1,9 @@
+// P9: ptr8/ptr64 load/store
+
+func main() {
+  // ptr64[...] always interprets the bracket expression as an address value.
+  // Use addr[x] to take the address of a local slot.
+  p = addr[x];
+  ptr64[p] = 7;
+  return ptr64[p];
+}

@@ -10,45 +10,85 @@
 // - no scaled indexing, so argv[i] uses (i<<3) byte offset
 
 func compile_one() {
-	// placeholder for: read_file -> lex -> parse -> emit -> write .asm
-	// For now, just echo the input path to prove argv plumbing works.
+	// read_file -> lex -> parse -> emit -> write .asm
 	// Convention: input path is passed in rdi.
-	print_str(rdi);
-	print_str("\n");
+	var path0;
+	var src_ptr;
+	var src_len;
+	var lex;
+	var p;
+
+	ptr64[path0] = rdi;
+
+	// Load source
+	rdi = ptr64[path0];
+	read_file(rdi);
+	ptr64[src_ptr] = rax;
+	ptr64[src_len] = rdx;
+
+	// Lex + parse
+	rdi = ptr64[src_ptr];
+	rsi = ptr64[src_len];
+	lexer_new(rdi, rsi);
+	ptr64[lex] = rax;
+
+	rdi = ptr64[lex];
+	parser_new(rdi);
+	ptr64[p] = rax;
+
+	// Reset codegen globals per compile.
+	asm { "mov qword [rel label_counter], 0\n" };
+	vec_new(8);
+	ptr64[vars_emitted] = rax;
+	asm { "call consts_reset\n" };
+
+	// Emit output.
+	emit_init();
+	emit_cstr("global _start\n");
+	emit_cstr("section .text\n");
+	emit_cstr("_start:\n");
+	emit_cstr("  call main\n");
+	emit_cstr("  mov rdi, rax\n");
+	emit_cstr("  mov rax, 60\n");
+	emit_cstr("  syscall\n");
+
+	// Emit all function bodies.
+	rdi = ptr64[p];
+	asm { "call parse_program_emit_funcs\n" };
+
+	// For now, always write to build/out.asm.
+	emit_to_file("build/out.asm");
 }
 
 func main() {
-	alias rdi : argc;
-	alias rsi : argv;
+	// NOTE(Stage1): do not keep argc/argv/i in registers across calls.
+	// Some helpers do not reliably preserve callee-saved regs, so we store
+	// loop state in stack slots and reload each iteration.
+	asm {
+		"push rbp\n"
+		"mov rbp, rsp\n"
+		"sub rsp, 32\n" // [rbp-8]=argc [rbp-16]=argv [rbp-24]=i
+		"mov [rbp-8], rdi\n"
+		"mov [rbp-16], rsi\n"
+		"mov qword [rbp-24], 1\n" // i = 1
 
-	// Preserve process args across calls (rdi/rsi are caller-saved and used for call args).
-	alias r12 : argc0;
-	alias r13 : argv0;
+		".loop:\n"
+		"mov rax, [rbp-24]\n" // i
+		"cmp rax, [rbp-8]\n"  // argc
+		"jae .done\n"
+		"mov rdx, rax\n"
+		"shl rdx, 3\n"         // i*8
+		"mov r8, [rbp-16]\n"  // argv
+		"add r8, rdx\n"
+		"mov rdi, [r8]\n"     // path
+		"call compile_one\n"
+		"mov rax, [rbp-24]\n"
+		"inc rax\n"
+		"mov [rbp-24], rax\n"
+		"jmp .loop\n"
 
-	// Important: rcx is clobbered by `syscall`, so don't use it for loop counters.
-	alias r14 : i;
-	alias rdx : off;
-	alias r8  : addr;
-	alias rbx : path;
-
-	argc0 = argc;
-	argv0 = argv;
-
-	// Skip argv[0] (program name). If no inputs, just exit(0).
-	i = 1;
-
-	while (i < argc0) {
-		off = i;
-		off <<= 3; // *8 bytes per pointer
-
-		addr = argv0;
-		addr += off;
-		path = ptr64[addr];
-
-		rdi = path;
-		compile_one();
-		i += 1;
-	}
-
-	sys_exit(0);
+		".done:\n"
+		"mov rdi, 0\n"
+		"call sys_exit\n"
+	};
 }

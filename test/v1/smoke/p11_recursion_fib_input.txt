@@ -1,0 +1,13 @@
+// P11: recursion (stack frame / local isolation)
+
+func fib(n) {
+  if (n < 2) {
+    return n;
+  }
+  return fib(n - 1) + fib(n - 2);
+}
+
+func main() {
+  // fib(10) = 55
+  return fib(10);
+}

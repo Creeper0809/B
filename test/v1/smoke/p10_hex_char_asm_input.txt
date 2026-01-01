@@ -1,0 +1,8 @@
+func main() {
+  x = 0x2a;
+  y = 'a';
+  asm {
+    nop
+  }
+  return x + (y - 'a');
+}
