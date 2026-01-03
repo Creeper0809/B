@@ -1,0 +1,10 @@
+// P24: raw asm block
+
+func main() {
+  asm {
+    mov r10, 123
+    ; comment inside raw asm
+    mov r11, r10
+  }
+  return 42;
+}

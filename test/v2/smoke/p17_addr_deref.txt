@@ -1,0 +1,11 @@
+// P17: & / * pointer sugar
+
+func main() {
+  var x = 41;
+  var p = &x;
+
+  *p = 100;
+  var y = *p;
+
+  return y;
+}

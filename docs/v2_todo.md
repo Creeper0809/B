@@ -10,19 +10,19 @@
 
 ## P0 — v2 스캐폴딩 + 회귀 기준선
 
-- [ ] v2 소스 트리 분리
+- [x] v2 소스 트리 분리
   - Depends on: 없음
   - 포함: `src/v2/{core,driver,emit,lex,parse,std}` 디렉토리
 
-- [ ] v2 빌드/스모크 하네스 초안
+- [x] v2 빌드/스모크 하네스 초안
   - Depends on: v2 소스 트리 분리
   - 목표: `src/v2/driver/main.b` 기반으로 드라이버를 빌드하고 입력 1개를 컴파일/실행까지 연결
   - 참고: 초기에는 v1의 `std/core/emit`를 재사용하고(v2 폴더는 driver/parse부터 교체) 점진적으로 분리
 
-- [ ] 회귀 스모크(필수)
+- [x] 회귀 스모크(필수)
   - Depends on: v2 빌드/스모크 하네스 초안
-  - [ ] P11: 재귀 fib(10)=55
-  - [ ] P12: addr/ptr64 swap -> a==20
+  - [x] P11: 재귀 fib(10)=55
+  - [x] P12: addr/ptr64 swap -> a==20
 
 - [ ] 회귀 스모크(권장)
   - Depends on: v2 빌드/스모크 하네스 초안
@@ -32,59 +32,77 @@
 
 ## P0.5 — 컴파일러용 자료구조(지금 당장 v1로 구현)
 
-- [ ] `HashMap` (Slice/문자열 키)
+- [x] `HashMap` (Slice/문자열 키)
   - Depends on: 없음(기존 Vec/Slice 사용)
   - 목표: `new/put/get/has` 최소 API
   - 사용처: P2 스코프 심볼테이블, P5 struct 필드, P7 import 캐시
+  - 구현: `src/library/v1/core/hashmap.b`
+  - smoke: `test/v1/run_smoke_p15.sh`
 
-- [ ] `StringInterner`
+- [x] `StringInterner`
   - Depends on: `HashMap`
   - 목표: `intern(ptr,len)->id`, `id->(ptr,len)`
+  - 구현: `src/library/v1/core/string_interner.b`
+  - smoke: `test/v1/run_smoke_p16.sh`
 
-- [ ] `Arena` bump allocator
+- [x] `Arena` bump allocator
   - Depends on: 없음
   - 목표: AST/타입 노드 등 잦은 할당을 단순화
+  - 구현: `src/library/v1/core/arena.b`
+  - smoke: `test/v1/run_smoke_p17.sh`
 
-- [ ] `StringBuilder` / 동적 버퍼
+- [x] `StringBuilder` / 동적 버퍼
   - Depends on: Vec
   - 목표: label mangling/에러 메시지 등 문자열 합성
+  - 구현: `src/library/v1/core/string_builder.b`
+  - smoke: `test/v1/run_smoke_p18.sh`
 
 ---
 
 ## P1 — ABI 정교화(가변 프레임) + 호출 규약 고정
 
-- [ ] 가변 locals frame size 계산
+- [x] 가변 locals frame size 계산
   - Depends on: P0 회귀 기준선
   - 포함: 로컬 슬롯/배열/임시 spill 포함, 16바이트 정렬
 
-- [ ] call-site 정렬 정책 확정
+- [x] call-site 정렬 정책 확정
   - Depends on: 가변 locals frame size 계산
   - 목표: helper call/함수 call 모두에서 안전한 정렬 보장
 
-- [ ] 6개 초과 인자 전달
+- [x] 6개 초과 인자 전달
   - Depends on: call-site 정렬 정책 확정
   - MVP: caller push + callee [rbp+..] 접근
+
+- [x] 레지스터 정책 명문화(caller-saved/callee-saved) + 코드젠 반영
+  - Depends on: P0 회귀 기준선
+  - 목표:
+    - helper call이 레지스터를 clobber 할 수 있음을 기본 전제로 고정
+    - 문서/주요 코드젠 경로에서 규칙을 일관되게 사용
+
+- [x] (>6 args) 스모크 추가
+  - Depends on: 6개 초과 인자 전달
+  - 목표: 7개 이상 인자 전달 + 재귀/로컬 프레임이 섞여도 정상 동작
 
 ---
 
 ## P2 — 선언/스코프(진짜 로컬) 도입
 
-- [ ] `var x;` 로컬 선언
+- [x] `var x;` 로컬 선언
   - Depends on: P0 회귀 기준선
 
-- [ ] `var x = expr;` 선언+초기화
+- [x] `var x = expr;` 선언+초기화
   - Depends on: `var x;`
 
-- [ ] 독립 블록 문장 `{ stmt* }`
+- [x] 독립 블록 문장 `{ stmt* }`
   - Depends on: P0 회귀 기준선
 
-- [ ] 블록 스코프 push/pop
+- [x] 블록 스코프 push/pop
   - Depends on: 독립 블록 문장
 
-- [ ] 미선언 변수 사용 시 에러
+- [x] 미선언 변수 사용 시 에러
   - Depends on: `var` 도입 + 스코프
 
-- [ ] P13 스모크: 블록 스코프 + shadowing
+- [x] P13 스모크: 블록 스코프 + shadowing
   - Depends on: 블록 스코프 push/pop
 
 - [ ] 전역 초기화(Global Init) 제약 명문화 + 에러 처리
@@ -97,18 +115,18 @@
 
 ## P2.5 — 상수/enum + 타입 힌트/캐스팅 + switch-case
 
-- [ ] top-level `const NAME = expr;`
+- [x] top-level `const NAME = expr;`
   - Depends on: P2(var/스코프) 기반(심볼테이블)
   - MVP: const expr는 정수 리터럴 + 산술/비트 연산부터
 
-- [ ] `enum Name { ... }` (컴파일 타임 상수)
+- [x] `enum Name { ... }` (컴파일 타임 상수)
   - Depends on: top-level const
   - MVP:
     - auto-increment(0..)
     - explicit value(`A=3`) 지원
     - 참조는 `Name.A`(namespaced)만 허용
 
-- [ ] 타입 힌트(선언 기반)
+- [x] 타입 힌트(선언 기반)
   - Depends on: P2(var/스코프)
   - MVP 예시: `var x: u64 = 1;` / `func f(x: u64) {}`
   - 초기엔 “검증/에러메시지” 중심으로 시작 가능
@@ -125,103 +143,125 @@
   - Depends on: 타입 힌트(선언 기반)
   - 옵션 A: `read_file(path) -> Slice` (권장)
 
-- [ ] 명시 캐스팅
+- [x] 명시 캐스팅
   - Depends on: 타입 힌트
   - MVP: u8/u64, sign/zero-extend 정책 확정
 
-- [ ] switch-case
+- [x] switch-case
   - Depends on: P2(독립 블록 문장) + top-level const/enum
   - MVP: if-else lowering + fallthrough 금지
 
-- [ ] P19 스모크: const/enum
+- [x] P19 스모크: const/enum
   - Depends on: `enum`
 
-- [ ] P20 스모크: 타입 힌트/캐스팅
+- [x] P20 스모크: 타입 힌트/캐스팅
   - Depends on: 명시 캐스팅
   - (권장 확장) 선언+초기화에 함수 호출 포함: `var s: Slice = read_file("...");`
 
-- [ ] P21 스모크: switch-case
+- [x] P21 스모크: switch-case
   - Depends on: switch-case
 
 ---
 
 ## P2.6 — for / foreach (루프 문법 확장)
 
-- [ ] `for (init; cond; post) stmt` 도입
+- [x] `for (init; cond; post) stmt` 도입
   - Depends on: P2(var/스코프) + P2(독립 블록 문장)
   - 구현:
     - 파서에서 전용 AST로 받거나, 곧바로 `while` AST로 lowering(선택)
     - `init/cond/post` 비어 있는 경우 정책 확정(예: cond 빈 경우 true)
 
-- [ ] `foreach (x in expr) stmt` 도입
+- [x] `foreach (x in expr) stmt` 도입
   - Depends on: P3(배열 로컬 + 인덱싱) + P2(var/스코프)
   - MVP 대상: `Slice`(ptr/len) 우선, 그 다음 로컬 배열
   - lowering: 인덱스 기반 `while`로 변환
+  - 현재(v2): `Slice*`를 **byte 단위로 순회**하는 MVP만 지원(요소 폭/타입 기반 foreach는 v3 로드맵으로 이관)
 
-- [ ] P22 스모크: `for`/`foreach` 기본 검증
+- [x] P22 스모크: `for`/`foreach` 기본 검증
   - Depends on: `for` + `foreach`
+
+---
+
+## P2.7 — asm 블록 문법 개선(raw multiline)
+
+- [x] `asm { ... }` 내부를 raw 텍스트로 파싱
+  - Depends on: P0 회귀 기준선
+  - MVP:
+    - 기존의 "...\n"; 나열 대신, 블록 내부 라인을 그대로 수집
+    - emitter로 보낼 때 줄 끝에 `\n` 자동 부여(정책 확정)
+    - 중첩 `{}`는 금지(내부 `}`에서 종료)
+
+- [x] P24 스모크: raw asm 블록 실행 검증
+  - Depends on: `asm` raw 텍스트 파싱
 
 ---
 
 ## P3 — 배열 로컬 + 인덱싱
 
-- [ ] `var a[16];` 선언
+- [x] `var a[16];` 선언
   - Depends on: P2(var/스코프)
 
-- [ ] `a[i]` load/store
+- [x] `a[i]` load/store
   - Depends on: 배열 선언
 
-- [ ] P14 스모크: 배열 채우고 합산
+- [x] P14 스모크: 배열 채우고 합산
   - Depends on: `a[i]` load/store
 
 ---
 
 ## P4 — 문자열 리터럴을 값으로 사용
 
-- [ ] `"..."`을 표현식 값으로 허용
+- [x] `"..."`을 표현식 값으로 허용
   - Depends on: P0 회귀 기준선
   - 설계 결정: 결과 타입을 `C-string ptr`로 할지 `(ptr,len)`로 할지
 
-- [ ] `.rodata` emit
+- [x] `.rodata` emit
   - Depends on: 문자열 리터럴 값화
 
-- [ ] P15 스모크: `sys_write`로 문자열 출력
+- [x] P15 스모크: 문자열 리터럴 주소/바이트 접근 검증(예: `ptr8["..."]`)
   - Depends on: `.rodata` emit
 
 ---
 
 ## P5 — struct + 필드 접근(. / ->)
 
-- [ ] `struct Name { ... }` 정의
+- [x] `struct Name { ... }` 정의
   - Depends on: P2(var/스코프)
 
-- [ ] 재귀 구조체 정책 구현(불완전 타입 포인터 / 전방 선언)
+- [x] 재귀 구조체 정책 구현(불완전 타입 포인터)
   - Depends on: `struct` 파서/타입 테이블(기본)
   - 목표:
     - `next: *Node` 같은 incomplete-type pointer 허용
     - `next: Node` 같은 by-value recursion은 에러
-    - 필요하면 `struct Node;` 전방 선언 지원
+    - (현재) 전방 선언 없이도 `*T`는 레이아웃 없이 허용
 
-- [ ] `sizeof/offsetof` 컴파일타임 값 제공
+- [x] `sizeof/offsetof` 컴파일타임 값 제공
   - Depends on: struct 정의
 
-- [ ] `x.field` / `p->field`
+- [x] `x.field` / `p->field`
   - Depends on: offsetof
 
-- [ ] P16 스모크: struct 필드 read/write
+- [x] Non-qword 필드 접근/저장(u8/u16/u32)
   - Depends on: `x.field` / `p->field`
+  - 목표: load는 `movzx`/`mov eax`로 0-확장, store는 byte/word/dword 크기로 정확히 저장
+
+- [x] P16 스모크: struct 필드 read/write
+  - Depends on: `x.field` / `p->field`
+
+- [x] P26 스모크: non-qword struct fields
+  - Depends on: Non-qword 필드 접근/저장(u8/u16/u32)
 
 ---
 
 ## P6 — 포인터 문법 확장
 
-- [ ] `&x` address-of
+- [x] `&x` address-of
   - Depends on: P2(var/스코프)
 
-- [ ] `*p` deref (lvalue 포함)
+- [x] `*p` deref (lvalue 포함)
   - Depends on: `&x`
 
-- [ ] P17 스모크: `&/*` 교차 검증
+- [x] P17 스모크: `&/*` 교차 검증
   - Depends on: `*p`
 
 ---

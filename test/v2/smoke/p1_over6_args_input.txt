@@ -1,0 +1,15 @@
+// P1 (v2): >6 args calling convention (7 args)
+
+func sum7(a, b, c, d, e, f, g) {
+  var t = a + b;
+  t = t + c;
+  t = t + d;
+  t = t + e;
+  t = t + f;
+  t = t + g;
+  return t;
+}
+
+func main() {
+  return sum7(1, 2, 3, 4, 5, 6, 7); // expect 28
+}

@@ -1,0 +1,18 @@
+// P14: local arrays + indexing load/store
+
+func main() {
+	var a[4];
+	var i = 0;
+
+	a[0] = 10;
+	a[1] = 20;
+	a[2] = 30;
+	a[3] = 40;
+
+	var s = 0;
+	while (i < 4) {
+		s = s + a[i];
+		i = i + 1;
+	}
+	return s; // 100
+}

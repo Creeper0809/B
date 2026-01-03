@@ -1,0 +1,13 @@
+// P19: const + enum + dotted access
+
+const X = 1 + 2*3;
+
+enum E {
+  A,
+  B = 10,
+  C,
+};
+
+func main() {
+  return X + E.C;
+}

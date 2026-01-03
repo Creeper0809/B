@@ -1,0 +1,6 @@
+// P15: string literals + .rodata emission
+
+func main() {
+	// Verify string literal is emitted into .rodata and addressable.
+	return ptr8["Hi\n"]; // 'H' = 72
+}

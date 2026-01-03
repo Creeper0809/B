@@ -1,0 +1,46 @@
+const W = 4;
+const H = 4;
+
+func dfs(x, y, grid, vis) {
+
+	if (x >= W) { return 0; }
+	if (y >= H) { return 0; }
+
+	var i = y * W + x;
+	if (ptr64[vis + i * 8] != 0) { return 0; }
+	if (ptr64[grid + i * 8] == 0) { return 0; }
+
+	ptr64[vis + i * 8] = 1;
+
+	var c = 1;
+
+	if (x > 0) { c = c + dfs(x - 1, y, grid, vis); }
+	if (y > 0) { c = c + dfs(x, y - 1, grid, vis); }
+	if (x + 1 < W) { c = c + dfs(x + 1, y, grid, vis); }
+	if (y + 1 < H) { c = c + dfs(x, y + 1, grid, vis); }
+
+	return c;
+}
+
+func main() {
+	var grid[16];
+	var vis[16];
+
+	var g = addr[grid];
+	var v = addr[vis];
+
+	var k = 0;
+	while (k < 16) {
+		ptr64[g + k * 8] = 0;
+		ptr64[v + k * 8] = 0;
+		k = k + 1;
+	}
+
+	// (1,1),(2,1),(1,2),(2,2)
+	ptr64[g + ((1 + 1 * W) * 8)] = 1;
+	ptr64[g + ((2 + 1 * W) * 8)] = 1;
+	ptr64[g + ((1 + 2 * W) * 8)] = 1;
+	ptr64[g + ((2 + 2 * W) * 8)] = 1;
+
+	return dfs(1, 1, g, v);
+}

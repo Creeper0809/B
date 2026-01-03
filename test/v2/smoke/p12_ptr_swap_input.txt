@@ -1,0 +1,30 @@
+// P12 (v2): addr[] + ptr64[] (memory / pointer correctness)
+// v2 semantics: locals must be declared; no implicit locals.
+
+func swap(p1, p2) {
+  var v1;
+  var v2;
+  v1 = ptr64[p1];
+  v2 = ptr64[p2];
+
+  ptr64[p1] = v2;
+  ptr64[p2] = v1;
+  return 0;
+}
+
+func main() {
+  var a;
+  var b;
+  var pa;
+  var pb;
+  a = 10;
+  b = 20;
+
+  pa = addr[a];
+  pb = addr[b];
+
+  swap(pa, pb);
+
+  // a should now be 20
+  return a;
+}

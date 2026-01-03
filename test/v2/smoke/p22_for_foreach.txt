@@ -1,0 +1,26 @@
+func main() {
+	var sum = 0;
+	alias rcx : i = 5;
+
+	for (i = 0; i < 5; i = i + 1) {
+		sum = sum + i;
+	}
+
+	var buf;
+	var sl_len;
+	var sl_ptr;
+	var sl;
+	var x;
+
+	buf = 0x04030201;
+	sl_len = 4;
+	sl_ptr = addr[buf];
+	sl = addr[sl_ptr];
+
+	foreach (x in sl) {
+		sum = sum + x;
+	}
+
+	return sum; // 10 (0..4) + 10 (1+2+3+4) = 20
+}
+ 

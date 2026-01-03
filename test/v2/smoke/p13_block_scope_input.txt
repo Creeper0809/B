@@ -1,0 +1,11 @@
+// P13 (v2): block scope + shadowing
+
+func main() {
+  var x = 1;
+  {
+    var x = 2;
+    // inner x should not affect outer
+    x = x + 40;
+  }
+  return x; // expect 1
+}

@@ -120,7 +120,7 @@ var vars_emitted;
 
 // v1.5 local variables (per-function) for recursion safety
 // Locals are mapped to qword slots at [rbp - offset].
-var locals_emitted;    // Vec of Local* (Local = {name_ptr,name_len,offset})
+var locals_emitted;    // Vec of Local* (Local = {name_ptr,name_len,offset,size,type_ptr,type_len,type_is_ptr})
 var locals_next_off;   // next offset in bytes (u64)
 const LOCALS_FRAME_SIZE = 1024;
 
@@ -131,3 +131,13 @@ var aliases_emitted;   // Vec of Alias* (Alias = {name_ptr,name_len,reg_id})
 // v1.7 constants (per-compilation-unit)
 // Constants map an identifier to an immediate u64 value.
 var consts_emitted;    // Vec of ConstSym* (ConstSym = {kind=SYM_CONST,name_ptr,name_len,value})
+
+// v2 strings: emitted into a final .rodata section by the v2 driver
+var rodata_emitted;    // Vec of RodataStr* (RodataStr = {tok_ptr,tok_len,label_id})
+var rodata_counter;    // next label id (u64)
+
+// v2 structs: compile-time type table
+var structs_emitted;   // Vec of StructDef* (StructDef = {name_ptr,name_len,fields_vec,size,in_progress})
+
+// v2 modules: module search roots (Vec of cstr)
+var v2_module_roots;

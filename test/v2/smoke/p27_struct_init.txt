@@ -1,0 +1,19 @@
+// P27: declaration-only struct aggregate init (brace-init)
+// Validates:
+// - `var s: S = { ... };` desugars into field stores
+// - field order follows struct declaration order
+// - sized fields (u8/u16/u32) store/load correctly
+
+struct S {
+  a: u64;
+  b: u8;
+  c: u16;
+  d: u32;
+  e: u64;
+};
+
+func main() {
+  var s: S = { 1, 2, 3, 4, 5 };
+  // expect 1 + 2 + 3 + 4 + 5 = 15
+  return s.a + s.b + s.c + s.d + (s.e & 255);
+}

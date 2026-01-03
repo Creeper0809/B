@@ -1,0 +1,7 @@
+var g;
+
+func main() {
+  g = 40;
+  g = g + 2;
+  return g;
+}

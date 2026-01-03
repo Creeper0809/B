@@ -1,0 +1,15 @@
+struct Pair {
+  a: u64;
+  b: u64;
+};
+
+func main() {
+  var p: Pair;
+  p.a = 40;
+  p.b = 2;
+
+  var pp: *Pair = &p;
+  pp->a = 100;
+
+  return pp->a + sizeof(Pair) + offsetof(Pair, b);
+}
