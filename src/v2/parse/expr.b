@@ -7,6 +7,15 @@ func die_expr_expected_factor() {
 	die("expr: expected factor");
 }
 
+func die_expr_expected_factor_at(line) {
+	// Convention: rdi=line (from caller)
+	asm {
+		"lea rsi, [rel .s_msg]\n"
+		"call panic_at\n"
+		".s_msg: db 'expr: expected factor', 0\n"
+	};
+}
+
 func die_expr_expected_rparen() {
 	die("expr: expected ')'");
 }
@@ -45,6 +54,15 @@ func die_expr_too_many_args() {
 
 func die_expr_undefined_ident() {
 	die("expr: undefined identifier");
+}
+
+func die_expr_undefined_ident_at(line) {
+	// Convention: rdi=line (from caller)
+	asm {
+		"lea rsi, [rel .s_msg]\n"
+		"call panic_at\n"
+		".s_msg: db 'expr: undefined identifier', 0\n"
+	};
 }
 
 func parser_new(lex) {
@@ -1553,7 +1571,7 @@ func expr_parse_factor_emit(p) {
 	asm {
 		"push r12\n"
 		"push r13\n"
-		"sub rsp, 80\n" // [0]=p [8]=name_ptr [16]=name_len [24]=tmp0 [32]=tmp1 [40]=tmp2 [48]=tmp3
+		"sub rsp, 112\n" // [0]=p [8]=name_ptr [16]=name_len [24]=tmp0 [32]=tmp1 [40]=tmp2 [48]=tmp3 [56]=tmp4 [64]=tmp5 [80]=scan_paren [88]=scan_brack [96]=scan_brace
 		"mov [rsp+0], rdi\n"
 		"mov r12, rdi\n"
 
@@ -1566,7 +1584,8 @@ func expr_parse_factor_emit(p) {
 		"je .ident\n"
 		"cmp rax, 30\n"         // TOK_LPAREN
 		"je .lparen\n"
-		"call die_expr_expected_factor\n"
+		"mov rdi, [r12+32]\n" // line
+		"call die_expr_expected_factor_at\n"
 
 		".int:\n"
 		// value = atoi_u64_or_panic(ptr,len)
@@ -1672,12 +1691,12 @@ func expr_parse_factor_emit(p) {
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"
 		// Consume '.'
-		"mov rax, [r12+8]\n" "cmp rax, 38\n" "je .dc_dot_ok\n" "call die_expr_expected_factor\n"
+		"mov rax, [r12+8]\n" "cmp rax, 38\n" "je .dc_dot_ok\n" "mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".dc_dot_ok:\n"
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"
 		// Second ident
-		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .dc_id2_ok\n" "call die_expr_expected_factor\n"
+		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .dc_id2_ok\n" "mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".dc_id2_ok:\n"
 		"mov r13, [r12+16]\n" // p2
 		"mov rbx, [r12+24]\n" // n2
@@ -1721,7 +1740,7 @@ func expr_parse_factor_emit(p) {
 		// base local must be typed as struct (non-pointer).
 		"mov rdi, [rsp+8]\n" "mov rsi, [rsp+16]\n" "call locals_get_entry\n" // rax=Local*
 		"test rdx, rdx\n" "jnz .sf_have_local\n"
-		"call die_expr_undefined_ident\n"
+		"mov rdi, [r12+32]\n" "call die_expr_undefined_ident_at\n"
 		".sf_have_local:\n"
 		"mov [rsp+24], rax\n" // tmp0 = Local*
 		"mov r15, rax\n"
@@ -1789,12 +1808,12 @@ func expr_parse_factor_emit(p) {
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"
 		// Consume '->'
-		"mov rax, [r12+8]\n" "cmp rax, 72\n" "je .ar_ok\n" "call die_expr_expected_factor\n"
+		"mov rax, [r12+8]\n" "cmp rax, 72\n" "je .ar_ok\n" "mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".ar_ok:\n"
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"
 		// Field ident
-		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .ar_f_ok\n" "call die_expr_expected_factor\n"
+		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .ar_f_ok\n" "mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".ar_f_ok:\n"
 		"mov r13, [r12+16]\n" // field_ptr
 		"mov rbx, [r12+24]\n" // field_len
@@ -1802,7 +1821,7 @@ func expr_parse_factor_emit(p) {
 		"mov r12, [rsp+0]\n"
 		// base local must be typed as *struct
 		"mov rdi, [rsp+8]\n" "mov rsi, [rsp+16]\n" "call locals_get_entry\n" // rax=Local*
-		"test rdx, rdx\n" "jnz .ar_have_local\n" "call die_expr_undefined_ident\n"
+		"test rdx, rdx\n" "jnz .ar_have_local\n" "mov rdi, [r12+32]\n" "call die_expr_undefined_ident_at\n"
 		".ar_have_local:\n"
 		"mov r15, rax\n"
 		"mov rax, [r15+32]\n" "test rax, rax\n" "jnz .ar_has_type\n" "call die_struct_field_access_needs_type\n"
@@ -1860,7 +1879,7 @@ func expr_parse_factor_emit(p) {
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"
 		// type ident
-		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .cast_ty_ok\n" "call die_expr_expected_factor\n"
+		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .cast_ty_ok\n" "mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".cast_ty_ok:\n"
 		"mov rax, [r12+16]\n" "mov [rsp+24], rax\n" // ty_ptr
 		"mov rax, [r12+24]\n" "mov [rsp+32], rax\n" // ty_len
@@ -1897,7 +1916,7 @@ func expr_parse_factor_emit(p) {
 		"mov rdi, [rsp+24]\n" "mov rsi, [rsp+32]\n"
 		"lea rdx, [rel .s_i64]\n" "mov rcx, 3\n" "call slice_eq_parts\n"
 		"test rax, rax\n" "jnz .cast_u64\n" // treat i64 as no-op for now
-		"call die_expr_expected_factor\n" // unknown type
+		"mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n" // unknown type
 		".cast_u8:\n"
 		"lea rdi, [rel .s_and_u8]\n" "call emit_cstr\n" "jmp .cast_push\n"
 		".cast_u16:\n"
@@ -1928,7 +1947,7 @@ func expr_parse_factor_emit(p) {
 		"mov r12, [rsp+0]\n"
 		".sz_no_star:\n"
 		// type ident
-		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .sz_ty_ok\n" "call die_expr_expected_factor\n"
+		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .sz_ty_ok\n" "mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".sz_ty_ok:\n"
 		"mov rax, [r12+16]\n" "mov [rsp+24], rax\n" // ty_ptr
 		"mov rax, [r12+24]\n" "mov [rsp+32], rax\n" // ty_len
@@ -1975,7 +1994,7 @@ func expr_parse_factor_emit(p) {
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"
 		// type ident
-		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .of_ty_ok\n" "call die_expr_expected_factor\n"
+		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .of_ty_ok\n" "mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".of_ty_ok:\n"
 		"mov rax, [r12+16]\n" "mov [rsp+24], rax\n" // ty_ptr
 		"mov rax, [r12+24]\n" "mov [rsp+32], rax\n" // ty_len
@@ -1987,7 +2006,7 @@ func expr_parse_factor_emit(p) {
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"
 		// field ident
-		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .of_f_ok\n" "call die_expr_expected_factor\n"
+		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .of_f_ok\n" "mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".of_f_ok:\n"
 		"mov rdx, [r12+16]\n" "mov rcx, [r12+24]\n"
 		"mov rdi, [rsp+24]\n" "mov rsi, [rsp+32]\n" "call structs_get_field\n"
@@ -2030,14 +2049,14 @@ func expr_parse_factor_emit(p) {
 		"mov rax, [r12+8]\n"
 		"cmp rax, 1\n" // TOK_IDENT
 		"je .addr_id_ok\n"
-		"call die_expr_expected_factor\n"
+		"mov rdi, [r12+32]\n" "call die_expr_expected_factor_at\n"
 		".addr_id_ok:\n"
 		"mov rdi, [r12+16]\n" // name_ptr
 		"mov rsi, [r12+24]\n" // name_len
 		"call locals_get\n" // rax=off, rdx=found
 		"test rdx, rdx\n"
 		"jnz .addr_found\n"
-		"call die_expr_undefined_ident\n"
+		"mov rdi, [r12+32]\n" "call die_expr_undefined_ident_at\n"
 		".addr_found:\n"
 		"mov r13, rax\n" // off
 		// emit: lea rax, [rbp-<off>] ; push rax
@@ -2113,7 +2132,7 @@ func expr_parse_factor_emit(p) {
 		"call locals_get\n"     // rax=off, rdx=found
 		"test rdx, rdx\n"
 		"jnz .arr_off_ok\n"
-		"call die_expr_undefined_ident\n"
+		"mov rdi, [r12+32]\n" "call die_expr_undefined_ident_at\n"
 		".arr_off_ok:\n"
 		"mov r13, rax\n" // off
 		// emit load: pop r10; lea r11,[rbp-off]; lea r11,[r11+r10*8]; mov rax,[r11]; push rax
@@ -2269,9 +2288,9 @@ func expr_parse_factor_emit(p) {
 		"mov r12, [rsp+0]\n"
 
 		// --- scan args to collect start positions, then replay in reverse order ---
-		// save emit_len so scan output can be discarded
-		"mov rax, [rel emit_len]\n"
-		"mov [rsp+40], rax\n"
+		// IMPORTANT: do not emit+rollback via emit_len here.
+		// The emitter may flush to the output fd for large functions; restoring
+		// emit_len cannot undo already-written bytes and can cause duplicated output.
 
 		// arg_starts = vec_new(8)
 		"mov rdi, 8\n"
@@ -2299,10 +2318,53 @@ func expr_parse_factor_emit(p) {
 		"call vec_push\n"
 		"mov r12, [rsp+0]\n"
 
-		// parse one arg expr (scan)
-		"mov rdi, r12\n"
-		"call expr_parse_bor_emit\n"
+		// scan one arg without emitting: advance tokens until ',' or ')' at depth 0
+		"mov qword [rsp+80], 0\n" // paren_depth
+		"mov qword [rsp+88], 0\n" // brack_depth
+		"mov qword [rsp+96], 0\n" // brace_depth
+		".call_scan_arg:\n"
 		"mov r12, [rsp+0]\n"
+		"mov rax, [r12+8]\n" // tok kind
+		// EOF here would otherwise spin forever (lexer_next keeps returning TOK_EOF)
+		"test rax, rax\n"      // TOK_EOF
+		"jnz .call_scan_not_eof\n"
+		"call die_expr_expected_rparen_call_scan\n"
+		".call_scan_not_eof:\n"
+		// update nesting depth counters and/or decide stop conditions
+		"cmp rax, 30\n" "jne .call_scan_chk_rp\n" // '('
+		"mov rdx, [rsp+80]\n" "inc rdx\n" "mov [rsp+80], rdx\n" "jmp .call_scan_adv\n"
+		".call_scan_chk_rp:\n"
+		"cmp rax, 31\n" "jne .call_scan_chk_lbr\n" // ')'
+		"mov rdx, [rsp+80]\n" "test rdx, rdx\n" "jz .call_scan_rp_top\n" "dec rdx\n" "mov [rsp+80], rdx\n" "jmp .call_scan_adv\n"
+		".call_scan_rp_top:\n"
+		// top-level ')': only stop if other depths are also zero
+		"mov rdx, [rsp+88]\n" "test rdx, rdx\n" "jnz .call_scan_adv\n"
+		"mov rdx, [rsp+96]\n" "test rdx, rdx\n" "jnz .call_scan_adv\n"
+		"jmp .call_scan_arg_done\n"
+		".call_scan_chk_lbr:\n"
+		"cmp rax, 34\n" "jne .call_scan_chk_rbr\n" // '['
+		"mov rdx, [rsp+88]\n" "inc rdx\n" "mov [rsp+88], rdx\n" "jmp .call_scan_adv\n"
+		".call_scan_chk_rbr:\n"
+		"cmp rax, 35\n" "jne .call_scan_chk_lbc\n" // ']'
+		"mov rdx, [rsp+88]\n" "test rdx, rdx\n" "jz .call_scan_adv\n" "dec rdx\n" "mov [rsp+88], rdx\n" "jmp .call_scan_adv\n"
+		".call_scan_chk_lbc:\n"
+		"cmp rax, 32\n" "jne .call_scan_chk_rbc\n" // '{'
+		"mov rdx, [rsp+96]\n" "inc rdx\n" "mov [rsp+96], rdx\n" "jmp .call_scan_adv\n"
+		".call_scan_chk_rbc:\n"
+		"cmp rax, 33\n" "jne .call_scan_chk_comma\n" // '}'
+		"mov rdx, [rsp+96]\n" "test rdx, rdx\n" "jz .call_scan_adv\n" "dec rdx\n" "mov [rsp+96], rdx\n" "jmp .call_scan_adv\n"
+		".call_scan_chk_comma:\n"
+		// stop at ',' at top-level
+		"cmp rax, 37\n" "jne .call_scan_adv\n" // TOK_COMMA
+		"mov rdx, [rsp+80]\n" "test rdx, rdx\n" "jnz .call_scan_adv\n"
+		"mov rdx, [rsp+88]\n" "test rdx, rdx\n" "jnz .call_scan_adv\n"
+		"mov rdx, [rsp+96]\n" "test rdx, rdx\n" "jnz .call_scan_adv\n"
+		"jmp .call_scan_arg_done\n"
+		".call_scan_adv:\n"
+		"mov rdi, r12\n" "call parser_next\n"
+		"jmp .call_scan_arg\n"
+
+		".call_scan_arg_done:\n"
 
 		// if ',' then consume and continue
 		"mov rax, [r12+8]\n"
@@ -2326,10 +2388,6 @@ func expr_parse_factor_emit(p) {
 		"mov [rsp+32], rax\n"  // after_rp_cur
 		"mov rax, [rbx+16]\n"  // line
 		"mov [rsp+48], rax\n"  // after_rp_line
-
-		// discard scan emissions
-		"mov rax, [rsp+40]\n"
-		"mov [rel emit_len], rax\n"
 
 		// argc = vec_len(arg_starts)
 		"mov rdi, [rsp+24]\n"
@@ -2618,7 +2676,8 @@ func expr_parse_unary_emit(p) {
 		"mov rax, [r12+8]\n"
 		"cmp rax, 1\n"            // TOK_IDENT
 		"je .uaddr_id_ok\n"
-		"call die_expr_expected_factor\n"
+		"mov rdi, [r12+32]\n" // line
+		"call die_expr_expected_factor_at\n"
 		".uaddr_id_ok:\n"
 		// locals_get_entry(name_ptr,name_len)
 		"mov rdi, [r12+16]\n"

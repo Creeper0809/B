@@ -128,6 +128,15 @@ func die_struct_expected_ident() {
 	die("struct: expected identifier");
 }
 
+func die_struct_expected_ident_at(line) {
+	// Convention: rdi=line (from caller). Use asm-local cstr.
+	asm {
+		"lea rsi, [rel .s_msg]\n"
+		"call panic_at\n"
+		".s_msg: db 'struct: expected identifier', 0\n"
+	};
+}
+
 func die_struct_expected_lbrace() {
 	die("struct: expected '{'");
 }
@@ -168,7 +177,7 @@ func parse_struct_decl(p) {
 		"mov r12, [rsp+0]\n"
 
 		// struct name
-		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .name_ok\n" "call die_struct_expected_ident\n"
+		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .name_ok\n" "mov rdi, [r12+32]\n" "call die_struct_expected_ident_at\n"
 		".name_ok:\n"
 		"mov rax, [r12+16]\n" "mov [rsp+8], rax\n"
 		"mov rax, [r12+24]\n" "mov [rsp+16], rax\n"
@@ -191,7 +200,7 @@ func parse_struct_decl(p) {
 		"mov rax, [r12+8]\n"
 		"cmp rax, 33\n" "je .done_fields\n" // '}'
 		// field ident
-		"cmp rax, 1\n" "je .fid_ok\n" "call die_struct_expected_ident\n"
+		"cmp rax, 1\n" "je .fid_ok\n" "mov rdi, [r12+32]\n" "call die_struct_expected_ident_at\n"
 		".fid_ok:\n"
 		"mov rax, [r12+16]\n" "mov [rsp+64], rax\n" // field_ptr
 		"mov rax, [r12+24]\n" "mov [rsp+72], rax\n" // field_len
@@ -211,7 +220,7 @@ func parse_struct_decl(p) {
 		"mov rdi, r12\n" "call parser_next\n" // consume '*'
 		"mov r12, [rsp+0]\n"
 		".type_no_star:\n"
-		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .tid_ok\n" "call die_struct_expected_ident\n"
+		"mov rax, [r12+8]\n" "cmp rax, 1\n" "je .tid_ok\n" "mov rdi, [r12+32]\n" "call die_struct_expected_ident_at\n"
 		".tid_ok:\n"
 		"mov rax, [r12+16]\n" "mov [rsp+40], rax\n"
 		"mov rax, [r12+24]\n" "mov [rsp+48], rax\n"
@@ -766,6 +775,69 @@ func slice_from_parts(ptr, len) {
 	};
 }
 
+func func_mark_emitted_or_dup(name_ptr, name_len) {
+	// Track emitted function names globally.
+	// Convention: rdi=name_ptr, rsi=name_len
+	// Returns: rax=1 if already emitted, else 0 (and records it)
+	asm {
+		"push rbx\n"
+		"push r12\n"
+		"push r13\n"
+		"push r14\n"
+		"sub rsp, 32\n" // [0]=name_ptr [8]=name_len [16]=i [24]=n
+		"mov [rsp+0], rdi\n"
+		"mov [rsp+8], rsi\n"
+
+		// n = vec_len(funcs_emitted)
+		"mov rdi, [rel funcs_emitted]\n"
+		"call vec_len\n"
+		"mov [rsp+24], rax\n"
+		"xor ebx, ebx\n" // i=0
+		".loop:\n"
+		"mov rax, [rsp+24]\n"
+		"cmp rbx, rax\n"
+		"jae .not_found\n"
+		// sl = vec_get(funcs_emitted, i)
+		"mov rdi, [rel funcs_emitted]\n"
+		"mov rsi, rbx\n"
+		"call vec_get\n" // rax=Slice*
+		"mov r12, rax\n"
+		"mov rdi, r12\n"
+		"call slice_parts\n" // rax=ptr, rdx=len
+		// compare to (name_ptr,name_len)
+		"mov rdi, rax\n"           // p1
+		"mov rsi, rdx\n"           // n1
+		"mov rdx, [rsp+0]\n"      // p2
+		"mov rcx, [rsp+8]\n"      // n2
+		"call slice_eq_parts\n"    // rax=1/0
+		"cmp rax, 1\n"
+		"je .dup\n"
+		"inc rbx\n"
+		"jmp .loop\n"
+
+		".dup:\n"
+		"mov rax, 1\n"
+		"jmp .done\n"
+
+		".not_found:\n"
+		// push new Slice(name_ptr,name_len)
+		"mov rdi, [rsp+0]\n"
+		"mov rsi, [rsp+8]\n"
+		"call slice_from_parts\n" // rax=Slice*
+		"mov rdi, [rel funcs_emitted]\n"
+		"mov rsi, rax\n"
+		"call vec_push\n"
+		"xor eax, eax\n"
+
+		".done:\n"
+		"add rsp, 32\n"
+		"pop r14\n"
+		"pop r13\n"
+		"pop r12\n"
+		"pop rbx\n"
+	};
+}
+
 func ret_label_from_func_name(name_ptr, name_len) {
 	// Build Slice* for "RET_<name>".
 	// Convention: rdi=name_ptr, rsi=name_len
@@ -1041,77 +1113,70 @@ func parse_program_emit_funcs(p) {
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"
 
-		// save current emit_len so scan output can be discarded
-		"mov rax, [rel emit_len]\n"
-		"mov [rsp+104], rax\n"
-
 		// ret label Slice*
 		"mov rdi, [rsp+8]\n"
 		"mov rsi, [rsp+16]\n"
 		"call ret_label_from_func_name\n"
 		"mov [rsp+32], rax\n"
 
-		// --- P1/P2: compute per-function frame size via a scan pass ---
-		// Save body-start lexer state (ptr, line) for replay.
-		"mov r13, [r12+0]\n"   // lex*
-		"mov r14, [r12+16]\n"  // tok_ptr (start)
-		"mov r15, [r12+32]\n"  // tok_line
-		// stash at [rsp+88]=body_ptr, [rsp+96]=body_line
-		"mov [rsp+88], r14\n"
-		"mov [rsp+96], r15\n"
+		// Fixed per-function frame size (avoid scan+replay emitter discard, which
+		// breaks once emit_str flushes to the output fd for large functions).
+		"mov qword [rsp+80], 1024\n" // LOCALS_FRAME_SIZE (already 16B aligned)
 
-		// reset locals/aliases for scan
+		// If this function name was already emitted, skip emitting it.
+		// Consume the body with a simple brace-depth walk (no emits).
+		"mov rdi, [rsp+8]\n"  // name_ptr
+		"mov rsi, [rsp+16]\n" // name_len
+		"call func_mark_emitted_or_dup\n" // rax=1 if dup
+		"test rax, rax\n"
+		"jz .do_emit\n"
+		"mov qword [rsp+104], 1\n" // depth=1
+		".skip_body:\n"
+		"mov r12, [rsp+0]\n"
+		"mov rax, [r12+8]\n" // tok kind
+		"cmp rax, 32\n" // TOK_LBRACE
+		"jne .skip_chk_rb\n"
+		"inc qword [rsp+104]\n"
+		"jmp .skip_adv\n"
+		".skip_chk_rb:\n"
+		"cmp rax, 33\n" // TOK_RBRACE
+		"jne .skip_adv\n"
+		"dec qword [rsp+104]\n"
+		"cmp qword [rsp+104], 0\n"
+		"je .skip_done\n"
+		".skip_adv:\n"
+		"mov rdi, r12\n" "call parser_next\n"
+		"jmp .skip_body\n"
+		".skip_done:\n"
+		// consume final '}'
+		"mov rdi, r12\n" "call parser_next\n"
+		"mov r12, [rsp+0]\n"
+		// optional ';'
+		"mov rax, [r12+8]\n"
+		"cmp rax, 36\n" // TOK_SEMI
+		"jne .top_loop\n"
+		"mov rdi, r12\n" "call parser_next\n"
+		"jmp .top_loop\n"
+
+		".do_emit:\n"
+
+		// reset locals/aliases for real emit pass
 		"call locals_reset\n"
 		"call aliases_reset\n"
 
-		// allocate arg locals (no emits)
+		// allocate arg locals
 		"mov rdi, [rsp+40]\n" "call vec_len\n"
 		"mov r14, rax\n" // argc
 		"xor ebx, ebx\n" // i
-		".arg_scan_loop:\n"
-		"cmp rbx, r14\n" "jae .arg_scan_done\n"
+		".arg_alloc_loop:\n"
+		"cmp rbx, r14\n" "jae .arg_alloc_done\n"
 		"mov rdi, [rsp+40]\n" "mov rsi, rbx\n" "call vec_get\n" // ArgName*
 		"mov r13, rax\n"
 		"mov rdi, [r13+0]\n" "mov rsi, [r13+8]\n"
 		"call locals_get_or_alloc\n"
 		"inc rbx\n"
-		"jmp .arg_scan_loop\n"
-		".arg_scan_done:\n"
-
-		// scan stmt list until '}'
-		"mov rdi, 8\n" "call vec_new\n" "mov [rsp+48], rax\n" // loop_starts
-		"mov rdi, 8\n" "call vec_new\n" "mov [rsp+56], rax\n" // loop_ends
-		"mov rdi, r12\n"
-		"mov rsi, [rsp+48]\n"
-		"mov rdx, [rsp+56]\n"
-		"mov rcx, [rsp+32]\n" // ret_target
-		"mov r8, 33\n" // TOK_RBRACE
-		"call stmt_parse_list\n"
-		"mov r12, [rsp+0]\n"
-
-		// frame_size = align16(locals_next_off)
-		"mov rax, [rel locals_next_off]\n"
-		"add rax, 15\n"
-		"and rax, -16\n"
-		"mov [rsp+80], rax\n" // frame_size
-
-		// discard any scan emissions
-		"mov rax, [rsp+104]\n"
-		"mov [rel emit_len], rax\n"
-
-		// replay body: restore lexer cur/line to body start, then parser_next
-		"mov r13, [r12+0]\n"   // lex*
-		"mov rax, [rsp+88]\n"  // body_ptr
-		"mov [r13+0], rax\n"
-		"mov rax, [rsp+96]\n"  // body_line
-		"mov [r13+16], rax\n"
-		"mov rdi, r12\n"
-		"call parser_next\n"
-		"mov r12, [rsp+0]\n"
-
-		// reset locals/aliases for real emit pass
-		"call locals_reset\n"
-		"call aliases_reset\n"
+		"jmp .arg_alloc_loop\n"
+		".arg_alloc_done:\n"
 
 		// emit function label
 		"mov rdi, [rsp+24]\n"

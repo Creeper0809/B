@@ -27,6 +27,8 @@ func memset(dst, byte, n) {
 		"jz .memset_done\n"
 		// al = byte (stosb uses AL)
 		"mov al, sil\n"
+		// Ensure forward direction for rep stosb.
+		"cld\n"
 		"rep stosb\n"
 		".memset_done:\n"
 		"mov rax, r8\n"
@@ -103,7 +105,7 @@ func atoi_u64_slice(s) {
 	// - rax = value (undefined if ok=0)
 	// - rdx = ok (1 on success, 0 on failure)
 	//
-	// Note: avoid basm(Stage1) high-level `if (...) {}` / `while (...) {}` statements here.
+	// Note: avoid basm(Stage1) high-level if/while statements here.
 	// Stage1 emits globally-numbered labels for those, which can collide across functions.
 	// Use asm-local labels (e.g. `.loop:`) and jumps instead.
 
@@ -158,7 +160,7 @@ func atoi_u64(p, n) {
 	// - rax = value (undefined if ok=0)
 	// - rdx = ok (1 on success, 0 on failure)
 	//
-	// Note: avoid basm(Stage1) high-level `if (...) {}` / `while (...) {}` statements here.
+	// Note: avoid basm(Stage1) high-level if/while statements here.
 	// Stage1 emits globally-numbered labels for those, which can collide across functions.
 	// Use asm-local labels (e.g. `.loop:`) and jumps instead.
 

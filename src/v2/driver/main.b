@@ -15,6 +15,7 @@ func die_import_not_found() {
 	die("import: module not found");
 }
 
+
 func cstr_len(s) {
 	// Convention: rdi = cstr
 	// Returns: rax = length (excluding NUL)
@@ -26,6 +27,29 @@ func cstr_len(s) {
 		"jz .done\n"
 		"inc rax\n"
 		"jmp .loop\n"
+		".done:\n"
+	};
+}
+
+func cstr_eq(a, b) {
+	// Convention: rdi=a, rsi=b
+	// Returns: rax=1 if equal, else 0
+	asm {
+		"xor ecx, ecx\n" // i=0
+		".loop:\n"
+		"mov al, byte [rdi+rcx]\n"
+		"mov dl, byte [rsi+rcx]\n"
+		"cmp al, dl\n"
+		"jne .no\n"
+		"test al, al\n"
+		"jz .yes\n"
+		"inc rcx\n"
+		"jmp .loop\n"
+		".yes:\n"
+		"mov eax, 1\n"
+		"jmp .done\n"
+		".no:\n"
+		"xor eax, eax\n"
 		".done:\n"
 	};
 }
@@ -261,21 +285,20 @@ func resolve_import_to_file(dir_cstr, rel_cstr) {
 		"mov rdi, [rsp+16]\n"
 		"call vec_len\n"
 		"mov [rsp+32], rax\n"
-		"xor ebx, ebx\n" // i=0
+		"mov qword [rsp+24], 0\n" // i=0 (do not keep in regs across calls)
 		".loop:\n"
-		"mov rax, [rsp+32]\n"
-		"cmp rbx, rax\n"
+		"mov rax, [rsp+24]\n"
+		"cmp rax, [rsp+32]\n"
 		"jae .not_found\n"
 		"mov rdi, [rsp+16]\n"
-		"mov rsi, rbx\n"
+		"mov rsi, [rsp+24]\n"
 		"call vec_get\n" // rax=root cstr
-		"mov r13, rax\n"
-		"mov rdi, r13\n"
+		"mov rdi, rax\n"
 		"mov rsi, [rsp+8]\n"
 		"call try_resolve_in_root\n"
 		"test rdx, rdx\n"
 		"jnz .ok\n"
-		"inc rbx\n"
+		"inc qword [rsp+24]\n"
 		"jmp .loop\n"
 		".not_found:\n"
 		"call die_import_not_found\n"
@@ -297,37 +320,38 @@ func module_cache_find(cache, path) {
 		"push r12\n"
 		"push r13\n"
 		"push r14\n"
-		"sub rsp, 24\n" // [0]=cache [8]=path [16]=n
+		"sub rsp, 40\n" // [0]=cache [8]=path [16]=n [24]=i [32]=entry
 		"mov [rsp+0], rdi\n"
 		"mov [rsp+8], rsi\n"
 		"mov rdi, [rsp+0]\n"
 		"call vec_len\n"
 		"mov [rsp+16], rax\n"
-		"xor ebx, ebx\n" // i=0
+		"mov qword [rsp+24], 0\n" // i=0 (do not keep in regs across calls)
 		".loop:\n"
-		"mov rax, [rsp+16]\n"
-		"cmp rbx, rax\n"
+		"mov rax, [rsp+24]\n"
+		"cmp rax, [rsp+16]\n"
 		"jae .not_found\n"
 		"mov rdi, [rsp+0]\n"
-		"mov rsi, rbx\n"
+		"mov rsi, [rsp+24]\n"
 		"call vec_get\n" // rax=entry*
-		"mov r12, rax\n"
-		"mov rdi, [r12+0]\n" // entry->path
+		"mov [rsp+32], rax\n"
+		"mov rax, [rsp+32]\n"
+		"mov rdi, [rax+0]\n" // entry->path
 		"mov rsi, [rsp+8]\n" // path
-		"call streq\n" // rax=1 if eq
+		"call cstr_eq\n" // rax=1 if eq
 		"cmp rax, 1\n"
 		"je .found\n"
-		"inc rbx\n"
+		"inc qword [rsp+24]\n"
 		"jmp .loop\n"
 		".found:\n"
-		"mov rax, r12\n"
+		"mov rax, [rsp+32]\n"
 		"mov edx, 1\n"
 		"jmp .done\n"
 		".not_found:\n"
 		"xor eax, eax\n"
 		"xor edx, edx\n"
 		".done:\n"
-		"add rsp, 24\n"
+		"add rsp, 40\n"
 		"pop r14\n"
 		"pop r13\n"
 		"pop r12\n"
@@ -370,7 +394,8 @@ func parse_imports_resolve_paths(p, out_vec) {
 		"push r13\n"
 		"push r14\n"
 		"push r15\n"
-		"sub rsp, 40\n" // [0]=p [8]=out [16]=path_ptr [24]=path_len [32]=tok_len
+		// Keep stack 16-byte aligned for nested calls (SysV ABI).
+		"sub rsp, 48\n" // [0]=p [8]=out [16]=path_ptr [24]=path_len [32]=tok_len [40]=pad
 		"mov [rsp+0], rdi\n"
 		"mov [rsp+8], rsi\n"
 		".loop:\n"
@@ -428,7 +453,7 @@ func parse_imports_resolve_paths(p, out_vec) {
 		"mov rdi, [rsp+8]\n" "mov rsi, [rsp+16]\n" "call vec_push\n"
 		"jmp .loop\n"
 		".done:\n"
-		"add rsp, 40\n"
+		"add rsp, 48\n"
 		"pop r15\n"
 		"pop r14\n"
 		"pop r13\n"
@@ -457,6 +482,10 @@ func compile_module_source(path) {
 	var lex;
 	var p;
 	ptr64[path0] = rdi;
+
+	print_str("[v2] compile_module_source: ");
+	print_str(ptr64[path0]);
+	print_str("\n");
 
 	rdi = ptr64[path0];
 	read_file(rdi);
@@ -516,6 +545,17 @@ func compile_module_recursive(cache_vec, path) {
 		"jmp .done\n"
 
 		".do_visit:\n"
+		// Optional trace: print each module as it is first visited.
+		"mov rax, [rel v2_trace_imports]\n"
+		"test rax, rax\n"
+		"jz .no_trace\n"
+		"lea rdi, [rel .s_trace]\n"
+		"call print_str\n"
+		"mov rdi, [rsp+8]\n"
+		"call print_str\n"
+		"lea rdi, [rel .s_nl]\n"
+		"call print_str\n"
+		".no_trace:\n"
 		// mark visiting
 		"mov qword [r12+8], 1\n"
 
@@ -541,8 +581,9 @@ func compile_module_recursive(cache_vec, path) {
 		"call parser_new\n"
 		"mov [rsp+88], rax\n"
 
-		// imports = vec_new(4)
-		"mov rdi, 4\n"
+		// imports = vec_new(128)
+		// Large enough to avoid Vec growth while scanning leading imports.
+		"mov rdi, 128\n"
 		"call vec_new\n"
 		"mov [rsp+32], rax\n"
 
@@ -555,30 +596,32 @@ func compile_module_recursive(cache_vec, path) {
 		"mov rdi, [rsp+32]\n"
 		"call vec_len\n"
 		"mov [rsp+48], rax\n"
-		"xor ebx, ebx\n" // i=0
+		"mov qword [rsp+40], 0\n" // i=0 (do not keep in regs across calls)
 		".imp_loop:\n"
-		"mov rax, [rsp+48]\n"
-		"cmp rbx, rax\n"
+		"mov rax, [rsp+40]\n"
+		"cmp rax, [rsp+48]\n"
 		"jae .after_imps\n"
 		"mov rdi, [rsp+32]\n"
-		"mov rsi, rbx\n"
+		"mov rsi, [rsp+40]\n"
 		"call vec_get\n" // rax=imp_path cstr
-		"mov r15, rax\n" // relpath
+		"mov [rsp+56], rax\n" // relpath (spill across calls)
 		// resolved = resolve_import_to_file(dir, rel)
 		"mov rdi, [rsp+24]\n"
-		"mov rsi, r15\n"
+		"mov rsi, [rsp+56]\n"
 		"call resolve_import_to_file\n" // rax=resolved cstr
-		"mov r15, rax\n"
+		"mov [rsp+56], rax\n" // resolved (spill across calls)
 		"mov rdi, [rsp+0]\n" // cache
-		"mov rsi, r15\n"
+		"mov rsi, [rsp+56]\n"
 		"call compile_module_recursive\n"
-		"inc rbx\n"
+		"inc qword [rsp+40]\n"
 		"jmp .imp_loop\n"
 		".after_imps:\n"
 
-		// emit this module
-		"mov rdi, [rsp+8]\n"
-		"call compile_module_source\n"
+		// Emit this module using the already-read source and the current parser.
+		// parse_imports_resolve_paths() has consumed leading imports, so we can
+		// continue from the current token and avoid re-reading the file (saves heap).
+		"mov rdi, [rsp+88]\n" // Parser*
+		"call parse_program_emit_funcs\n"
 
 		// mark done
 		"mov r12, [rsp+16]\n"
@@ -591,6 +634,10 @@ func compile_module_recursive(cache_vec, path) {
 		"pop r13\n"
 		"pop r12\n"
 		"pop rbx\n"
+		"jmp near .exit\n"
+		".s_trace: db '[v2] mod ', 0\n"
+		".s_nl: db 10, 0\n"
+		".exit:\n"
 	};
 }
 
@@ -600,25 +647,45 @@ func compile_entry(path_cstr) {
 	var cache;
 	ptr64[path0] = rdi;
 
+	// Safety: ensure DF=0 for rep string builtins (memcpy/strlen/streq).
+	// If DF is ever left set, cache lookups and path building can break and
+	// lead to duplicate module/function emission.
+	asm { "cld\n" };
+
 	// Reset codegen globals per compilation.
 	asm { "mov qword [rel label_counter], 0\n" };
-	vec_new(8);
+	// Avoid Vec growth during large builds (can break dedup state).
+	vec_new(1024);
 	ptr64[vars_emitted] = rax;
+	// Hosted-v3 pulls in many functions; keep this comfortably above that.
+	vec_new(8192);
+	ptr64[funcs_emitted] = rax;
 	asm { "call consts_reset\n" };
 	asm { "call structs_reset\n" };
 	asm { "call rodata_reset\n" };
 
-	// Emit output prelude once.
+	// Emit output prelude once (streaming to avoid Stage1 heap OOM).
 	emit_init();
+	emit_open("build/v2_out.asm");
 	emit_cstr("global _start\n");
 	emit_cstr("section .text\n");
 	emit_cstr("_start:\n");
+	// Pass argc/argv to main via SysV ABI registers.
+	// Linux process entry stack: [rsp]=argc, [rsp+8]=argv[0], ...
+	emit_cstr("  mov rdi, [rsp]\n");
+	emit_cstr("  lea rsi, [rsp+8]\n");
 	emit_cstr("  call main\n");
 	emit_cstr("  mov rdi, rax\n");
 	emit_cstr("  mov rax, 60\n");
 	emit_cstr("  syscall\n");
 
-	vec_new(8);
+	// NOTE: avoid triggering Vec growth during compilation.
+	// Stage1 builds are sensitive to allocator/ABI edge cases; if vec_push grows
+	// while compiling large programs, it can corrupt the module cache and cause
+	// duplicate compilation/emission.
+	// This is a small, bounded allocation (u64 ptrs) and keeps compilation stable.
+	// P4 hosted-v3 pulls in a lot of modules; keep this comfortably above that.
+	vec_new(4096);
 	ptr64[cache] = rax;
 
 	rdi = ptr64[cache];
@@ -628,8 +695,8 @@ func compile_entry(path_cstr) {
 	// Emit .rodata for string literals (if any).
 	asm { "call rodata_emit_all\n" };
 
-	// Write output.
-	emit_to_file("build/v2_out.asm");
+	// Flush output and close.
+	emit_close();
 }
 
 func main() {
@@ -659,7 +726,7 @@ func main() {
 		"mov rax, [r8]\n"     // arg ptr
 		"mov [rsp+32], rax\n"
 		// if arg == "-I" then consume next as root
-		"mov rdi, [rsp+32]\n" "lea rsi, [rel .s_opt_I]\n" "call streq\n"
+		"mov rdi, [rsp+32]\n" "lea rsi, [rel .s_opt_I]\n" "call cstr_eq\n"
 		"cmp rax, 1\n" "jne .chk_root\n"
 		"mov rax, [rsp+16]\n" "inc rax\n" "mov [rsp+16], rax\n" // i++
 		"cmp rax, [rsp+0]\n" "jae .opt_miss\n"
@@ -669,8 +736,15 @@ func main() {
 		"mov rax, [rsp+16]\n" "inc rax\n" "mov [rsp+16], rax\n" // i++ (skip root)
 		"jmp .loop\n"
 		".chk_root:\n"
+		// if arg == "--trace-imports" then enable module tracing
+		"mov rdi, [rsp+32]\n" "lea rsi, [rel .s_opt_trace]\n" "call cstr_eq\n"
+		"cmp rax, 1\n" "jne .chk_root2\n"
+		"mov qword [rel v2_trace_imports], 1\n"
+		"mov rax, [rsp+16]\n" "inc rax\n" "mov [rsp+16], rax\n"
+		"jmp .loop\n"
+		".chk_root2:\n"
 		// if arg == "--module-root" then consume next as root
-		"mov rdi, [rsp+32]\n" "lea rsi, [rel .s_opt_root]\n" "call streq\n"
+		"mov rdi, [rsp+32]\n" "lea rsi, [rel .s_opt_root]\n" "call cstr_eq\n"
 		"cmp rax, 1\n" "jne .is_input\n"
 		"mov rax, [rsp+16]\n" "inc rax\n" "mov [rsp+16], rax\n" // i++
 		"cmp rax, [rsp+0]\n" "jae .opt_miss\n"
@@ -694,6 +768,7 @@ func main() {
 		"mov rdi, 0\n"
 		"call sys_exit\n"
 		".s_opt_I: db '-', 'I', 0\n"
+		".s_opt_trace: db '-', '-', 't','r','a','c','e','-','i','m','p','o','r','t','s', 0\n"
 		".s_opt_root: db '-', '-', 'm','o','d','u','l','e','-','r','o','o','t', 0\n"
 	};
 }

@@ -21,6 +21,15 @@ func die_stmt_expected_rparen() {
 	die("stmt: expected ')'");
 }
 
+func die_stmt_expected_rparen_at(line) {
+	// Convention: rdi=line (from caller)
+	asm {
+		"lea rsi, [rel .s_msg]\n"
+		"call panic_at\n"
+		".s_msg: db 'stmt: expected )', 0\n"
+	};
+}
+
 func die_stmt_expected_lbrace() {
 	die("stmt: expected '{'");
 }
@@ -1900,7 +1909,8 @@ func stmt_if(p, loop_starts, loop_ends, ret_target) {
 		"mov rax, [r12+8]\n"
 		"cmp rax, 31\n" // TOK_RPAREN
 		"je .rp_ok\n"
-		"call die_stmt_expected_rparen\n"
+		"mov rdi, [r12+32]\n" // tok_line
+		"call die_stmt_expected_rparen_at\n"
 		".rp_ok:\n"
 		"mov rdi, r12\n"
 		"call parser_next\n"
@@ -2061,7 +2071,8 @@ func stmt_while(p, loop_starts, loop_ends, ret_target) {
 		"mov rax, [r12+8]\n"
 		"cmp rax, 31\n" // TOK_RPAREN
 		"je .rp_ok\n"
-		"call die_stmt_expected_rparen\n"
+		"mov rdi, [r12+32]\n" // tok_line
+		"call die_stmt_expected_rparen_at\n"
 		".rp_ok:\n"
 		"mov rdi, r12\n"
 		"call parser_next\n"
@@ -2245,7 +2256,7 @@ func stmt_for(p, loop_starts, loop_ends, ret_target) {
 		"mov r12, [rsp+0]\n"
 
 		// expect ')'
-		"mov rax, [r12+8]\n" "cmp rax, 31\n" "je .rp_ok\n" "call die_stmt_expected_rparen\n"
+		"mov rax, [r12+8]\n" "cmp rax, 31\n" "je .rp_ok\n" "mov rdi, [r12+32]\n" "call die_stmt_expected_rparen_at\n"
 		".rp_ok:\n"
 		"mov rdi, r12\n" "call parser_next\n"
 
@@ -2389,7 +2400,7 @@ func stmt_foreach(p, loop_starts, loop_ends, ret_target) {
 
 		// expect ')'
 		"mov r12, [rsp+0]\n"
-		"mov rax, [r12+8]\n" "cmp rax, 31\n" "je .rp_ok\n" "call die_stmt_expected_rparen\n"
+		"mov rax, [r12+8]\n" "cmp rax, 31\n" "je .rp_ok\n" "mov rdi, [r12+32]\n" "call die_stmt_expected_rparen_at\n"
 		".rp_ok:\n"
 		"mov rdi, r12\n" "call parser_next\n"
 
@@ -2563,7 +2574,8 @@ func stmt_break(p, loop_starts, loop_ends, ret_target) {
 		"mov rax, [r12+8]\n"
 		"cmp rax, 31\n" // TOK_RPAREN
 		"je .rp_ok\n"
-		"call die_stmt_expected_rparen\n"
+		"mov rdi, [r12+32]\n" // tok_line
+		"call die_stmt_expected_rparen_at\n"
 		".rp_ok:\n"
 		"mov rdi, r12\n"
 		"call parser_next\n"
@@ -2665,7 +2677,8 @@ func stmt_continue(p, loop_starts, loop_ends, ret_target) {
 		"mov rax, [r12+8]\n"
 		"cmp rax, 31\n" // TOK_RPAREN
 		"je .rp_ok\n"
-		"call die_stmt_expected_rparen\n"
+		"mov rdi, [r12+32]\n" // tok_line
+		"call die_stmt_expected_rparen_at\n"
 		".rp_ok:\n"
 		"mov rdi, r12\n"
 		"call parser_next\n"
@@ -2764,7 +2777,7 @@ func stmt_switch(p, loop_starts, loop_ends, ret_target) {
 		"lea rdi, [rel .s_mov1]\n" "call emit_cstr\n"
 		"mov r12, [rsp+0]\n"
 		// expect ')'
-		"mov rax, [r12+8]\n" "cmp rax, 31\n" "je .rp_ok\n" "call die_stmt_expected_rparen\n"
+		"mov rax, [r12+8]\n" "cmp rax, 31\n" "je .rp_ok\n" "mov rdi, [r12+32]\n" "call die_stmt_expected_rparen_at\n"
 		".rp_ok:\n"
 		"mov rdi, r12\n" "call parser_next\n"
 		"mov r12, [rsp+0]\n"

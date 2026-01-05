@@ -114,9 +114,17 @@ var label_counter;
 var emit_buf;
 var emit_len;
 var emit_cap;
+var emit_fd;
 
 // v1 simple variable declarations emitted on demand (Vec of Slice*)
 var vars_emitted;
+
+// v2: emitted function names (Vec of Slice*)
+// Used to suppress duplicate function emission if a module is (incorrectly) compiled twice.
+var funcs_emitted;
+
+// v2 driver debug/diagnostic flags (default 0).
+var v2_trace_imports;
 
 // v1.5 local variables (per-function) for recursion safety
 // Locals are mapped to qword slots at [rbp - offset].

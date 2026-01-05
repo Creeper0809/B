@@ -6,7 +6,7 @@
 // NOTE:
 // - `layout Slice { ptr; len; }` is declared in src/v1/std/std0_sys.b so it appears
 //   in the merged compile unit before any function definitions.
-// - Avoid basm(Stage1) high-level `if`/`while` inside std/core helpers because Stage1
+// - Avoid basm(Stage1) high-level if/while inside std/core helpers because Stage1
 //   emits globally-numbered labels that can collide across functions.
 
 func slice_eq_parts(p1, n1, p2, n2) {

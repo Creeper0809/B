@@ -44,6 +44,7 @@ func compile_one() {
 
 	// Emit output.
 	emit_init();
+	emit_open("build/out.asm");
 	emit_cstr("global _start\n");
 	emit_cstr("section .text\n");
 	emit_cstr("_start:\n");
@@ -57,7 +58,7 @@ func compile_one() {
 	asm { "call parse_program_emit_funcs\n" };
 
 	// For now, always write to build/out.asm.
-	emit_to_file("build/out.asm");
+	emit_close();
 }
 
 func main() {
