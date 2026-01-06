@@ -74,6 +74,7 @@ enum AstStmtKind {
 	IF = 5,
 	WHILE = 6,
 	FOREACH = 7,
+	WIPE = 8,
 };
 
 struct AstStmt {

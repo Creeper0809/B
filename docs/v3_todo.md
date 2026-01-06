@@ -213,23 +213,23 @@ NOTE
 ## Phase 4 — 보안/해커(정체성)
 
 ### 4.1 `$` unsafe 연산(타입/제약)
-- [ ] `$ptr` load/store를 허용하는 타입 규칙
-- [ ] `arr[$i]` bounds-check 생략 규칙
-- [ ] `obj.$field` 훅 우회 raw field access
+- [x] `$ptr` load/store를 허용하는 타입 규칙
+- [x] `arr[$i]` bounds-check 생략 규칙
+- [x] `obj.$field` 훅 우회 raw field access
 - DoD
-    - `$` 대상이 아닌 곳(예: 임의 expr)에 사용 시 에러
+	- `$` 대상이 아닌 곳(예: 임의 expr)에 사용 시 에러
 
 ### 4.2 `wipe` + 최적화 방지 IR
-- [ ] 문법: `wipe variable;`, `wipe ptr, len;`
-- [ ] IR opcode: `secure_store`(또는 `volatile_store`) 도입
-- [ ] DCE에서 `secure_store` 절대 제거 금지
+- [x] 문법: `wipe variable;`, `wipe ptr, len;`
+- [x] IR opcode: `secure_store`(또는 `volatile_store`) 도입
+- [x] DCE에서 `secure_store` 절대 제거 금지
 - DoD
     - 최적화 패스 후에도 wipe가 남아있음(IR 덤프로 확인)
 
 ### 4.3 `secret` 변수
-- [ ] `secret` 수식 파싱/타입체크
-- [ ] 스코프 종료 시 zeroize 보장(조기 종료 포함)
-- [ ] lowering: `secure_store` 사용
+- [x] `secret` 수식 파싱/타입체크
+- [x] 스코프 종료 시 zeroize 보장(조기 종료 포함)
+- [x] lowering: `secure_store` 사용
 - DoD
     - 함수에 `return` 여러 개가 있어도 zeroize 삽입
 
@@ -246,8 +246,8 @@ NOTE
     - extern 호출에서 지정 레지스터를 그대로 사용
 
 ### 4.6 보안/암호 연산자 lowering
-- [ ] rotate: `<<<`, `>>>` (ROL/ROR)
-- [ ] constant-time eq: `===`, `!==`
+- [x] rotate: `<<<`, `>>>` (ROL/ROR)
+- [x] constant-time eq: `===`, `!==`
 - DoD
     - 최소 1개 벡터 테스트(고정 입력)로 결과 검증
 

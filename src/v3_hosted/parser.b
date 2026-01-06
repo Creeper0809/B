@@ -780,6 +780,7 @@ func parse_unary(p) {
 	else if (k == TokKind.TILDE) { is_prefix = 1; }
 	else if (k == TokKind.AMP) { is_prefix = 1; }
 	else if (k == TokKind.STAR) { is_prefix = 1; }
+	else if (k == TokKind.DOLLAR) { is_prefix = 1; }
 	if (is_prefix == 0) {
 		return parse_postfix(p);
 	}
@@ -821,7 +822,7 @@ func parse_shift(p) {
 	var e = parse_add(p);
 	while (1) {
 		var k = ptr64[p + 16];
-		if (k != TokKind.LSHIFT) { if (k != TokKind.RSHIFT) { break; } }
+		if (k != TokKind.LSHIFT) { if (k != TokKind.RSHIFT) { if (k != TokKind.ROTL) { if (k != TokKind.ROTR) { break; } } } }
 		var tokp = ptr64[p + 8];
 		var op = k;
 		parser_bump(p);
@@ -854,7 +855,11 @@ func parse_eq(p) {
 	var e = parse_rel(p);
 	while (1) {
 		var k = ptr64[p + 16];
-		if (k != TokKind.EQEQ) { if (k != TokKind.NEQ) { break; } }
+		if (k != TokKind.EQEQ) {
+			if (k != TokKind.NEQ) {
+				if (k != TokKind.EQEQEQ) { if (k != TokKind.NEQEQ) { break; } }
+			}
+		}
 		var tokp = ptr64[p + 8];
 		var op = k;
 		parser_bump(p);
@@ -862,6 +867,36 @@ func parse_eq(p) {
 		e = expr_new_binary(op, e, rhs, tokp);
 	}
 	return e;
+}
+
+func stmt_new_wipe(a0, b0, tokp) {
+	var s = heap_alloc(88);
+	if (s == 0) { return 0; }
+	ptr64[s + 0] = AstStmtKind.WIPE;
+	ptr64[s + 8] = a0; // expr0: variable or ptr
+	ptr64[s + 16] = b0; // expr1: len (or 0)
+	ptr64[s + 24] = 0;
+	ptr64[s + 32] = 0;
+	ptr64[s + 40] = 0;
+	ptr64[s + 48] = 0;
+	ptr64[s + 56] = 0;
+	ptr64[s + 64] = ptr64[tokp + 32];
+	ptr64[s + 72] = ptr64[tokp + 24];
+	ptr64[s + 80] = ptr64[tokp + 40];
+	return s;
+}
+
+func parse_wipe_stmt(p) {
+	var kw_tok = ptr64[p + 8];
+	parser_bump(p); // wipe
+	var a0 = parse_expr(p);
+	var b0 = 0;
+	if (parser_match(p, TokKind.COMMA) == 1) {
+		b0 = parse_expr(p);
+	}
+	parser_expect(p, TokKind.SEMI, "wipe: expected ';'");
+	if (ptr64[p + 16] == TokKind.SEMI) { parser_bump(p); }
+	return stmt_new_wipe(a0, b0, kw_tok);
 }
 
 func parse_bitand(p) {
@@ -1097,11 +1132,30 @@ func parse_block(p) {
 func parse_stmt(p) {
 	var k = ptr64[p + 16];
 	if (k == TokKind.LBRACE) { return parse_block(p); }
+	if (k == TokKind.KW_SECRET || k == TokKind.KW_NOSPILL) {
+		// Phase 4.3/4.4: modifiers for var.
+		var flags = 0;
+		while (1) {
+			var k2 = ptr64[p + 16];
+			if (k2 == TokKind.KW_SECRET) { flags = flags | 1; parser_bump(p); continue; }
+			if (k2 == TokKind.KW_NOSPILL) { flags = flags | 2; parser_bump(p); continue; }
+			break;
+		}
+		parser_expect(p, TokKind.KW_VAR, "expected 'var' after modifier");
+		if (ptr64[p + 16] == TokKind.KW_VAR) {
+			var s0 = parse_var_stmt(p);
+			if (s0 != 0) { ptr64[s0 + 8] = flags; }
+			return s0;
+		}
+		parser_sync_stmt(p);
+		return 0;
+	}
 	if (k == TokKind.KW_VAR) { return parse_var_stmt(p); }
 	if (k == TokKind.KW_RETURN) { return parse_return_stmt(p); }
 	if (k == TokKind.KW_IF) { return parse_if_stmt(p); }
 	if (k == TokKind.KW_WHILE) { return parse_while_stmt(p); }
 	if (k == TokKind.KW_FOREACH) { return parse_foreach_stmt(p); }
+	if (k == TokKind.KW_WIPE) { return parse_wipe_stmt(p); }
 	if (k == TokKind.SEMI) { parser_bump(p); return 0; }
 
 	// expression statement

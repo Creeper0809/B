@@ -39,6 +39,7 @@ func keyword_kind(p, n) {
 			if (slice_eq_parts(p, n, "func", 4) == 1) { return TokKind.KW_FUNC; }
 			if (slice_eq_parts(p, n, "enum", 4) == 1) { return TokKind.KW_ENUM; }
 			if (slice_eq_parts(p, n, "null", 4) == 1) { return TokKind.KW_NULL; }
+			if (slice_eq_parts(p, n, "wipe", 4) == 1) { return TokKind.KW_WIPE; }
 			break;
 		}
 		case 5: {
@@ -54,10 +55,12 @@ func keyword_kind(p, n) {
 			if (slice_eq_parts(p, n, "struct", 6) == 1) { return TokKind.KW_STRUCT; }
 			if (slice_eq_parts(p, n, "switch", 6) == 1) { return TokKind.KW_SWITCH; }
 			if (slice_eq_parts(p, n, "return", 6) == 1) { return TokKind.KW_RETURN; }
+			if (slice_eq_parts(p, n, "secret", 6) == 1) { return TokKind.KW_SECRET; }
 			break;
 		}
 		case 7: {
 			if (slice_eq_parts(p, n, "foreach", 7) == 1) { return TokKind.KW_FOREACH; }
+			if (slice_eq_parts(p, n, "nospill", 7) == 1) { return TokKind.KW_NOSPILL; }
 			break;
 		}
 		case 8: {
@@ -477,6 +480,23 @@ func lexer_next(lex, tok_out) {
 
 	// two-char ops
 	var kind = 0;
+	// three-char ops (Phase 4.6)
+	if (cur + 2 < end) {
+		var ch1_3 = ptr8[cur + 1];
+		var ch2_3 = ptr8[cur + 2];
+		if (ch0 == 60) { // '<'
+			if (ch1_3 == 60 && ch2_3 == 60) { kind = TokKind.ROTL; cur = cur + 3; }
+		}
+		else if (ch0 == 62) { // '>'
+			if (ch1_3 == 62 && ch2_3 == 62) { kind = TokKind.ROTR; cur = cur + 3; }
+		}
+		else if (ch0 == 61) { // '='
+			if (ch1_3 == 61 && ch2_3 == 61) { kind = TokKind.EQEQEQ; cur = cur + 3; }
+		}
+		else if (ch0 == 33) { // '!'
+			if (ch1_3 == 61 && ch2_3 == 61) { kind = TokKind.NEQEQ; cur = cur + 3; }
+		}
+	}
 	if (cur + 1 < end) {
 		var ch1 = ptr8[cur + 1];
 		if (ch0 == 61) { if (ch1 == 61) { kind = TokKind.EQEQ; cur = cur + 2; } }

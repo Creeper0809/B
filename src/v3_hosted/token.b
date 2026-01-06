@@ -48,6 +48,10 @@ enum TokKind {
 	QUESTION = 73,
 	DOLLAR = 74,
 	AT = 75,
+	ROTL = 76,
+	ROTR = 77,
+	EQEQEQ = 78,
+	NEQEQ = 79,
 
 	// keywords (Phase 1.1)
 	// NOTE: keep these distinct from IDENT to simplify parser.
@@ -69,6 +73,9 @@ enum TokKind {
 	KW_NULL = 115,
 	KW_PUBLIC = 116,
 	KW_PACKED = 117,
+	KW_WIPE = 118,
+	KW_SECRET = 119,
+	KW_NOSPILL = 120,
 };
 
 struct Token {

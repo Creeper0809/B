@@ -28,7 +28,10 @@ enum IrInstrKind {
 	STORE_MEM8 = 20,
 	STORE_MEM64 = 21,
 	PUSH_ARG = 22,
-	CALL = 23
+	CALL = 23,
+	SECURE_STORE_MEM8 = 24,
+	SECURE_STORE_MEM64 = 25,
+	CTEQ_SLICE_U8 = 26
 };
 
 struct IrInstr {

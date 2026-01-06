@@ -894,6 +894,52 @@ func tc_expr_with_expected(env, e, expected) {
 				return expected;
 			}
 		}
+		if (op == TokKind.DOLLAR) {
+			// Phase 4.1: unsafe deref/load: $ptr
+			// Allows nullable pointers (no implicit null check).
+			var rhs_ty2 = tc_expr(env, ptr64[e + 16]);
+			if (tc_is_ptr(rhs_ty2) == 0) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'$' expects pointer");
+				return TC_TY_INVALID;
+			}
+			var base_ty = tc_ptr_base(rhs_ty2);
+			var sz = tc_sizeof(base_ty);
+			ptr64[e + 32] = sz; // for codegen: 1 or 8 supported
+			return base_ty;
+		}
+		if (op == TokKind.AMP) {
+			// Address-of should not push expected into operand; it creates a pointer.
+			var rhs2 = ptr64[e + 16];
+			var rhs_ty3 = tc_expr(env, rhs2);
+			if (rhs2 == 0) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
+				return TC_TY_INVALID;
+			}
+			var rk2 = ptr64[rhs2 + 0];
+			if (rk2 != AstExprKind.IDENT && rk2 != AstExprKind.FIELD) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
+				return TC_TY_INVALID;
+			}
+			var pty2 = tc_make_ptr(rhs_ty3, 0);
+			if (pty2 == TC_TY_INVALID) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot take address of this type");
+				return TC_TY_INVALID;
+			}
+			return pty2;
+		}
+		if (op == TokKind.STAR) {
+			// Deref should not push expected into operand; it consumes a pointer.
+			var rhs_ty4 = tc_expr(env, ptr64[e + 16]);
+			if (tc_is_ptr(rhs_ty4) == 0) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "deref expects pointer");
+				return TC_TY_INVALID;
+			}
+			if (tc_is_ptr_nullable(rhs_ty4) == 1) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot deref nullable pointer");
+				return TC_TY_INVALID;
+			}
+			return tc_ptr_base(rhs_ty4);
+		}
 		// Fallback: type-check rhs normally.
 		var rhs_ty = tc_expr_with_expected(env, ptr64[e + 16], expected);
 		if (op == TokKind.BANG) {
@@ -1213,6 +1259,18 @@ func tc_expr(env, e) {
 	if (k == AstExprKind.UNARY) {
 		var rhs_ty = tc_expr(env, ptr64[e + 16]);
 		var op = ptr64[e + 8];
+		if (op == TokKind.DOLLAR) {
+			// Phase 4.1: unsafe deref/load/store operand.
+			// Allows nullable pointers (no implicit null check).
+			if (tc_is_ptr(rhs_ty) == 0) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'$' expects pointer");
+				return TC_TY_INVALID;
+			}
+			var base_ty = tc_ptr_base(rhs_ty);
+			var sz0 = tc_sizeof(base_ty);
+			ptr64[e + 32] = sz0; // for codegen: 1 or 8 supported
+			return base_ty;
+		}
 		if (op == TokKind.STAR) {
 			if (tc_is_ptr(rhs_ty) == 0) {
 				tc_err_at(ptr64[e + 64], ptr64[e + 72], "deref expects pointer");
@@ -1272,8 +1330,11 @@ func tc_expr(env, e) {
 			var lk = ptr64[lhs + 0];
 			if (lk != AstExprKind.IDENT) {
 				if (lk != AstExprKind.FIELD) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "assignment lhs must be identifier or field");
-					return TC_TY_INVALID;
+					// Phase 4.1: allow $ptr = v stores.
+					if (lk != AstExprKind.UNARY || ptr64[lhs + 8] != TokKind.DOLLAR) {
+						tc_err_at(ptr64[e + 64], ptr64[e + 72], "assignment lhs must be identifier, field, or $ptr");
+						return TC_TY_INVALID;
+					}
 				}
 			}
 			var lhs_ty0 = tc_expr(env, lhs);
@@ -1317,6 +1378,8 @@ func tc_expr(env, e) {
 		var is_cmp = 0;
 		if (op == TokKind.EQEQ) { is_cmp = 1; }
 		else if (op == TokKind.NEQ) { is_cmp = 1; }
+		else if (op == TokKind.EQEQEQ) { is_cmp = 1; }
+		else if (op == TokKind.NEQEQ) { is_cmp = 1; }
 		else if (op == TokKind.LT) { is_cmp = 1; }
 		else if (op == TokKind.LTE) { is_cmp = 1; }
 		else if (op == TokKind.GT) { is_cmp = 1; }
@@ -1335,6 +1398,27 @@ func tc_expr(env, e) {
 				tc_err_at(ptr64[e + 64], ptr64[e + 72], "comparison operands must match");
 				return TC_TY_INVALID;
 			}
+			// Phase 4.6: constant-time eq operators.
+			if (op == TokKind.EQEQEQ || op == TokKind.NEQEQ) {
+				if (tc_is_int(lhs_ty) == 1) { return TC_TY_BOOL; }
+				if (tc_is_slice(lhs_ty) == 1) {
+					if (tc_slice_elem(lhs_ty) != TC_TY_U8) {
+						tc_err_at(ptr64[e + 64], ptr64[e + 72], "constant-time eq expects []u8");
+						return TC_TY_INVALID;
+					}
+					return TC_TY_BOOL;
+				}
+				if (tc_is_array(lhs_ty) == 1) {
+					var elem_ty = tc_array_elem(lhs_ty);
+					if (elem_ty != TC_TY_U8) {
+						tc_err_at(ptr64[e + 64], ptr64[e + 72], "constant-time eq expects [N]u8");
+						return TC_TY_INVALID;
+					}
+					return TC_TY_BOOL;
+				}
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "constant-time eq expects integer or byte sequence");
+				return TC_TY_INVALID;
+			}
 			return TC_TY_BOOL;
 		}
 
@@ -1350,6 +1434,8 @@ func tc_expr(env, e) {
 		else if (op == TokKind.CARET) { is_int_op = 1; }
 		else if (op == TokKind.LSHIFT) { is_int_op = 1; }
 		else if (op == TokKind.RSHIFT) { is_int_op = 1; }
+		else if (op == TokKind.ROTL) { is_int_op = 1; }
+		else if (op == TokKind.ROTR) { is_int_op = 1; }
 		// Pointer arithmetic (Phase 2.2): byte-wise.
 		// - ptr +/- int -> ptr
 		// - ptr - ptr -> u64
@@ -1824,6 +1910,44 @@ func tc_stmt(env, s) {
 
 		tc_stmt(env, body);
 		ptr64[env + 8] = saved;
+		return 0;
+	}
+	if (k == AstStmtKind.WIPE) {
+		// Layout:
+		//  s->a: expr0 (variable or ptr)
+		//  s->b: expr1 (len) or 0
+		var a0 = ptr64[s + 8];
+		var b0 = ptr64[s + 16];
+		if (b0 == 0) {
+			// wipe variable;
+			if (a0 == 0 || ptr64[a0 + 0] != AstExprKind.IDENT) {
+				tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe variable: expected identifier");
+				// Still typecheck for recovery.
+				if (a0 != 0) { tc_expr(env, a0); }
+				return 0;
+			}
+			tc_expr(env, a0);
+			return 0;
+		}
+		// wipe ptr, len;
+		var pty = tc_expr(env, a0);
+		var lty = tc_expr(env, b0);
+		if (tc_is_ptr(pty) == 0) {
+			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: ptr must be pointer");
+			return 0;
+		}
+		if (tc_is_ptr_nullable(pty) == 1) {
+			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: ptr must be non-null pointer");
+			return 0;
+		}
+		if (tc_ptr_base(pty) != TC_TY_U8) {
+			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: ptr must be *u8");
+			return 0;
+		}
+		if (tc_is_int(lty) == 0) {
+			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: len must be integer");
+			return 0;
+		}
 		return 0;
 	}
 

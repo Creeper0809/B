@@ -30,7 +30,59 @@ struct CodegenCtx {
 	locals: u64; // Vec of CgLocal*
 	label_next: u64;
 	ret_label: u64;
+	secret_locals: u64; // Vec of CgLocal* (len is mutated via ptr64)
 };
+
+func cg_wipe_scratch_ptr_local(ctx) {
+	return cg_local_find(ctx, "__v3h_wipe_ptr", 14);
+}
+
+func cg_wipe_scratch_len_local(ctx) {
+	return cg_local_find(ctx, "__v3h_wipe_len", 14);
+}
+
+func cg_emit_wipe_loop(ctx, ptr_off, len_off) {
+	var f = ptr64[ctx + 8];
+	var start_id = cg_label_alloc(ctx);
+	var end_id = cg_label_alloc(ctx);
+	ir_emit(f, IrInstrKind.LABEL, start_id, 0, 0);
+	// if len == 0: break
+	ir_emit(f, IrInstrKind.PUSH_LOCAL, len_off, 0, 0);
+	ir_emit(f, IrInstrKind.JZ, end_id, 0, 0);
+	// *ptr = 0 (secure)
+	ir_emit(f, IrInstrKind.PUSH_LOCAL, ptr_off, 0, 0);
+	ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+	ir_emit(f, IrInstrKind.SECURE_STORE_MEM8, 0, 0, 0);
+	// ptr++
+	ir_emit(f, IrInstrKind.PUSH_LOCAL, ptr_off, 0, 0);
+	ir_emit(f, IrInstrKind.PUSH_IMM, 1, 0, 0);
+	ir_emit(f, IrInstrKind.BINOP, TokKind.PLUS, 0, 0);
+	ir_emit(f, IrInstrKind.STORE_LOCAL, ptr_off, 0, 0);
+	// len--
+	ir_emit(f, IrInstrKind.PUSH_LOCAL, len_off, 0, 0);
+	ir_emit(f, IrInstrKind.PUSH_IMM, 1, 0, 0);
+	ir_emit(f, IrInstrKind.BINOP, TokKind.MINUS, 0, 0);
+	ir_emit(f, IrInstrKind.STORE_LOCAL, len_off, 0, 0);
+	ir_emit(f, IrInstrKind.JMP, start_id, 0, 0);
+	ir_emit(f, IrInstrKind.LABEL, end_id, 0, 0);
+	return 0;
+}
+
+func cg_emit_wipe_local(ctx, l) {
+	if (l == 0) { return 0; }
+	var f = ptr64[ctx + 8];
+	var l_ptr = cg_wipe_scratch_ptr_local(ctx);
+	var l_len = cg_wipe_scratch_len_local(ctx);
+	if (l_ptr == 0 || l_len == 0) { return 0; }
+	// ptr = &local
+	ir_emit(f, IrInstrKind.PUSH_LOCAL_ADDR, ptr64[l + 16], 0, 0);
+	ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_ptr + 16], 0, 0);
+	// len = size_bytes
+	ir_emit(f, IrInstrKind.PUSH_IMM, cg_local_size_bytes(l), 0, 0);
+	ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_len + 16], 0, 0);
+	cg_emit_wipe_loop(ctx, ptr64[l_ptr + 16], ptr64[l_len + 16]);
+	return 0;
+}
 
 func cg_parse_u64_dec(p, n) {
 	var i = 0;
@@ -732,6 +784,19 @@ func cg_lower_expr(ctx, e) {
 			}
 			return 0;
 		}
+		if (op == TokKind.DOLLAR) {
+			// Phase 4.1: unsafe deref/load.
+			cg_lower_expr(ctx, rhs);
+			var sz = ptr64[e + 32];
+			if (sz == 1) { ir_emit(f, IrInstrKind.LOAD_MEM8, 0, 0, 0); }
+			else if (sz == 8) { ir_emit(f, IrInstrKind.LOAD_MEM64, 0, 0, 0); }
+			else {
+				// Unsupported load size.
+				ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+				ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+			}
+			return 0;
+		}
 		cg_lower_expr(ctx, rhs);
 		ir_emit(f, IrInstrKind.UNOP, op, 0, 0);
 		return 0;
@@ -743,6 +808,37 @@ func cg_lower_expr(ctx, e) {
 		var rhs = ptr64[e + 24];
 		if (op == TokKind.EQ) {
 			// assignment
+			if (ptr64[lhs + 0] == AstExprKind.UNARY && ptr64[lhs + 8] == TokKind.DOLLAR) {
+				// $ptr = rhs
+				var szp = ptr64[lhs + 32];
+				if (szp != 1 && szp != 8) {
+					// Unsupported store size; evaluate rhs and push 0.
+					cg_lower_expr(ctx, rhs);
+					if (cg_expr_is_slice(ctx, rhs) == 1) {
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					}
+					else { ir_emit(f, IrInstrKind.POP, 0, 0, 0); }
+					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+					return 0;
+				}
+				// push addr then value (STORE_MEM* pops value then addr)
+				cg_lower_expr(ctx, ptr64[lhs + 16]);
+				cg_lower_expr(ctx, rhs);
+				if (cg_expr_is_slice(ctx, rhs) == 1) {
+					// best-effort discard
+					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+					return 0;
+				}
+				if (szp == 1) { ir_emit(f, IrInstrKind.STORE_MEM8, 0, 0, 0); }
+				else { ir_emit(f, IrInstrKind.STORE_MEM64, 0, 0, 0); }
+				// Return assigned value by re-loading.
+				cg_lower_expr(ctx, lhs);
+				return 0;
+			}
 			if (ptr64[lhs + 0] == AstExprKind.FIELD) {
 				// field assignment (scalar or u8)
 				var extra = ptr64[lhs + 32];
@@ -921,6 +1017,19 @@ func cg_lower_expr(ctx, e) {
 			return 0;
 		}
 
+		// Phase 4.6: constant-time eq for []u8 (lower to a dedicated IR op).
+		if (op == TokKind.EQEQEQ || op == TokKind.NEQEQ) {
+			if (cg_expr_is_slice(ctx, lhs) == 1 && cg_expr_is_slice(ctx, rhs) == 1) {
+				cg_lower_expr(ctx, lhs);
+				cg_lower_expr(ctx, rhs);
+				var mismatch_id = cg_label_alloc(ctx);
+				var loop_id = cg_label_alloc(ctx);
+				var done_id = cg_label_alloc(ctx);
+				ir_emit(f, IrInstrKind.CTEQ_SLICE_U8, mismatch_id, loop_id, done_id);
+				if (op == TokKind.NEQEQ) { ir_emit(f, IrInstrKind.UNOP, TokKind.BANG, 0, 0); }
+				return 0;
+			}
+		}
 		cg_lower_expr(ctx, lhs);
 		cg_lower_expr(ctx, rhs);
 		ir_emit(f, IrInstrKind.BINOP, op, 0, 0);
@@ -1026,6 +1135,7 @@ func cg_lower_stmt(ctx, st) {
 	var f = ptr64[ctx + 8];
 
 	if (k == AstStmtKind.VAR) {
+		var flags = ptr64[st + 8];
 		var name_ptr = ptr64[st + 32];
 		var name_len = ptr64[st + 40];
 		var init = ptr64[st + 56];
@@ -1057,6 +1167,12 @@ func cg_lower_stmt(ctx, st) {
 				ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l + 16], 0, 0);
 			}
 		}
+			// Phase 4.3: secret vars are zeroized on scope exit (and before return).
+			var is_secret = flags & 1;
+			if (is_secret != 0) {
+				var sv = ptr64[ctx + 40];
+				if (sv != 0 && l != 0) { vec_push(sv, l); }
+			}
 		return 0;
 	}
 
@@ -1074,6 +1190,16 @@ func cg_lower_stmt(ctx, st) {
 	}
 
 	if (k == AstStmtKind.RETURN) {
+		// Phase 4.3: zeroize all live secrets on early exit.
+		var sv2 = ptr64[ctx + 40];
+		if (sv2 != 0) {
+			var sn2 = vec_len(sv2);
+			var si2 = 0;
+			while (si2 < sn2) {
+				cg_emit_wipe_local(ctx, vec_get(sv2, si2));
+				si2 = si2 + 1;
+			}
+		}
 		var e = ptr64[st + 56];
 		if (e != 0) { cg_lower_expr(ctx, e); }
 		else { ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0); }
@@ -1082,6 +1208,10 @@ func cg_lower_stmt(ctx, st) {
 	}
 
 	if (k == AstStmtKind.BLOCK) {
+		// Phase 4.3: block-scoped secret vars.
+		var sv3 = ptr64[ctx + 40];
+		var saved = 0;
+		if (sv3 != 0) { saved = vec_len(sv3); }
 		var ss = ptr64[st + 8];
 		var n = vec_len(ss);
 		var i = 0;
@@ -1089,6 +1219,44 @@ func cg_lower_stmt(ctx, st) {
 			cg_lower_stmt(ctx, vec_get(ss, i));
 			i = i + 1;
 		}
+		// Wipe secrets declared in this block.
+		if (sv3 != 0) {
+			var sn3 = vec_len(sv3);
+			var si3 = saved;
+			while (si3 < sn3) {
+				cg_emit_wipe_local(ctx, vec_get(sv3, si3));
+				si3 = si3 + 1;
+			}
+			ptr64[sv3 + 8] = saved;
+		}
+		return 0;
+	}
+
+	if (k == AstStmtKind.WIPE) {
+		// Layout:
+		//  st->a: expr0 (IDENT or ptr)
+		//  st->b: expr1 (len) or 0
+		var a0 = ptr64[st + 8];
+		var b0 = ptr64[st + 16];
+		if (b0 == 0) {
+			// wipe variable;
+			if (a0 != 0 && ptr64[a0 + 0] == AstExprKind.IDENT) {
+				var name_ptr = ptr64[a0 + 40];
+				var name_len = ptr64[a0 + 48];
+				var l0 = cg_local_find(ctx, name_ptr, name_len);
+				cg_emit_wipe_local(ctx, l0);
+			}
+			return 0;
+		}
+		// wipe ptr, len;
+		var l_ptr = cg_wipe_scratch_ptr_local(ctx);
+		var l_len = cg_wipe_scratch_len_local(ctx);
+		if (l_ptr == 0 || l_len == 0) { return 0; }
+		cg_lower_expr(ctx, a0);
+		ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_ptr + 16], 0, 0);
+		cg_lower_expr(ctx, b0);
+		ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_len + 16], 0, 0);
+		cg_emit_wipe_loop(ctx, ptr64[l_ptr + 16], ptr64[l_len + 16]);
 		return 0;
 	}
 
@@ -1357,15 +1525,40 @@ func cg_emit_binop(sb, op) {
 		cg_emit_line(sb, "\tdiv rbx");
 		cg_emit_line(sb, "\tmov rax, rdx");
 	}
-	else if (op == TokKind.EQEQ) {
+	else if (op == TokKind.EQEQ || op == TokKind.EQEQEQ) {
 		cg_emit_line(sb, "\tcmp rax, rbx");
 		cg_emit_line(sb, "\tsete al");
 		cg_emit_line(sb, "\tmovzx rax, al");
 	}
-	else if (op == TokKind.NEQ) {
+	else if (op == TokKind.NEQ || op == TokKind.NEQEQ) {
 		cg_emit_line(sb, "\tcmp rax, rbx");
 		cg_emit_line(sb, "\tsetne al");
 		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.AMP) {
+		cg_emit_line(sb, "\tand rax, rbx");
+	}
+	else if (op == TokKind.PIPE) {
+		cg_emit_line(sb, "\tor rax, rbx");
+	}
+	else if (op == TokKind.CARET) {
+		cg_emit_line(sb, "\txor rax, rbx");
+	}
+	else if (op == TokKind.LSHIFT) {
+		cg_emit_line(sb, "\tmov rcx, rbx");
+		cg_emit_line(sb, "\tshl rax, cl");
+	}
+	else if (op == TokKind.RSHIFT) {
+		cg_emit_line(sb, "\tmov rcx, rbx");
+		cg_emit_line(sb, "\tshr rax, cl");
+	}
+	else if (op == TokKind.ROTL) {
+		cg_emit_line(sb, "\tmov rcx, rbx");
+		cg_emit_line(sb, "\trol rax, cl");
+	}
+	else if (op == TokKind.ROTR) {
+		cg_emit_line(sb, "\tmov rcx, rbx");
+		cg_emit_line(sb, "\tror rax, cl");
 	}
 	else if (op == TokKind.LT) {
 		cg_emit_line(sb, "\tcmp rax, rbx");
@@ -1577,6 +1770,55 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_line(sb, "\tpop rax\t; addr");
 				cg_emit_line(sb, "\tmov qword [rax], rbx");
 			}
+			else if (k == IrInstrKind.SECURE_STORE_MEM8) {
+				cg_emit_line(sb, "\tpop rbx\t; value");
+				cg_emit_line(sb, "\tpop rax\t; addr");
+				cg_emit_line(sb, "\tmov byte [rax], bl");
+			}
+			else if (k == IrInstrKind.SECURE_STORE_MEM64) {
+				cg_emit_line(sb, "\tpop rbx\t; value");
+				cg_emit_line(sb, "\tpop rax\t; addr");
+				cg_emit_line(sb, "\tmov qword [rax], rbx");
+			}
+			else if (k == IrInstrKind.CTEQ_SLICE_U8) {
+				// Stack (top..): b_len, b_ptr, a_len, a_ptr
+				var mismatch_id = a;
+				var loop_id = b;
+				var done_id = c;
+				cg_emit_line(sb, "\tpop rcx\t; b_len");
+				cg_emit_line(sb, "\tpop rbx\t; b_ptr");
+				cg_emit_line(sb, "\tpop rdx\t; a_len");
+				cg_emit_line(sb, "\tpop rax\t; a_ptr");
+				cg_emit_line(sb, "\tcmp rdx, rcx");
+				cg_emit(sb, "\tjne .L");
+				cg_emit_u64(sb, mismatch_id);
+				cg_emit_nl(sb);
+				cg_emit_line(sb, "\txor r8, r8\t; acc");
+				cg_emit_line(sb, "\txor r9, r9\t; i");
+				cg_emit_label(sb, loop_id);
+				cg_emit_line(sb, "\tcmp r9, rdx");
+				cg_emit(sb, "\tje .L");
+				cg_emit_u64(sb, done_id);
+				cg_emit_nl(sb);
+				cg_emit_line(sb, "\tmovzx r10d, byte [rax + r9]");
+				cg_emit_line(sb, "\tmovzx r11d, byte [rbx + r9]");
+				cg_emit_line(sb, "\txor r10d, r11d");
+				cg_emit_line(sb, "\tor r8d, r10d");
+				cg_emit_line(sb, "\tinc r9");
+				cg_emit(sb, "\tjmp .L");
+				cg_emit_u64(sb, loop_id);
+				cg_emit_nl(sb);
+				cg_emit_label(sb, mismatch_id);
+				cg_emit_line(sb, "\tmov r8, 1\t; acc!=0 => false");
+				cg_emit(sb, "\tjmp .L");
+				cg_emit_u64(sb, done_id);
+				cg_emit_nl(sb);
+				cg_emit_label(sb, done_id);
+				cg_emit_line(sb, "\tcmp r8, 0");
+				cg_emit_line(sb, "\tsete al");
+				cg_emit_line(sb, "\tmovzx rax, al");
+				cg_emit_line(sb, "\tpush rax");
+			}
 
 			i = i + 1;
 		}
@@ -1610,13 +1852,14 @@ func v3h_codegen_program(ast_prog) {
 	if (irp == 0) { return out; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(40);
+	var ctx = heap_alloc(48);
 	if (ctx == 0) { return out; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
 	ptr64[ctx + 16] = vec_new(16);
 	ptr64[ctx + 24] = 0;
 	ptr64[ctx + 32] = 0;
+	ptr64[ctx + 40] = vec_new(16);
 
 	// Phase 3.5: synthesize default property hook functions.
 	cg_emit_default_property_hooks(ast_prog, ctx, irp);
@@ -1636,6 +1879,12 @@ func v3h_codegen_program(ast_prog) {
 			var fn = ir_func_new(name_ptr, name_len);
 			ptr64[ctx + 8] = fn;
 			ptr64[ctx + 16] = vec_new(16);
+			// Scratch locals for wipe/secret lowering.
+			cg_local_add(ctx, "__v3h_wipe_ptr", 14);
+			cg_local_add(ctx, "__v3h_wipe_len", 14);
+			// Reset secret tracking for this function.
+			var sv0 = ptr64[ctx + 40];
+			if (sv0 != 0) { ptr64[sv0 + 8] = 0; }
 			// Reserve a stable return label id (used by codegen).
 			ptr64[ctx + 32] = cg_label_alloc(ctx);
 			ptr64[fn + 24] = ptr64[ctx + 32];
@@ -1714,13 +1963,14 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 	if (irp == 0) { return 0; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(40);
+	var ctx = heap_alloc(48);
 	if (ctx == 0) { return 0; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
 	ptr64[ctx + 16] = vec_new(16);
 	ptr64[ctx + 24] = 0;
 	ptr64[ctx + 32] = 0;
+	ptr64[ctx + 40] = vec_new(16);
 
 	var decls = ptr64[ast_prog + 0];
 	var n = 0;
@@ -1737,6 +1987,11 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 			var fn = ir_func_new(name_ptr, name_len);
 			ptr64[ctx + 8] = fn;
 			ptr64[ctx + 16] = vec_new(16);
+			// Scratch locals for wipe/secret lowering.
+			cg_local_add(ctx, "__v3h_wipe_ptr", 14);
+			cg_local_add(ctx, "__v3h_wipe_len", 14);
+			var sv0 = ptr64[ctx + 40];
+			if (sv0 != 0) { ptr64[sv0 + 8] = 0; }
 			ptr64[ctx + 32] = cg_label_alloc(ctx);
 			ptr64[fn + 24] = ptr64[ctx + 32];
 
