@@ -655,10 +655,10 @@ func compile_entry(path_cstr) {
 	// Reset codegen globals per compilation.
 	asm { "mov qword [rel label_counter], 0\n" };
 	// Avoid Vec growth during large builds (can break dedup state).
-	vec_new(1024);
+	vec_new(4096);
 	ptr64[vars_emitted] = rax;
 	// Hosted-v3 pulls in many functions; keep this comfortably above that.
-	vec_new(8192);
+	vec_new(32768);
 	ptr64[funcs_emitted] = rax;
 	asm { "call consts_reset\n" };
 	asm { "call structs_reset\n" };
@@ -685,7 +685,7 @@ func compile_entry(path_cstr) {
 	// duplicate compilation/emission.
 	// This is a small, bounded allocation (u64 ptrs) and keeps compilation stable.
 	// P4 hosted-v3 pulls in a lot of modules; keep this comfortably above that.
-	vec_new(4096);
+	vec_new(16384);
 	ptr64[cache] = rax;
 
 	rdi = ptr64[cache];
@@ -700,6 +700,10 @@ func compile_entry(path_cstr) {
 }
 
 func main() {
+	// Safety: ensure DF=0 before any string builtins during argv parsing.
+	// Some helper paths (e.g. normalize_root/cstr_eq) rely on DF=0.
+	asm { "cld\n" };
+
 	// NOTE(Stage1): do not keep argc/argv/i in registers across calls.
 	// Some helpers do not reliably preserve callee-saved regs, so we store
 	// loop state in stack slots and reload each iteration.

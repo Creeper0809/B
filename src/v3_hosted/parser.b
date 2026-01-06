@@ -68,7 +68,8 @@ func parser_sync_stmt(p) {
 		var k = ptr64[p + 16];
 		if (k == TokKind.EOF) { return 0; }
 		if (k == TokKind.SEMI) { parser_bump(p); return 0; }
-		if (k == TokKind.RBRACE) { return 0; }
+		// Avoid infinite loops on error recovery (e.g. top-level stray '}').
+		if (k == TokKind.RBRACE) { parser_bump(p); return 0; }
 		parser_bump(p);
 	}
 	return 0;
@@ -731,6 +732,11 @@ func parse_postfix(p) {
 			var via_ptr = 0;
 			if (k == TokKind.ARROW) { via_ptr = 1; }
 			parser_bump(p);
+			var raw = 0;
+			if (ptr64[p + 16] == TokKind.DOLLAR) {
+				raw = 1;
+				parser_bump(p);
+			}
 			if (ptr64[p + 16] != TokKind.IDENT) {
 				parser_err_here(p, "field: expected name");
 				continue;
@@ -746,9 +752,11 @@ func parse_postfix(p) {
 			ptr64[ex2 + 8] = 0;
 			ptr64[ex2 + 16] = e;
 			ptr64[ex2 + 24] = field_ptr;
-			// Pack via_ptr in the high bit, keep field_len in low bits.
-			var packed = field_len;
-			if (via_ptr == 1) { packed = packed | 9223372036854775808; }
+			// Pack (pre-typecheck): [field_len:62][via_ptr:1][raw:1]
+			// Avoids relying on 2^63 literals/shifts in the bootstrap compiler.
+			var packed = (field_len << 2);
+			packed = packed | ((via_ptr & 1) << 1);
+			packed = packed | (raw & 1);
 			ptr64[ex2 + 32] = packed;
 			ptr64[ex2 + 40] = ptr64[tokp3 + 8];
 			ptr64[ex2 + 48] = ptr64[tokp3 + 16];
@@ -1250,6 +1258,59 @@ func parse_struct_decl(p, is_public) {
 		if (k == TokKind.RBRACE) { parser_bump(p); break; }
 		if (k == TokKind.SEMI) { parser_bump(p); continue; }
 		if (k == TokKind.COMMA) { parser_bump(p); continue; }
+		var fattr = 0;
+		var fattr_args = 0;
+		while (k == TokKind.AT) {
+			// attribute: @[getter] / @[setter]
+			parser_bump(p); // '@'
+			parser_expect(p, TokKind.LBRACK, "attr: expected '['");
+			if (ptr64[p + 16] == TokKind.LBRACK) { parser_bump(p); }
+			if (ptr64[p + 16] == TokKind.IDENT) {
+				var atok = ptr64[p + 8];
+				var ap = ptr64[atok + 8];
+				var al = ptr64[atok + 16];
+				var is_getter = 0;
+				var is_setter = 0;
+				if (slice_eq_parts(ap, al, "getter", 6) == 1) { fattr = fattr | 1; is_getter = 1; }
+				else if (slice_eq_parts(ap, al, "setter", 6) == 1) { fattr = fattr | 2; is_setter = 1; }
+				else { parser_err_here(p, "unknown attribute"); }
+				parser_bump(p);
+				// Optional: @[getter(func)] / @[setter(func)]
+				if (ptr64[p + 16] == TokKind.LPAREN) {
+					parser_bump(p);
+					if (ptr64[p + 16] != TokKind.IDENT) {
+						parser_err_here(p, "attr: expected function name");
+					} else {
+						var ftok2 = ptr64[p + 8];
+						var fp2 = ptr64[ftok2 + 8];
+						var fl2 = ptr64[ftok2 + 16];
+						parser_bump(p);
+						if (fattr_args == 0) {
+							fattr_args = heap_alloc(32);
+							if (fattr_args != 0) {
+								ptr64[fattr_args + 0] = 0;
+								ptr64[fattr_args + 8] = 0;
+								ptr64[fattr_args + 16] = 0;
+								ptr64[fattr_args + 24] = 0;
+							}
+						}
+						if (fattr_args != 0) {
+							if (is_getter == 1) { ptr64[fattr_args + 0] = fp2; ptr64[fattr_args + 8] = fl2; }
+							if (is_setter == 1) { ptr64[fattr_args + 16] = fp2; ptr64[fattr_args + 24] = fl2; }
+						}
+					}
+					parser_expect(p, TokKind.RPAREN, "attr: expected ')'");
+					if (ptr64[p + 16] == TokKind.RPAREN) { parser_bump(p); }
+				}
+			} else {
+				parser_err_here(p, "attr: expected name");
+			}
+			parser_expect(p, TokKind.RBRACK, "attr: expected ']'");
+			if (ptr64[p + 16] == TokKind.RBRACK) { parser_bump(p); }
+			k = ptr64[p + 16];
+			if (k == TokKind.SEMI) { parser_bump(p); k = ptr64[p + 16]; continue; }
+			if (k == TokKind.COMMA) { parser_bump(p); k = ptr64[p + 16]; continue; }
+		}
 		var field_public = 0;
 		if (k == TokKind.KW_PUBLIC) {
 			field_public = 1;
@@ -1290,6 +1351,8 @@ func parse_struct_decl(p, is_public) {
 
 		var field_node = stmt_new_var(fname_ptr, fname_len, ftype, 0, ftok);
 		if (field_node != 0) { ptr64[field_node + 8] = field_public; }
+		if (field_node != 0) { ptr64[field_node + 16] = fattr; }
+		if (field_node != 0) { ptr64[field_node + 24] = fattr_args; }
 		if (field_node != 0) { vec_push(fields, field_node); }
 	}
 	if (ptr64[p + 16] == TokKind.SEMI) { parser_bump(p); }
@@ -1410,6 +1473,16 @@ func parse_program(p, prog_out) {
 				parser_err_here(p, "public: cannot apply to import");
 			}
 			d = parse_import_decl(p);
+		} else if (k == TokKind.KW_PACKED) {
+			// Phase 3.4: packed structs: `packed struct Name { ... };`
+			parser_bump(p); // packed
+			k = ptr64[p + 16];
+			if (k != TokKind.KW_STRUCT) {
+				parser_err_here(p, "packed: expected 'struct'");
+				parser_sync_stmt(p);
+				continue;
+			}
+			d = parse_struct_decl(p, is_public);
 		} else if (k == TokKind.KW_FUNC) {
 			d = parse_func_decl(p, is_public);
 		} else if (k == TokKind.KW_VAR) {

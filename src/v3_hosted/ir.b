@@ -26,7 +26,9 @@ enum IrInstrKind {
 	LOAD_MEM8 = 18,
 	LOAD_MEM64 = 19,
 	STORE_MEM8 = 20,
-	STORE_MEM64 = 21
+	STORE_MEM64 = 21,
+	PUSH_ARG = 22,
+	CALL = 23
 };
 
 struct IrInstr {

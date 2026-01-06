@@ -59,6 +59,9 @@ build_driver() {
     "$driver_main" > "$merged"
 
   basm "$merged" -o "$drv_asm" >/dev/null
+  # Stage1 heap: basm emits a fixed-size HEAP_SIZE (default 1 MiB).
+  # Hosted-v3 builds have grown; bump the driver heap to avoid OOM->NULL deref.
+  sed -i 's/%define HEAP_SIZE 1048576/%define HEAP_SIZE 16777216/' "$drv_asm"
   nasm -felf64 "$drv_asm" -o "$drv_obj"
   ld -o "$drv_bin" "$drv_obj"
 }
@@ -168,7 +171,9 @@ for input in "${inputs[@]}"; do
 
   rm -f "$out_dir/v2_out.asm"
   log="$out_dir/v2c_${name}.log"
-  if ! "$drv_bin" --module-root "$root_dir/src/library/v2" --module-root "$root_dir/src" "$input_abs" >"$log" 2>&1; then
+  # Workaround: the v2 driver currently can segfault when given absolute
+  # --module-root paths. Run from repo root and pass relative roots instead.
+  if ! (cd "$root_dir" && "$drv_bin" --module-root ./src/library/v2 --module-root ./src "$input_abs") >"$log" 2>&1; then
     echo "FAIL: v2 driver error for $input" >&2
     cat "$log" >&2
     exit 1

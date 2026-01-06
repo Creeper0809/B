@@ -47,6 +47,7 @@ enum TokKind {
 	ARROW = 72,
 	QUESTION = 73,
 	DOLLAR = 74,
+	AT = 75,
 
 	// keywords (Phase 1.1)
 	// NOTE: keep these distinct from IDENT to simplify parser.
@@ -67,6 +68,7 @@ enum TokKind {
 	KW_RETURN = 114,
 	KW_NULL = 115,
 	KW_PUBLIC = 116,
+	KW_PACKED = 117,
 };
 
 struct Token {

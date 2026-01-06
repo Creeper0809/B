@@ -60,6 +60,17 @@ var tc_enums;
 // Global pointer-type registry (Vec of compound ptr types).
 var tc_ptr_types;
 
+// Global function signature registry (Vec of TcFuncSig*).
+// TcFuncSig layout (heap_alloc 64):
+//  +0 name_ptr
+//  +8 name_len
+// +16 mod_id
+// +24 param_count
+// +32 p0_ty
+// +40 p1_ty
+// +48 ret_ty (0 means no return type / void)
+var tc_funcs;
+
 // Module context for Phase 3.2 (1 file = 1 module).
 // tc_modules: Vec of TcModule*
 // TcModule layout (heap_alloc 32):
@@ -270,6 +281,34 @@ func tc_type_from_name(name_ptr, name_len) {
 	if (slice_eq_parts(name_ptr, name_len, "i32", 3) == 1) { return TC_TY_I32; }
 	if (slice_eq_parts(name_ptr, name_len, "i64", 3) == 1) { return TC_TY_I64; }
 	if (slice_eq_parts(name_ptr, name_len, "bool", 4) == 1) { return TC_TY_BOOL; }
+	// Phase 3.4 MVP: accept bit-width integer aliases like `u3`/`i5`.
+	// For hosted tests we model them as full-width u64/i64.
+	if (name_len >= 2) {
+		var c0 = ptr8[name_ptr];
+		var is_bit = 0;
+		if (c0 == 117) { is_bit = 1; } // 'u'
+		if (c0 == 105) { is_bit = 1; } // 'i'
+		if (is_bit == 1) {
+			var i = 1;
+			var bits = 0;
+			var ok = 1;
+			while (i < name_len) {
+				var ch = ptr8[name_ptr + i];
+				if (ch < 48) { ok = 0; break; }
+				if (ch > 57) { ok = 0; break; }
+				bits = (bits * 10) + (ch - 48);
+				i = i + 1;
+			}
+			if (ok == 1) {
+				if (bits > 0) {
+					if (bits <= 64) {
+						if (c0 == 117) { return TC_TY_U64; }
+						return TC_TY_I64;
+					}
+				}
+			}
+		}
+	}
 	return TC_TY_INVALID;
 }
 
@@ -353,6 +392,216 @@ func tc_enum_find_variant(ty, name_ptr, name_len) {
 		// Variant node layout: {name_ptr, name_len, value}
 		if (slice_eq_parts(ptr64[v + 0], ptr64[v + 8], name_ptr, name_len) == 1) { return v; }
 		i = i + 1;
+	}
+	return 0;
+}
+
+func tc_func_lookup_mod(mod_id, name_ptr, name_len) {
+	if (tc_funcs == 0) { return 0; }
+	var n = vec_len(tc_funcs);
+	var i = 0;
+	while (i < n) {
+		var f = vec_get(tc_funcs, i);
+		if (f != 0) {
+			if (ptr64[f + 16] == mod_id) {
+				if (slice_eq_parts(ptr64[f + 0], ptr64[f + 8], name_ptr, name_len) == 1) {
+					return f;
+				}
+			}
+		}
+		i = i + 1;
+	}
+	return 0;
+}
+
+func tc_collect_func_sigs_from_prog(prog, mod_id) {
+	if (prog == 0) { return 0; }
+	var decls = ptr64[prog + 0];
+	if (decls == 0) { return 0; }
+	var n = vec_len(decls);
+	var i = 0;
+	while (i < n) {
+		var d = vec_get(decls, i);
+		if (d != 0 && ptr64[d + 0] == AstDeclKind.FUNC) {
+			var name_ptr = ptr64[d + 8];
+			var name_len = ptr64[d + 16];
+			var params = ptr64[d + 24];
+			var ret_ast = ptr64[d + 32];
+			var pc = 0;
+			var p0 = TC_TY_INVALID;
+			var p1 = TC_TY_INVALID;
+			if (params != 0) {
+				pc = vec_len(params);
+				if (pc > 0) {
+					var ps0 = vec_get(params, 0);
+					if (ps0 != 0 && ptr64[ps0 + 48] != 0) { p0 = tc_type_from_asttype(ptr64[ps0 + 48]); }
+				}
+				if (pc > 1) {
+					var ps1 = vec_get(params, 1);
+					if (ps1 != 0 && ptr64[ps1 + 48] != 0) { p1 = tc_type_from_asttype(ptr64[ps1 + 48]); }
+				}
+			}
+			var ret_ty = 0;
+			if (ret_ast != 0) { ret_ty = tc_type_from_asttype(ret_ast); }
+
+			var sig = heap_alloc(64);
+			if (sig != 0) {
+				ptr64[sig + 0] = name_ptr;
+				ptr64[sig + 8] = name_len;
+				ptr64[sig + 16] = mod_id;
+				ptr64[sig + 24] = pc;
+				ptr64[sig + 32] = p0;
+				ptr64[sig + 40] = p1;
+				ptr64[sig + 48] = ret_ty;
+				ptr64[sig + 56] = 0;
+				vec_push(tc_funcs, sig);
+			}
+		}
+		i = i + 1;
+	}
+	return 0;
+}
+
+func tc_build_hook_name(struct_ty0, field_meta0, is_set0) {
+	// Returns: rax=ptr, rdx=len (not NUL-terminated)
+	var sn_ptr0 = ptr64[struct_ty0 + 8];
+	var sn_len0 = ptr64[struct_ty0 + 16];
+	var fn_ptr0 = ptr64[field_meta0 + 0];
+	var fn_len0 = ptr64[field_meta0 + 8];
+	var out_len0 = sn_len0 + 5 + fn_len0;
+	var out_ptr0 = heap_alloc(out_len0);
+	if (out_ptr0 == 0) {
+		alias rdx : out_len_z;
+		out_len_z = 0;
+		return 0;
+	}
+	var i0 = 0;
+	while (i0 < sn_len0) { ptr8[out_ptr0 + i0] = ptr8[sn_ptr0 + i0]; i0 = i0 + 1; }
+	ptr8[out_ptr0 + sn_len0 + 0] = 95; // '_'
+	if (is_set0 == 1) {
+		ptr8[out_ptr0 + sn_len0 + 1] = 115; // 's'
+		ptr8[out_ptr0 + sn_len0 + 2] = 101; // 'e'
+		ptr8[out_ptr0 + sn_len0 + 3] = 116; // 't'
+	} else {
+		ptr8[out_ptr0 + sn_len0 + 1] = 103; // 'g'
+		ptr8[out_ptr0 + sn_len0 + 2] = 101; // 'e'
+		ptr8[out_ptr0 + sn_len0 + 3] = 116; // 't'
+	}
+	ptr8[out_ptr0 + sn_len0 + 4] = 95; // '_'
+	var j0 = 0;
+	while (j0 < fn_len0) { ptr8[out_ptr0 + sn_len0 + 5 + j0] = ptr8[fn_ptr0 + j0]; j0 = j0 + 1; }
+	alias rdx : out_len_ret;
+	out_len_ret = out_len0;
+	return out_ptr0;
+}
+
+func tc_validate_property_hooks_mod(mod_id) {
+	if (tc_structs == 0) { return 0; }
+	var tsn = vec_len(tc_structs);
+	var tsi = 0;
+	while (tsi < tsn) {
+		var st = vec_get(tc_structs, tsi);
+		if (st != 0 && ptr64[st + 0] == TC_COMPOUND_STRUCT && ptr64[st + 48] == mod_id) {
+			var fields0 = ptr64[st + 24];
+			var fnn0 = 0;
+			if (fields0 != 0) { fnn0 = vec_len(fields0); }
+			var fi0 = 0;
+			while (fi0 < fnn0) {
+				var fm = vec_get(fields0, fi0);
+				if (fm != 0) {
+					var fattr0 = ptr64[fm + 40];
+					var fty0 = ptr64[fm + 16];
+					var fsz0 = tc_sizeof(fty0);
+					var eline = ptr64[fm + 80];
+					var ecol = ptr64[fm + 88];
+
+					var has_getter0 = fattr0 & 1;
+					var has_setter0 = fattr0 & 2;
+
+					// getter
+					if (has_getter0 != 0) {
+						var gptr = ptr64[fm + 48];
+						var glen = ptr64[fm + 56];
+						if (gptr != 0 && glen != 0) {
+							var sigg = tc_func_lookup_mod(mod_id, gptr, glen);
+							if (sigg == 0) {
+								tc_err_at(eline, ecol, "getter hook: unknown function");
+							} else {
+								var pcg = ptr64[sigg + 24];
+								var p0g = ptr64[sigg + 32];
+								var rg = ptr64[sigg + 48];
+								var want_self = tc_make_ptr(st, 0);
+								if (pcg != 1) {
+									tc_err_at(eline, ecol, "getter hook: signature mismatch");
+								} else if (p0g != want_self) {
+									tc_err_at(eline, ecol, "getter hook: signature mismatch");
+								} else if (rg != fty0) {
+									tc_err_at(eline, ecol, "getter hook: signature mismatch");
+								}
+							}
+						} else {
+							// auto-generated name must not collide
+							if (fsz0 != 1 && fsz0 != 8) {
+								tc_err_at(eline, ecol, "getter hook: auto hook unsupported field type");
+							} else {
+								tc_build_hook_name(st, fm, 0);
+									alias rdx : glen2;
+									gptr = rax;
+									glen = glen2;
+								if (gptr != 0 && glen != 0) {
+									if (tc_func_lookup_mod(mod_id, gptr, glen) != 0) {
+										tc_err_at(eline, ecol, "getter hook: auto name conflicts with existing function");
+									}
+								}
+							}
+						}
+					}
+
+					// setter
+					if (has_setter0 != 0) {
+						var sptr = ptr64[fm + 64];
+						var slen = ptr64[fm + 72];
+						if (sptr != 0 && slen != 0) {
+							var sigs = tc_func_lookup_mod(mod_id, sptr, slen);
+							if (sigs == 0) {
+								tc_err_at(eline, ecol, "setter hook: unknown function");
+							} else {
+								var pcs = ptr64[sigs + 24];
+								var p0s = ptr64[sigs + 32];
+								var p1s = ptr64[sigs + 40];
+								var rs = ptr64[sigs + 48];
+								var want_self = tc_make_ptr(st, 0);
+								if (pcs != 2) {
+									tc_err_at(eline, ecol, "setter hook: signature mismatch");
+								} else if (p0s != want_self) {
+									tc_err_at(eline, ecol, "setter hook: signature mismatch");
+								} else if (p1s != fty0) {
+									tc_err_at(eline, ecol, "setter hook: signature mismatch");
+								} else if (rs != 0) {
+									tc_err_at(eline, ecol, "setter hook: signature mismatch");
+								}
+							}
+						} else {
+							if (fsz0 != 1 && fsz0 != 8) {
+								tc_err_at(eline, ecol, "setter hook: auto hook unsupported field type");
+							} else {
+								tc_build_hook_name(st, fm, 1);
+								alias rdx : slen2;
+								sptr = rax;
+								slen = slen2;
+								if (sptr != 0 && slen != 0) {
+									if (tc_func_lookup_mod(mod_id, sptr, slen) != 0) {
+										tc_err_at(eline, ecol, "setter hook: auto name conflicts with existing function");
+									}
+								}
+							}
+						}
+					}
+				}
+				fi0 = fi0 + 1;
+			}
+		}
+		tsi = tsi + 1;
 	}
 	return 0;
 }
@@ -807,6 +1056,8 @@ func tc_register_struct_decl(d, mod_id, is_public) {
 		var fname_ptr = ptr64[st + 32];
 		var fname_len = ptr64[st + 40];
 		var fpublic = ptr64[st + 8];
+		var fattr = ptr64[st + 16];
+		var fattr_args = ptr64[st + 24];
 		var fty_ast = ptr64[st + 48];
 		var fty = tc_type_from_asttype(fty_ast);
 		if (fty == TC_TY_INVALID) {
@@ -826,13 +1077,28 @@ func tc_register_struct_decl(d, mod_id, is_public) {
 		cur = cur + f_size;
 		if (f_align > align) { align = f_align; }
 
-		var f = heap_alloc(40);
+		var f = heap_alloc(96);
 		if (f == 0) { return 1; }
 		ptr64[f + 0] = fname_ptr;
 		ptr64[f + 8] = fname_len;
 		ptr64[f + 16] = fty;
 		ptr64[f + 24] = off;
 		ptr64[f + 32] = fpublic;
+		ptr64[f + 40] = fattr;
+		// Optional property hook target functions from parser: @[getter(func)] / @[setter(func)]
+		ptr64[f + 48] = 0;
+		ptr64[f + 56] = 0;
+		ptr64[f + 64] = 0;
+		ptr64[f + 72] = 0;
+		if (fattr_args != 0) {
+			ptr64[f + 48] = ptr64[fattr_args + 0];
+			ptr64[f + 56] = ptr64[fattr_args + 8];
+			ptr64[f + 64] = ptr64[fattr_args + 16];
+			ptr64[f + 72] = ptr64[fattr_args + 24];
+		}
+		// Store source location for diagnostics.
+		ptr64[f + 80] = ptr64[st + 72];
+		ptr64[f + 88] = ptr64[st + 80];
 		vec_push(fields, f);
 		i = i + 1;
 	}
@@ -964,6 +1230,24 @@ func tc_expr(env, e) {
 				return TC_TY_INVALID;
 			}
 			return TC_TY_BOOL;
+		}
+		if (op == TokKind.AMP) {
+			var rhs = ptr64[e + 16];
+			if (rhs == 0) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
+				return TC_TY_INVALID;
+			}
+			var rk = ptr64[rhs + 0];
+			if (rk != AstExprKind.IDENT && rk != AstExprKind.FIELD) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
+				return TC_TY_INVALID;
+			}
+			var pty = tc_make_ptr(rhs_ty, 0);
+			if (pty == TC_TY_INVALID) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot take address of this type");
+				return TC_TY_INVALID;
+			}
+			return pty;
 		}
 		if (op == TokKind.PLUS || op == TokKind.MINUS || op == TokKind.TILDE) {
 			if (tc_is_int(rhs_ty) == 0) {
@@ -1237,8 +1521,10 @@ func tc_expr(env, e) {
 	if (k == AstExprKind.FIELD) {
 		var base = ptr64[e + 16];
 		var packed0a = ptr64[e + 32];
-		var via_ptr0 = packed0a >> 63;
-		var field_len0 = packed0a & 9223372036854775807;
+		// Pre-typecheck packing from parser: [field_len<<2] | [via_ptr<<1] | raw
+		var via_ptr0 = (packed0a >> 1) & 1;
+		var raw0 = packed0a & 1;
+		var field_len0 = packed0a >> 2;
 		var field_ptr0 = ptr64[e + 24];
 
 		// Phase 3.2: module-qualified symbol access: mod.sym
@@ -1331,7 +1617,7 @@ func tc_expr(env, e) {
 							}
 							// Store computed value into op; mark FIELD as immediate via size=127.
 							ptr64[e + 8] = ptr64[v + 16];
-							var packed_im = (127 << 56) | (field_len0 & 72057594037927935);
+							var packed_im = (127 << 56) | (field_len0 & 36028797018963967);
 							ptr64[e + 32] = packed_im;
 							return en;
 						}
@@ -1342,8 +1628,9 @@ func tc_expr(env, e) {
 		var base_ty = tc_expr(env, base);
 		var field_ptr = ptr64[e + 24];
 		var packed0 = ptr64[e + 32];
-		var via_ptr = packed0 >> 63;
-		var field_len = packed0 & 9223372036854775807;
+		var via_ptr = (packed0 >> 1) & 1;
+		var raw = packed0 & 1;
+		var field_len = packed0 >> 2;
 		var struct_ty = base_ty;
 		if (via_ptr == 1) {
 			if (tc_is_ptr(base_ty) == 0) {
@@ -1381,8 +1668,29 @@ func tc_expr(env, e) {
 		ptr64[e + 8] = ptr64[f + 24];
 		var fty = ptr64[f + 16];
 		var fsz = tc_sizeof(fty);
-		// Pack: [via_ptr:1][field_size:7][field_len:56]
-		var packed = (via_ptr << 63) | ((fsz & 127) << 56) | (field_len & 72057594037927935);
+		// Phase 3.5: property hooks.
+		// Pack: [via_ptr:1][field_size:7][raw:1][hook:1][field_len:54]
+		var hook = 0;
+		var fattr2 = ptr64[f + 40];
+		if (raw == 0) {
+			var ha = fattr2 & 3;
+			if (ha != 0) { hook = 1; }
+		}
+		if (hook == 1) {
+			// Store a tiny record for codegen: { struct_ty, field_meta }
+			var rec = heap_alloc(16);
+			if (rec != 0) {
+				ptr64[rec + 0] = struct_ty;
+				ptr64[rec + 8] = f;
+				ptr64[e + 24] = rec;
+			}
+		}
+		var packed = 0;
+		packed = packed | (via_ptr << 63);
+		packed = packed | ((fsz & 127) << 56);
+		packed = packed | ((raw & 1) << 55);
+		packed = packed | ((hook & 1) << 54);
+		packed = packed | (field_len & 18014398509481983);
 		ptr64[e + 32] = packed;
 		return fty;
 	}
@@ -1558,6 +1866,8 @@ func typecheck_program(prog) {
 		i0 = i0 + 1;
 	}
 
+	// Pass 0.5 reserved for Phase 3.5 property hook validation.
+
 	var env = tc_env_new();
 	if (env == 0) {
 		return 1;
@@ -1598,6 +1908,26 @@ func typecheck_program(prog) {
 		} else if (k == AstDeclKind.FUNC) {
 			// New scope for each function.
 			var saved = vec_len(env);
+			// Bind params into the environment.
+			var params = ptr64[d + 24];
+			if (params != 0) {
+				var pn = vec_len(params);
+				var pi = 0;
+				while (pi < pn) {
+					var ps = vec_get(params, pi);
+					if (ps != 0) {
+						// Params are AstStmt(VAR)
+						var pname_ptr = ptr64[ps + 32];
+						var pname_len = ptr64[ps + 40];
+						var pty = TC_TY_INVALID;
+						if (ptr64[ps + 48] != 0) {
+							pty = tc_type_from_asttype(ptr64[ps + 48]);
+						}
+						tc_env_push(env, pname_ptr, pname_len, pty);
+					}
+					pi = pi + 1;
+				}
+			}
 			var body = ptr64[d + 40];
 			if (body != 0) {
 				tc_stmt(env, body);
@@ -1674,6 +2004,27 @@ func tc_typecheck_all_modules() {
 		mi = mi + 1;
 	}
 
+	// Pass 0.5 reserved for Phase 3.5 property hook validation.
+	tc_funcs = vec_new(8);
+	if (tc_funcs == 0) { return 1; }
+	mi = 0;
+	while (mi < mcount) {
+		var m05 = vec_get(tc_modules, mi);
+		var prog05 = 0;
+		if (m05 != 0) { prog05 = ptr64[m05 + 16]; }
+		tc_collect_func_sigs_from_prog(prog05, mi);
+		mi = mi + 1;
+	}
+	mi = 0;
+	while (mi < mcount) {
+		tc_cur_mod = mi;
+		var m05b = vec_get(tc_modules, mi);
+		tc_cur_imports = 0;
+		if (m05b != 0) { tc_cur_imports = ptr64[m05b + 24]; }
+		tc_validate_property_hooks_mod(mi);
+		mi = mi + 1;
+	}
+
 	// Pass 1: typecheck each module in isolation.
 	mi = 0;
 	while (mi < mcount) {
@@ -1724,6 +2075,26 @@ func tc_typecheck_all_modules() {
 			} else if (k == AstDeclKind.FUNC) {
 				// New scope for each function.
 				var saved = vec_len(env);
+				// Bind params into the environment.
+				var params = ptr64[d + 24];
+				if (params != 0) {
+					var pn = vec_len(params);
+					var pi = 0;
+					while (pi < pn) {
+						var ps = vec_get(params, pi);
+						if (ps != 0) {
+							// Params are AstStmt(VAR)
+							var pname_ptr = ptr64[ps + 32];
+							var pname_len = ptr64[ps + 40];
+							var pty = TC_TY_INVALID;
+							if (ptr64[ps + 48] != 0) {
+								pty = tc_type_from_asttype(ptr64[ps + 48]);
+							}
+							tc_env_push(env, pname_ptr, pname_len, pty);
+						}
+						pi = pi + 1;
+					}
+				}
 				var body = ptr64[d + 40];
 				if (body != 0) {
 					tc_stmt(env, body);

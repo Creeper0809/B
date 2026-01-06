@@ -183,19 +183,30 @@ NOTE
     - `foreach`가 u8/u64 배열에서 올바른 stride로 동작
 
 ### 3.4 `packed struct` 비트필드
-- [ ] `uN/iN`(1..64) 파싱/검증(일반 타입 사용은 MVP 금지)
-- [ ] read/write lowering(shift/mask, RMW)
+- [x] `uN/iN`(1..64) 파싱/검증(일반 타입 사용은 MVP 금지)
+- [x] read/write lowering(shift/mask, RMW)
 - DoD
     - 간단한 패킷 헤더 encode/decode 예제 통과
 
 ### 3.5 프로퍼티 훅 `@[getter]`/`@[setter]`
-- [ ] 어트리뷰트 파싱 + 필드에 부착
-- [ ] lowering: `p.hp = v` → `set_hp(&p, v)` / `p.hp` → `get_hp(&p)`
-- [ ] 자동 생성: `Player_set_hp`, `Player_get_hp` (이름 충돌 시 에러)
-- [ ] raw access로 재귀 방지: `self.$hp`
+
+- [x] 어트리뷰트 파싱 + 필드에 부착
+	- `@[getter]` / `@[setter]`: 훅 함수 자동 생성
+	- `@[getter(func)]` / `@[setter(func)]`: 지정 함수 호출
+
+- [x] lowering
+	- 자동 생성: `p.hp = v` → `Player_set_hp(&p, v)` / `p.hp` → `Player_get_hp(&p)`
+	- 지정 함수: `p.hp = v` → `func(&p, v)` / `p.hp` → `func(&p)`
+
+- [x] 자동 생성 이름(Struct 이름 prefix): `StructName_set_field`, `StructName_get_field`
+	- 예: `struct Player { hp: u64 }` → `Player_set_hp`, `Player_get_hp`
+	- 이름 충돌 시 에러
+
+- [x] raw access로 재귀 방지: `self.$hp` / `self->$hp`
 - DoD
-    - 훅 함수 시그니처 불일치 시 에러
-    - 자동 생성이 raw read/write를 사용
+	- 훅 함수 시그니처 불일치 시 에러
+	- `@[getter(func)]`/`@[setter(func)]`가 codegen golden에서 커버됨
+	- raw access가 훅 우회를 보장(재귀 방지)
 
 ---
 

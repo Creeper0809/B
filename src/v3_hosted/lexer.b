@@ -49,6 +49,7 @@ func keyword_kind(p, n) {
 		}
 		case 6: {
 			if (slice_eq_parts(p, n, "import", 6) == 1) { return TokKind.KW_IMPORT; }
+			if (slice_eq_parts(p, n, "packed", 6) == 1) { return TokKind.KW_PACKED; }
 			if (slice_eq_parts(p, n, "public", 6) == 1) { return TokKind.KW_PUBLIC; }
 			if (slice_eq_parts(p, n, "struct", 6) == 1) { return TokKind.KW_STRUCT; }
 			if (slice_eq_parts(p, n, "switch", 6) == 1) { return TokKind.KW_SWITCH; }
@@ -507,6 +508,7 @@ func lexer_next(lex, tok_out) {
 		else if (ch0 == 58) { kind = TokKind.COLON; }
 		else if (ch0 == 63) { kind = TokKind.QUESTION; }
 		else if (ch0 == 36) { kind = TokKind.DOLLAR; }
+		else if (ch0 == 64) { kind = TokKind.AT; }
 		else if (ch0 == 43) { kind = TokKind.PLUS; }
 		else if (ch0 == 45) { kind = TokKind.MINUS; }
 		else if (ch0 == 42) { kind = TokKind.STAR; }
