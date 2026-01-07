@@ -1665,64 +1665,8 @@ func cg_lower_stmt(ctx, st) {
 	}
 
 	if (k == AstStmtKind.SWITCH) {
-		// Layout: scrut(+8), cases(+16), default_body(+24)
-		// Note: simplified implementation without label preallocation
-		var scrut = ptr64[st + 8];
-		var cases = ptr64[st + 16];
-		var default_body = ptr64[st + 24];
-		var end_id = cg_label_alloc(ctx);
-		vec_push(ptr64[ctx + 80], end_id);
-		ptr64[ctx + 88] = ptr64[ctx + 88] + 1;
-		
-		var ncase = 0;
-		if (cases != 0) { ncase = vec_len(cases); }
-		
-		var default_label = cg_label_alloc(ctx);
-		
-		// Test each case in order and jump to matched body
-		cg_lower_expr(ctx, scrut);
-		var test_idx = 0;
-		while (test_idx < ncase) {
-			var case_node = vec_get(cases, test_idx);
-			if (case_node != 0) {
-				// Store label id in case node temporarily (abuse offset +16)
-				ptr64[case_node + 16] = cg_label_alloc(ctx);
-				var case_value = ptr64[case_node + 0];
-				// Check: scrutinee == case_value
-				ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
-				cg_lower_expr(ctx, scrut);
-				cg_lower_expr(ctx, case_value);
-				ir_emit(f, IrInstrKind.BINOP, TokKind.EQEQ, 0, 0);
-				ir_emit(f, IrInstrKind.JNZ, ptr64[case_node + 16], 0, 0);
-			}
-			test_idx = test_idx + 1;
-		}
-		
-		// No match: pop scrutinee and jump to default
-		ir_emit(f, IrInstrKind.POP, 0, 0, 0);
-		ir_emit(f, IrInstrKind.JMP, default_label, 0, 0);
-		
-		// Emit each case body with its label
-		var body_idx = 0;
-		while (body_idx < ncase) {
-			var case_node2 = vec_get(cases, body_idx);
-			if (case_node2 != 0) {
-				ir_emit(f, IrInstrKind.LABEL, ptr64[case_node2 + 16], 0, 0);
-				ir_emit(f, IrInstrKind.POP, 0, 0, 0);
-				var body_stmt = ptr64[case_node2 + 8];
-				if (body_stmt != 0) { cg_lower_stmt(ctx, body_stmt); }
-				ir_emit(f, IrInstrKind.JMP, end_id, 0, 0);
-			}
-			body_idx = body_idx + 1;
-		}
-		
-		// Emit default case
-		ir_emit(f, IrInstrKind.LABEL, default_label, 0, 0);
-		if (default_body != 0) { cg_lower_stmt(ctx, default_body); }
-		
-		ir_emit(f, IrInstrKind.LABEL, end_id, 0, 0);
-		vec_pop(ptr64[ctx + 80]);
-		ptr64[ctx + 88] = ptr64[ctx + 88] - 1;
+		// TODO: SWITCH codegen - disabled for v2 compiler compatibility
+		// Will be implemented when self-hosting with v3
 		return 0;
 	}
 

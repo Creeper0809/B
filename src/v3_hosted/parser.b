@@ -6,6 +6,20 @@ import v3_hosted.ast;
 
 import io;
 import vec;
+import hashmap;
+
+// Phase 5.1: temp token buffer for lookahead (48 bytes = 6 u64s)
+var parser_temp_tok_buf0;
+var parser_temp_tok_buf1;
+var parser_temp_tok_buf2;
+var parser_temp_tok_buf3;
+var parser_temp_tok_buf4;
+var parser_temp_tok_buf5;
+
+// Phase 5.1: Generic template registry
+// Maps name -> AstDecl* (for func and struct templates)
+var generic_registry; // HashMap*
+var parser_cur_prog; // Current program being parsed
 
 struct Parser {
 	lex: u64;
@@ -116,6 +130,502 @@ func parse_u64_token(tok) {
 	return val;
 }
 
+// Phase 5.1: lookahead to distinguish < in generics from comparison
+func parser_is_generic_param_list(p) {
+	// Called when current token is '<'.
+	// Returns 1 if this looks like a generic parameter list: <T>, <T, U>, etc.
+	// Returns 0 if this looks like a comparison: a < b.
+	// Simple heuristic: peek one token ahead. If it's IDENT, likely generic.
+	var lexp = ptr64[p + 0];
+	var saved_cur = ptr64[lexp + 8];
+	var saved_line = ptr64[lexp + 24];
+	var saved_line_start = ptr64[lexp + 32];
+	
+	// Use global temp token buffer (address of first element)
+	var temp_tok = &parser_temp_tok_buf0;
+	
+	// Lookahead: check first token after '<'
+	var k = lexer_next(lexp, temp_tok);
+	
+	// Restore lexer state
+	ptr64[lexp + 8] = saved_cur;
+	ptr64[lexp + 24] = saved_line;
+	ptr64[lexp + 32] = saved_line_start;
+	
+	// If next token is IDENT, treat as generic
+	if (k == TokKind.IDENT) { return 1; }
+	
+	// Otherwise treat as comparison
+	return 0;
+}
+
+// Phase 5.1: parse generic type parameters: <T>, <T, U>, etc.
+// Returns a Vec* of name strings (ptr:u64, len:u64 pairs stored as 2 u64s each).
+func parse_generic_params(p) {
+	if (ptr64[p + 16] != TokKind.LT) { return 0; }
+	if (parser_is_generic_param_list(p) == 0) { return 0; }
+	
+	parser_bump(p); // '<'
+	var params = vec_new(4);
+	if (params == 0) { return 0; }
+	
+	while (1) {
+		if (ptr64[p + 16] != TokKind.IDENT) {
+			parser_err_here(p, "generic param: expected type parameter name");
+			break;
+		}
+		var tokp = ptr64[p + 8];
+		var name_ptr = ptr64[tokp + 8];
+		var name_len = ptr64[tokp + 16];
+		vec_push(params, name_ptr);
+		vec_push(params, name_len);
+		parser_bump(p);
+		
+		if (ptr64[p + 16] == TokKind.COMMA) {
+			parser_bump(p);
+			continue;
+		}
+		break;
+	}
+	
+	parser_expect(p, TokKind.GT, "generic params: expected '>'");
+	if (ptr64[p + 16] == TokKind.GT) { parser_bump(p); }
+	
+	return params;
+}
+
+// Phase 5.1: AST Deep Copy functions (for generic instantiation)
+
+func clone_asttype(t) {
+	if (t == 0) { return 0; }
+	var nt = heap_alloc(64);
+	if (nt == 0) { return 0; }
+	ptr64[nt + 0] = ptr64[t + 0]; // kind
+	ptr64[nt + 8] = ptr64[t + 8];
+	ptr64[nt + 16] = ptr64[t + 16];
+	ptr64[nt + 24] = ptr64[t + 24];
+	ptr64[nt + 32] = ptr64[t + 32];
+	ptr64[nt + 40] = ptr64[t + 40];
+	ptr64[nt + 48] = ptr64[t + 48];
+	ptr64[nt + 56] = ptr64[t + 56];
+	var kind = ptr64[t + 0];
+	if (kind == AstTypeKind.PTR) {
+		var inner = ptr64[t + 8];
+		if (inner != 0) { ptr64[nt + 8] = clone_asttype(inner); }
+	}
+	else if (kind == AstTypeKind.SLICE) {
+		var inner = ptr64[t + 8];
+		if (inner != 0) { ptr64[nt + 8] = clone_asttype(inner); }
+	}
+	else if (kind == AstTypeKind.ARRAY) {
+		var inner = ptr64[t + 8];
+		if (inner != 0) { ptr64[nt + 8] = clone_asttype(inner); }
+	}
+	return nt;
+}
+
+func clone_astexpr(e) {
+	if (e == 0) { return 0; }
+	var ne = heap_alloc(80);
+	if (ne == 0) { return 0; }
+	ptr64[ne + 0] = ptr64[e + 0]; // kind
+	ptr64[ne + 8] = ptr64[e + 8]; // op
+	ptr64[ne + 16] = 0;
+	ptr64[ne + 24] = 0;
+	ptr64[ne + 32] = 0;
+	ptr64[ne + 40] = ptr64[e + 40]; // tok_ptr
+	ptr64[ne + 48] = ptr64[e + 48]; // tok_len
+	ptr64[ne + 56] = ptr64[e + 56]; // start_off
+	ptr64[ne + 64] = ptr64[e + 64]; // line
+	ptr64[ne + 72] = ptr64[e + 72]; // col
+	var kind = ptr64[e + 0];
+	if (kind == AstExprKind.UNARY) {
+		var rhs = ptr64[e + 16];
+		if (rhs != 0) { ptr64[ne + 16] = clone_astexpr(rhs); }
+	}
+	else if (kind == AstExprKind.BINARY) {
+		var lhs = ptr64[e + 16];
+		var rhs = ptr64[e + 24];
+		if (lhs != 0) { ptr64[ne + 16] = clone_astexpr(lhs); }
+		if (rhs != 0) { ptr64[ne + 24] = clone_astexpr(rhs); }
+	}
+	else if (kind == AstExprKind.CALL) {
+		var callee = ptr64[e + 16];
+		var args = ptr64[e + 32];
+		if (callee != 0) { ptr64[ne + 16] = clone_astexpr(callee); }
+		if (args != 0) {
+			var nargs = vec_new(4);
+			var i = 0;
+			var n = vec_len(args);
+			while (i < n) {
+				var arg = vec_get(args, i);
+				if (arg != 0) { vec_push(nargs, clone_astexpr(arg)); }
+				i = i + 1;
+			}
+			ptr64[ne + 32] = nargs;
+		}
+	}
+	else if (kind == AstExprKind.CAST) {
+		var ty = ptr64[e + 16];
+		var val = ptr64[e + 24];
+		if (ty != 0) { ptr64[ne + 16] = clone_asttype(ty); }
+		if (val != 0) { ptr64[ne + 24] = clone_astexpr(val); }
+	}
+	else if (kind == AstExprKind.INDEX) {
+		var base = ptr64[e + 16];
+		var idx = ptr64[e + 24];
+		if (base != 0) { ptr64[ne + 16] = clone_astexpr(base); }
+		if (idx != 0) { ptr64[ne + 24] = clone_astexpr(idx); }
+	}
+	else if (kind == AstExprKind.FIELD) {
+		var base = ptr64[e + 16];
+		if (base != 0) { ptr64[ne + 16] = clone_astexpr(base); }
+	}
+	else if (kind == AstExprKind.OFFSETOF) {
+		var ty = ptr64[e + 16];
+		if (ty != 0) { ptr64[ne + 16] = clone_asttype(ty); }
+	}
+	else if (kind == AstExprKind.BRACE_INIT) {
+		var items = ptr64[e + 32];
+		if (items != 0) {
+			var nitems = vec_new(4);
+			var i = 0;
+			var n = vec_len(items);
+			while (i < n) {
+				var item = vec_get(items, i);
+				if (item != 0) { vec_push(nitems, clone_astexpr(item)); }
+				i = i + 1;
+			}
+			ptr64[ne + 32] = nitems;
+		}
+	}
+	return ne;
+}
+
+func clone_aststmt(s) {
+	if (s == 0) { return 0; }
+	var ns = heap_alloc(96);
+	if (ns == 0) { return 0; }
+	ptr64[ns + 0] = ptr64[s + 0]; // kind
+	ptr64[ns + 8] = 0;
+	ptr64[ns + 16] = 0;
+	ptr64[ns + 24] = 0;
+	ptr64[ns + 32] = ptr64[s + 32]; // name_ptr
+	ptr64[ns + 40] = ptr64[s + 40]; // name_len
+	ptr64[ns + 48] = 0;
+	ptr64[ns + 56] = 0;
+	ptr64[ns + 64] = ptr64[s + 64]; // start_off
+	ptr64[ns + 72] = ptr64[s + 72]; // line
+	ptr64[ns + 80] = ptr64[s + 80]; // col
+	ptr64[ns + 88] = 0;
+	var kind = ptr64[s + 0];
+	if (kind == AstStmtKind.BLOCK) {
+		var stmts = ptr64[s + 8];
+		if (stmts != 0) {
+			var nstmts = vec_new(4);
+			var i = 0;
+			var n = vec_len(stmts);
+			while (i < n) {
+				var stmt = vec_get(stmts, i);
+				if (stmt != 0) { vec_push(nstmts, clone_aststmt(stmt)); }
+				i = i + 1;
+			}
+			ptr64[ns + 8] = nstmts;
+		}
+	}
+	else if (kind == AstStmtKind.VAR) {
+		var ty = ptr64[s + 48];
+		var expr = ptr64[s + 56];
+		if (ty != 0) { ptr64[ns + 48] = clone_asttype(ty); }
+		if (expr != 0) { ptr64[ns + 56] = clone_astexpr(expr); }
+	}
+	else if (kind == AstStmtKind.EXPR) {
+		var expr = ptr64[s + 56];
+		if (expr != 0) { ptr64[ns + 56] = clone_astexpr(expr); }
+	}
+	else if (kind == AstStmtKind.RETURN) {
+		var expr = ptr64[s + 56];
+		if (expr != 0) { ptr64[ns + 56] = clone_astexpr(expr); }
+	}
+	else if (kind == AstStmtKind.IF) {
+		var cond = ptr64[s + 8];
+		var then_b = ptr64[s + 16];
+		var else_b = ptr64[s + 24];
+		if (cond != 0) { ptr64[ns + 8] = clone_astexpr(cond); }
+		if (then_b != 0) { ptr64[ns + 16] = clone_aststmt(then_b); }
+		if (else_b != 0) { ptr64[ns + 24] = clone_aststmt(else_b); }
+	}
+	else if (kind == AstStmtKind.WHILE) {
+		var cond = ptr64[s + 8];
+		var body = ptr64[s + 16];
+		if (cond != 0) { ptr64[ns + 8] = clone_astexpr(cond); }
+		if (body != 0) { ptr64[ns + 16] = clone_aststmt(body); }
+	}
+	else if (kind == AstStmtKind.FOR) {
+		var init = ptr64[s + 8];
+		var cond = ptr64[s + 16];
+		var post = ptr64[s + 24];
+		var body = ptr64[s + 56];
+		if (init != 0) { ptr64[ns + 8] = clone_aststmt(init); }
+		if (cond != 0) { ptr64[ns + 16] = clone_astexpr(cond); }
+		if (post != 0) { ptr64[ns + 24] = clone_aststmt(post); }
+		if (body != 0) { ptr64[ns + 56] = clone_aststmt(body); }
+	}
+	else if (kind == AstStmtKind.FOREACH) {
+		var bind = ptr64[s + 8];
+		var iter = ptr64[s + 16];
+		var body = ptr64[s + 24];
+		if (bind != 0) {
+			var nbind = heap_alloc(48);
+			if (nbind != 0) {
+				ptr64[nbind + 0] = ptr64[bind + 0];
+				ptr64[nbind + 8] = ptr64[bind + 8];
+				ptr64[nbind + 16] = ptr64[bind + 16];
+				ptr64[nbind + 24] = ptr64[bind + 24];
+				ptr64[nbind + 32] = ptr64[bind + 32];
+				ptr64[nbind + 40] = ptr64[bind + 40];
+				ptr64[ns + 8] = nbind;
+			}
+		}
+		if (iter != 0) { ptr64[ns + 16] = clone_astexpr(iter); }
+		if (body != 0) { ptr64[ns + 24] = clone_aststmt(body); }
+	}
+	else if (kind == AstStmtKind.WIPE) {
+		var expr = ptr64[s + 56];
+		if (expr != 0) { ptr64[ns + 56] = clone_astexpr(expr); }
+	}
+	else if (kind == AstStmtKind.SWITCH) {
+		var cond = ptr64[s + 8];
+		var cases = ptr64[s + 16];
+		if (cond != 0) { ptr64[ns + 8] = clone_astexpr(cond); }
+		if (cases != 0) {
+			var ncases = vec_new(4);
+			var i = 0;
+			var n = vec_len(cases);
+			while (i < n) {
+				var c = vec_get(cases, i);
+				if (c != 0) { vec_push(ncases, clone_aststmt(c)); }
+				i = i + 1;
+			}
+			ptr64[ns + 16] = ncases;
+		}
+	}
+	return ns;
+}
+
+// Phase 5.1: Type substitution engine
+// Substitutes generic param name with concrete type in AstType tree
+
+func name_matches(name_ptr, name_len, target_ptr, target_len) {
+	if (name_len != target_len) { return 0; }
+	var i = 0;
+	while (i < name_len) {
+		var a = ptr8[name_ptr + i];
+		var b = ptr8[target_ptr + i];
+		if (a != b) { return 0; }
+		i = i + 1;
+	}
+	return 1;
+}
+
+func substitute_type(t, param_name_ptr, param_name_len, concrete_type) {
+	if (t == 0) { return 0; }
+	var kind = ptr64[t + 0];
+	if (kind == AstTypeKind.NAME) {
+		var name_ptr = ptr64[t + 8];
+		var name_len = ptr64[t + 16];
+		if (name_matches(name_ptr, name_len, param_name_ptr, param_name_len) == 1) {
+			return clone_asttype(concrete_type);
+		}
+		return clone_asttype(t);
+	}
+	else if (kind == AstTypeKind.PTR) {
+		var inner = ptr64[t + 8];
+		var new_inner = substitute_type(inner, param_name_ptr, param_name_len, concrete_type);
+		var nt = clone_asttype(t);
+		ptr64[nt + 8] = new_inner;
+		return nt;
+	}
+	else if (kind == AstTypeKind.SLICE) {
+		var inner = ptr64[t + 8];
+		var new_inner = substitute_type(inner, param_name_ptr, param_name_len, concrete_type);
+		var nt = clone_asttype(t);
+		ptr64[nt + 8] = new_inner;
+		return nt;
+	}
+	else if (kind == AstTypeKind.ARRAY) {
+		var inner = ptr64[t + 8];
+		var new_inner = substitute_type(inner, param_name_ptr, param_name_len, concrete_type);
+		var nt = clone_asttype(t);
+		ptr64[nt + 8] = new_inner;
+		return nt;
+	}
+	return clone_asttype(t);
+}
+
+func substitute_expr(e, param_name_ptr, param_name_len, concrete_type) {
+	if (e == 0) { return 0; }
+	var ne = clone_astexpr(e);
+	var kind = ptr64[e + 0];
+	if (kind == AstExprKind.CAST) {
+		var ty = ptr64[e + 16];
+		if (ty != 0) {
+			ptr64[ne + 16] = substitute_type(ty, param_name_ptr, param_name_len, concrete_type);
+		}
+	}
+	else if (kind == AstExprKind.OFFSETOF) {
+		var ty = ptr64[e + 16];
+		if (ty != 0) {
+			ptr64[ne + 16] = substitute_type(ty, param_name_ptr, param_name_len, concrete_type);
+		}
+	}
+	return ne;
+}
+
+func substitute_stmt(s, param_name_ptr, param_name_len, concrete_type) {
+	if (s == 0) { return 0; }
+	var ns = clone_aststmt(s);
+	var kind = ptr64[s + 0];
+	if (kind == AstStmtKind.VAR) {
+		var ty = ptr64[s + 48];
+		if (ty != 0) {
+			ptr64[ns + 48] = substitute_type(ty, param_name_ptr, param_name_len, concrete_type);
+		}
+	}
+	return ns;
+}
+
+// Phase 5.1: Simple name mangling (Type -> Type_u64 style)
+func mangle_generic_name(base_ptr, base_len, type_arg) {
+	// Simple mangling: just append "_typename"
+	// e.g., Vec + u64 -> Vec_u64
+	if (type_arg == 0) { return 0; }
+	var arg_name_ptr = 0;
+	var arg_name_len = 0;
+	var kind = ptr64[type_arg + 0];
+	if (kind == AstTypeKind.NAME) {
+		arg_name_ptr = ptr64[type_arg + 8];
+		arg_name_len = ptr64[type_arg + 16];
+	}
+	else {
+		// For complex types, just use "T" as placeholder
+		var complex_str = heap_alloc(2);
+		if (complex_str == 0) { return 0; }
+		ptr8[complex_str + 0] = 84; // 'T'
+		ptr8[complex_str + 1] = 0;
+		arg_name_ptr = complex_str;
+		arg_name_len = 1;
+	}
+	// Allocate buffer: base + "_" + arg
+	var total_len = base_len + 1 + arg_name_len;
+	var buf = heap_alloc(total_len + 1);
+	if (buf == 0) { return 0; }
+	var i = 0;
+	while (i < base_len) {
+		ptr8[buf + i] = ptr8[base_ptr + i];
+		i = i + 1;
+	}
+	ptr8[buf + i] = 95; // '_'
+	i = i + 1;
+	var j = 0;
+	while (j < arg_name_len) {
+		ptr8[buf + i] = ptr8[arg_name_ptr + j];
+		i = i + 1;
+		j = j + 1;
+	}
+	ptr8[buf + i] = 0; // null terminator
+	return buf;
+}
+
+// Phase 5.1: Generic struct instantiation
+// Returns the instantiated struct decl (added to program)
+
+func instantiate_generic_struct(template, type_args, tokp) {
+	if (template == 0) { return 0; }
+	if (type_args == 0) { return 0; }
+	var n_args = vec_len(type_args);
+	if (n_args == 0) { return 0; }
+	
+	var template_name_ptr = ptr64[template + 8];
+	var template_name_len = ptr64[template + 16];
+	var generic_params = ptr64[template + 88];
+	
+	if (generic_params == 0) { return 0; }
+	var n_params = vec_len(generic_params);
+	if (n_params == 0) { return 0; }
+	var param_count = n_params / 2; // name_ptr, name_len pairs
+	var arg_count = n_args;
+	
+	if (param_count != arg_count) {
+		// TODO: error reporting
+		return 0;
+	}
+	
+	// Create mangled name (simple: Base_Type)
+	var first_arg = vec_get(type_args, 0);
+	var mangled_ptr = mangle_generic_name(template_name_ptr, template_name_len, first_arg);
+	if (mangled_ptr == 0) { return 0; }
+	var mangled_len = 0;
+	while (ptr8[mangled_ptr + mangled_len] != 0) {
+		mangled_len = mangled_len + 1;
+	}
+	
+	// Clone the struct decl
+	var new_decl = heap_alloc(104);
+	if (new_decl == 0) { return 0; }
+	ptr64[new_decl + 0] = ptr64[template + 0]; // kind
+	ptr64[new_decl + 8] = mangled_ptr;
+	ptr64[new_decl + 16] = mangled_len;
+	ptr64[new_decl + 24] = 0; // fields (will be filled)
+	ptr64[new_decl + 32] = ptr64[template + 32];
+	ptr64[new_decl + 40] = ptr64[template + 40];
+	ptr64[new_decl + 48] = ptr64[template + 48];
+	ptr64[new_decl + 56] = ptr64[template + 56];
+	ptr64[new_decl + 64] = ptr64[template + 64];
+	ptr64[new_decl + 72] = ptr64[template + 72];
+	ptr64[new_decl + 80] = ptr64[template + 80];
+	ptr64[new_decl + 88] = 0; // No generic params in instantiated version
+	ptr64[new_decl + 96] = ptr64[template + 96];
+	
+	// Substitute type parameters in fields
+	var template_fields = ptr64[template + 24];
+	if (template_fields != 0) {
+		var new_fields = vec_new(4);
+		var i = 0;
+		var n = vec_len(template_fields);
+		while (i < n) {
+			var field = vec_get(template_fields, i);
+			if (field != 0) {
+				// Clone and substitute
+				var new_field = clone_aststmt(field);
+				// For now, only substitute first param
+				var param_name_ptr = vec_get(generic_params, 0);
+				var param_name_len = vec_get(generic_params, 1);
+				var concrete_type = vec_get(type_args, 0);
+				
+				var field_type = ptr64[new_field + 48];
+				if (field_type != 0) {
+					ptr64[new_field + 48] = substitute_type(field_type, param_name_ptr, param_name_len, concrete_type);
+				}
+				
+				vec_push(new_fields, new_field);
+			}
+			i = i + 1;
+		}
+		ptr64[new_decl + 24] = new_fields;
+	}
+	
+	// Add to program
+	if (parser_cur_prog != 0) {
+		var prog_decls = ptr64[parser_cur_prog + 0];
+		if (prog_decls != 0) {
+			vec_push(prog_decls, new_decl);
+		}
+	}
+	
+	return new_decl;
+}
+
 func type_new_name(name_ptr, name_len, tokp) {
 	var t = heap_alloc(64);
 	if (t == 0) { return 0; }
@@ -191,6 +701,23 @@ func type_new_array(inner, len, tokp) {
 	ptr64[t + 0] = AstTypeKind.ARRAY;
 	ptr64[t + 8] = inner;
 	ptr64[t + 16] = len;
+	ptr64[t + 24] = ptr64[tokp + 32];
+	ptr64[t + 32] = ptr64[tokp + 24];
+	ptr64[t + 40] = ptr64[tokp + 40];
+	ptr64[t + 48] = 0;
+	ptr64[t + 56] = 0;
+	return t;
+}
+
+// Phase 5.1: generic type instantiation: Type<Args>
+// base_type: AstType* for the base name (e.g., Vec)
+// type_args: Vec* of AstType* (e.g., [u64])
+func type_new_generic(base_type, type_args, tokp) {
+	var t = heap_alloc(64);
+	if (t == 0) { return 0; }
+	ptr64[t + 0] = AstTypeKind.GENERIC;
+	ptr64[t + 8] = base_type;
+	ptr64[t + 16] = type_args;
 	ptr64[t + 24] = ptr64[tokp + 32];
 	ptr64[t + 32] = ptr64[tokp + 24];
 	ptr64[t + 40] = ptr64[tokp + 40];
@@ -588,9 +1115,46 @@ func parse_type(p) {
 			var name1_ptr = ptr64[tokp2 + 8];
 			var name1_len = ptr64[tokp2 + 16];
 			parser_bump(p);
-			return type_new_qual_name(name0_ptr, name0_len, name1_ptr, name1_len, tokp);
+			var base = type_new_qual_name(name0_ptr, name0_len, name1_ptr, name1_len, tokp);
+			return base;
 		}
-		return type_new_name(name0_ptr, name0_len, tokp);
+		var base_name = type_new_name(name0_ptr, name0_len, tokp);
+		// Phase 5.1: check for generic instantiation: Type<Args>
+		if (ptr64[p + 16] == TokKind.LT) {
+			if (parser_is_generic_param_list(p) == 1) {
+				parser_bump(p); // '<'
+				var type_args = vec_new(4);
+				while (1) {
+					var arg_type = parse_type(p);
+					if (arg_type != 0) { vec_push(type_args, arg_type); }
+					if (ptr64[p + 16] == TokKind.COMMA) {
+						parser_bump(p);
+						continue;
+					}
+					break;
+				}
+				parser_expect(p, TokKind.GT, "type args: expected '>'");
+				if (ptr64[p + 16] == TokKind.GT) { parser_bump(p); }
+				
+				if (generic_registry != 0) {
+					var n_args = vec_len(type_args);
+					if (n_args > 0) {
+						var template = hashmap_get(generic_registry, name0_ptr, name0_len);
+						if (template != 0) {
+							var inst = instantiate_generic_struct(template, type_args, tokp);
+							if (inst != 0) {
+								var inst_name_ptr = ptr64[inst + 8];
+								var inst_name_len = ptr64[inst + 16];
+								return type_new_name(inst_name_ptr, inst_name_len, tokp);
+							}
+						}
+					}
+				}
+				
+				return type_new_generic(base_name, type_args, tokp);
+			}
+		}
+		return base_name;
 	}
 	parser_err_here(p, "type: expected name");
 	return 0;
@@ -1570,6 +2134,9 @@ func parse_func_decl(p, is_public) {
 	var name_len = ptr64[tokp + 16];
 	parser_bump(p);
 
+	// Phase 5.1: parse generic type parameters if present
+	var generic_params = parse_generic_params(p);
+
 	parser_expect(p, TokKind.LPAREN, "func: expected '('");
 	if (ptr64[p + 16] == TokKind.LPAREN) { parser_bump(p); }
 	var params = vec_new(4);
@@ -1646,6 +2213,10 @@ func parse_func_decl(p, is_public) {
 	if (ret_reg0 != 0) {
 		ptr64[d + 80] = ptr64[d + 80] | ((ret_reg0 & 255) << PARSER_DECL_RETREG_SHIFT);
 	}
+	// Phase 5.1: store generic params at offset 88
+	if (generic_params != 0) {
+		ptr64[d + 88] = generic_params;
+	}
 	return d;
 }
 
@@ -1683,6 +2254,9 @@ func parse_struct_decl(p, is_public) {
 	var name_ptr = ptr64[tokp + 8];
 	var name_len = ptr64[tokp + 16];
 	parser_bump(p);
+
+	// Phase 5.1: parse generic type parameters if present
+	var generic_params = parse_generic_params(p);
 
 	parser_expect(p, TokKind.LBRACE, "struct: expected '{'");
 	if (ptr64[p + 16] == TokKind.LBRACE) { parser_bump(p); }
@@ -1796,7 +2370,12 @@ func parse_struct_decl(p, is_public) {
 		if (field_node != 0) { vec_push(fields, field_node); }
 	}
 	if (ptr64[p + 16] == TokKind.SEMI) { parser_bump(p); }
-	return decl_new_struct(name_ptr, name_len, is_public, fields, kw_tok);
+	var d = decl_new_struct(name_ptr, name_len, is_public, fields, kw_tok);
+	// Phase 5.1: store generic params at offset 88
+	if (generic_params != 0) {
+		ptr64[d + 88] = generic_params;
+	}
+	return d;
 }
 
 func parse_enum_decl(p, is_public) {
@@ -1888,6 +2467,15 @@ func parse_enum_decl(p, is_public) {
 }
 
 func parse_program(p, prog_out) {
+	// Phase 5.1: Initialize generic registry
+	if (generic_registry == 0) {
+		generic_registry = hashmap_new(16);
+		if (generic_registry == 0) {
+			return 0;
+		}
+	}
+	parser_cur_prog = prog_out;
+	
 	var decls = vec_new(8);
 	if (decls == 0) { return 0; }
 	ptr64[prog_out + 0] = decls;
@@ -1953,7 +2541,18 @@ func parse_program(p, prog_out) {
 			parser_sync_stmt(p);
 			continue;
 		}
-		if (d != 0) { vec_push(decls, d); }
+		if (d != 0) {
+			var generic_params = ptr64[d + 88];
+			if (generic_params != 0) {
+				var n_params = vec_len(generic_params);
+				if (n_params > 0) {
+					var name_ptr = ptr64[d + 8];
+					var name_len = ptr64[d + 16];
+					hashmap_put(generic_registry, name_ptr, name_len, d);
+				}
+			}
+			vec_push(decls, d);
+		}
 	}
 	ptr64[prog_out + 8] = ptr64[p + 24];
 	return 0;

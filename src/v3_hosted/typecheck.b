@@ -4543,9 +4543,9 @@ func typecheck_program(prog) {
 			tc_register_enum_decl(d0, 0, ptr64[d0 + 72]);
 		}
 		if (ptr64[d0 + 0] == AstDeclKind.STRUCT) {
-			var tflag0 = ptr64[d0 + 80] & TC_DECL_FLAG_GENERIC_TEMPLATE;
-			var tparams0 = ptr64[d0 + 96];
-			if (tflag0 == 0 && tparams0 == 0) {
+			// Phase 5.1: skip generic template structs
+			var generic_params0 = ptr64[d0 + 88];
+			if (generic_params0 == 0) {
 				tc_register_struct_decl(d0, 0, ptr64[d0 + 72]);
 			}
 		}
@@ -4604,9 +4604,8 @@ func typecheck_program(prog) {
 			tc_env_push(env, name_ptr, name_len, bind_ty);
 		} else if (k == AstDeclKind.FUNC) {
 			// Phase 5.1: skip generic templates; they are instantiated at call sites.
-			var tflag2 = ptr64[d + 80] & TC_DECL_FLAG_GENERIC_TEMPLATE;
-			var tparams2 = ptr64[d + 96];
-			if (tflag2 != 0 || tparams2 != 0) { i = i + 1; continue; }
+			var generic_params2 = ptr64[d + 88];
+			if (generic_params2 != 0) { i = i + 1; continue; }
 			// Phase 4.5: validate @reg annotations (extern-only).
 			tc_validate_reg_anno_in_func(d);
 			// New scope for each function.

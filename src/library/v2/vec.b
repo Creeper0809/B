@@ -69,3 +69,16 @@ func vec_push(v, item) {
 	ptr64[v + 8] = len;
 	return len;
 }
+
+func vec_pop(v) {
+	// Returns: popped item (or 0 if empty)
+	var len = ptr64[v + 8];
+	if (len == 0) {
+		return 0;
+	}
+	len = len - 1;
+	var buf = ptr64[v + 0];
+	var item = ptr64[buf + len * 8];
+	ptr64[v + 8] = len;
+	return item;
+}
