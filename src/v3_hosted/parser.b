@@ -97,6 +97,25 @@ func parser_skip_braced(p) {
 	return 0;
 }
 
+func parse_u64_token(tok) {
+	// Parse u64 from token text (decimal only for now)
+	var ptr = ptr64[tok + 8];
+	var len = ptr64[tok + 16];
+	var val = 0;
+	var i = 0;
+	while (i < len) {
+		var ch = ptr8[ptr + i];
+		if (ch >= 48 && ch <= 57) {
+			val = val * 10 + (ch - 48);
+		} else {
+			// Non-digit: stop parsing
+			return val;
+		}
+		i = i + 1;
+	}
+	return val;
+}
+
 func type_new_name(name_ptr, name_len, tokp) {
 	var t = heap_alloc(64);
 	if (t == 0) { return 0; }

@@ -1666,59 +1666,60 @@ func cg_lower_stmt(ctx, st) {
 
 	if (k == AstStmtKind.SWITCH) {
 		// Layout: scrut(+8), cases(+16), default_body(+24)
+		// Note: simplified implementation without label preallocation
 		var scrut = ptr64[st + 8];
 		var cases = ptr64[st + 16];
 		var default_body = ptr64[st + 24];
 		var end_id = cg_label_alloc(ctx);
 		vec_push(ptr64[ctx + 80], end_id);
 		ptr64[ctx + 88] = ptr64[ctx + 88] + 1;
-		cg_lower_expr(ctx, scrut);
+		
 		var ncase = 0;
 		if (cases != 0) { ncase = vec_len(cases); }
-		var case_labels = vec_new(16);
-		var i = 0;
-		while (i < ncase) {
-			vec_push(case_labels, cg_label_alloc(ctx));
-			i = i + 1;
-		}
-		var default_label = 0;
-		if (default_body != 0) {
-			default_label = cg_label_alloc(ctx);
-		} else {
-			default_label = end_id;
-		}
-		var j = 0;
-		while (j < ncase) {
-			var c = vec_get(cases, j);
-			if (c != 0) {
-				var vexpr = ptr64[c + 0];
+		
+		var default_label = cg_label_alloc(ctx);
+		
+		// Test each case in order and jump to matched body
+		cg_lower_expr(ctx, scrut);
+		var test_idx = 0;
+		while (test_idx < ncase) {
+			var case_node = vec_get(cases, test_idx);
+			if (case_node != 0) {
+				// Store label id in case node temporarily (abuse offset +16)
+				ptr64[case_node + 16] = cg_label_alloc(ctx);
+				var case_value = ptr64[case_node + 0];
+				// Check: scrutinee == case_value
 				ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
 				cg_lower_expr(ctx, scrut);
-				cg_lower_expr(ctx, vexpr);
+				cg_lower_expr(ctx, case_value);
 				ir_emit(f, IrInstrKind.BINOP, TokKind.EQEQ, 0, 0);
-				var lbl = vec_get(case_labels, j);
-				ir_emit(f, IrInstrKind.JNZ, lbl, 0, 0);
+				ir_emit(f, IrInstrKind.JNZ, ptr64[case_node + 16], 0, 0);
 			}
-			j = j + 1;
+			test_idx = test_idx + 1;
 		}
+		
+		// No match: pop scrutinee and jump to default
 		ir_emit(f, IrInstrKind.POP, 0, 0, 0);
 		ir_emit(f, IrInstrKind.JMP, default_label, 0, 0);
-		var m = 0;
-		while (m < ncase) {
-			var c2 = vec_get(cases, m);
-			if (c2 != 0) {
-				ir_emit(f, IrInstrKind.LABEL, vec_get(case_labels, m), 0, 0);
+		
+		// Emit each case body with its label
+		var body_idx = 0;
+		while (body_idx < ncase) {
+			var case_node2 = vec_get(cases, body_idx);
+			if (case_node2 != 0) {
+				ir_emit(f, IrInstrKind.LABEL, ptr64[case_node2 + 16], 0, 0);
 				ir_emit(f, IrInstrKind.POP, 0, 0, 0);
-				var body2 = ptr64[c2 + 8];
-				if (body2 != 0) { cg_lower_stmt(ctx, body2); }
+				var body_stmt = ptr64[case_node2 + 8];
+				if (body_stmt != 0) { cg_lower_stmt(ctx, body_stmt); }
 				ir_emit(f, IrInstrKind.JMP, end_id, 0, 0);
 			}
-			m = m + 1;
+			body_idx = body_idx + 1;
 		}
-		if (default_body != 0) {
-			ir_emit(f, IrInstrKind.LABEL, default_label, 0, 0);
-			cg_lower_stmt(ctx, default_body);
-		}
+		
+		// Emit default case
+		ir_emit(f, IrInstrKind.LABEL, default_label, 0, 0);
+		if (default_body != 0) { cg_lower_stmt(ctx, default_body); }
+		
 		ir_emit(f, IrInstrKind.LABEL, end_id, 0, 0);
 		vec_pop(ptr64[ctx + 80]);
 		ptr64[ctx + 88] = ptr64[ctx + 88] - 1;
