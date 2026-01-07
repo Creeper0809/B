@@ -63,6 +63,10 @@ struct CodegenCtx {
 	secret_locals: u64; // Vec of CgLocal* (len is mutated via ptr64)
 	ast_prog: u64; // AstProgram*
 	ret_reg: u64; // x86 reg id (0=rax)
+	loop_start_stack: u64; // Vec of label ids
+	loop_end_stack: u64; // Vec of label ids
+	switch_end_stack: u64; // Vec of label ids
+	loop_depth: u64; // Current loop nesting depth
 };
 
 // AstDecl.decl_flags (keep in sync with parser/typecheck)
@@ -629,6 +633,31 @@ func cg_collect_locals_in_stmt(ctx, st) {
 		cg_local_add(ctx, p_len, n_len);
 
 		cg_collect_locals_in_stmt(ctx, ptr64[st + 24]);
+		return 0;
+	}
+	if (k == AstStmtKind.FOR) {
+		var init0 = ptr64[st + 8];
+		var body0 = ptr64[st + 56];
+		if (init0 != 0) { cg_collect_locals_in_stmt(ctx, init0); }
+		if (body0 != 0) { cg_collect_locals_in_stmt(ctx, body0); }
+		return 0;
+	}
+	if (k == AstStmtKind.SWITCH) {
+		var cases0 = ptr64[st + 16];
+		var default0 = ptr64[st + 24];
+		if (cases0 != 0) {
+			var n0 = vec_len(cases0);
+			var i0 = 0;
+			while (i0 < n0) {
+				var c0 = vec_get(cases0, i0);
+				if (c0 != 0) {
+					var body0 = ptr64[c0 + 8];
+					if (body0 != 0) { cg_collect_locals_in_stmt(ctx, body0); }
+				}
+				i0 = i0 + 1;
+			}
+		}
+		if (default0 != 0) { cg_collect_locals_in_stmt(ctx, default0); }
 		return 0;
 	}
 	return 0;
@@ -1434,12 +1463,73 @@ func cg_lower_stmt(ctx, st) {
 	if (k == AstStmtKind.WHILE) {
 		var start_id = cg_label_alloc(ctx);
 		var end_id = cg_label_alloc(ctx);
+		vec_push(ptr64[ctx + 64], start_id);
+		vec_push(ptr64[ctx + 72], end_id);
+		ptr64[ctx + 88] = ptr64[ctx + 88] + 1;
 		ir_emit(f, IrInstrKind.LABEL, start_id, 0, 0);
 		cg_lower_expr(ctx, ptr64[st + 8]);
 		ir_emit(f, IrInstrKind.JZ, end_id, 0, 0);
 		cg_lower_stmt(ctx, ptr64[st + 16]);
 		ir_emit(f, IrInstrKind.JMP, start_id, 0, 0);
 		ir_emit(f, IrInstrKind.LABEL, end_id, 0, 0);
+		vec_pop(ptr64[ctx + 64]);
+		vec_pop(ptr64[ctx + 72]);
+		ptr64[ctx + 88] = ptr64[ctx + 88] - 1;
+		return 0;
+	}
+
+	if (k == AstStmtKind.FOR) {
+		// Layout: init(+8), cond(+16), post(+24), body(+56)
+		var init0 = ptr64[st + 8];
+		var cond0 = ptr64[st + 16];
+		var post0 = ptr64[st + 24];
+		var body0 = ptr64[st + 56];
+		if (init0 != 0) { cg_lower_stmt(ctx, init0); }
+		var start_id = cg_label_alloc(ctx);
+		var end_id = cg_label_alloc(ctx);
+		var post_id = cg_label_alloc(ctx);
+		vec_push(ptr64[ctx + 64], post_id);
+		vec_push(ptr64[ctx + 72], end_id);
+		ptr64[ctx + 88] = ptr64[ctx + 88] + 1;
+		ir_emit(f, IrInstrKind.LABEL, start_id, 0, 0);
+		if (cond0 != 0) {
+			cg_lower_expr(ctx, cond0);
+			ir_emit(f, IrInstrKind.JZ, end_id, 0, 0);
+		}
+		if (body0 != 0) { cg_lower_stmt(ctx, body0); }
+		ir_emit(f, IrInstrKind.LABEL, post_id, 0, 0);
+		if (post0 != 0) { cg_lower_stmt(ctx, post0); }
+		ir_emit(f, IrInstrKind.JMP, start_id, 0, 0);
+		ir_emit(f, IrInstrKind.LABEL, end_id, 0, 0);
+		vec_pop(ptr64[ctx + 64]);
+		vec_pop(ptr64[ctx + 72]);
+		ptr64[ctx + 88] = ptr64[ctx + 88] - 1;
+		return 0;
+	}
+
+	if (k == AstStmtKind.BREAK) {
+		var level = ptr64[st + 8];
+		if (level == 0) { level = 1; }
+		var depth = ptr64[ctx + 88];
+		if (level > depth) { return 0; }
+		var end_stack = ptr64[ctx + 72];
+		var end_len = vec_len(end_stack);
+		if (end_len < level) { return 0; }
+		var target_label = vec_get(end_stack, end_len - level);
+		ir_emit(f, IrInstrKind.JMP, target_label, 0, 0);
+		return 0;
+	}
+
+	if (k == AstStmtKind.CONTINUE) {
+		var level2 = ptr64[st + 8];
+		if (level2 == 0) { level2 = 1; }
+		var depth2 = ptr64[ctx + 88];
+		if (level2 > depth2) { return 0; }
+		var start_stack = ptr64[ctx + 64];
+		var start_len = vec_len(start_stack);
+		if (start_len < level2) { return 0; }
+		var target_label2 = vec_get(start_stack, start_len - level2);
+		ir_emit(f, IrInstrKind.JMP, target_label2, 0, 0);
 		return 0;
 	}
 
@@ -1500,6 +1590,9 @@ func cg_lower_stmt(ctx, st) {
 
 		var start_id = cg_label_alloc(ctx);
 		var end_id = cg_label_alloc(ctx);
+		vec_push(ptr64[ctx + 64], start_id);
+		vec_push(ptr64[ctx + 72], end_id);
+		ptr64[ctx + 88] = ptr64[ctx + 88] + 1;
 		ir_emit(f, IrInstrKind.LABEL, start_id, 0, 0);
 
 		// cond: i < len
@@ -1565,6 +1658,70 @@ func cg_lower_stmt(ctx, st) {
 		ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_i + 16], 0, 0);
 		ir_emit(f, IrInstrKind.JMP, start_id, 0, 0);
 		ir_emit(f, IrInstrKind.LABEL, end_id, 0, 0);
+		vec_pop(ptr64[ctx + 64]);
+		vec_pop(ptr64[ctx + 72]);
+		ptr64[ctx + 88] = ptr64[ctx + 88] - 1;
+		return 0;
+	}
+
+	if (k == AstStmtKind.SWITCH) {
+		// Layout: scrut(+8), cases(+16), default_body(+24)
+		var scrut = ptr64[st + 8];
+		var cases = ptr64[st + 16];
+		var default_body = ptr64[st + 24];
+		var end_id = cg_label_alloc(ctx);
+		vec_push(ptr64[ctx + 80], end_id);
+		ptr64[ctx + 88] = ptr64[ctx + 88] + 1;
+		cg_lower_expr(ctx, scrut);
+		var ncase = 0;
+		if (cases != 0) { ncase = vec_len(cases); }
+		var case_labels = vec_new(16);
+		var i = 0;
+		while (i < ncase) {
+			vec_push(case_labels, cg_label_alloc(ctx));
+			i = i + 1;
+		}
+		var default_label = 0;
+		if (default_body != 0) {
+			default_label = cg_label_alloc(ctx);
+		} else {
+			default_label = end_id;
+		}
+		var j = 0;
+		while (j < ncase) {
+			var c = vec_get(cases, j);
+			if (c != 0) {
+				var vexpr = ptr64[c + 0];
+				ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+				cg_lower_expr(ctx, scrut);
+				cg_lower_expr(ctx, vexpr);
+				ir_emit(f, IrInstrKind.BINOP, TokKind.EQEQ, 0, 0);
+				var lbl = vec_get(case_labels, j);
+				ir_emit(f, IrInstrKind.JNZ, lbl, 0, 0);
+			}
+			j = j + 1;
+		}
+		ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+		ir_emit(f, IrInstrKind.JMP, default_label, 0, 0);
+		var m = 0;
+		while (m < ncase) {
+			var c2 = vec_get(cases, m);
+			if (c2 != 0) {
+				ir_emit(f, IrInstrKind.LABEL, vec_get(case_labels, m), 0, 0);
+				ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+				var body2 = ptr64[c2 + 8];
+				if (body2 != 0) { cg_lower_stmt(ctx, body2); }
+				ir_emit(f, IrInstrKind.JMP, end_id, 0, 0);
+			}
+			m = m + 1;
+		}
+		if (default_body != 0) {
+			ir_emit(f, IrInstrKind.LABEL, default_label, 0, 0);
+			cg_lower_stmt(ctx, default_body);
+		}
+		ir_emit(f, IrInstrKind.LABEL, end_id, 0, 0);
+		vec_pop(ptr64[ctx + 80]);
+		ptr64[ctx + 88] = ptr64[ctx + 88] - 1;
 		return 0;
 	}
 
@@ -2089,7 +2246,7 @@ func v3h_codegen_program(ast_prog) {
 	if (irp == 0) { return out; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(64);
+	var ctx = heap_alloc(96);
 	if (ctx == 0) { return out; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
@@ -2099,6 +2256,10 @@ func v3h_codegen_program(ast_prog) {
 	ptr64[ctx + 40] = vec_new(16);
 	ptr64[ctx + 48] = ast_prog;
 	ptr64[ctx + 56] = 0;
+	ptr64[ctx + 64] = vec_new(16);
+	ptr64[ctx + 72] = vec_new(16);
+	ptr64[ctx + 80] = vec_new(16);
+	ptr64[ctx + 88] = 0;
 
 	// Phase 3.5: synthesize default property hook functions.
 	cg_emit_default_property_hooks(ast_prog, ctx, irp);
