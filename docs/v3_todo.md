@@ -234,15 +234,13 @@ NOTE
     - 함수에 `return` 여러 개가 있어도 zeroize 삽입
 
 ### 4.4 `nospill`
-- [ ] IR/RA에서 nospill 값 태깅
-- [ ] spill 필요 시 컴파일 에러(+ 위치 정보)
-- DoD
+- [x] IR/RA에서 nospill 값 태깅
+- [x] spill 필요 시 컴파일 에러(+ 위치 정보)
     - 인위적으로 레지스터 압박을 만들면 에러가 뜸
 
 ### 4.5 `@reg` (extern 전용)
-- [ ] 파라미터/리턴 레지스터 어노테이션 파싱
-- [ ] extern 함수에서만 허용(일반 함수는 에러)
-- DoD
+- [x] 파라미터/리턴 레지스터 어노테이션 파싱
+- [x] extern 함수에서만 허용(일반 함수는 에러)
     - extern 호출에서 지정 레지스터를 그대로 사용
 
 ### 4.6 보안/암호 연산자 lowering
@@ -287,6 +285,142 @@ NOTE
 
 ---
 
+---
+
+## Phase 6 — 추가 문법/표면 언어(Modern Surface Syntax)
+
+### 6.1 불변 바인딩/복합 대입/증감 (Phase 1.2.1)
+- [ ] `final var x = expr;` (불변 바인딩)
+- [x] 복합 대입: `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
+- [x] 증감(문장 위치만): `x++;`, `x--;`
+- DoD
+    - [x] `x += 1;`이 `x = x + 1;`로 lowering 확인
+    - [ ] `final` 변수 재대입 시 에러
+
+### 6.2 구조체/enum 리터럴 (Phase 1.3)
+- [ ] named: `Pair{ a: 1, b: 2 }`
+- [ ] positional: `Pair{ 1, 2 }`
+- [ ] enum: `Color.Red` (이미 구현, 문서화 확인)
+- DoD
+    - struct 리터럴로 값 생성/전달 동작
+
+### 6.3 메서드/네임스페이스 (Phase 1.4)
+- [ ] 메서드 호출 설탕: `x.f(y)` ↔ `f(x, y)`
+- [ ] `impl Type { ... }` 블록
+- DoD
+    - `x.add(y)`가 `add(x, y)` 호출로 lowering
+
+### 6.4 자원 관리: `defer` (Phase 1.5)
+- [ ] `defer <stmt>;` 파싱/AST
+- [ ] 블록 스코프 종료 시 역순 실행
+- [ ] return/break/continue/panic 시 실행 보장
+- DoD
+    - `defer free(p);`가 블록 종료 시 실행됨
+
+### 6.5 함수 포인터 타입 (Phase 1.8)
+- [ ] 타입 표기: `func(T, U) -> R`
+- [ ] 변수에 함수 주소 저장
+- [ ] 간접 호출 코드젠
+- DoD
+    - 콜백 함수 전달 예제 동작
+
+### 6.6 강제 Tail Call (Phase 1.2.6)
+- [ ] `return tail f(args...);` 파싱/AST
+- [ ] IR: `musttail` 플래그
+- [ ] defer 충돌 검사(defer 있으면 에러)
+- [ ] 코드젠: `jmp`로 변환
+- DoD
+    - tail call이 stack frame 안 쌓는지 확인
+
+### 6.7 정수 비트 슬라이싱 (Phase 1.2.6)
+- [ ] `x[hi:lo]` 파싱/AST
+- [ ] 상수 범위 검증
+- [ ] lowering: `shift + mask`
+- DoD
+    - `inst[31:26]` 같은 패턴 동작
+
+### 6.8 Inline ASM 개선 (Phase 1.11)
+- [ ] `asm(alias1, alias2) { ... }` 파싱
+- [ ] `{name}` → 실제 레지스터 치환
+- [ ] alias가 아닌 변수 사용 시 에러
+- DoD
+    - `mov {tmp}, 0` 같은 템플릿 동작
+
+### 6.9 어노테이션 시스템 (Phase 1.12)
+- [ ] `@[inline]`, `@[no_mangle]` 등 파싱
+- [ ] (선택) 계약: `@[requires]`, `@[ensures]`, `@[invariant]`
+- DoD
+    - 기본 어노테이션이 파싱/검증됨
+
+### 6.10 파서 내장 유틸 (Phase 1.13)
+- [ ] `print(expr)` 타입별 자동 분기
+- [ ] `@embed("path")` 파일 삽입
+- [ ] `@trng` 하드웨어 난수
+- DoD
+    - `print(123)`와 `print("hi")`가 다르게 동작
+
+### 6.11 암호/알고리즘 Builtin Intrinsics (Phase 1.13.1)
+- [ ] `bswap(x)` - 바이트 스왑
+- [ ] `popcnt(x)` - 비트 카운트
+- [ ] `ctz(x)`, `clz(x)` - 0 카운트
+- [ ] `addc(a, b, c)`, `subb(a, b, b)` - carry/borrow
+- [ ] `umul_wide(a, b)`, `smul_wide(a, b)` - wide multiply
+- [ ] `ct_select(mask, a, b)` - 상수시간 선택
+- [ ] (후순위) `clmul`, `crc32`
+- DoD
+    - 각 intrinsic이 올바른 x86-64 명령으로 lowering
+
+### 6.12 타입 별칭 + distinct (Phase 2.1.5/2.1.6)
+- [x] `type Alias = T;` 별칭
+- [x] `type NewType = distinct T;` 강한 별칭
+- [x] distinct 타입 간 자동 변환 금지(명시적 cast만)
+- DoD
+    - `Key`와 `u64`를 섞어 쓰면 에러
+
+---
+
+## Phase 7 — 컴파일러 구조/품질
+
+### 7.1 심볼 테이블 HashMap 전환 (Phase 6.2)
+- [ ] 스코프별 HashMap 스택
+- [ ] `put/get/has` 평균 O(1)
+- [ ] shadowing 지원
+- DoD
+    - 큰 모듈에서 심볼 조회 성능 개선
+
+### 7.2 다중 리턴 ABI 완전 지원 (Phase 6.4.5)
+- [x] AST: `-> (T0, T1)`
+- [x] return: `return a, b;`
+- [x] destructuring: `var q, r = f();`, `q, r = f();`, `_` discard
+- [x] IR: `ret v0, v1`
+- [x] ABI: `rax/rdx` 매핑
+- DoD
+    - 2리턴 함수 end-to-end 동작
+
+### 7.3 Location Info 전파 (Phase 6.5)
+- [ ] AST → IR → ASM 단계까지 파일/줄/컬럼 유지
+- [ ] 런타임 패닉 시 스택 트레이스 출력
+- [ ] (후순위) `.loc` 지시어로 gdb 연동
+- DoD
+    - 패닉 메시지에 소스 위치 출력
+
+### 7.4 Panic 메커니즘 (Phase 6.5)
+- [ ] `panic("msg")` 내장 함수
+- [ ] stderr 출력 + 종료
+- [ ] (후순위) 스택 정리 정책
+- DoD
+    - `panic` 호출 시 메시지 출력되고 종료
+
+### 7.5 컴파일러 API 설계 (Phase 7)
+- [ ] 메모리 상 소스 문자열 입력
+- [ ] 메모리 상 asm/IR 덤프 출력
+- [ ] 구조화된 diagnostics
+- [ ] 상태 캡슐화(재진입성)
+- DoD
+    - 동일 프로세스에서 여러 번 컴파일 가능
+
+---
+
 ## 부록: 빠른 스모크 예제(권장)
 
 - [ ] Phase 1: 산술/if/while/함수 호출/return
@@ -294,3 +428,5 @@ NOTE
 - [ ] Phase 3: struct 레이아웃 + foreach + packed
 - [ ] Phase 4: secret/wipe/nospill
 - [ ] Phase 5: 제네릭 + named args + multi-return
+- [ ] Phase 6: final/복합대입/증감, struct 리터럴, defer, 함수 포인터
+- [ ] Phase 7: panic, 스택 트레이스

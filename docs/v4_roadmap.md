@@ -49,6 +49,267 @@ v3에서는 const-eval 수준만 유지하고, 함수 호출/루프/테이블 �
 	- [ ] AST/IR const-eval 확장: 가능한 범위는 AST/IR 기반 평가기로 처리(권장)
 	- [ ] 제한 바이트코드 VM: 필요한 경우에만 최소 명령 집합으로 VM을 추가
 
+### 1.2) The Comptime Revolution: Zig 스타일 True CTFE
+
+v3의 "단순 치환(Template)" 방식으로 제네릭의 급한 불을 끄고,
+v4에서는 엔진을 갈아엎어 **Zig 스타일의 "True Comptime(CTFE - Compile Time Function Execution)"**을 구현한다.
+
+**핵심 철학:**
+1. **"타입(Type)도 값(Value)이다."** (`var t: type = u64;`)
+2. **"제네릭은 타입을 리턴하는 함수일 뿐이다."** (`func Vec(T: type) -> type`)
+3. **"컴파일러는 첫 번째 사용자다."** (컴파일 타임에 코드 실행)
+
+#### Phase 4.0: CTFE 엔진 탑재
+
+가장 먼저 컴파일러 내부(`lib_compiler`)에 **AST 인터프리터**를 심어야 한다.
+
+- [ ] **AST Interpreter 구현**
+	- [ ] 컴파일러 내부에 `eval(Node, Env) -> Value` 함수 구현
+	- [ ] 산술 연산(`+`, `-`, `*`, `/`, `%`) 및 논리 연산 평가 가능
+	- [ ] 비트 연산(`&`, `|`, `^`, `<<`, `>>`, `<<<`, `>>>`) 지원
+	- [ ] 변수 바인딩: 컴파일 타임 변수 저장소(`Map<Name, Value>`) 구현
+	- [ ] 제어 흐름: `if`/`else`, `while`, `for` 루프의 컴파일 타임 실행
+	- [ ] 함수 호출: 컴파일 타임 함수 호출 스택 관리
+	- [ ] **DoD:** `const X = 10 + 20;`을 파싱할 때, 런타임 코드가 아니라 컴파일 타임 상수 `30`으로 계산되어 박제됨
+
+- [ ] **`comptime` 블록/키워드 지원**
+	- [ ] `comptime { ... }`: 이 블록 안의 코드는 즉시 `eval()`로 보내고, 결과만 남김
+	- [ ] `func(comptime x: i32)`: 인자가 상수가 아니면 컴파일 에러 발생
+	- [ ] `comptime var x = expr;`: 컴파일 타임 변수 선언
+
+#### Phase 4.1: "Types as Values" (타입의 1등 시민화)
+
+지금까지 `u64`, `i32`는 키워드였지만, 이제는 **값**으로 취급한다.
+
+- [ ] **`type` 타입 추가**
+	- [ ] 컴파일러 내부 값(`Value` enum)에 `Type(TypeInfo)` 추가
+	- [ ] 문법 허용: `var T: type = i32;`
+	- [ ] 타입 변수 전달: `func print_type(T: type) { ... }`
+
+- [ ] **타입 연산 (Type Operations)**
+	- [ ] `@sizeof(T: type) -> u64` (컴파일 타임 내장 함수)
+	- [ ] `@alignof(T: type) -> u64`
+	- [ ] `@offsetof(T: type, field: string) -> u64`
+	- [ ] `@typeof(expr) -> type` (표현식의 타입 추출)
+	- [ ] `@type_name(T: type) -> []u8` (타입 이름 문자열 반환)
+
+- [ ] **DoD:** 아래 코드가 컴파일 타임에 실행되어야 함
+```b
+comptime {
+    var my_type: type = u64;
+    if (@sizeof(my_type) == 8) {
+        // 컴파일 타임 출력 (컴파일러 로그)
+        @comptime_print("It's 64bit!");
+    }
+}
+```
+
+#### Phase 4.2: 제네릭의 재정의 (Generics as Functions)
+
+v3의 "텍스트 치환 방식(`<T>`)"을 내부적으로 **"함수 실행 방식"**으로 전환한다.
+
+- [ ] **구조체 생성 함수 (Type Constructors)**
+	- [ ] 함수가 `type`을 반환할 수 있게 허용
+	- [ ] 반환된 `struct` 정의를 익명 구조체로 등록
+
+```b
+// v4 스타일 제네릭 (내부 표현)
+func Vec(comptime T: type) -> type {
+    return struct {
+        ptr: *T;
+        len: u64;
+        cap: u64;
+    };
+}
+```
+
+- [ ] **문법 설탕 (Syntactic Sugar) 유지**
+	- [ ] 사용자는 여전히 `Vec<u64>`로 쓸 수 있음 (v3 호환성)
+	- [ ] 파서가 `Vec<u64>`를 만나면 → 내부적으로 `Vec(u64)` 함수 호출로 변환(Lowering)
+	- [ ] 양방향 지원:
+		- [ ] `Vec<u64>` (C++ 스타일 문법 설탕)
+		- [ ] `Vec(u64)` (Zig 스타일 직접 호출)
+
+- [ ] **Memoization (캐싱)**
+	- [ ] `Vec(u64)`를 두 번 호출하면, 인터프리터가 "어? 아까 입력값 `u64`로 돌린 결과 있네?" 하고 캐시된 구조체를 반환
+	- [ ] 중복 정의 방지 + 컴파일 속도 향상
+
+- [ ] **제네릭 함수 재정의**
+```b
+// 기존 v3 방식 (문법 설탕으로 유지)
+func add<T>(a: T, b: T) -> T { return a + b; }
+
+// v4 내부 변환 (comptime 파라미터)
+func add(comptime T: type, a: T, b: T) -> T { 
+    return a + b; 
+}
+
+// 호출
+add<i32>(10, 20)  // 문법 설탕
+add(i32, 10, 20)  // 직접 호출 (둘 다 지원)
+```
+
+#### Phase 4.3: 조건부 컴파일 (Conditional Compilation)
+
+v4의 꽃이다. 제네릭 내부에서 `if`문을 써서 **구조체 모양을 바꾼다.**
+
+- [ ] **Comptime Control Flow**
+	- [ ] `eval()` 함수가 `if` 문을 만났을 때, 조건이 `true`인 분기만 AST에 남기고 `false` 분기는 **삭제(Dead Code Elimination)**
+	- [ ] 컴파일 타임 루프 언롤링(Loop Unrolling)
+	- [ ] 컴파일 타임 분기에 따른 타입 변경
+
+- [ ] **검증 (Use Case)**
+```b
+func IntOrFloat(comptime T: type) -> type {
+    comptime {
+        if (T == i32 or T == i64) {
+            return struct { i: T; };
+        } else if (T == f32 or T == f64) {
+            return struct { f: T; };
+        } else {
+            @compile_error("IntOrFloat requires integer or float type");
+        }
+    }
+}
+
+// 사용
+var x: IntOrFloat<i32>;  // struct { i: i32; }
+var y: IntOrFloat<f32>;  // struct { f: f32; }
+var z: IntOrFloat<bool>; // 컴파일 에러!
+```
+
+- [ ] **플랫폼별 조건부 컴파일**
+```b
+func get_socket_type() -> type {
+    comptime {
+        if (@target_os() == "windows") {
+            return struct { handle: u64; };
+        } else {
+            return struct { fd: i32; };
+        }
+    }
+}
+```
+
+#### Phase 4.4: 리플렉션 (Reflection)
+
+구조체의 필드 정보를 컴파일 타임에 순회할 수 있게 한다. (직렬화 라이브러리 자동화)
+
+- [ ] **`@type_info(T)` 내장 함수**
+	- [ ] 구조체 `T`를 넣으면 필드 리스트를 반환
+	- [ ] 반환 값: 필드 배열 (`name: []u8`, `type: type`, `offset: u64`)
+	- [ ] enum의 경우: variant 리스트 반환
+
+- [ ] **Comptime Loop (Unrolling)**
+	- [ ] `comptime for` 문이 컴파일 타임에 돌면서 코드를 복사-붙여넣기함
+
+```b
+// JSON 직렬화 자동 생성 예시
+struct Player {
+    name: []u8;
+    hp: i32;
+    level: u64;
+}
+
+func serialize(obj: anytype) -> []u8 {
+    var result: []u8 = "{";
+    
+    comptime {
+        var fields = @type_info(@typeof(obj)).fields;
+        
+        // 컴파일 타임 루프: 각 필드마다 코드 생성
+        for (field, i in fields) {
+            if (i > 0) {
+                result = result.concat(", ");
+            }
+            
+            // 필드 이름 출력
+            result = result.concat("\"" ++ field.name ++ "\": ");
+            
+            // 필드 값 접근 ($연산자로 동적 필드 접근)
+            result = result.concat(to_json(@field(obj, field.name)));
+        }
+    }
+    
+    result = result.concat("}");
+    return result;
+}
+```
+
+- [ ] **`@field(obj, name)` 내장 함수**
+	- [ ] 컴파일 타임에 알려진 문자열로 필드 접근
+	- [ ] 의미: `obj.name`과 동일하지만, `name`이 컴파일 타임 변수일 때 사용
+
+#### Phase 4.5: 컴파일 타임 코드 생성 (Code Generation)
+
+가장 강력한 기능: 컴파일 타임에 **함수를 만든다.**
+
+- [ ] **`@embed_code()` 또는 mixin 메커니즘**
+	- [ ] 컴파일 타임에 문자열로 코드를 생성하고, AST에 주입
+
+```b
+// 예시: 성능 크리티컬 벡터 연산 생성기
+func generate_vec_ops(comptime size: u64) -> type {
+    comptime {
+        var code = "struct Vec" ++ @to_string(size) ++ " {\n";
+        
+        // 필드 생성
+        for (i in 0..size) {
+            code = code ++ "    x" ++ @to_string(i) ++ ": f32;\n";
+        }
+        
+        // 덧셈 함수 생성
+        code = code ++ "    func add(self: *Vec, other: Vec) -> Vec {\n";
+        code = code ++ "        return Vec{\n";
+        for (i in 0..size) {
+            code = code ++ "            .x" ++ @to_string(i) 
+                   ++ " = self.x" ++ @to_string(i) 
+                   ++ " + other.x" ++ @to_string(i) ++ ",\n";
+        }
+        code = code ++ "        };\n    }\n}";
+        
+        return @embed_code(code);
+    }
+}
+
+var v4: generate_vec_ops(4);  // Vec4 생성 (x0, x1, x2, x3)
+```
+
+#### 📊 v3 vs v4 비교 요약
+
+| 기능 | Basm v3 (Template) | Basm v4 (Comptime) |
+| --- | --- | --- |
+| **제네릭 원리** | 텍스트 치환 (Find & Replace) | **함수 실행 (Function Call)** |
+| **`Vec<T>`** | `T` 자리에 타입을 끼워 넣음 | `Vec` 함수가 `struct`를 리턴함 |
+| **`if`문 사용** | 불가능 (혹은 `#ifdef` 전처리기) | **가능** (조건에 따라 필드 변경 가능) |
+| **컴파일러 구조** | 파서 → 변환기 → 코드젠 | 파서 → **VM(실행)** → 코드젠 |
+| **타입의 지위** | 키워드 (고정) | **1급 값** (`type` 타입) |
+| **리플렉션** | 없음 | **완전 지원** (`@type_info`) |
+| **유연성** | C++ 템플릿 수준 | Zig/Lisp 수준 (무한한 자유) |
+| **마이그레이션** | - | `Vec<T>` 문법 설탕 유지 (호환성) |
+
+#### 구현 우선순위
+
+1. **Phase 4.0** (필수): AST Interpreter 기본 엔진
+2. **Phase 4.1** (필수): `type` 타입 + 타입 연산
+3. **Phase 4.2** (고우선): 제네릭 재구현 (v3 호환성 유지)
+4. **Phase 4.3** (중우선): 조건부 컴파일
+5. **Phase 4.4** (중우선): 리플렉션
+6. **Phase 4.5** (저우선): 코드 생성 (실험적)
+
+#### 보안/안정성 고려사항
+
+- [ ] **무한 루프 방지**: 컴파일 타임 실행 step count 제한 (위의 1.1 참고)
+- [ ] **메모리 제한**: 컴파일 타임 할당 상한 (위의 1.1 참고)
+- [ ] **에러 전파**: 컴파일 타임 에러는 원본 소스 위치와 함께 보고
+- [ ] **결정성**: I/O/시스템콜/시간/랜덤 금지 (위의 1.1 참고)
+
+### 🏁 결론
+
+이 로드맵은 **컴파일러의 두뇌를 교체하는 대수술**이다.
+v3에서 언어의 **"뼈대(Parser, CodeGen, Memory)"**를 완성하고,
+v4에서 **"지능(Interpreter)"**을 심는다.
+
 ---
 
 ## 2) 테스트/검증 전략(v4)

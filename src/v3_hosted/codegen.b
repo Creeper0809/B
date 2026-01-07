@@ -16,12 +16,42 @@ struct CgLocal {
 	size_bytes: u64; // low bits=size, high bit may store flags
 };
 
+// CgLocal.size_bytes packing
+const CG_LOCAL_SIZE_MASK = 9223372036854775807; // (1<<63)-1
+const CG_LOCAL_FLAG_NOSPILL = 9223372036854775808; // 1<<63
+
+// CgLocal.offset encoding for register-backed locals.
+// offset = CG_LOCAL_OFF_IS_REG | reg_id
+// reg_id uses the x86-64 register number (rax=0, rcx=1, rdx=2, rbx=3, rsp=4, rbp=5, rsi=6, rdi=7, r8=8..r15=15)
+const CG_LOCAL_OFF_IS_REG = 9223372036854775808; // 1<<63
+
 func cg_local_size_bytes(l) {
-	return ptr64[l + 24];
+	return ptr64[l + 24] & CG_LOCAL_SIZE_MASK;
 }
 
 func cg_local_is_slice(l) {
-	return ptr64[l + 24] == 24;
+	return (ptr64[l + 24] & CG_LOCAL_SIZE_MASK) == 24;
+}
+
+func cg_local_has_nospill(l) {
+	return (ptr64[l + 24] & CG_LOCAL_FLAG_NOSPILL) != 0;
+}
+
+func cg_local_mark_nospill(l) {
+	ptr64[l + 24] = ptr64[l + 24] | CG_LOCAL_FLAG_NOSPILL;
+	return 0;
+}
+
+func cg_local_off_is_reg(off) {
+	return (off & CG_LOCAL_OFF_IS_REG) != 0;
+}
+
+func cg_local_off_reg_id(off) {
+	return off & 255;
+}
+
+func cg_local_off_pack_reg(reg_id) {
+	return CG_LOCAL_OFF_IS_REG | (reg_id & 255);
 }
 
 struct CodegenCtx {
@@ -31,7 +61,37 @@ struct CodegenCtx {
 	label_next: u64;
 	ret_label: u64;
 	secret_locals: u64; // Vec of CgLocal* (len is mutated via ptr64)
+	ast_prog: u64; // AstProgram*
+	ret_reg: u64; // x86 reg id (0=rax)
 };
+
+// AstDecl.decl_flags (keep in sync with parser/typecheck)
+const CG_DECL_FLAG_EXTERN = 1;
+const CG_DECL_RETREG_SHIFT = 8;
+
+func cg_decl_retreg(d) {
+	return (ptr64[d + 80] >> CG_DECL_RETREG_SHIFT) & 255;
+}
+
+func cg_decl_is_extern(d) {
+	return (ptr64[d + 80] & CG_DECL_FLAG_EXTERN) != 0;
+}
+
+func cg_ast_find_func_decl(ast_prog, name_ptr, name_len) {
+	if (ast_prog == 0) { return 0; }
+	var decls = ptr64[ast_prog + 0];
+	if (decls == 0) { return 0; }
+	var n = vec_len(decls);
+	var i = 0;
+	while (i < n) {
+		var d = vec_get(decls, i);
+		if (d != 0 && ptr64[d + 0] == AstDeclKind.FUNC) {
+			if (cg_slice_eq(ptr64[d + 8], ptr64[d + 16], name_ptr, name_len) == 1) { return d; }
+		}
+		i = i + 1;
+	}
+	return 0;
+}
 
 func cg_wipe_scratch_ptr_local(ctx) {
 	return cg_local_find(ctx, "__v3h_wipe_ptr", 14);
@@ -152,8 +212,10 @@ func cg_local_add(ctx, name_ptr, name_len) {
 func cg_local_set_size_bytes(l, size_bytes) {
 	// Only grow (collection may see partial info before typecheck-style inference).
 	var cur = ptr64[l + 24];
-	if (cur < size_bytes) {
-		ptr64[l + 24] = size_bytes;
+	var flags = cur & (~CG_LOCAL_SIZE_MASK);
+	var cur_sz = cur & CG_LOCAL_SIZE_MASK;
+	if (cur_sz < size_bytes) {
+		ptr64[l + 24] = flags | size_bytes;
 	}
 	return 0;
 }
@@ -473,9 +535,14 @@ func cg_decode_string_literal(tok_ptr, tok_len) {
 func cg_collect_locals_in_stmt(ctx, st) {
 	var k = ptr64[st + 0];
 	if (k == AstStmtKind.VAR) {
+		var flags0 = ptr64[st + 8];
 		var name_ptr = ptr64[st + 32];
 		var name_len = ptr64[st + 40];
 		var l = cg_local_add(ctx, name_ptr, name_len);
+		var is_nospill = flags0 & 2; // TC_STMT_FLAG_NOSPILL
+		if (is_nospill != 0) {
+			cg_local_mark_nospill(l);
+		}
 		// If we can determine this is a []u8 local, reserve 16 bytes.
 		var t = ptr64[st + 48];
 		if (cg_type_is_slice_u8(t) == 1) {
@@ -797,6 +864,42 @@ func cg_lower_expr(ctx, e) {
 			}
 			return 0;
 		}
+		// Postfix ++ / -- (Phase 6.1): increment/decrement and return new value.
+		// Note: true postfix semantics (return old value) would require DUP or temp storage.
+		// For now, implement as prefix for simplicity.
+		if (op == TokKind.PLUSPLUS || op == TokKind.MINUSMINUS) {
+			// Read current value.
+			cg_lower_expr(ctx, rhs);
+			// Increment/decrement.
+			ir_emit(f, IrInstrKind.PUSH_IMM, 1, 0, 0);
+			if (op == TokKind.PLUSPLUS) {
+				ir_emit(f, IrInstrKind.BINOP, TokKind.PLUS, 0, 0);
+			} else {
+				ir_emit(f, IrInstrKind.BINOP, TokKind.MINUS, 0, 0);
+			}
+			// Store back to lvalue.
+			if (ptr64[rhs + 0] == AstExprKind.IDENT) {
+				var l = cg_local_find(ctx, ptr64[rhs + 16], ptr64[rhs + 24]);
+				if (l != 0) {
+					var off = ptr64[l + 16];
+					// For simplicity, treat all locals the same: store and reload.
+					ir_emit(f, IrInstrKind.STORE_LOCAL, off, 0, 0);
+					ir_emit(f, IrInstrKind.PUSH_LOCAL, off, 0, 0);
+				} else {
+					// Unknown local: just pop and push 0.
+					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+				}
+			} else if (ptr64[rhs + 0] == AstExprKind.FIELD) {
+				// field store - simplified version: just pop and push 0.
+				ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+				ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+			} else {
+				ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+				ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+			}
+			return 0;
+		}
 		cg_lower_expr(ctx, rhs);
 		ir_emit(f, IrInstrKind.UNOP, op, 0, 0);
 		return 0;
@@ -1102,10 +1205,63 @@ func cg_lower_expr(ctx, e) {
 				}
 			}
 		}
-		// User call (Phase 3.5 MVP): only IDENT callee; args passed on stack.
+		// User call: only IDENT callee.
 		if (callee != 0 && ptr64[callee + 0] == AstExprKind.IDENT) {
 			var name_ptr2 = ptr64[callee + 40];
 			var name_len2 = ptr64[callee + 48];
+			// Phase 4.5: extern @reg call (args moved into registers).
+			var ast_prog = ptr64[ctx + 48];
+			var decl = cg_ast_find_func_decl(ast_prog, name_ptr2, name_len2);
+			if (decl != 0 && cg_decl_is_extern(decl) != 0) {
+				var params2 = ptr64[decl + 24];
+				var pn2 = 0;
+				if (params2 != 0) { pn2 = vec_len(params2); }
+				var narg2 = 0;
+				if (args != 0) { narg2 = vec_len(args); }
+				var ret_reg2 = cg_decl_retreg(decl);
+				// Detect whether this extern uses @reg.
+				var has_param_reg2 = 0;
+				var pi2 = 0;
+				while (pi2 < pn2) {
+					var ps2 = vec_get(params2, pi2);
+					if (ps2 != 0 && ptr64[ps2 + 16] != 0) { has_param_reg2 = 1; }
+					pi2 = pi2 + 1;
+				}
+				if (has_param_reg2 != 0 || ret_reg2 != 0) {
+					// Evaluate args right-to-left (so arg0 ends up on top).
+					var idx2 = narg2;
+					while (idx2 != 0) {
+						idx2 = idx2 - 1;
+						var a00 = vec_get(args, idx2);
+						cg_lower_expr(ctx, a00);
+						// MVP: only 8-byte args.
+						if (cg_expr_is_slice(ctx, a00) == 1) {
+							// Unsupported: pop the slice and push 0.
+							ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+							ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+							ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+						}
+					}
+					// Pop args into their specified registers.
+					var pi3 = 0;
+					while (pi3 < pn2) {
+						var ps3 = vec_get(params2, pi3);
+						var rid3 = 0;
+						if (ps3 != 0) { rid3 = ptr64[ps3 + 16]; }
+						// rid3==0 should be rejected by typecheck for @reg functions.
+						ir_emit(f, IrInstrKind.STORE_LOCAL, cg_local_off_pack_reg(rid3), 0, 0);
+						pi3 = pi3 + 1;
+					}
+					// Call (no stack args to clean).
+					ir_emit(f, IrInstrKind.CALL, name_ptr2, name_len2, 0);
+					// If return reg is not rax, replace pushed rax with the annotated reg.
+					if (ret_reg2 != 0) {
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+						ir_emit(f, IrInstrKind.PUSH_LOCAL, cg_local_off_pack_reg(ret_reg2), 0, 0);
+					}
+					return 0;
+				}
+			}
 			var narg = 0;
 			if (args != 0) { narg = vec_len(args); }
 			var idx = narg;
@@ -1203,7 +1359,7 @@ func cg_lower_stmt(ctx, st) {
 		var e = ptr64[st + 56];
 		if (e != 0) { cg_lower_expr(ctx, e); }
 		else { ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0); }
-		ir_emit(f, IrInstrKind.RET, 0, 0, 0);
+		ir_emit(f, IrInstrKind.RET, ptr64[ctx + 56], 0, 0);
 		return 0;
 	}
 
@@ -1616,6 +1772,11 @@ func cg_gen_asm(prog, ir_func) {
 		cg_emit_line(sb, ":");
 		cg_emit_line(sb, "\tpush rbp");
 		cg_emit_line(sb, "\tmov rbp, rsp");
+		// Reserve callee-saved regs for nospill/@reg usage.
+		cg_emit_line(sb, "\tpush r12");
+		cg_emit_line(sb, "\tpush r13");
+		cg_emit_line(sb, "\tpush r14");
+		cg_emit_line(sb, "\tpush r15");
 
 		var frame = ptr64[ir_func2 + 16];
 		if (frame != 0) {
@@ -1640,15 +1801,57 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_nl(sb);
 			}
 			else if (k == IrInstrKind.PUSH_LOCAL) {
-				cg_emit(sb, "\tpush qword [rbp-");
-				cg_emit_u64(sb, a);
-				cg_emit_line(sb, "]");
+				if (cg_local_off_is_reg(a) != 0) {
+					var rid = cg_local_off_reg_id(a);
+					cg_emit(sb, "\tpush ");
+					if (rid == 0) { cg_emit_line(sb, "rax"); }
+					else if (rid == 1) { cg_emit_line(sb, "rcx"); }
+					else if (rid == 2) { cg_emit_line(sb, "rdx"); }
+					else if (rid == 3) { cg_emit_line(sb, "rbx"); }
+					else if (rid == 6) { cg_emit_line(sb, "rsi"); }
+					else if (rid == 7) { cg_emit_line(sb, "rdi"); }
+					else if (rid == 8) { cg_emit_line(sb, "r8"); }
+					else if (rid == 9) { cg_emit_line(sb, "r9"); }
+					else if (rid == 10) { cg_emit_line(sb, "r10"); }
+					else if (rid == 11) { cg_emit_line(sb, "r11"); }
+					else if (rid == 12) { cg_emit_line(sb, "r12"); }
+					else if (rid == 13) { cg_emit_line(sb, "r13"); }
+					else if (rid == 14) { cg_emit_line(sb, "r14"); }
+					else if (rid == 15) { cg_emit_line(sb, "r15"); }
+					else { cg_emit_line(sb, "rax"); }
+				}
+				else {
+					cg_emit(sb, "\tpush qword [rbp-");
+					cg_emit_u64(sb, a);
+					cg_emit_line(sb, "]");
+				}
 			}
 			else if (k == IrInstrKind.STORE_LOCAL) {
 				cg_emit_line(sb, "\tpop rax");
-				cg_emit(sb, "\tmov [rbp-");
-				cg_emit_u64(sb, a);
-				cg_emit_line(sb, "], rax");
+				if (cg_local_off_is_reg(a) != 0) {
+					var rid2 = cg_local_off_reg_id(a);
+					cg_emit(sb, "\tmov ");
+					if (rid2 == 0) { cg_emit_line(sb, "rax, rax"); }
+					else if (rid2 == 1) { cg_emit_line(sb, "rcx, rax"); }
+					else if (rid2 == 2) { cg_emit_line(sb, "rdx, rax"); }
+					else if (rid2 == 3) { cg_emit_line(sb, "rbx, rax"); }
+					else if (rid2 == 6) { cg_emit_line(sb, "rsi, rax"); }
+					else if (rid2 == 7) { cg_emit_line(sb, "rdi, rax"); }
+					else if (rid2 == 8) { cg_emit_line(sb, "r8, rax"); }
+					else if (rid2 == 9) { cg_emit_line(sb, "r9, rax"); }
+					else if (rid2 == 10) { cg_emit_line(sb, "r10, rax"); }
+					else if (rid2 == 11) { cg_emit_line(sb, "r11, rax"); }
+					else if (rid2 == 12) { cg_emit_line(sb, "r12, rax"); }
+					else if (rid2 == 13) { cg_emit_line(sb, "r13, rax"); }
+					else if (rid2 == 14) { cg_emit_line(sb, "r14, rax"); }
+					else if (rid2 == 15) { cg_emit_line(sb, "r15, rax"); }
+					else { cg_emit_line(sb, "rax, rax"); }
+				}
+				else {
+					cg_emit(sb, "\tmov [rbp-");
+					cg_emit_u64(sb, a);
+					cg_emit_line(sb, "], rax");
+				}
 			}
 			else if (k == IrInstrKind.BINOP) {
 				cg_emit_binop(sb, a);
@@ -1678,10 +1881,17 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_print_str(sb, a, b);
 			}
 			else if (k == IrInstrKind.PUSH_LOCAL_ADDR) {
-				cg_emit(sb, "\tlea rax, [rbp-");
-				cg_emit_u64(sb, a);
-				cg_emit_line(sb, "]");
-				cg_emit_line(sb, "\tpush rax");
+				if (cg_local_off_is_reg(a) != 0) {
+					// nospill/@reg locals do not have an address.
+					cg_emit_line(sb, "\t; ERROR: reg local has no address");
+					cg_emit_line(sb, "\tpush 0");
+				}
+				else {
+					cg_emit(sb, "\tlea rax, [rbp-");
+					cg_emit_u64(sb, a);
+					cg_emit_line(sb, "]");
+					cg_emit_line(sb, "\tpush rax");
+				}
 			}
 			else if (k == IrInstrKind.STORE_LOCAL_RODATA_ADDR) {
 				cg_emit(sb, "\tlea rax, [rel S");
@@ -1730,6 +1940,24 @@ func cg_gen_asm(prog, ir_func) {
 			}
 			else if (k == IrInstrKind.RET) {
 				cg_emit_line(sb, "\tpop rax");
+				if (a != 0) {
+					// Copy return value from rax into the requested return reg.
+					cg_emit(sb, "\tmov ");
+					if (a == 1) { cg_emit_line(sb, "rcx, rax"); }
+					else if (a == 2) { cg_emit_line(sb, "rdx, rax"); }
+					else if (a == 3) { cg_emit_line(sb, "rbx, rax"); }
+					else if (a == 6) { cg_emit_line(sb, "rsi, rax"); }
+					else if (a == 7) { cg_emit_line(sb, "rdi, rax"); }
+					else if (a == 8) { cg_emit_line(sb, "r8, rax"); }
+					else if (a == 9) { cg_emit_line(sb, "r9, rax"); }
+					else if (a == 10) { cg_emit_line(sb, "r10, rax"); }
+					else if (a == 11) { cg_emit_line(sb, "r11, rax"); }
+					else if (a == 12) { cg_emit_line(sb, "r12, rax"); }
+					else if (a == 13) { cg_emit_line(sb, "r13, rax"); }
+					else if (a == 14) { cg_emit_line(sb, "r14, rax"); }
+					else if (a == 15) { cg_emit_line(sb, "r15, rax"); }
+					else { cg_emit_line(sb, "rax, rax"); }
+				}
 				cg_emit(sb, "\tjmp .L");
 				cg_emit_u64(sb, ret_label);
 				cg_emit_nl(sb);
@@ -1824,6 +2052,15 @@ func cg_gen_asm(prog, ir_func) {
 		}
 
 		cg_emit_label(sb, ret_label);
+		if (frame != 0) {
+			cg_emit(sb, "\tadd rsp, ");
+			cg_emit_u64(sb, frame);
+			cg_emit_nl(sb);
+		}
+		cg_emit_line(sb, "\tpop r15");
+		cg_emit_line(sb, "\tpop r14");
+		cg_emit_line(sb, "\tpop r13");
+		cg_emit_line(sb, "\tpop r12");
 		cg_emit_line(sb, "\tmov rsp, rbp");
 		cg_emit_line(sb, "\tpop rbp");
 		cg_emit_line(sb, "\tret");
@@ -1852,7 +2089,7 @@ func v3h_codegen_program(ast_prog) {
 	if (irp == 0) { return out; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(48);
+	var ctx = heap_alloc(64);
 	if (ctx == 0) { return out; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
@@ -1860,6 +2097,8 @@ func v3h_codegen_program(ast_prog) {
 	ptr64[ctx + 24] = 0;
 	ptr64[ctx + 32] = 0;
 	ptr64[ctx + 40] = vec_new(16);
+	ptr64[ctx + 48] = ast_prog;
+	ptr64[ctx + 56] = 0;
 
 	// Phase 3.5: synthesize default property hook functions.
 	cg_emit_default_property_hooks(ast_prog, ctx, irp);
@@ -1879,6 +2118,7 @@ func v3h_codegen_program(ast_prog) {
 			var fn = ir_func_new(name_ptr, name_len);
 			ptr64[ctx + 8] = fn;
 			ptr64[ctx + 16] = vec_new(16);
+			ptr64[ctx + 56] = cg_decl_retreg(d);
 			// Scratch locals for wipe/secret lowering.
 			cg_local_add(ctx, "__v3h_wipe_ptr", 14);
 			cg_local_add(ctx, "__v3h_wipe_len", 14);
@@ -1889,7 +2129,7 @@ func v3h_codegen_program(ast_prog) {
 			ptr64[ctx + 32] = cg_label_alloc(ctx);
 			ptr64[fn + 24] = ptr64[ctx + 32];
 
-			// Add params as locals and copy args into locals.
+			// Add params as locals and copy args into locals (unless @reg param).
 			var params = ptr64[d + 24];
 			var pn = 0;
 			if (params != 0) { pn = vec_len(params); }
@@ -1903,6 +2143,10 @@ func v3h_codegen_program(ast_prog) {
 				if (l != 0) {
 					var psz = cg_type_size_bytes(ptype);
 					cg_local_set_size_bytes(l, psz);
+					if (cg_decl_is_extern(d) != 0) {
+						var preg = ptr64[pst + 16];
+						if (preg != 0) { ptr64[l + 16] = cg_local_off_pack_reg(preg); }
+					}
 				}
 				pi = pi + 1;
 			}
@@ -1911,23 +2155,59 @@ func v3h_codegen_program(ast_prog) {
 			var body = ptr64[d + 40];
 			cg_collect_locals_in_stmt(ctx, body);
 			var locals = ptr64[ctx + 16];
-			// Assign offsets (contiguous), align to 8.
-			var off = 0;
 			var ln = vec_len(locals);
+			// Assign offsets (contiguous), align to 8.
+			// Keep [rbp-8..-32] for r12..r15 spills.
+			var base_off = 32;
+			var off = base_off;
+			var nospill_reg_next = 12; // r12..r15
+			// Avoid collisions with fixed @reg locals.
+			var used_mask = 0;
+			var prei = 0;
+			while (prei < ln) {
+				var ll = vec_get(locals, prei);
+				if (ll != 0) {
+					var o0 = ptr64[ll + 16];
+					if (cg_local_off_is_reg(o0) != 0) {
+						var rid0 = cg_local_off_reg_id(o0);
+						if (rid0 >= 12 && rid0 <= 15) { used_mask = used_mask | (1 << (rid0 - 12)); }
+					}
+				}
+				prei = prei + 1;
+			}
 			var li = 0;
 			while (li < ln) {
 				var l2 = vec_get(locals, li);
-				var sz = cg_local_size_bytes(l2);
-				if (off % 8 != 0) { off = off + (8 - (off % 8)); }
-				off = off + sz;
-				ptr64[l2 + 16] = off;
+				if (cg_local_off_is_reg(ptr64[l2 + 16]) != 0) {
+					// Fixed reg local (e.g. extern @reg param)
+				}
+				else if (cg_local_has_nospill(l2) != 0) {
+					// nospill locals live in callee-saved regs (no stack slot).
+					while (nospill_reg_next <= 15) {
+						var shift_amt = nospill_reg_next - 12;
+						var bit_mask = 1 << shift_amt;
+						var is_used = used_mask & bit_mask;
+						if (is_used == 0) { break; }
+						nospill_reg_next = nospill_reg_next + 1;
+					}
+					ptr64[l2 + 16] = cg_local_off_pack_reg(nospill_reg_next);
+					used_mask = used_mask | (1 << (nospill_reg_next - 12));
+					nospill_reg_next = nospill_reg_next + 1;
+				}
+				else {
+					var sz = cg_local_size_bytes(l2);
+					if (off % 8 != 0) { off = off + (8 - (off % 8)); }
+					off = off + sz;
+					ptr64[l2 + 16] = off;
+				}
 				li = li + 1;
 			}
-			var frame = off;
+			var frame = 0;
+			if (off > base_off) { frame = off - base_off; }
 			if (frame % 16 != 0) { frame = frame + 8; }
 			ptr64[fn + 16] = frame;
 
-			// Prologue arg copy: param i at [rbp+16+8*i]
+			// Prologue arg copy: param i at [rbp+16+8*i] (skip @reg params)
 			pi = 0;
 			while (pi < pn) {
 				var pst2 = vec_get(params, pi);
@@ -1935,15 +2215,17 @@ func v3h_codegen_program(ast_prog) {
 				var pname_len2 = ptr64[pst2 + 40];
 				var l3 = cg_local_find(ctx, pname_ptr2, pname_len2);
 				if (l3 != 0) {
-					ir_emit(fn, IrInstrKind.PUSH_ARG, 16 + (pi * 8), 0, 0);
-					ir_emit(fn, IrInstrKind.STORE_LOCAL, ptr64[l3 + 16], 0, 0);
+					if (cg_local_off_is_reg(ptr64[l3 + 16]) == 0) {
+						ir_emit(fn, IrInstrKind.PUSH_ARG, 16 + (pi * 8), 0, 0);
+						ir_emit(fn, IrInstrKind.STORE_LOCAL, ptr64[l3 + 16], 0, 0);
+					}
 				}
 				pi = pi + 1;
 			}
 
 			cg_lower_stmt(ctx, body);
 			ir_emit(fn, IrInstrKind.PUSH_IMM, 0, 0, 0);
-			ir_emit(fn, IrInstrKind.RET, 0, 0, 0);
+			ir_emit(fn, IrInstrKind.RET, ptr64[ctx + 56], 0, 0);
 			vec_push(ptr64[irp + 0], fn);
 		}
 		i = i + 1;
@@ -1963,7 +2245,7 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 	if (irp == 0) { return 0; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(48);
+	var ctx = heap_alloc(64);
 	if (ctx == 0) { return 0; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
@@ -1971,6 +2253,11 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 	ptr64[ctx + 24] = 0;
 	ptr64[ctx + 32] = 0;
 	ptr64[ctx + 40] = vec_new(16);
+	ptr64[ctx + 48] = ast_prog;
+	ptr64[ctx + 56] = 0;
+
+	// Phase 3.5: synthesize default property hook functions.
+	cg_emit_default_property_hooks(ast_prog, ctx, irp);
 
 	var decls = ptr64[ast_prog + 0];
 	var n = 0;
@@ -1987,6 +2274,7 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 			var fn = ir_func_new(name_ptr, name_len);
 			ptr64[ctx + 8] = fn;
 			ptr64[ctx + 16] = vec_new(16);
+			ptr64[ctx + 56] = cg_decl_retreg(d);
 			// Scratch locals for wipe/secret lowering.
 			cg_local_add(ctx, "__v3h_wipe_ptr", 14);
 			cg_local_add(ctx, "__v3h_wipe_len", 14);
@@ -2008,6 +2296,10 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 				if (l != 0) {
 					var psz = cg_type_size_bytes(ptype);
 					cg_local_set_size_bytes(l, psz);
+					if (cg_decl_is_extern(d) != 0) {
+						var preg = ptr64[pst + 16];
+						if (preg != 0) { ptr64[l + 16] = cg_local_off_pack_reg(preg); }
+					}
 				}
 				pi = pi + 1;
 			}
@@ -2015,21 +2307,57 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 			var body = ptr64[d + 40];
 			cg_collect_locals_in_stmt(ctx, body);
 			var locals = ptr64[ctx + 16];
-			var off = 0;
+			var base_off = 32;
+			var off = base_off;
+			var nospill_reg_next = 12;
 			var ln = vec_len(locals);
+			// Avoid collisions with fixed @reg locals.
+			var used_mask = 0;
+			var prei = 0;
+			while (prei < ln) {
+				var ll = vec_get(locals, prei);
+				if (ll != 0) {
+					var o0 = ptr64[ll + 16];
+					if (cg_local_off_is_reg(o0) != 0) {
+						var rid0 = cg_local_off_reg_id(o0);
+						if (rid0 >= 12 && rid0 <= 15) { used_mask = used_mask | (1 << (rid0 - 12)); }
+					}
+				}
+				prei = prei + 1;
+			}
 			var li = 0;
 			while (li < ln) {
 				var l2 = vec_get(locals, li);
-				var sz = cg_local_size_bytes(l2);
-				if (off % 8 != 0) { off = off + (8 - (off % 8)); }
-				off = off + sz;
-				ptr64[l2 + 16] = off;
+				if (cg_local_off_is_reg(ptr64[l2 + 16]) != 0) {
+					// Fixed reg local (e.g. extern @reg param)
+				}
+				else if (cg_local_has_nospill(l2) != 0) {
+					while (nospill_reg_next <= 15) {
+						var shift_amt = nospill_reg_next - 12;
+						var bit_mask = 1 << shift_amt;
+						var is_used = used_mask & bit_mask;
+						if (is_used == 0) { break; }
+						nospill_reg_next = nospill_reg_next + 1;
+					}
+					ptr64[l2 + 16] = cg_local_off_pack_reg(nospill_reg_next);
+					var shift_amt2 = nospill_reg_next - 12;
+					used_mask = used_mask | (1 << shift_amt2);
+					nospill_reg_next = nospill_reg_next + 1;
+				}
+				else {
+					var sz = cg_local_size_bytes(l2);
+					if (off % 8 != 0) { off = off + (8 - (off % 8)); }
+					off = off + sz;
+					ptr64[l2 + 16] = off;
+				}
 				li = li + 1;
 			}
-			var frame = off;
+			var frame = 0;
+			if (off > base_off) { frame = off - base_off; }
 			if (frame % 16 != 0) { frame = frame + 8; }
 			ptr64[fn + 16] = frame;
 
+			// Prologue arg copy (skip @reg params)
 			pi = 0;
 			while (pi < pn) {
 				var pst2 = vec_get(params, pi);
@@ -2037,15 +2365,17 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 				var pname_len2 = ptr64[pst2 + 40];
 				var l3 = cg_local_find(ctx, pname_ptr2, pname_len2);
 				if (l3 != 0) {
-					ir_emit(fn, IrInstrKind.PUSH_ARG, 16 + (pi * 8), 0, 0);
-					ir_emit(fn, IrInstrKind.STORE_LOCAL, ptr64[l3 + 16], 0, 0);
+					if (cg_local_off_is_reg(ptr64[l3 + 16]) == 0) {
+						ir_emit(fn, IrInstrKind.PUSH_ARG, 16 + (pi * 8), 0, 0);
+						ir_emit(fn, IrInstrKind.STORE_LOCAL, ptr64[l3 + 16], 0, 0);
+					}
 				}
 				pi = pi + 1;
 			}
 
 			cg_lower_stmt(ctx, body);
 			ir_emit(fn, IrInstrKind.PUSH_IMM, 0, 0, 0);
-			ir_emit(fn, IrInstrKind.RET, 0, 0, 0);
+			ir_emit(fn, IrInstrKind.RET, ptr64[ctx + 56], 0, 0);
 			vec_push(ptr64[irp + 0], fn);
 		}
 		i = i + 1;

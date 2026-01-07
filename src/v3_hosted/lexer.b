@@ -35,11 +35,13 @@ func keyword_kind(p, n) {
 			break;
 		}
 		case 4: {
+			if (slice_eq_parts(p, n, "type", 4) == 1) { return TokKind.KW_TYPE; }
 			if (slice_eq_parts(p, n, "else", 4) == 1) { return TokKind.KW_ELSE; }
 			if (slice_eq_parts(p, n, "func", 4) == 1) { return TokKind.KW_FUNC; }
 			if (slice_eq_parts(p, n, "enum", 4) == 1) { return TokKind.KW_ENUM; }
 			if (slice_eq_parts(p, n, "null", 4) == 1) { return TokKind.KW_NULL; }
 			if (slice_eq_parts(p, n, "wipe", 4) == 1) { return TokKind.KW_WIPE; }
+			if (slice_eq_parts(p, n, "case", 4) == 1) { return TokKind.KW_CASE; }
 			break;
 		}
 		case 5: {
@@ -56,14 +58,17 @@ func keyword_kind(p, n) {
 			if (slice_eq_parts(p, n, "switch", 6) == 1) { return TokKind.KW_SWITCH; }
 			if (slice_eq_parts(p, n, "return", 6) == 1) { return TokKind.KW_RETURN; }
 			if (slice_eq_parts(p, n, "secret", 6) == 1) { return TokKind.KW_SECRET; }
+			if (slice_eq_parts(p, n, "extern", 6) == 1) { return TokKind.KW_EXTERN; }
 			break;
 		}
 		case 7: {
 			if (slice_eq_parts(p, n, "foreach", 7) == 1) { return TokKind.KW_FOREACH; }
 			if (slice_eq_parts(p, n, "nospill", 7) == 1) { return TokKind.KW_NOSPILL; }
+			if (slice_eq_parts(p, n, "default", 7) == 1) { return TokKind.KW_DEFAULT; }
 			break;
 		}
 		case 8: {
+			if (slice_eq_parts(p, n, "distinct", 8) == 1) { return TokKind.KW_DISTINCT; }
 			if (slice_eq_parts(p, n, "continue", 8) == 1) { return TokKind.KW_CONTINUE; }
 			break;
 		}
@@ -512,6 +517,28 @@ func lexer_next(lex, tok_out) {
 		else if (ch0 == 38) { if (ch1 == 38) { kind = TokKind.ANDAND; cur = cur + 2; } }
 		else if (ch0 == 124) { if (ch1 == 124) { kind = TokKind.OROR; cur = cur + 2; } }
 		else if (ch0 == 45) { if (ch1 == 62) { kind = TokKind.ARROW; cur = cur + 2; } }
+		// compound assignment (Phase 6.1)
+		else if (ch0 == 43) {
+			if (ch1 == 61) { kind = TokKind.PLUSEQ; cur = cur + 2; }
+			else if (ch1 == 43) { kind = TokKind.PLUSPLUS; cur = cur + 2; }
+		}
+		else if (ch0 == 45) {
+			if (ch1 == 61) { kind = TokKind.MINUSEQ; cur = cur + 2; }
+			else if (ch1 == 45) { kind = TokKind.MINUSMINUS; cur = cur + 2; }
+		}
+		else if (ch0 == 42) { if (ch1 == 61) { kind = TokKind.STAREQ; cur = cur + 2; } }
+		else if (ch0 == 47) { if (ch1 == 61) { kind = TokKind.SLASHEQ; cur = cur + 2; } }
+		else if (ch0 == 37) { if (ch1 == 61) { kind = TokKind.PERCENTEQ; cur = cur + 2; } }
+		else if (ch0 == 38) { if (ch1 == 61) { kind = TokKind.AMPEQ; cur = cur + 2; } }
+		else if (ch0 == 124) { if (ch1 == 61) { kind = TokKind.PIPEEQ; cur = cur + 2; } }
+		else if (ch0 == 94) { if (ch1 == 61) { kind = TokKind.CARETEQ; cur = cur + 2; } }
+	}
+	// check for <<= and >>=
+	if (cur + 2 < end) {
+		var ch1_3 = ptr8[cur + 1];
+		var ch2_3 = ptr8[cur + 2];
+		if (ch0 == 60 && ch1_3 == 60 && ch2_3 == 61) { kind = TokKind.LSHIFTEQ; cur = cur + 3; }
+		else if (ch0 == 62 && ch1_3 == 62 && ch2_3 == 61) { kind = TokKind.RSHIFTEQ; cur = cur + 3; }
 	}
 
 	if (kind == 0) {

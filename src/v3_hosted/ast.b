@@ -8,6 +8,12 @@ enum AstTypeKind {
 	SLICE = 3,
 	ARRAY = 4,
 	QUAL_NAME = 5,
+	// Phase 5+: tuple types (used for multi-return)
+	TUPLE = 6,
+	// Phase 4+: generic instantiation wrapper
+	GENERIC = 7,
+	// Phase 3+: comptime type expression wrapper
+	COMPTIME_EXPR = 8,
 };
 
 struct AstType {
@@ -38,6 +44,8 @@ enum AstExprKind {
 	BRACE_INIT = 11,
 	OFFSETOF = 12,
 	FIELD = 13,
+	// Lowering-only expression: a=AstType*
+	TYPE_LIT = 14,
 };
 
 struct AstExpr {
@@ -75,6 +83,11 @@ enum AstStmtKind {
 	WHILE = 6,
 	FOREACH = 7,
 	WIPE = 8,
+	BREAK = 9,
+	CONTINUE = 10,
+	DESTRUCT = 11,
+	FOR = 12,
+	SWITCH = 13,
 };
 
 struct AstStmt {
@@ -98,6 +111,7 @@ enum AstDeclKind {
 	CONST = 4,
 	ENUM = 5,
 	STRUCT = 6,
+	TYPE = 7,
 };
 
 struct AstDecl {
@@ -111,6 +125,7 @@ struct AstDecl {
 	line: u64;
 	col: u64;
 	is_public: u64;
+	decl_flags: u64;
 };
 
 struct AstProgram {

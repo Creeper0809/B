@@ -261,7 +261,7 @@ func expr_new_cast(type_ptr, expr_ptr, tokp) {
 }
 
 func stmt_new_block(stmts, tokp) {
-	var s = heap_alloc(88);
+	var s = heap_alloc(96);
 	if (s == 0) { return 0; }
 	ptr64[s + 0] = AstStmtKind.BLOCK;
 	ptr64[s + 8] = stmts;
@@ -274,11 +274,12 @@ func stmt_new_block(stmts, tokp) {
 	ptr64[s + 64] = ptr64[tokp + 32];
 	ptr64[s + 72] = ptr64[tokp + 24];
 	ptr64[s + 80] = ptr64[tokp + 40];
+	ptr64[s + 88] = 0;
 	return s;
 }
 
 func stmt_new_var(name_ptr, name_len, type_ptr, init_expr, tokp) {
-	var s = heap_alloc(88);
+	var s = heap_alloc(96);
 	if (s == 0) { return 0; }
 	ptr64[s + 0] = AstStmtKind.VAR;
 	ptr64[s + 8] = 0;
@@ -291,11 +292,12 @@ func stmt_new_var(name_ptr, name_len, type_ptr, init_expr, tokp) {
 	ptr64[s + 64] = ptr64[tokp + 32];
 	ptr64[s + 72] = ptr64[tokp + 24];
 	ptr64[s + 80] = ptr64[tokp + 40];
+	ptr64[s + 88] = 0;
 	return s;
 }
 
 func stmt_new_expr(expr_ptr, tokp) {
-	var s = heap_alloc(88);
+	var s = heap_alloc(96);
 	if (s == 0) { return 0; }
 	ptr64[s + 0] = AstStmtKind.EXPR;
 	ptr64[s + 8] = 0;
@@ -308,11 +310,12 @@ func stmt_new_expr(expr_ptr, tokp) {
 	ptr64[s + 64] = ptr64[tokp + 32];
 	ptr64[s + 72] = ptr64[tokp + 24];
 	ptr64[s + 80] = ptr64[tokp + 40];
+	ptr64[s + 88] = 0;
 	return s;
 }
 
 func stmt_new_return(expr_ptr, tokp) {
-	var s = heap_alloc(88);
+	var s = heap_alloc(96);
 	if (s == 0) { return 0; }
 	ptr64[s + 0] = AstStmtKind.RETURN;
 	ptr64[s + 8] = 0;
@@ -325,11 +328,12 @@ func stmt_new_return(expr_ptr, tokp) {
 	ptr64[s + 64] = ptr64[tokp + 32];
 	ptr64[s + 72] = ptr64[tokp + 24];
 	ptr64[s + 80] = ptr64[tokp + 40];
+	ptr64[s + 88] = 0;
 	return s;
 }
 
 func stmt_new_if(cond, then_s, else_s, tokp) {
-	var s = heap_alloc(88);
+	var s = heap_alloc(96);
 	if (s == 0) { return 0; }
 	ptr64[s + 0] = AstStmtKind.IF;
 	ptr64[s + 8] = cond;
@@ -342,11 +346,12 @@ func stmt_new_if(cond, then_s, else_s, tokp) {
 	ptr64[s + 64] = ptr64[tokp + 32];
 	ptr64[s + 72] = ptr64[tokp + 24];
 	ptr64[s + 80] = ptr64[tokp + 40];
+	ptr64[s + 88] = 0;
 	return s;
 }
 
 func stmt_new_while(cond, body, tokp) {
-	var s = heap_alloc(88);
+	var s = heap_alloc(96);
 	if (s == 0) { return 0; }
 	ptr64[s + 0] = AstStmtKind.WHILE;
 	ptr64[s + 8] = cond;
@@ -359,6 +364,7 @@ func stmt_new_while(cond, body, tokp) {
 	ptr64[s + 64] = ptr64[tokp + 32];
 	ptr64[s + 72] = ptr64[tokp + 24];
 	ptr64[s + 80] = ptr64[tokp + 40];
+	ptr64[s + 88] = 0;
 	return s;
 }
 
@@ -375,7 +381,7 @@ func foreach_bind_new(name0_ptr, name0_len, name1_ptr, name1_len, has_two) {
 }
 
 func stmt_new_foreach(bind, iter_expr, body, tokp) {
-	var s = heap_alloc(88);
+	var s = heap_alloc(96);
 	if (s == 0) { return 0; }
 	ptr64[s + 0] = AstStmtKind.FOREACH;
 	ptr64[s + 8] = bind;
@@ -388,11 +394,12 @@ func stmt_new_foreach(bind, iter_expr, body, tokp) {
 	ptr64[s + 64] = ptr64[tokp + 32];
 	ptr64[s + 72] = ptr64[tokp + 24];
 	ptr64[s + 80] = ptr64[tokp + 40];
+	ptr64[s + 88] = 0;
 	return s;
 }
 
 func decl_new_simple(kind, name_ptr, name_len, is_public, tokp) {
-	var d = heap_alloc(80);
+	var d = heap_alloc(104);
 	if (d == 0) { return 0; }
 	ptr64[d + 0] = kind;
 	ptr64[d + 8] = name_ptr;
@@ -404,11 +411,14 @@ func decl_new_simple(kind, name_ptr, name_len, is_public, tokp) {
 	ptr64[d + 56] = ptr64[tokp + 24];
 	ptr64[d + 64] = ptr64[tokp + 40];
 	ptr64[d + 72] = is_public;
+	ptr64[d + 80] = 0;
+	ptr64[d + 88] = 0;
+	ptr64[d + 96] = 0;
 	return d;
 }
 
 func decl_new_global_var(kind, name_ptr, name_len, is_public, type_ptr, init_expr, tokp) {
-	var d = heap_alloc(80);
+	var d = heap_alloc(104);
 	if (d == 0) { return 0; }
 	ptr64[d + 0] = kind;
 	ptr64[d + 8] = name_ptr;
@@ -420,11 +430,14 @@ func decl_new_global_var(kind, name_ptr, name_len, is_public, type_ptr, init_exp
 	ptr64[d + 56] = ptr64[tokp + 24];
 	ptr64[d + 64] = ptr64[tokp + 40];
 	ptr64[d + 72] = is_public;
+	ptr64[d + 80] = 0;
+	ptr64[d + 88] = 0;
+	ptr64[d + 96] = 0;
 	return d;
 }
 
 func decl_new_func(name_ptr, name_len, is_public, params, ret_type, body, tokp) {
-	var d = heap_alloc(80);
+	var d = heap_alloc(104);
 	if (d == 0) { return 0; }
 	ptr64[d + 0] = AstDeclKind.FUNC;
 	ptr64[d + 8] = name_ptr;
@@ -436,11 +449,14 @@ func decl_new_func(name_ptr, name_len, is_public, params, ret_type, body, tokp) 
 	ptr64[d + 56] = ptr64[tokp + 24];
 	ptr64[d + 64] = ptr64[tokp + 40];
 	ptr64[d + 72] = is_public;
+	ptr64[d + 80] = 0;
+	ptr64[d + 88] = 0;
+	ptr64[d + 96] = 0;
 	return d;
 }
 
 func decl_new_struct(name_ptr, name_len, is_public, fields, tokp) {
-	var d = heap_alloc(80);
+	var d = heap_alloc(104);
 	if (d == 0) { return 0; }
 	ptr64[d + 0] = AstDeclKind.STRUCT;
 	ptr64[d + 8] = name_ptr;
@@ -452,11 +468,14 @@ func decl_new_struct(name_ptr, name_len, is_public, fields, tokp) {
 	ptr64[d + 56] = ptr64[tokp + 24];
 	ptr64[d + 64] = ptr64[tokp + 40];
 	ptr64[d + 72] = is_public;
+	ptr64[d + 80] = 0;
+	ptr64[d + 88] = 0;
+	ptr64[d + 96] = 0;
 	return d;
 }
 
 func decl_new_enum(name_ptr, name_len, is_public, variants, tokp) {
-	var d = heap_alloc(80);
+	var d = heap_alloc(104);
 	if (d == 0) { return 0; }
 	ptr64[d + 0] = AstDeclKind.ENUM;
 	ptr64[d + 8] = name_ptr;
@@ -468,7 +487,35 @@ func decl_new_enum(name_ptr, name_len, is_public, variants, tokp) {
 	ptr64[d + 56] = ptr64[tokp + 24];
 	ptr64[d + 64] = ptr64[tokp + 40];
 	ptr64[d + 72] = is_public;
+	ptr64[d + 80] = 0;
+	ptr64[d + 88] = 0;
+	ptr64[d + 96] = 0;
 	return d;
+}
+
+// AstDecl.decl_flags (keep in sync with typecheck)
+const PARSER_DECL_FLAG_EXTERN = 1;
+const PARSER_DECL_RETREG_SHIFT = 8;
+
+func parser_reg_id(tokp) {
+	// Map IDENT token text to x86-64 reg id (0..15). Unknown => 255.
+	var p = ptr64[tokp + 8];
+	var n = ptr64[tokp + 16];
+	if (slice_eq_parts(p, n, "rax", 3) == 1) { return 0; }
+	if (slice_eq_parts(p, n, "rcx", 3) == 1) { return 1; }
+	if (slice_eq_parts(p, n, "rdx", 3) == 1) { return 2; }
+	if (slice_eq_parts(p, n, "rbx", 3) == 1) { return 3; }
+	if (slice_eq_parts(p, n, "rsi", 3) == 1) { return 6; }
+	if (slice_eq_parts(p, n, "rdi", 3) == 1) { return 7; }
+	if (slice_eq_parts(p, n, "r8", 2) == 1) { return 8; }
+	if (slice_eq_parts(p, n, "r9", 2) == 1) { return 9; }
+	if (slice_eq_parts(p, n, "r10", 3) == 1) { return 10; }
+	if (slice_eq_parts(p, n, "r11", 3) == 1) { return 11; }
+	if (slice_eq_parts(p, n, "r12", 3) == 1) { return 12; }
+	if (slice_eq_parts(p, n, "r13", 3) == 1) { return 13; }
+	if (slice_eq_parts(p, n, "r14", 3) == 1) { return 14; }
+	if (slice_eq_parts(p, n, "r15", 3) == 1) { return 15; }
+	return 255;
 }
 
 func parse_type(p) {
@@ -870,7 +917,7 @@ func parse_eq(p) {
 }
 
 func stmt_new_wipe(a0, b0, tokp) {
-	var s = heap_alloc(88);
+	var s = heap_alloc(96);
 	if (s == 0) { return 0; }
 	ptr64[s + 0] = AstStmtKind.WIPE;
 	ptr64[s + 8] = a0; // expr0: variable or ptr
@@ -883,6 +930,7 @@ func stmt_new_wipe(a0, b0, tokp) {
 	ptr64[s + 64] = ptr64[tokp + 32];
 	ptr64[s + 72] = ptr64[tokp + 24];
 	ptr64[s + 80] = ptr64[tokp + 40];
+	ptr64[s + 88] = 0;
 	return s;
 }
 
@@ -956,7 +1004,8 @@ func parse_logor(p) {
 
 func parse_assign(p) {
 	var e = parse_logor(p);
-	if (ptr64[p + 16] == TokKind.EQ) {
+	var k = ptr64[p + 16];
+	if (k == TokKind.EQ) {
 		var tokp = ptr64[p + 8];
 		parser_bump(p);
 		var rhs = parse_assign(p);
@@ -1161,6 +1210,7 @@ func parse_stmt(p) {
 	// expression statement
 	var tokp = ptr64[p + 8];
 	var e = parse_expr(p);
+	
 	parser_expect(p, TokKind.SEMI, "expected ';'");
 	if (ptr64[p + 16] == TokKind.SEMI) { parser_bump(p); }
 	return stmt_new_expr(e, tokp);
@@ -1221,6 +1271,7 @@ func parse_func_decl(p, is_public) {
 	if (ptr64[p + 16] == TokKind.LPAREN) { parser_bump(p); }
 	var params = vec_new(4);
 	if (params == 0) { return 0; }
+	var ret_reg0 = 0;
 	if (ptr64[p + 16] != TokKind.RPAREN) {
 		while (1) {
 			if (ptr64[p + 16] != TokKind.IDENT) {
@@ -1234,11 +1285,26 @@ func parse_func_decl(p, is_public) {
 			var poff = ptr64[ptok + 32];
 			var pcol = ptr64[ptok + 40];
 			parser_bump(p);
+			// Phase 4.5: optional register annotation: name @ rdi: u64
+			var preg = 0;
+			if (ptr64[p + 16] == TokKind.AT) {
+				parser_bump(p);
+				if (ptr64[p + 16] != TokKind.IDENT) {
+					parser_err_here(p, "@reg: expected register name");
+				}
+				else {
+					preg = parser_reg_id(ptr64[p + 8]);
+					if (preg == 255) { parser_err_here(p, "@reg: unknown register"); }
+					else if (preg == 0) { parser_err_here(p, "@reg: param cannot use rax"); }
+					parser_bump(p);
+				}
+			}
 			var ptype = 0;
 			if (parser_match(p, TokKind.COLON) == 1) {
 				ptype = parse_type(p);
 			}
 			var param_node = stmt_new_var(pname_ptr, pname_len, ptype, 0, ptok);
+			if (param_node != 0) { ptr64[param_node + 16] = preg; }
 			if (param_node != 0) { vec_push(params, param_node); }
 			if (ptr64[p + 16] == TokKind.COMMA) { parser_bump(p); continue; }
 			break;
@@ -1249,6 +1315,19 @@ func parse_func_decl(p, is_public) {
 
 	var ret_type = 0;
 	if (parser_match(p, TokKind.ARROW) == 1) {
+		var ret_reg = 0;
+		if (ptr64[p + 16] == TokKind.AT) {
+			parser_bump(p);
+			if (ptr64[p + 16] != TokKind.IDENT) {
+				parser_err_here(p, "@reg: expected return register name");
+			}
+			else {
+				ret_reg = parser_reg_id(ptr64[p + 8]);
+				if (ret_reg == 255) { parser_err_here(p, "@reg: unknown register"); ret_reg = 0; }
+				parser_bump(p);
+			}
+		}
+		ret_reg0 = ret_reg;
 		ret_type = parse_type(p);
 	}
 
@@ -1260,7 +1339,11 @@ func parse_func_decl(p, is_public) {
 		parser_sync_stmt(p);
 	}
 
-	return decl_new_func(name_ptr, name_len, is_public, params, ret_type, body, kw_tok);
+	var d = decl_new_func(name_ptr, name_len, is_public, params, ret_type, body, kw_tok);
+	if (ret_reg0 != 0) {
+		ptr64[d + 80] = ptr64[d + 80] | ((ret_reg0 & 255) << PARSER_DECL_RETREG_SHIFT);
+	}
+	return d;
 }
 
 func parse_braced_decl(p, decl_kind) {
@@ -1469,6 +1552,7 @@ func parse_enum_decl(p, is_public) {
 
 		// Enum variant node layout: {name_ptr:u64, name_len:u64, value:u64}
 		var ent = heap_alloc(24);
+		var s = heap_alloc(96);
 		if (ent != 0) {
 			ptr64[ent + 0] = vname_ptr;
 			ptr64[ent + 8] = vname_len;
@@ -1481,6 +1565,7 @@ func parse_enum_decl(p, is_public) {
 			parser_bump(p);
 		}
 		else if (ptr64[p + 16] == TokKind.SEMI) {
+		ptr64[s + 88] = 0;
 			parser_bump(p);
 		}
 		else if (ptr64[p + 16] != TokKind.RBRACE) {
@@ -1537,6 +1622,19 @@ func parse_program(p, prog_out) {
 				continue;
 			}
 			d = parse_struct_decl(p, is_public);
+		} else if (k == TokKind.KW_EXTERN) {
+			// Phase 4.5: extern func (minimal form for @reg MVP)
+			var ext_tok = ptr64[p + 8];
+			parser_bump(p);
+			parser_expect(p, TokKind.KW_FUNC, "extern: expected 'func'");
+			if (ptr64[p + 16] == TokKind.KW_FUNC) {
+				d = parse_func_decl(p, is_public);
+				if (d != 0) { ptr64[d + 80] = ptr64[d + 80] | PARSER_DECL_FLAG_EXTERN; }
+			} else {
+				parser_err_here(p, "extern: expected 'func'");
+				parser_sync_stmt(p);
+				continue;
+			}
 		} else if (k == TokKind.KW_FUNC) {
 			d = parse_func_decl(p, is_public);
 		} else if (k == TokKind.KW_VAR) {

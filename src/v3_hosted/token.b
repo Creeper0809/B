@@ -53,6 +53,20 @@ enum TokKind {
 	EQEQEQ = 78,
 	NEQEQ = 79,
 
+	// compound assignment (Phase 6.1)
+	PLUSEQ = 80,
+	MINUSEQ = 81,
+	STAREQ = 82,
+	SLASHEQ = 83,
+	PLUSPLUS = 84,
+	MINUSMINUS = 85,
+	PERCENTEQ = 86,
+	AMPEQ = 87,
+	PIPEEQ = 88,
+	CARETEQ = 89,
+	LSHIFTEQ = 90,
+	RSHIFTEQ = 91,
+
 	// keywords (Phase 1.1)
 	// NOTE: keep these distinct from IDENT to simplify parser.
 	KW_IMPORT = 100,
@@ -76,6 +90,11 @@ enum TokKind {
 	KW_WIPE = 118,
 	KW_SECRET = 119,
 	KW_NOSPILL = 120,
+	KW_EXTERN = 121,
+	KW_TYPE = 122,
+	KW_DISTINCT = 123,
+	KW_CASE = 124,
+	KW_DEFAULT = 125,
 };
 
 struct Token {
