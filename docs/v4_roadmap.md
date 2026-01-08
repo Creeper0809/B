@@ -9,6 +9,75 @@ v4는 v3(MVP)에서 의도적으로 뒤로 미룬 “블랙홀 위험 기능”�
 - 컴파일러 내부 실행기/검증/퍼징은 쉽게 규모가 커지므로, 결정성/샌드박스/리소스 제한을 최우선으로 둔다.
 
 ---
+## 0) v3에서 이동된 항목 (Deferred from v3)
+
+v3 MVP 구현 중 복잡도/블랙홀 리스크로 인해 v4로 미룬 항목들.
+
+### 0.1) 구조체 리터럴 expression
+
+v3 테스트 33에서 실패. typecheck 복잡도(필드 매칭, 순서 재정렬, 타입 추론 등)가 크기 때문에 v4로 이동.
+
+- [ ] named: `Pair{ a: 1, b: 2 }`
+- [ ] positional: `Pair{ 1, 2 }`
+- [ ] codegen: BRACE_INIT → 스택 초기화, sret 반환, VAR 초기화
+- DoD
+    - struct 리터럴로 값 생성/전달 동작
+    - 필드 순서와 무관하게 named init 동작 (e.g., `{ b: 2, a: 1 }`)
+
+### 0.2) 조건부 컴파일 `@[cfg]`
+
+플랫폼별 분기가 필요하지만, v3 MVP 범위에서는 단일 타겟(Linux x86-64)만 지원.
+
+- [ ] 문법: `@[cfg(target_os="linux")]`
+- [ ] 지원 대상: `target_os` (`linux`/`windows`)
+- [ ] 분기 범위: 선언 + 문장(statement) 레벨
+- DoD
+    - `@[cfg(target_os="linux")]` 붙은 함수가 Linux에서만 컴파일됨
+
+### 0.3) FFI extern 블록
+
+v3에서는 단순 `extern func` 선언만 지원. 블록 방식 + 호출 규약 지정은 v4.
+
+- [ ] 문법: `extern "C" { func ...; }`
+- [ ] 호출 규약: `extern "sysv"`, `extern "win64"`
+- [ ] 심볼 이름 매핑 (e.g., `@[link_name="custom_name"]`)
+- DoD
+    - C 라이브러리 함수 호출 예제 동작
+
+### 0.4) 캡처 없는 익명 함수 / 함수 포인터
+
+- [ ] 함수 포인터 타입: `func(T, U) -> R`
+- [ ] 변수에 함수 주소 저장
+- [ ] 간접 호출 코드젠
+- [ ] (후순위) 익명 함수: `|x| x+1` 또는 `fn(x) { ... }` 형태
+- [ ] (후순위) 클로저(캡처 있음)
+- DoD
+    - 콜백 함수 전달 예제 동작
+
+### 0.5) 다중 리턴 (Multi-Return)
+
+v3 테스트 24에서 실패. codegen 복잡도(rax/rdx 매핑, destructuring 등)로 인해 v4로 이동.
+
+- [x] 함수 선언: `-> (T0, T1)` (파싱 완료)
+- [x] return 문장: `return a, b;` (파싱 완료)
+- [ ] destructuring: `var q, r = f();`, `q, r = f();`, `_` discard
+- [ ] IR: `ret v0, v1` (ret value_list)
+- [ ] ABI: `rax/rdx` 매핑
+- DoD
+    - 2리턴 함수 호출/바인딩이 end-to-end로 동작
+
+### 0.6) 런타임 디버깅 인프라 (Location Info 고급)
+
+v3에서는 컴파일 에러 위치만 지원. 런타임 위치 정보는 DWARF 등 복잡도로 인해 v4로 이동.
+
+- [ ] IR → ASM 단계까지 파일/줄/컬럼 유지
+- [ ] 런타임 패닉 시 스택 트레이스 출력
+- [ ] `.loc` 지시어로 gdb 연동
+- [ ] 스택 정리 정책 (panic 시 defer 실행 등)
+- DoD
+    - 패닉 메시지에 소스 위치 + 호출 스택 출력
+
+---
 
 ## 1) 메타프로그래밍: `comptime`
 

@@ -16,6 +16,7 @@ import file;
 
 import io;
 import vec;
+import hashmap;
 
 const TC_TY_INVALID = 0;
 
@@ -59,8 +60,13 @@ var tc_errors;
 
 // Global struct registry (Vec of struct type pointers).
 var tc_structs;
+// HashMap for O(1) struct lookup: key = "mod_id:name", value = struct ptr
+var tc_structs_map;
+
 // Global enum registry (Vec of enum type pointers).
 var tc_enums;
+// HashMap for O(1) enum lookup
+var tc_enums_map;
 
 // Phase 2.6: type alias registry (Vec of TcTypeAlias*).
 // TcTypeAlias layout (heap_alloc 56):
@@ -72,6 +78,8 @@ var tc_enums;
 // +40  base_ty (for distinct: underlying type; otherwise equals aliased_ty)
 // +48  is_distinct (0/1)
 var tc_type_aliases;
+// HashMap for O(1) type alias lookup
+var tc_type_aliases_map;
 
 // Global pointer-type registry (Vec of compound ptr types).
 var tc_ptr_types;
@@ -86,6 +94,8 @@ var tc_ptr_types;
 // +40 p1_ty
 // +48 ret_ty (0 means no return type / void)
 var tc_funcs;
+// HashMap for O(1) function lookup
+var tc_funcs_map;
 
 // Phase 4.4 nospill (hosted-friendly approximation):
 // Treat `nospill` locals as requiring a dedicated register. If more than
@@ -746,7 +756,62 @@ func tc_alignof(ty) {
 	return 1;
 }
 
+// Scratch buffer for building HashMap keys: "mod_id:name"
+// Max key size: 20 (mod_id as decimal) + 1 (:) + 256 (name) = 277
+var tc_key_buf;
+
+func tc_make_key(mod_id, name_ptr, name_len) {
+	// Returns: rax=ptr, rdx=len
+	// Builds key "mod_id:name" in tc_key_buf
+	if (tc_key_buf == 0) {
+		tc_key_buf = heap_alloc(280);
+	}
+	var p = tc_key_buf;
+	// Write mod_id as decimal
+	var m = mod_id;
+	var digits = 0;
+	var tmp_buf = p + 270; // temp area at end of buffer
+	if (m == 0) {
+		ptr8[tmp_buf] = 48; // '0'
+		digits = 1;
+	} else {
+		while (m > 0) {
+			ptr8[tmp_buf + digits] = 48 + (m % 10);
+			m = m / 10;
+			digits = digits + 1;
+		}
+	}
+	// Reverse digits into p
+	var di = 0;
+	while (di < digits) {
+		ptr8[p + di] = ptr8[tmp_buf + (digits - 1 - di)];
+		di = di + 1;
+	}
+	// Write ':'
+	ptr8[p + digits] = 58;
+	var pos = digits + 1;
+	// Copy name
+	var ni = 0;
+	while (ni < name_len) {
+		ptr8[p + pos] = ptr8[name_ptr + ni];
+		ni = ni + 1;
+		pos = pos + 1;
+	}
+	alias rdx : out_len;
+	out_len = pos;
+	return p;
+}
+
 func tc_struct_lookup_mod(mod_id, name_ptr, name_len) {
+	if (tc_structs_map != 0) {
+		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
+		alias rdx : key_len;
+		var result = hashmap_get(tc_structs_map, key_ptr, key_len);
+		alias rdx : ok;
+		if (ok != 0) { return result; }
+		return 0;
+	}
+	// Fallback to linear search if map not initialized
 	if (tc_structs == 0) { return 0; }
 	var n = vec_len(tc_structs);
 	var i = 0;
@@ -895,6 +960,15 @@ func tc_is_ptr(ty) {
 }
 
 func tc_enum_lookup_mod(mod_id, name_ptr, name_len) {
+	if (tc_enums_map != 0) {
+		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
+		alias rdx : key_len;
+		var result = hashmap_get(tc_enums_map, key_ptr, key_len);
+		alias rdx : ok;
+		if (ok != 0) { return result; }
+		return 0;
+	}
+	// Fallback to linear search if map not initialized
 	if (tc_enums == 0) { return 0; }
 	var n = vec_len(tc_enums);
 	var i = 0;
@@ -917,6 +991,15 @@ func tc_enum_lookup(name_ptr, name_len) {
 }
 
 func tc_type_alias_lookup_mod(mod_id, name_ptr, name_len) {
+	if (tc_type_aliases_map != 0) {
+		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
+		alias rdx : key_len;
+		var result = hashmap_get(tc_type_aliases_map, key_ptr, key_len);
+		alias rdx : ok;
+		if (ok != 0) { return result; }
+		return 0;
+	}
+	// Fallback to linear search if map not initialized
 	if (tc_type_aliases == 0) { return 0; }
 	var n = vec_len(tc_type_aliases);
 	var i = 0;
@@ -987,6 +1070,12 @@ func tc_register_type_alias_decl(d, mod_id, is_public) {
 	ptr64[rec + 40] = base_ty;
 	ptr64[rec + 48] = is_distinct0;
 	vec_push(tc_type_aliases, rec);
+	// HashMap insert for O(1) lookup
+	if (tc_type_aliases_map != 0) {
+		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
+		alias rdx : key_len;
+		hashmap_put(tc_type_aliases_map, key_ptr, key_len, rec);
+	}
 	return 0;
 }
 
@@ -1005,6 +1094,15 @@ func tc_enum_find_variant(ty, name_ptr, name_len) {
 }
 
 func tc_func_lookup_mod(mod_id, name_ptr, name_len) {
+	if (tc_funcs_map != 0) {
+		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
+		alias rdx : key_len;
+		var result = hashmap_get(tc_funcs_map, key_ptr, key_len);
+		alias rdx : ok;
+		if (ok != 0) { return result; }
+		return 0;
+	}
+	// Fallback to linear search if map not initialized
 	if (tc_funcs == 0) { return 0; }
 	var n = vec_len(tc_funcs);
 	var i = 0;
@@ -1067,6 +1165,12 @@ func tc_collect_func_sigs_from_prog(prog, mod_id) {
 				ptr64[sig + 48] = ret_ty;
 				ptr64[sig + 56] = 0;
 				vec_push(tc_funcs, sig);
+				// HashMap insert for O(1) lookup
+				if (tc_funcs_map != 0) {
+					var key_ptr_f = tc_make_key(mod_id, name_ptr, name_len);
+					alias rdx : key_len_f;
+					hashmap_put(tc_funcs_map, key_ptr_f, key_len_f, sig);
+				}
 			}
 		}
 		i = i + 1;
@@ -2139,6 +2243,12 @@ func tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, args_
 	ptr64[t + 48] = mod_id;
 	ptr64[t + 56] = is_public;
 	vec_push(tc_structs, t);
+	// HashMap insert for O(1) lookup
+	if (tc_structs_map != 0) {
+		var key_ptr_s = tc_make_key(mod_id, new_name_ptr, new_name_len);
+		alias rdx : key_len_s;
+		hashmap_put(tc_structs_map, key_ptr_s, key_len_s, t);
+	}
 	return t;
 }
 
@@ -2224,6 +2334,12 @@ func tc_register_struct_decl(d, mod_id, is_public) {
 	ptr64[t + 48] = mod_id;
 	ptr64[t + 56] = is_public;
 	vec_push(tc_structs, t);
+	// HashMap insert for O(1) lookup
+	if (tc_structs_map != 0) {
+		var key_ptr_s = tc_make_key(mod_id, name_ptr, name_len);
+		alias rdx : key_len_s;
+		hashmap_put(tc_structs_map, key_ptr_s, key_len_s, t);
+	}
 	return 0;
 }
 
@@ -2249,6 +2365,12 @@ func tc_register_enum_decl(d, mod_id, is_public) {
 	ptr64[t + 32] = mod_id;
 	ptr64[t + 40] = is_public;
 	vec_push(tc_enums, t);
+	// HashMap insert for O(1) lookup
+	if (tc_enums_map != 0) {
+		var key_ptr_e = tc_make_key(mod_id, name_ptr, name_len);
+		alias rdx : key_len_e;
+		hashmap_put(tc_enums_map, key_ptr_e, key_len_e, t);
+	}
 	return 0;
 }
 
@@ -4607,6 +4729,12 @@ func typecheck_program(prog) {
 	tc_type_aliases = vec_new(8);
 	if (tc_type_aliases == 0) { return 1; }
 
+	// Initialize HashMap tables for O(1) lookup
+	tc_structs_map = hashmap_new(16);
+	tc_enums_map = hashmap_new(16);
+	tc_type_aliases_map = hashmap_new(16);
+	tc_funcs_map = hashmap_new(16);
+
 	// Pass 0: register enum and struct layouts.
 	var decls0 = ptr64[prog + 0];
 	var i0 = 0;
@@ -4769,6 +4897,12 @@ func tc_typecheck_all_modules() {
 	if (tc_ptr_types == 0) { return 1; }
 	tc_type_aliases = vec_new(8);
 	if (tc_type_aliases == 0) { return 1; }
+
+	// Initialize HashMap tables for O(1) lookup
+	tc_structs_map = hashmap_new(16);
+	tc_enums_map = hashmap_new(16);
+	tc_type_aliases_map = hashmap_new(16);
+	tc_funcs_map = hashmap_new(16);
 
 	// Pass 0: register enum and struct layouts per module.
 	var mcount = vec_len(tc_modules);

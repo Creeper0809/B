@@ -6,17 +6,20 @@
 ---
 ## 현재 테스트 현황 (2026-01-08)
 
-**codegen_golden: 31 passing, 4 failing**
+**codegen_golden: 33 passing, 4 failing**
 
 실패 테스트:
 - 20_generics_struct_offsetof — value generics + struct offsetof
 - 22_comptime_array_len_expr — comptime 배열 길이
-- 24_multi_return — 다중 반환 codegen
-- 33_struct_literal — struct literal expression (V4로 이동)
+- 24_multi_return — V4로 이동
+- 33_struct_literal — V4로 이동
 
 최근 구현:
 - ✅ 테스트 34 (impl_method): `impl Type {}` 블록 + 메서드 호출 설탕
 - ✅ 테스트 35, 36 (defer): `defer` 문 기본 구현 (블록 스코프, return 시 실행)
+- ✅ 테스트 37 (shadowing): **변수 섀도잉** 완전 지원
+- ✅ 테스트 38 (panic): `panic("msg")` 내장 함수 (stderr 출력 + exit(1))
+- ✅ 전역 심볼 테이블 HashMap 전환 (O(1) lookup)
 
 ---
 ## 전제(Freeze 요약)
@@ -271,11 +274,11 @@ NOTE
 - [x] 문법: `func f[T](x: T) -> T`, `struct Vec[T] { ... }` (파싱 구현됨)
 - [x] 인스턴스화: AST 단계 monomorph (기본 동작)
 - [x] 기본 타입 추론(호출 시 타입 인자 생략)
-- [ ] value generics: `func f[N: u64]()` (부분 구현)
+- [ ] value generics: `func f[N: u64]()` (테스트 20, 21, 22 실패 중)
 - DoD
     - [x] `id(10)`이 `id[u64](10)`로 monomorph
     - [ ] 중복 인스턴스 캐시(동일 타입 인자) 동작
-    - [ ] value generics 완전 지원 (테스트 20, 21, 22 실패 중)
+    - [ ] value generics 완전 지원
 
 ### 5.2 named args
 - [x] 호출 파싱: `f(a: x, b: y)`
@@ -288,17 +291,7 @@ NOTE
 - DoD
     - 간단한 입력에서 dead branch 제거 확인
 
-### 5.4 multi-return(언어 표면 + IR + ABI)
-- [x] 함수 선언: `-> (T0, T1)`
-- [x] return 문장: `return a, b;`
-- [x] destructuring: `var q, r = f();`, `q, r = f();`, `_` discard
-- [x] IR: `ret v0, v1` (ret value_list)
-- [x] ABI: `rax/rdx` 매핑
-- [ ] codegen golden 테스트 통과 (테스트 24 실패 중)
-    - 2리턴 함수 호출/바인딩이 end-to-end로 동작
-
----
-
+(multi-return은 V4로 이동 - 사유: codegen 복잡도, 테스트 24 실패 중)
 ---
 
 ## Phase 6 — 추가 문법/표면 언어(Modern Surface Syntax)
@@ -311,13 +304,10 @@ NOTE
     - [x] `x += 1;`이 `x = x + 1;`로 lowering 확인
     - [ ] `final` 변수 재대입 시 에러
 
-### 6.2 구조체/enum 리터럴 (Phase 1.3) → V4로 이동
-- [ ] named: `Pair{ a: 1, b: 2 }`
-- [ ] positional: `Pair{ 1, 2 }`
+### 6.2 enum 리터럴
 - [x] enum: `Color.Red` (구현됨)
-- 사유: typecheck 복잡도(필드 매칭, 순서 재정렬 등)
-- DoD
-    - struct 리터럴로 값 생성/전달 동작
+
+(struct 리터럴은 V4로 이동 - 사유: typecheck 복잡도)
 
 ### 6.3 메서드/네임스페이스 (Phase 1.4)
 - [x] 메서드 호출 설탕: `x.f(y)` ↔ `f(x, y)` (typecheck에서 변환)
@@ -333,14 +323,9 @@ NOTE
 - DoD
     - [x] `defer free(p);`가 블록 종료 시 실행됨 (테스트 35, 36 통과)
 
-### 6.5 함수 포인터 타입 (Phase 1.8)
-- [ ] 타입 표기: `func(T, U) -> R`
-- [ ] 변수에 함수 주소 저장
-- [ ] 간접 호출 코드젠
-- DoD
-    - 콜백 함수 전달 예제 동작
+(함수 포인터는 V4로 이동 - 사유: 타입 시스템 확장 필요)
 
-### 6.6 강제 Tail Call (Phase 1.2.6)
+### 6.5 강제 Tail Call (Phase 1.2.6)
 - [ ] `return tail f(args...);` 파싱/AST
 - [ ] IR: `musttail` 플래그
 - [ ] defer 충돌 검사(defer 있으면 에러)
@@ -348,34 +333,34 @@ NOTE
 - DoD
     - tail call이 stack frame 안 쌓는지 확인
 
-### 6.7 정수 비트 슬라이싱 (Phase 1.2.6)
+### 6.6 정수 비트 슬라이싱 (Phase 1.2.6)
 - [ ] `x[hi:lo]` 파싱/AST
 - [ ] 상수 범위 검증
 - [ ] lowering: `shift + mask`
 - DoD
     - `inst[31:26]` 같은 패턴 동작
 
-### 6.8 Inline ASM 개선 (Phase 1.11)
+### 6.7 Inline ASM 개선 (Phase 1.11)
 - [ ] `asm(alias1, alias2) { ... }` 파싱
 - [ ] `{name}` → 실제 레지스터 치환
 - [ ] alias가 아닌 변수 사용 시 에러
 - DoD
     - `mov {tmp}, 0` 같은 템플릿 동작
 
-### 6.9 어노테이션 시스템 (Phase 1.12)
+### 6.8 어노테이션 시스템 (Phase 1.12)
 - [ ] `@[inline]`, `@[no_mangle]` 등 파싱
 - [ ] (선택) 계약: `@[requires]`, `@[ensures]`, `@[invariant]`
 - DoD
     - 기본 어노테이션이 파싱/검증됨
 
-### 6.10 파서 내장 유틸 (Phase 1.13)
+### 6.9 파서 내장 유틸 (Phase 1.13)
 - [ ] `print(expr)` 타입별 자동 분기
 - [ ] `@embed("path")` 파일 삽입
 - [ ] `@trng` 하드웨어 난수
 - DoD
     - `print(123)`와 `print("hi")`가 다르게 동작
 
-### 6.11 암호/알고리즘 Builtin Intrinsics (Phase 1.13.1)
+### 6.10 암호/알고리즘 Builtin Intrinsics (Phase 1.13.1)
 - [ ] `bswap(x)` - 바이트 스왑
 - [ ] `popcnt(x)` - 비트 카운트
 - [ ] `ctz(x)`, `clz(x)` - 0 카운트
@@ -386,7 +371,7 @@ NOTE
 - DoD
     - 각 intrinsic이 올바른 x86-64 명령으로 lowering
 
-### 6.12 타입 별칭 + distinct (Phase 2.1.5/2.1.6)
+### 6.11 타입 별칭 + distinct (Phase 2.1.5/2.1.6)
 - [x] `type Alias = T;` 별칭
 - [x] `type NewType = distinct T;` 강한 별칭
 - [x] distinct 타입 간 자동 변환 금지(명시적 cast만)
@@ -397,37 +382,42 @@ NOTE
 
 ## Phase 7 — 컴파일러 구조/품질
 
-### 7.1 심볼 테이블 HashMap 전환 (Phase 6.2)
-- [ ] 스코프별 HashMap 스택
-- [ ] `put/get/has` 평균 O(1)
-- [ ] shadowing 지원
-- DoD
-    - 큰 모듈에서 심볼 조회 성능 개선
+### 7.1 심볼 테이블 최적화 (Phase 6.2)
 
-### 7.2 다중 리턴 ABI 완전 지원 (Phase 6.4.5)
-- [x] AST: `-> (T0, T1)`
-- [x] return: `return a, b;`
-- [x] destructuring: `var q, r = f();`, `q, r = f();`, `_` discard
-- [x] IR: `ret v0, v1`
-- [x] ABI: `rax/rdx` 매핑
+**전역 심볼: HashMap 전환 (완료)**
+- [x] 전역 심볼 테이블 HashMap 전환 (structs, enums, type_aliases, funcs)
+- [x] `put/get` 평균 O(1) (mod_id:name 복합 키)
+- [x] lookup 함수들에 HashMap 우선 조회 + fallback
 - DoD
-    - 2리턴 함수 end-to-end 동작
+    - [x] 전역 심볼 조회 O(1) 달성
+    - 큰 모듈에서 심볼 조회 성능 개선 완료
 
-### 7.3 Location Info 전파 (Phase 6.5)
-- [ ] AST → IR → ASM 단계까지 파일/줄/컬럼 유지
-- [ ] 런타임 패닉 시 스택 트레이스 출력
-- [ ] (후순위) `.loc` 지시어로 gdb 연동
+**로컬 스코프: Vec 기반 역순 검색 + Shadowing (완료)**
+- [x] 역순 검색: `cg_local_find`를 역순 검색으로 변경 (뒤에서부터 찾음)
+- [x] collect 단계: 모든 VAR를 수집하고 AST(st+88)에 local 포인터 저장
+- [x] lower 전 truncate: params만 남기고 body vars 제거
+- [x] lower의 VAR: st+88에서 local 가져와서 활성 목록에 추가
+- [x] lower의 BLOCK: 진입 시 len 저장, 종료 시 truncate로 복원
+- [x] shadowing 지원: 같은 이름의 중첩 변수가 별도 슬롯 할당
+- 자료구조: Vec 유지 (HashMap 전환 불필요 - 로컬 변수는 ~50개 미만)
 - DoD
-    - 패닉 메시지에 소스 위치 출력
+    - [x] 중첩 블록에서 서로 다른 이름의 변수가 올바르게 동작 (테스트 37)
+    - [x] `{ var x = 1; { var x = 2; } }` shadowing 완전 지원 ✅
 
-### 7.4 Panic 메커니즘 (Phase 6.5)
-- [ ] `panic("msg")` 내장 함수
-- [ ] stderr 출력 + 종료
-- [ ] (후순위) 스택 정리 정책
+
+### 7.2 에러 리포팅 기초 (Phase 6.5)
+
+**MVP 범위 (지금 해야 할 것):**
+- [x] AST에 위치 정보(`Span`) 저장: 파서가 토큰의 줄 번호를 AST 노드에 박아둨
+- [x] 컴파일 에러 출력: 타입 체크 실패 시 `"Error at line 10: ..."` 출력
+- [x] `panic("msg")` 내장 함수: stderr 출력 + 즉시 종료 (`exit(1)`) ✅
 - DoD
-    - `panic` 호출 시 메시지 출력되고 종료
+    - [x] 컴파일 에러에 줄 번호 포함
+    - [x] `panic` 호출 시 메시지 출력되고 종료 (테스트 38)
 
-### 7.5 컴파일러 API 설계 (Phase 7)
+(런타임 스택 트레이스, ASM 위치 전파는 V4로 이동 - 사유: DWARF 등 복잡도)
+
+### 7.3 컴파일러 API 설계 (Phase 7)
 - [ ] 메모리 상 소스 문자열 입력
 - [ ] 메모리 상 asm/IR 덤프 출력
 - [ ] 구조화된 diagnostics
@@ -435,34 +425,7 @@ NOTE
 - DoD
     - 동일 프로세스에서 여러 번 컴파일 가능
 
----
 
-## Phase 8 — V4로 이동 예정 (Post-MVP)
-
-### 8.1 `comptime` 메타프로그래밍
-- [ ] 컴파일 타임 코드 실행
-- [ ] 상수 평가기(const-eval) 또는 제한 인터프리터
-- 사유: 실행기/VM 구현 블랙홀 리스크
-
-### 8.2 구조체 리터럴 expression (Phase 1.3)
-- [ ] named: `Pair{ a: 1, b: 2 }`
-- [ ] positional: `Pair{ 1, 2 }`
-- [ ] codegen: BRACE_INIT → 스택 초기화, sret 반환, VAR 초기화
-- 사유: typecheck 복잡도(필드 매칭, 순서 재정렬 등)
-
-### 8.3 조건부 컴파일 `@[cfg]` (Phase 1.7)
-- [ ] 문법: `@[cfg(target_os="linux")]`
-- [ ] 지원 대상: `target_os` (`linux`/`windows`)
-- [ ] 분기 범위: 선언 + 문장(statement) 레벨
-
-### 8.4 FFI extern 블록 (Phase 1.6)
-- [ ] 문법: `extern "C" { func ...; }`
-- [ ] 호출 규약: `extern "sysv"`, `extern "win64"`
-- [ ] 심볼 이름 매핑
-
-### 8.5 캡처 없는 익명 함수 (Phase 1.8)
-- [ ] `|x| x+1` 또는 `fn(x) { ... }` 형태
-- [ ] 클로저(캡처 있음)는 후순위
 
 ---
 
@@ -472,6 +435,6 @@ NOTE
 - [x] Phase 2: 포인터 null/unwrap_ptr, `[]u8` 문자열 리터럴, 배열 init
 - [x] Phase 3: struct 레이아웃 + foreach + packed
 - [x] Phase 4: secret/wipe/nospill
-- [ ] Phase 5: 제네릭 + named args + multi-return
-- [ ] Phase 6: final/복합대입/증감, struct 리터럴, defer, 함수 포인터
+- [ ] Phase 5: 제네릭 + named args (value generics 미완성, multi-return V4로 이동)
+- [x] Phase 6: 복합대입/증감, defer (struct 리터럴은 V4로 이동)
 - [ ] Phase 7: panic, 스택 트레이스

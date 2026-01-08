@@ -256,20 +256,20 @@ func cg_tmp_name(prefix, prefix_len, id) {
 }
 
 func cg_local_find(ctx, name_ptr, name_len) {
+	// Reverse search for shadowing support: finds the most recently added binding
 	if (name_ptr == 0) { return 0; }
 	if (name_len == 0) { return 0; }
 	var locals = ptr64[ctx + 16];
 	if (locals == 0) { return 0; }
 	var n = vec_len(locals);
-	var i = 0;
-	while (i < n) {
-		var l = vec_get(locals, i);
+	while (n != 0) {
+		n = n - 1;
+		var l = vec_get(locals, n);
 		if (l != 0) {
 			if (cg_slice_eq(ptr64[l + 0], ptr64[l + 8], name_ptr, name_len) == 1) {
 				return l;
 			}
 		}
-		i = i + 1;
 	}
 	return 0;
 }
@@ -298,9 +298,7 @@ func cg_lower_struct_arg(ctx, e, sz) {
 
 func cg_local_add(ctx, name_ptr, name_len) {
 	var locals = ptr64[ctx + 16];
-	var existing = cg_local_find(ctx, name_ptr, name_len);
-	if (existing != 0) { return existing; }
-
+	// Shadowing: always add new local (no duplicate check)
 	var l = heap_alloc(32);
 	if (l == 0) { return 0; }
 	ptr64[l + 0] = name_ptr;
@@ -308,6 +306,10 @@ func cg_local_add(ctx, name_ptr, name_len) {
 	ptr64[l + 16] = 0;
 	ptr64[l + 24] = 8;
 	vec_push(locals, l);
+	// Update max_locals_len (high water mark for stack frame calculation)
+	var cur_len = vec_len(locals);
+	var max_len = ptr64[ctx + 104];
+	if (cur_len > max_len) { ptr64[ctx + 104] = cur_len; }
 	return l;
 }
 
@@ -641,6 +643,8 @@ func cg_collect_locals_in_stmt(ctx, st) {
 		var name_ptr = ptr64[st + 32];
 		var name_len = ptr64[st + 40];
 		var l = cg_local_add(ctx, name_ptr, name_len);
+		// Store local pointer in AST for lower phase (shadowing support)
+		ptr64[st + 88] = l;
 		var is_nospill = flags0 & 2; // TC_STMT_FLAG_NOSPILL
 		if (is_nospill != 0) {
 			cg_local_mark_nospill(l);
@@ -674,6 +678,8 @@ func cg_collect_locals_in_stmt(ctx, st) {
 		return 0;
 	}
 	if (k == AstStmtKind.BLOCK) {
+		// Collect all locals in nested blocks (no truncate here -
+		// we need all locals for stack frame size calculation)
 		var ss = ptr64[st + 8];
 		var n = vec_len(ss);
 		var i = 0;
@@ -705,14 +711,17 @@ func cg_collect_locals_in_stmt(ctx, st) {
 			// foreach bindings become locals.
 			if (has_two == 1) {
 				if (cg_is_discard_ident(name0_ptr, name0_len) == 0) {
-					cg_local_add(ctx, name0_ptr, name0_len);
+					var l0 = cg_local_add(ctx, name0_ptr, name0_len);
+					ptr64[st + 56] = l0;  // store idx binding local in FOREACH st
 				}
 				if (cg_is_discard_ident(name1_ptr, name1_len) == 0) {
-					cg_local_add(ctx, name1_ptr, name1_len);
+					var l1 = cg_local_add(ctx, name1_ptr, name1_len);
+					ptr64[st + 88] = l1;  // store val binding local in FOREACH st
 				}
 			} else {
 				if (cg_is_discard_ident(name0_ptr, name0_len) == 0) {
-					cg_local_add(ctx, name0_ptr, name0_len);
+					var l0 = cg_local_add(ctx, name0_ptr, name0_len);
+					ptr64[st + 56] = l0;  // store binding local in FOREACH st
 				}
 			}
 		}
@@ -722,13 +731,16 @@ func cg_collect_locals_in_stmt(ctx, st) {
 		alias rdx : n_reg;
 		var p_i = cg_tmp_name("__foreach_i_", 12, id);
 		var n_i = n_reg;
-		cg_local_add(ctx, p_i, n_i);
+		var l_i = cg_local_add(ctx, p_i, n_i);
+		ptr64[st + 32] = l_i;  // store __foreach_i_ local
 		var p_ptr = cg_tmp_name("__foreach_ptr_", 14, id);
 		var n_ptr = n_reg;
-		cg_local_add(ctx, p_ptr, n_ptr);
+		var l_ptr = cg_local_add(ctx, p_ptr, n_ptr);
+		ptr64[st + 40] = l_ptr;  // store __foreach_ptr_ local
 		var p_len = cg_tmp_name("__foreach_len_", 14, id);
 		var n_len = n_reg;
-		cg_local_add(ctx, p_len, n_len);
+		var l_len = cg_local_add(ctx, p_len, n_len);
+		ptr64[st + 48] = l_len;  // store __foreach_len_ local
 
 		cg_collect_locals_in_stmt(ctx, ptr64[st + 24]);
 		return 0;
@@ -1385,6 +1397,16 @@ func cg_lower_expr(ctx, e) {
 				}
 			}
 
+			// builtin panic(msg): print "panic: <msg>\n" to stderr and exit(1)
+			if (cg_slice_eq(name_ptr, name_len, "panic", 5) == 1) {
+				if (vec_len(args) == 1) {
+					cg_lower_expr(ctx, vec_get(args, 0));
+					ir_emit(f, IrInstrKind.PANIC, 0, 0, 0);
+					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+					return 0;
+				}
+			}
+
 			if (cg_slice_eq(name_ptr, name_len, "slice_from_ptr_len", 18) == 1) {
 				if (vec_len(args) == 2) {
 					// Lower to slice {ptr,len}
@@ -1528,8 +1550,18 @@ func cg_lower_stmt(ctx, st) {
 		var name_ptr = ptr64[st + 32];
 		var name_len = ptr64[st + 40];
 		var init = ptr64[st + 56];
-		var l = cg_local_find(ctx, name_ptr, name_len);
-		if (l == 0) { l = cg_local_add(ctx, name_ptr, name_len); }
+		// Get local from AST (stored by collect phase for shadowing support)
+		var l = ptr64[st + 88];
+		if (l == 0) {
+			// Fallback: find or add
+			l = cg_local_find(ctx, name_ptr, name_len);
+			if (l == 0) { l = cg_local_add(ctx, name_ptr, name_len); }
+		}
+		else {
+			// Add to active locals for name lookup (shadowing support)
+			var locals = ptr64[ctx + 16];
+			if (locals != 0) { vec_push(locals, l); }
+		}
 		// If init is CALL returning struct, set local size from return type
 		if (init != 0 && ptr64[init + 0] == AstExprKind.CALL) {
 			var ast_prog2 = ptr64[ctx + 48];
@@ -1682,6 +1714,10 @@ func cg_lower_stmt(ctx, st) {
 	}
 
 	if (k == AstStmtKind.BLOCK) {
+		// Save locals length for shadowing support
+		var locals = ptr64[ctx + 16];
+		var locals_saved = 0;
+		if (locals != 0) { locals_saved = vec_len(locals); }
 		// Phase 4.3: block-scoped secret vars.
 		var sv3 = ptr64[ctx + 40];
 		var saved = 0;
@@ -1713,6 +1749,8 @@ func cg_lower_stmt(ctx, st) {
 			}
 			ptr64[sv3 + 8] = saved;
 		}
+		// Restore locals (shadowing support)
+		if (locals != 0) { ptr64[locals + 8] = locals_saved; }
 		return 0;
 	}
 
@@ -1859,9 +1897,10 @@ func cg_lower_stmt(ctx, st) {
 			}
 		}
 
-		var l_i = cg_foreach_tmp_local(ctx, st, "__foreach_i_", 12);
-		var l_ptr = cg_foreach_tmp_local(ctx, st, "__foreach_ptr_", 14);
-		var l_len = cg_foreach_tmp_local(ctx, st, "__foreach_len_", 14);
+		// Get internal locals from AST (stored by collect phase)
+		var l_i = ptr64[st + 32];
+		var l_ptr = ptr64[st + 40];
+		var l_len = ptr64[st + 48];
 		if (l_i == 0 || l_ptr == 0 || l_len == 0) { return 0; }
 
 		// Evaluate iterable once: store ptr/len.
@@ -1900,6 +1939,18 @@ func cg_lower_stmt(ctx, st) {
 		var name1_ptr = ptr64[bind + 16];
 		var name1_len = ptr64[bind + 24];
 
+		// Add binding locals to active list for name lookup in body
+		var locals = ptr64[ctx + 16];
+		if (has_two == 1) {
+			var l_bind0 = ptr64[st + 56];
+			var l_bind1 = ptr64[st + 88];
+			if (l_bind0 != 0 && locals != 0) { vec_push(locals, l_bind0); }
+			if (l_bind1 != 0 && locals != 0) { vec_push(locals, l_bind1); }
+		} else {
+			var l_bind = ptr64[st + 56];
+			if (l_bind != 0 && locals != 0) { vec_push(locals, l_bind); }
+		}
+
 		var start_id = cg_label_alloc(ctx);
 		var end_id = cg_label_alloc(ctx);
 		vec_push(ptr64[ctx + 64], start_id);
@@ -1913,10 +1964,10 @@ func cg_lower_stmt(ctx, st) {
 		ir_emit(f, IrInstrKind.BINOP, TokKind.LT, 0, 0);
 		ir_emit(f, IrInstrKind.JZ, end_id, 0, 0);
 
-		// Optional idx binding.
+		// Optional idx binding (stored in st+56 by collect phase).
 		if (has_two == 1) {
 			if (cg_is_discard_ident(name0_ptr, name0_len) == 0) {
-				var l_idx = cg_local_find(ctx, name0_ptr, name0_len);
+				var l_idx = ptr64[st + 56];  // get from AST
 				if (l_idx != 0) {
 					ir_emit(f, IrInstrKind.PUSH_LOCAL, ptr64[l_i + 16], 0, 0);
 					ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_idx + 16], 0, 0);
@@ -1939,7 +1990,7 @@ func cg_lower_stmt(ctx, st) {
 		// Store to value binding if present.
 		if (has_two == 1) {
 			if (cg_is_discard_ident(name1_ptr, name1_len) == 0) {
-				var l_val = cg_local_find(ctx, name1_ptr, name1_len);
+				var l_val = ptr64[st + 88];  // get from AST
 				if (l_val != 0) {
 					ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_val + 16], 0, 0);
 				} else {
@@ -1950,7 +2001,7 @@ func cg_lower_stmt(ctx, st) {
 			}
 		} else {
 			if (cg_is_discard_ident(name0_ptr, name0_len) == 0) {
-				var l_val2 = cg_local_find(ctx, name0_ptr, name0_len);
+				var l_val2 = ptr64[st + 56];  // get from AST (single binding)
 				if (l_val2 != 0) {
 					ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_val2 + 16], 0, 0);
 				} else {
@@ -2079,6 +2130,12 @@ func cg_emit_label(sb, id) {
 
 func cg_emit_rodata(sb, prog) {
 	cg_emit_line(sb, "section .rodata");
+	// Panic helper strings
+	cg_emit_line(sb, "__panic_prefix:");
+	cg_emit_line(sb, "\tdb 112,97,110,105,99,58,32"); // "panic: "
+	cg_emit_line(sb, "__panic_newline:");
+	cg_emit_line(sb, "\tdb 10"); // "\n"
+	// User string literals
 	var rdv = ptr64[prog + 8];
 	var n = vec_len(rdv);
 	var i = 0;
@@ -2410,6 +2467,13 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_line(sb, "\tpop rax");
 				cg_emit_line(sb, "\tcall __print_u64");
 			}
+			else if (k == IrInstrKind.PANIC) {
+				// panic: pop slice (ptr, len), print "panic: <msg>\n" to stderr, exit(1)
+				cg_emit_line(sb, "\t; panic");
+				cg_emit_line(sb, "\tpop rdx\t; len");
+				cg_emit_line(sb, "\tpop rsi\t; ptr");
+				cg_emit_line(sb, "\tcall __panic");
+			}
 			else if (k == IrInstrKind.SLICE_INDEX_U8) {
 				// Stack: ptr, len, idx
 				cg_emit_line(sb, "\tpop rcx\t; idx");
@@ -2597,6 +2661,33 @@ func cg_gen_asm(prog, ir_func) {
 	cg_emit_line(sb, "\tpop rbp");
 	cg_emit_line(sb, "\tret");
 
+	// __panic: rsi=ptr, rdx=len. Print "panic: <msg>\n" to stderr, exit(1)
+	cg_emit_line(sb, "__panic:");
+	cg_emit_line(sb, "\tpush rsi");
+	cg_emit_line(sb, "\tpush rdx");
+	// Print "panic: " to stderr (fd=2)
+	cg_emit_line(sb, "\tmov rax, 1");
+	cg_emit_line(sb, "\tmov rdi, 2");
+	cg_emit_line(sb, "\tlea rsi, [rel __panic_prefix]");
+	cg_emit_line(sb, "\tmov rdx, 7");
+	cg_emit_line(sb, "\tsyscall");
+	// Print the message
+	cg_emit_line(sb, "\tpop rdx");
+	cg_emit_line(sb, "\tpop rsi");
+	cg_emit_line(sb, "\tmov rax, 1");
+	cg_emit_line(sb, "\tmov rdi, 2");
+	cg_emit_line(sb, "\tsyscall");
+	// Print newline
+	cg_emit_line(sb, "\tmov rax, 1");
+	cg_emit_line(sb, "\tmov rdi, 2");
+	cg_emit_line(sb, "\tlea rsi, [rel __panic_newline]");
+	cg_emit_line(sb, "\tmov rdx, 1");
+	cg_emit_line(sb, "\tsyscall");
+	// exit(1)
+	cg_emit_line(sb, "\tmov rdi, 1");
+	cg_emit_line(sb, "\tmov rax, 60");
+	cg_emit_line(sb, "\tsyscall");
+
 	return sb;
 }
 
@@ -2611,7 +2702,7 @@ func v3h_codegen_program(ast_prog) {
 	if (irp == 0) { return out; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(104);
+	var ctx = heap_alloc(112);
 	if (ctx == 0) { return out; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
@@ -2626,6 +2717,7 @@ func v3h_codegen_program(ast_prog) {
 	ptr64[ctx + 80] = vec_new(16);
 	ptr64[ctx + 88] = 0; // loop_depth
 	ptr64[ctx + 96] = vec_new(16); // defer_stack
+	ptr64[ctx + 104] = 0; // scope_depth for shadowing
 
 	// Phase 3.5: synthesize default property hook functions.
 	cg_emit_default_property_hooks(ast_prog, ctx, irp);
@@ -2683,6 +2775,9 @@ func v3h_codegen_program(ast_prog) {
 				}
 				pi = pi + 1;
 			}
+
+			// Save base locals count (scratch + params) for shadowing support
+			var base_locals_count = vec_len(ptr64[ctx + 16]);
 
 			// Collect locals from body.
 			var body = ptr64[d + 40];
@@ -2786,6 +2881,10 @@ func v3h_codegen_program(ast_prog) {
 				pi = pi + 1;
 			}
 
+			// Truncate locals to base (scratch + params) for shadowing support
+			// Body vars will be re-added during lower as they are encountered
+			ptr64[locals + 8] = base_locals_count;
+
 			cg_lower_stmt(ctx, body);
 			ir_emit(fn, IrInstrKind.PUSH_IMM, 0, 0, 0);
 			ir_emit(fn, IrInstrKind.RET, ptr64[ctx + 56], 0, 0);
@@ -2808,7 +2907,7 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 	if (irp == 0) { return 0; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(104);
+	var ctx = heap_alloc(112);
 	if (ctx == 0) { return 0; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
@@ -2823,6 +2922,7 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 	ptr64[ctx + 80] = 0;
 	ptr64[ctx + 88] = 0; // loop_depth
 	ptr64[ctx + 96] = vec_new(16); // defer_stack
+	ptr64[ctx + 104] = 0; // scope_depth for shadowing
 
 	// Phase 3.5: synthesize default property hook functions.
 	cg_emit_default_property_hooks(ast_prog, ctx, irp);
@@ -2872,6 +2972,9 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 				}
 				pi = pi + 1;
 			}
+
+			// Save base locals count (scratch + params) for shadowing support
+			var base_locals_count = vec_len(ptr64[ctx + 16]);
 
 			var body = ptr64[d + 40];
 			cg_collect_locals_in_stmt(ctx, body);
@@ -2941,6 +3044,9 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 				}
 				pi = pi + 1;
 			}
+
+			// Truncate locals to base (scratch + params) for shadowing support
+			ptr64[locals + 8] = base_locals_count;
 
 			cg_lower_stmt(ctx, body);
 			ir_emit(fn, IrInstrKind.PUSH_IMM, 0, 0, 0);
