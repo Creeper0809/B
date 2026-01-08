@@ -2536,6 +2536,48 @@ func parse_program(p, prog_out) {
 			d = parse_enum_decl(p, is_public);
 		} else if (k == TokKind.KW_STRUCT) {
 			d = parse_struct_decl(p, is_public);
+		} else if (k == TokKind.KW_IMPL) {
+			// impl TypeName { func method(...) {...} ... }
+			parser_bump(p); // impl
+			if (ptr64[p + 16] != TokKind.IDENT) {
+				parser_err_here(p, "impl: expected type name");
+				parser_sync_stmt(p);
+				continue;
+			}
+			var impl_tok = ptr64[p + 8];
+			var impl_name_ptr = ptr64[impl_tok + 8];
+			var impl_name_len = ptr64[impl_tok + 16];
+			parser_bump(p); // type name
+			parser_expect(p, TokKind.LBRACE, "impl: expected '{'");
+			if (ptr64[p + 16] == TokKind.LBRACE) { parser_bump(p); }
+			while (ptr64[p + 16] != TokKind.RBRACE && ptr64[p + 16] != TokKind.EOF) {
+				if (ptr64[p + 16] == TokKind.KW_FUNC) {
+					var md = parse_func_decl(p, 0);
+					if (md != 0) {
+						// Rename: method -> TypeName_method
+						var mname_ptr = ptr64[md + 8];
+						var mname_len = ptr64[md + 16];
+						var new_len = impl_name_len + 1 + mname_len;
+						var new_ptr = heap_alloc(new_len);
+						if (new_ptr != 0) {
+							var ii = 0;
+							while (ii < impl_name_len) { ptr8[new_ptr + ii] = ptr8[impl_name_ptr + ii]; ii = ii + 1; }
+							ptr8[new_ptr + impl_name_len] = 95; // '_'
+							var jj = 0;
+							while (jj < mname_len) { ptr8[new_ptr + impl_name_len + 1 + jj] = ptr8[mname_ptr + jj]; jj = jj + 1; }
+							ptr64[md + 8] = new_ptr;
+							ptr64[md + 16] = new_len;
+						}
+						vec_push(decls, md);
+					}
+				} else {
+					parser_err_here(p, "impl: expected func");
+					parser_bump(p);
+				}
+			}
+			parser_expect(p, TokKind.RBRACE, "impl: expected '}'");
+			if (ptr64[p + 16] == TokKind.RBRACE) { parser_bump(p); }
+			continue;
 		} else {
 			parser_err_here(p, "top-level: unexpected token");
 			parser_sync_stmt(p);

@@ -42,6 +42,7 @@ func keyword_kind(p, n) {
 			if (slice_eq_parts(p, n, "null", 4) == 1) { return TokKind.KW_NULL; }
 			if (slice_eq_parts(p, n, "wipe", 4) == 1) { return TokKind.KW_WIPE; }
 			if (slice_eq_parts(p, n, "case", 4) == 1) { return TokKind.KW_CASE; }
+			if (slice_eq_parts(p, n, "impl", 4) == 1) { return TokKind.KW_IMPL; }
 			break;
 		}
 		case 5: {
