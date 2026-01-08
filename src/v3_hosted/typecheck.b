@@ -231,6 +231,63 @@ func tc_validate_reg_anno_in_func(d) {
 	return 0;
 }
 
+// Phase 3.7: Method call transformation helper.
+// Transforms s.method(args) -> TypeName_method(s, args)
+// Returns 1 if transformation was performed, 0 otherwise.
+func tc_try_method_call(env, e) {
+	var callee = ptr64[e + 16];
+	var args = ptr64[e + 32];
+	if (callee == 0) { return 0; }
+	if (ptr64[callee + 0] != AstExprKind.FIELD) { return 0; }
+	var base_expr = ptr64[callee + 16];
+	if (base_expr == 0) { return 0; }
+	var meth_ptr = ptr64[callee + 24];
+	var packed0 = ptr64[callee + 32];
+	var meth_len = packed0 >> 2;
+	var base_ty = tc_expr(env, base_expr);
+	var struct_ty = 0;
+	if (tc_is_ptr(base_ty) == 1) {
+		struct_ty = tc_ptr_base(base_ty);
+	}
+	else if (tc_is_struct(base_ty) == 1) {
+		struct_ty = base_ty;
+	}
+	if (struct_ty == 0) { return 0; }
+	if (tc_is_struct(struct_ty) == 0) { return 0; }
+	var sn_ptr = ptr64[struct_ty + 8];
+	var sn_len = ptr64[struct_ty + 16];
+	var total_len = sn_len + 1 + meth_len;
+	var mn_buf = heap_alloc(total_len + 1);
+	if (mn_buf == 0) { return 0; }
+	var wi = 0;
+	while (wi < sn_len) {
+		ptr8[mn_buf + wi] = ptr8[sn_ptr + wi];
+		wi = wi + 1;
+	}
+	ptr8[mn_buf + sn_len] = 95;
+	wi = 0;
+	while (wi < meth_len) {
+		ptr8[mn_buf + sn_len + 1 + wi] = ptr8[meth_ptr + wi];
+		wi = wi + 1;
+	}
+	var fd = tc_find_func_decl_in_prog(tc_cur_ast_prog, mn_buf, total_len);
+	if (fd == 0) { return 0; }
+	ptr64[callee + 0] = AstExprKind.IDENT;
+	ptr64[callee + 40] = mn_buf;
+	ptr64[callee + 48] = total_len;
+	var new_args = vec_new(8);
+	vec_push(new_args, base_expr);
+	var an = 0;
+	if (args != 0) { an = vec_len(args); }
+	var ai = 0;
+	while (ai < an) {
+		vec_push(new_args, vec_get(args, ai));
+		ai = ai + 1;
+	}
+	ptr64[e + 32] = new_args;
+	return 1;
+}
+
 // Current AST program being typechecked (for Phase 5.1 monomorphization).
 var tc_cur_ast_prog;
 
@@ -3476,6 +3533,8 @@ func tc_expr(env, e) {
 		return lhs_ty;
 	}
 	if (k == AstExprKind.CALL) {
+		// Phase 3.7: method call transformation - s.add(5) -> S_add(s, 5)
+		tc_try_method_call(env, e);
 		// Phase 5.2: normalize named args before monomorphization and typing.
 		tc_normalize_named_call_args(env, e);
 		// Phase 5.1: call-site monomorphization for generic templates.
