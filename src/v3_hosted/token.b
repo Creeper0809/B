@@ -97,6 +97,8 @@ enum TokKind {
 	KW_DEFAULT = 125,
 	KW_IMPL = 126,
 	KW_DEFER = 127,
+	KW_PRINT = 128,
+	KW_PRINTLN = 129,
 };
 
 struct Token {

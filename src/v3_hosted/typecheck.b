@@ -3128,6 +3128,24 @@ func tc_clone_stmt_subst(s, type_params, type_args_tc) {
 		ptr64[out + 48] = 0;
 		return out;
 	}
+	if (k == AstStmtKind.PRINT || k == AstStmtKind.PRINTLN) {
+		// a = Vec* of AstExpr* args
+		var old_args = ptr64[s + 8];
+		var new_args = vec_new(4);
+		if (new_args != 0 && old_args != 0) {
+			var n = vec_len(old_args);
+			var i = 0;
+			while (i < n) {
+				var old_e = vec_get(old_args, i);
+				vec_push(new_args, tc_clone_expr_subst(old_e, type_params, type_args_tc));
+				i = i + 1;
+			}
+		}
+		ptr64[out + 8] = new_args;
+		ptr64[out + 48] = 0;
+		ptr64[out + 56] = 0;
+		return out;
+	}
 	// default
 	ptr64[out + 48] = ptr64[s + 48];
 	ptr64[out + 56] = ptr64[s + 56];
@@ -4698,6 +4716,20 @@ func tc_stmt(env, s) {
 		if (tc_is_int(lty) == 0) {
 			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: len must be integer");
 			return 0;
+		}
+		return 0;
+	}
+	if (k == AstStmtKind.PRINT || k == AstStmtKind.PRINTLN) {
+		// a = Vec* of args
+		var args = ptr64[s + 8];
+		if (args != 0) {
+			var n = vec_len(args);
+			var i = 0;
+			while (i < n) {
+				var arg = vec_get(args, i);
+				if (arg != 0) { tc_expr(env, arg); }
+				i = i + 1;
+			}
 		}
 		return 0;
 	}

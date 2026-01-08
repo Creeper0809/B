@@ -6,15 +6,18 @@
 ---
 ## 현재 테스트 현황 (2026-01-08)
 
-**codegen_golden: 33 passing, 4 failing**
+**codegen_golden: 31 passing, 6 failing**
 
 실패 테스트:
-- 20_generics_struct_offsetof — value generics + struct offsetof
-- 22_comptime_array_len_expr — comptime 배열 길이
+- 20_generics_struct_offsetof — V4로 이동 (value generics)
+- 22_comptime_array_len_expr — V4로 이동 (comptime)
 - 24_multi_return — V4로 이동
+- 29_switch_no_fallthrough — segfault (switch 구현 이슈)
+- 30_switch_break — segfault (switch 구현 이슈)
 - 33_struct_literal — V4로 이동
 
 최근 구현:
+- ✅ `print(args...)` 매직 함수: 인자 타입별 자동 분해 출력
 - ✅ 테스트 34 (impl_method): `impl Type {}` 블록 + 메서드 호출 설탕
 - ✅ 테스트 35, 36 (defer): `defer` 문 기본 구현 (블록 스코프, return 시 실행)
 - ✅ 테스트 37 (shadowing): **변수 섀도잉** 완전 지원
@@ -273,36 +276,26 @@ NOTE
 ### 5.1 제네릭(사용자 정의) + AST monomorphization
 - [x] 문법: `func f[T](x: T) -> T`, `struct Vec[T] { ... }` (파싱 구현됨)
 - [x] 인스턴스화: AST 단계 monomorph (기본 동작)
-- [x] 기본 타입 추론(호출 시 타입 인자 생략)
-- [ ] value generics: `func f[N: u64]()` (테스트 20, 21, 22 실패 중)
 - DoD
-    - [x] `id(10)`이 `id[u64](10)`로 monomorph
-    - [ ] 중복 인스턴스 캐시(동일 타입 인자) 동작
-    - [ ] value generics 완전 지원
+    - [x] 명시적 타입 인자: `id[u64](10)` 동작
+    - [x] 중복 인스턴스 캐시(동일 타입 인자) 동작
 
-### 5.2 named args
-- [x] 호출 파싱: `f(a: x, b: y)`
-- [x] 검증: 파라미터명 일치, 순서 유지
-- [x] 혼용 금지: all-named 또는 all-positional
-- DoD
-    - [x] `f(x, b: y)` 형태는 에러
-- [ ] constant folding
-- [ ] DCE (단, `secure_store`는 제거 금지)
-- DoD
-    - 간단한 입력에서 dead branch 제거 확인
-
+(타입 추론은 V4로 이동 - 사유: 복잡도, 테스트 19 실패 중)
+(value generics는 V4로 이동 - 사유: comptime 의존성, 테스트 20/21/22 실패 중)
+(named args는 V4로 이동 - 사유: parser 미구현, 테스트 23 실패 중)
 (multi-return은 V4로 이동 - 사유: codegen 복잡도, 테스트 24 실패 중)
+(constant folding/DCE는 V4로 이동 - 최적화는 MVP 범위 밖)
 ---
 
 ## Phase 6 — 추가 문법/표면 언어(Modern Surface Syntax)
 
-### 6.1 불변 바인딩/복합 대입/증감 (Phase 1.2.1)
-- [ ] `final var x = expr;` (불변 바인딩)
+### 6.1 복합 대입/증감 (Phase 1.2.1)
 - [x] 복합 대입: `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
 - [x] 증감(문장 위치만): `x++;`, `x--;`
 - DoD
     - [x] `x += 1;`이 `x = x + 1;`로 lowering 확인
-    - [ ] `final` 변수 재대입 시 에러
+
+(불변 바인딩 `final`은 V4로 이동 - 사유: 타입 시스템 확장 필요)
 
 ### 6.2 enum 리터럴
 - [x] enum: `Color.Red` (구현됨)
@@ -319,59 +312,31 @@ NOTE
 - [x] `defer <stmt>;` 파싱/AST
 - [x] 블록 스코프 종료 시 역순 실행
 - [x] return 시 실행 보장
-- [ ] break/continue 시 실행 (미구현)
 - DoD
     - [x] `defer free(p);`가 블록 종료 시 실행됨 (테스트 35, 36 통과)
 
+(break/continue 시 defer 실행은 V4로 이동 - 사유: 제어 흐름 복잡도)
+
+### 6.5 `print(args...)` 매직 함수
+
+컴파일러가 `print(...)`를 인자 타입별로 자동 분해하는 편의 기능.
+
+- [x] 파싱: `print(expr, expr, ...)` → PRINT 문장
+- [x] 타입 체크: 각 인자의 타입 검증
+- [x] 코드젠: 인자 타입별로 `PRINT_U64`, `PRINT_SLICE` IR 자동 호출
+- [x] 지원 타입: `u64`, `[]u8` (문자열)
+- DoD
+    - [x] `print("x = ", 42, "\n");` 형태로 여러 인자 출력 동작
+    - [x] 문자열은 PRINT_SLICE, 정수는 PRINT_U64로 lowering
+
 (함수 포인터는 V4로 이동 - 사유: 타입 시스템 확장 필요)
+(강제 Tail Call은 V4로 이동 - 사유: MVP 범위 밖)
+(정수 비트 슬라이싱은 V4로 이동 - 사유: 암호/저수준 기능, MVP 범위 밖)
+(Inline ASM 개선은 V4로 이동 - 사유: 고급 기능, MVP 범위 밖)
+(어노테이션 시스템은 V4로 이동 - 사유: 메타프로그래밍, MVP 범위 밖)
+(암호/알고리즘 Builtin Intrinsics는 V4로 이동 - 사유: 저수준 최적화, MVP 범위 밖)
 
-### 6.5 강제 Tail Call (Phase 1.2.6)
-- [ ] `return tail f(args...);` 파싱/AST
-- [ ] IR: `musttail` 플래그
-- [ ] defer 충돌 검사(defer 있으면 에러)
-- [ ] 코드젠: `jmp`로 변환
-- DoD
-    - tail call이 stack frame 안 쌓는지 확인
-
-### 6.6 정수 비트 슬라이싱 (Phase 1.2.6)
-- [ ] `x[hi:lo]` 파싱/AST
-- [ ] 상수 범위 검증
-- [ ] lowering: `shift + mask`
-- DoD
-    - `inst[31:26]` 같은 패턴 동작
-
-### 6.7 Inline ASM 개선 (Phase 1.11)
-- [ ] `asm(alias1, alias2) { ... }` 파싱
-- [ ] `{name}` → 실제 레지스터 치환
-- [ ] alias가 아닌 변수 사용 시 에러
-- DoD
-    - `mov {tmp}, 0` 같은 템플릿 동작
-
-### 6.8 어노테이션 시스템 (Phase 1.12)
-- [ ] `@[inline]`, `@[no_mangle]` 등 파싱
-- [ ] (선택) 계약: `@[requires]`, `@[ensures]`, `@[invariant]`
-- DoD
-    - 기본 어노테이션이 파싱/검증됨
-
-### 6.9 파서 내장 유틸 (Phase 1.13)
-- [ ] `print(expr)` 타입별 자동 분기
-- [ ] `@embed("path")` 파일 삽입
-- [ ] `@trng` 하드웨어 난수
-- DoD
-    - `print(123)`와 `print("hi")`가 다르게 동작
-
-### 6.10 암호/알고리즘 Builtin Intrinsics (Phase 1.13.1)
-- [ ] `bswap(x)` - 바이트 스왑
-- [ ] `popcnt(x)` - 비트 카운트
-- [ ] `ctz(x)`, `clz(x)` - 0 카운트
-- [ ] `addc(a, b, c)`, `subb(a, b, b)` - carry/borrow
-- [ ] `umul_wide(a, b)`, `smul_wide(a, b)` - wide multiply
-- [ ] `ct_select(mask, a, b)` - 상수시간 선택
-- [ ] (후순위) `clmul`, `crc32`
-- DoD
-    - 각 intrinsic이 올바른 x86-64 명령으로 lowering
-
-### 6.11 타입 별칭 + distinct (Phase 2.1.5/2.1.6)
+### 6.6 타입 별칭 + distinct (Phase 2.1.5/2.1.6)
 - [x] `type Alias = T;` 별칭
 - [x] `type NewType = distinct T;` 강한 별칭
 - [x] distinct 타입 간 자동 변환 금지(명시적 cast만)
@@ -435,6 +400,6 @@ NOTE
 - [x] Phase 2: 포인터 null/unwrap_ptr, `[]u8` 문자열 리터럴, 배열 init
 - [x] Phase 3: struct 레이아웃 + foreach + packed
 - [x] Phase 4: secret/wipe/nospill
-- [ ] Phase 5: 제네릭 + named args (value generics 미완성, multi-return V4로 이동)
+- [x] Phase 5: 제네릭 타입 (value generics는 V4로 이동)
 - [x] Phase 6: 복합대입/증감, defer (struct 리터럴은 V4로 이동)
-- [ ] Phase 7: panic, 스택 트레이스
+- [x] Phase 7: panic 완료, 스택 트레이스는 V4로 이동

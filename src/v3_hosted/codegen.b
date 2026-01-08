@@ -1541,6 +1541,27 @@ func cg_emit_defers(ctx, from, to) {
 	return 0;
 }
 
+func cg_lower_print_args(ctx, args) {
+	// Lower all print args. args = Vec* of AstExpr*
+	if (args == 0) { return 0; }
+	var f = ptr64[ctx + 8];
+	var n = vec_len(args);
+	var i = 0;
+	while (i < n) {
+		var arg = vec_get(args, i);
+		if (arg != 0) {
+			cg_lower_expr(ctx, arg);
+			if (cg_expr_is_slice(ctx, arg) == 1) {
+				ir_emit(f, IrInstrKind.PRINT_SLICE, 0, 0, 0);
+			} else {
+				ir_emit(f, IrInstrKind.PRINT_U64_NO_NL, 0, 0, 0);
+			}
+		}
+		i = i + 1;
+	}
+	return 0;
+}
+
 func cg_lower_stmt(ctx, st) {
 	var k = ptr64[st + 0];
 	var f = ptr64[ctx + 8];
@@ -1789,6 +1810,16 @@ func cg_lower_stmt(ctx, st) {
 		cg_lower_expr(ctx, b0);
 		ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l_len + 16], 0, 0);
 		cg_emit_wipe_loop(ctx, ptr64[l_ptr + 16], ptr64[l_len + 16]);
+		return 0;
+	}
+
+	if (k == AstStmtKind.PRINT) {
+		cg_lower_print_args(ctx, ptr64[st + 8]);
+		return 0;
+	}
+	if (k == AstStmtKind.PRINTLN) {
+		cg_lower_print_args(ctx, ptr64[st + 8]);
+		ir_emit(f, IrInstrKind.PRINT_NL, 0, 0, 0);
 		return 0;
 	}
 
@@ -2462,10 +2493,21 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_line(sb, "\tsyscall");
 			}
 			else if (k == IrInstrKind.PRINT_U64) {
-				// print_u64: pop value, convert to decimal string, print
+				// print_u64: pop value, convert to decimal string, print with newline
 				cg_emit_line(sb, "\t; print_u64");
 				cg_emit_line(sb, "\tpop rax");
 				cg_emit_line(sb, "\tcall __print_u64");
+			}
+			else if (k == IrInstrKind.PRINT_U64_NO_NL) {
+				// print_u64 without newline
+				cg_emit_line(sb, "\t; print_u64_no_nl");
+				cg_emit_line(sb, "\tpop rax");
+				cg_emit_line(sb, "\tcall __print_u64_no_nl");
+			}
+			else if (k == IrInstrKind.PRINT_NL) {
+				// print newline
+				cg_emit_line(sb, "\t; print_nl");
+				cg_emit_line(sb, "\tcall __print_nl");
 			}
 			else if (k == IrInstrKind.PANIC) {
 				// panic: pop slice (ptr, len), print "panic: <msg>\n" to stderr, exit(1)
@@ -2656,6 +2698,53 @@ func cg_gen_asm(prog, ir_func) {
 	cg_emit_line(sb, "\tsub rdx, rcx");
 	cg_emit_line(sb, "\tinc rdx"); // include newline
 	cg_emit_line(sb, "\tmov rax, 1");
+	cg_emit_line(sb, "\tsyscall");
+	cg_emit_line(sb, "\tmov rsp, rbp");
+	cg_emit_line(sb, "\tpop rbp");
+	cg_emit_line(sb, "\tret");
+
+	// __print_u64_no_nl: print rax as decimal, no newline
+	cg_emit_line(sb, "__print_u64_no_nl:");
+	cg_emit_line(sb, "\tpush rbp");
+	cg_emit_line(sb, "\tmov rbp, rsp");
+	cg_emit_line(sb, "\tsub rsp, 32");
+	cg_emit_line(sb, "\tmov rcx, rsp");
+	cg_emit_line(sb, "\tadd rcx, 31");
+	cg_emit_line(sb, "\tmov r8, rcx");
+	cg_emit_line(sb, "\ttest rax, rax");
+	cg_emit_line(sb, "\tjnz .L__pu64nn_loop");
+	cg_emit_line(sb, "\tdec rcx");
+	cg_emit_line(sb, "\tmov byte [rcx], 48");
+	cg_emit_line(sb, "\tjmp .L__pu64nn_print");
+	cg_emit_line(sb, ".L__pu64nn_loop:");
+	cg_emit_line(sb, "\ttest rax, rax");
+	cg_emit_line(sb, "\tjz .L__pu64nn_print");
+	cg_emit_line(sb, "\txor rdx, rdx");
+	cg_emit_line(sb, "\tmov r9, 10");
+	cg_emit_line(sb, "\tdiv r9");
+	cg_emit_line(sb, "\tadd dl, 48");
+	cg_emit_line(sb, "\tdec rcx");
+	cg_emit_line(sb, "\tmov [rcx], dl");
+	cg_emit_line(sb, "\tjmp .L__pu64nn_loop");
+	cg_emit_line(sb, ".L__pu64nn_print:");
+	cg_emit_line(sb, "\tmov rdi, 1");
+	cg_emit_line(sb, "\tmov rsi, rcx");
+	cg_emit_line(sb, "\tmov rdx, r8");
+	cg_emit_line(sb, "\tsub rdx, rcx");
+	cg_emit_line(sb, "\tmov rax, 1");
+	cg_emit_line(sb, "\tsyscall");
+	cg_emit_line(sb, "\tmov rsp, rbp");
+	cg_emit_line(sb, "\tpop rbp");
+	cg_emit_line(sb, "\tret");
+
+	// __print_nl: print newline
+	cg_emit_line(sb, "__print_nl:");
+	cg_emit_line(sb, "\tpush rbp");
+	cg_emit_line(sb, "\tmov rbp, rsp");
+	cg_emit_line(sb, "\tmov rax, 1");
+	cg_emit_line(sb, "\tmov rdi, 1");
+	cg_emit_line(sb, "\tlea rsi, [rel __panic_newline]");
+	cg_emit_line(sb, "\tmov rdx, 1");
 	cg_emit_line(sb, "\tsyscall");
 	cg_emit_line(sb, "\tmov rsp, rbp");
 	cg_emit_line(sb, "\tpop rbp");

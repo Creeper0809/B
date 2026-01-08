@@ -50,6 +50,7 @@ func keyword_kind(p, n) {
 			if (slice_eq_parts(p, n, "const", 5) == 1) { return TokKind.KW_CONST; }
 			if (slice_eq_parts(p, n, "break", 5) == 1) { return TokKind.KW_BREAK; }
 			if (slice_eq_parts(p, n, "defer", 5) == 1) { return TokKind.KW_DEFER; }
+			if (slice_eq_parts(p, n, "print", 5) == 1) { return TokKind.KW_PRINT; }
 			break;
 		}
 		case 6: {
@@ -67,6 +68,7 @@ func keyword_kind(p, n) {
 			if (slice_eq_parts(p, n, "foreach", 7) == 1) { return TokKind.KW_FOREACH; }
 			if (slice_eq_parts(p, n, "nospill", 7) == 1) { return TokKind.KW_NOSPILL; }
 			if (slice_eq_parts(p, n, "default", 7) == 1) { return TokKind.KW_DEFAULT; }
+			if (slice_eq_parts(p, n, "println", 7) == 1) { return TokKind.KW_PRINTLN; }
 			break;
 		}
 		case 8: {

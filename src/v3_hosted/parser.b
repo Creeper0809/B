@@ -1565,6 +1565,46 @@ func parse_defer_stmt(p) {
 	return s;
 }
 
+// print(arg1, arg2, ...) or println(arg1, arg2, ...)
+// a = Vec* of AstExpr* arguments
+func parse_print_stmt(p, stmt_kind) {
+	var kw_tok = ptr64[p + 8];
+	parser_bump(p); // print or println
+	parser_expect(p, TokKind.LPAREN, "print: expected '('");
+	if (ptr64[p + 16] == TokKind.LPAREN) { parser_bump(p); }
+	var args = vec_new(4);
+	if (args == 0) { return 0; }
+	if (ptr64[p + 16] != TokKind.RPAREN) {
+		while (1) {
+			var arg = parse_expr(p);
+			vec_push(args, arg);
+			if (ptr64[p + 16] == TokKind.COMMA) {
+				parser_bump(p);
+				continue;
+			}
+			break;
+		}
+	}
+	parser_expect(p, TokKind.RPAREN, "print: expected ')'");
+	if (ptr64[p + 16] == TokKind.RPAREN) { parser_bump(p); }
+	parser_expect(p, TokKind.SEMI, "print: expected ';'");
+	if (ptr64[p + 16] == TokKind.SEMI) { parser_bump(p); }
+	var s = heap_alloc(88);
+	if (s == 0) { return 0; }
+	ptr64[s + 0] = stmt_kind;
+	ptr64[s + 8] = args; // a = args Vec*
+	ptr64[s + 16] = 0;
+	ptr64[s + 24] = 0;
+	ptr64[s + 32] = 0;
+	ptr64[s + 40] = 0;
+	ptr64[s + 48] = 0;
+	ptr64[s + 56] = 0;
+	ptr64[s + 64] = ptr64[kw_tok + 32];
+	ptr64[s + 72] = ptr64[kw_tok + 24];
+	ptr64[s + 80] = ptr64[kw_tok + 40];
+	return s;
+}
+
 func parse_bitand(p) {
 	var e = parse_eq(p);
 	while (ptr64[p + 16] == TokKind.AMP) {
@@ -2095,6 +2135,8 @@ func parse_stmt(p) {
 	if (k == TokKind.KW_CONTINUE) { return parse_continue_stmt(p); }
 	if (k == TokKind.KW_WIPE) { return parse_wipe_stmt(p); }
 	if (k == TokKind.KW_DEFER) { return parse_defer_stmt(p); }
+	if (k == TokKind.KW_PRINT) { return parse_print_stmt(p, AstStmtKind.PRINT); }
+	if (k == TokKind.KW_PRINTLN) { return parse_print_stmt(p, AstStmtKind.PRINTLN); }
 	if (k == TokKind.SEMI) { parser_bump(p); return 0; }
 
 	// expression statement
