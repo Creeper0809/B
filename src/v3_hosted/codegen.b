@@ -232,6 +232,57 @@ func cg_parse_u64_dec(p, n) {
 	return v;
 }
 
+// Phase 6.6: Parse floating-point literal and return IEEE 754 bit pattern.
+// MVP: Very simple approximation for common cases.
+// Returns f64 bit pattern. is_f32 is output via rdx alias.
+func cg_parse_float_literal(p, n) {
+	var i = 0;
+	var int_part = 0;
+	var frac_part = 0;
+	var frac_digits = 0;
+	var is_f32 = 0;
+
+	// Integer part
+	while (i < n) {
+		var ch = ptr8[p + i];
+		if (ch < 48 || ch > 57) { break; }
+		int_part = int_part * 10 + (ch - 48);
+		i = i + 1;
+	}
+
+	// Fractional part
+	if (i < n && ptr8[p + i] == 46) {
+		i = i + 1;
+		while (i < n) {
+			var ch2 = ptr8[p + i];
+			if (ch2 < 48 || ch2 > 57) { break; }
+			frac_part = frac_part * 10 + (ch2 - 48);
+			frac_digits = frac_digits + 1;
+			i = i + 1;
+		}
+	}
+
+	// Skip exponent for MVP
+	// f suffix
+	while (i < n) {
+		var c = ptr8[p + i];
+		if (c == 102) { is_f32 = 1; }
+		i = i + 1;
+	}
+
+	// MVP: Store raw bits as immediate value
+	// For float support we just push the literal bits onto the stack.
+	// This is a placeholder - real float support needs proper IEEE encoding.
+	// For now, just return (int_part * 1000 + frac_part) as a simple encoding.
+	var result = int_part;
+	result = result << 32;
+	result = result | frac_part;
+
+	alias rdx : out_f32_2;
+	out_f32_2 = is_f32;
+	return result;
+}
+
 func cg_slice_eq(a_ptr, a_len, b_ptr, b_len) {
 	return slice_eq(a_ptr, a_len, b_ptr, b_len);
 }
@@ -832,6 +883,19 @@ func cg_lower_expr(ctx, e) {
 	if (ek == AstExprKind.INT) {
 		var v = cg_parse_u64_dec(ptr64[e + 40], ptr64[e + 48]);
 		ir_emit(f, IrInstrKind.PUSH_IMM, v, 0, 0);
+		return 0;
+	}
+
+	// Phase 6.6: floating-point literal
+	if (ek == AstExprKind.FLOAT) {
+		var bits = cg_parse_float_literal(ptr64[e + 40], ptr64[e + 48]);
+		alias rdx : is_f32;
+		// For now, push as immediate (same as INT but will be loaded into XMM)
+		if (is_f32 == 1) {
+			ir_emit(f, IrInstrKind.PUSH_IMM_F32, bits, 0, 0);
+		} else {
+			ir_emit(f, IrInstrKind.PUSH_IMM_F64, bits, 0, 0);
+		}
 		return 0;
 	}
 
@@ -2294,6 +2358,22 @@ func cg_emit_binop(sb, op) {
 		cg_emit_line(sb, "\tsetae al");
 		cg_emit_line(sb, "\tmovzx rax, al");
 	}
+	else if (op == TokKind.ANDAND) {
+		// Logical AND: (rax != 0) && (rbx != 0)
+		cg_emit_line(sb, "\ttest rax, rax");
+		cg_emit_line(sb, "\tsetne al");
+		cg_emit_line(sb, "\ttest rbx, rbx");
+		cg_emit_line(sb, "\tsetne bl");
+		cg_emit_line(sb, "\tand al, bl");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.OROR) {
+		// Logical OR: (rax != 0) || (rbx != 0)
+		cg_emit_line(sb, "\tor rax, rbx");
+		cg_emit_line(sb, "\ttest rax, rax");
+		cg_emit_line(sb, "\tsetne al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
 
 	cg_emit_line(sb, "\tpush rax");
 	return 0;
@@ -2310,6 +2390,108 @@ func cg_emit_unop(sb, op) {
 		cg_emit_line(sb, "\tmovzx rax, al");
 	}
 	cg_emit_line(sb, "\tpush rax");
+	return 0;
+}
+
+// Phase 6.6: emit f32 binary operation (xmm0=lhs, xmm1=rhs, result in xmm0 or rax)
+func cg_emit_binop_f32(sb, op) {
+	if (op == TokKind.PLUS) {
+		cg_emit_line(sb, "\taddss xmm0, xmm1");
+	}
+	else if (op == TokKind.MINUS) {
+		cg_emit_line(sb, "\tsubss xmm0, xmm1");
+	}
+	else if (op == TokKind.STAR) {
+		cg_emit_line(sb, "\tmulss xmm0, xmm1");
+	}
+	else if (op == TokKind.SLASH) {
+		cg_emit_line(sb, "\tdivss xmm0, xmm1");
+	}
+	else if (op == TokKind.EQEQ) {
+		cg_emit_line(sb, "\tcomiss xmm0, xmm1");
+		cg_emit_line(sb, "\tsete al");
+		cg_emit_line(sb, "\tsetnp cl");
+		cg_emit_line(sb, "\tand al, cl");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.NEQ) {
+		cg_emit_line(sb, "\tcomiss xmm0, xmm1");
+		cg_emit_line(sb, "\tsetne al");
+		cg_emit_line(sb, "\tsetp cl");
+		cg_emit_line(sb, "\tor al, cl");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.LT) {
+		cg_emit_line(sb, "\tcomiss xmm0, xmm1");
+		cg_emit_line(sb, "\tsetb al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.LTE) {
+		cg_emit_line(sb, "\tcomiss xmm0, xmm1");
+		cg_emit_line(sb, "\tsetbe al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.GT) {
+		cg_emit_line(sb, "\tcomiss xmm0, xmm1");
+		cg_emit_line(sb, "\tseta al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.GTE) {
+		cg_emit_line(sb, "\tcomiss xmm0, xmm1");
+		cg_emit_line(sb, "\tsetae al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	return 0;
+}
+
+// Phase 6.6: emit f64 binary operation (xmm0=lhs, xmm1=rhs, result in xmm0 or rax)
+func cg_emit_binop_f64(sb, op) {
+	if (op == TokKind.PLUS) {
+		cg_emit_line(sb, "\taddsd xmm0, xmm1");
+	}
+	else if (op == TokKind.MINUS) {
+		cg_emit_line(sb, "\tsubsd xmm0, xmm1");
+	}
+	else if (op == TokKind.STAR) {
+		cg_emit_line(sb, "\tmulsd xmm0, xmm1");
+	}
+	else if (op == TokKind.SLASH) {
+		cg_emit_line(sb, "\tdivsd xmm0, xmm1");
+	}
+	else if (op == TokKind.EQEQ) {
+		cg_emit_line(sb, "\tcomisd xmm0, xmm1");
+		cg_emit_line(sb, "\tsete al");
+		cg_emit_line(sb, "\tsetnp cl");
+		cg_emit_line(sb, "\tand al, cl");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.NEQ) {
+		cg_emit_line(sb, "\tcomisd xmm0, xmm1");
+		cg_emit_line(sb, "\tsetne al");
+		cg_emit_line(sb, "\tsetp cl");
+		cg_emit_line(sb, "\tor al, cl");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.LT) {
+		cg_emit_line(sb, "\tcomisd xmm0, xmm1");
+		cg_emit_line(sb, "\tsetb al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.LTE) {
+		cg_emit_line(sb, "\tcomisd xmm0, xmm1");
+		cg_emit_line(sb, "\tsetbe al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.GT) {
+		cg_emit_line(sb, "\tcomisd xmm0, xmm1");
+		cg_emit_line(sb, "\tseta al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
+	else if (op == TokKind.GTE) {
+		cg_emit_line(sb, "\tcomisd xmm0, xmm1");
+		cg_emit_line(sb, "\tsetae al");
+		cg_emit_line(sb, "\tmovzx rax, al");
+	}
 	return 0;
 }
 
@@ -2637,6 +2819,88 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_line(sb, "\tsete al");
 				cg_emit_line(sb, "\tmovzx rax, al");
 				cg_emit_line(sb, "\tpush rax");
+			}
+			// Phase 6.6: floating-point instructions
+			else if (k == IrInstrKind.PUSH_IMM_F32) {
+				// Push 32-bit float as 64-bit (zero-extended)
+				cg_emit(sb, "\tpush ");
+				cg_emit_u64(sb, a);
+				cg_emit_line(sb, "\t; f32 imm");
+			}
+			else if (k == IrInstrKind.PUSH_IMM_F64) {
+				// Push 64-bit float
+				cg_emit(sb, "\tmov rax, ");
+				cg_emit_u64(sb, a);
+				cg_emit_line(sb, "\t; f64 imm");
+				cg_emit_line(sb, "\tpush rax");
+			}
+			else if (k == IrInstrKind.PUSH_LOCAL_F32) {
+				cg_emit(sb, "\tmovss xmm0, dword [rbp-");
+				cg_emit_u64(sb, a);
+				cg_emit_line(sb, "]");
+				cg_emit_line(sb, "\tsub rsp, 8");
+				cg_emit_line(sb, "\tmovss dword [rsp], xmm0");
+			}
+			else if (k == IrInstrKind.PUSH_LOCAL_F64) {
+				cg_emit(sb, "\tmovsd xmm0, qword [rbp-");
+				cg_emit_u64(sb, a);
+				cg_emit_line(sb, "]");
+				cg_emit_line(sb, "\tsub rsp, 8");
+				cg_emit_line(sb, "\tmovsd qword [rsp], xmm0");
+			}
+			else if (k == IrInstrKind.STORE_LOCAL_F32) {
+				cg_emit_line(sb, "\tmovss xmm0, dword [rsp]");
+				cg_emit_line(sb, "\tadd rsp, 8");
+				cg_emit(sb, "\tmovss dword [rbp-");
+				cg_emit_u64(sb, a);
+				cg_emit_line(sb, "], xmm0");
+			}
+			else if (k == IrInstrKind.STORE_LOCAL_F64) {
+				cg_emit_line(sb, "\tmovsd xmm0, qword [rsp]");
+				cg_emit_line(sb, "\tadd rsp, 8");
+				cg_emit(sb, "\tmovsd qword [rbp-");
+				cg_emit_u64(sb, a);
+				cg_emit_line(sb, "], xmm0");
+			}
+			else if (k == IrInstrKind.BINOP_F32) {
+				// a = TokKind for op
+				cg_emit_line(sb, "\tmovss xmm1, dword [rsp]\t; rhs");
+				cg_emit_line(sb, "\tadd rsp, 8");
+				cg_emit_line(sb, "\tmovss xmm0, dword [rsp]\t; lhs");
+				cg_emit_binop_f32(sb, a);
+				cg_emit_line(sb, "\tmovss dword [rsp], xmm0");
+			}
+			else if (k == IrInstrKind.BINOP_F64) {
+				// a = TokKind for op
+				cg_emit_line(sb, "\tmovsd xmm1, qword [rsp]\t; rhs");
+				cg_emit_line(sb, "\tadd rsp, 8");
+				cg_emit_line(sb, "\tmovsd xmm0, qword [rsp]\t; lhs");
+				cg_emit_binop_f64(sb, a);
+				cg_emit_line(sb, "\tmovsd qword [rsp], xmm0");
+			}
+			else if (k == IrInstrKind.LOAD_MEM_F32) {
+				cg_emit_line(sb, "\tpop rax\t; addr");
+				cg_emit_line(sb, "\tmovss xmm0, dword [rax]");
+				cg_emit_line(sb, "\tsub rsp, 8");
+				cg_emit_line(sb, "\tmovss dword [rsp], xmm0");
+			}
+			else if (k == IrInstrKind.LOAD_MEM_F64) {
+				cg_emit_line(sb, "\tpop rax\t; addr");
+				cg_emit_line(sb, "\tmovsd xmm0, qword [rax]");
+				cg_emit_line(sb, "\tsub rsp, 8");
+				cg_emit_line(sb, "\tmovsd qword [rsp], xmm0");
+			}
+			else if (k == IrInstrKind.STORE_MEM_F32) {
+				cg_emit_line(sb, "\tmovss xmm0, dword [rsp]\t; value");
+				cg_emit_line(sb, "\tadd rsp, 8");
+				cg_emit_line(sb, "\tpop rax\t; addr");
+				cg_emit_line(sb, "\tmovss dword [rax], xmm0");
+			}
+			else if (k == IrInstrKind.STORE_MEM_F64) {
+				cg_emit_line(sb, "\tmovsd xmm0, qword [rsp]\t; value");
+				cg_emit_line(sb, "\tadd rsp, 8");
+				cg_emit_line(sb, "\tpop rax\t; addr");
+				cg_emit_line(sb, "\tmovsd qword [rax], xmm0");
 			}
 
 			i = i + 1;

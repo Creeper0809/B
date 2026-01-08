@@ -1243,6 +1243,12 @@ func parse_primary(p) {
 		parser_bump(p);
 		return e;
 	}
+	// Phase 6.6: floating-point literals
+	if (k == TokKind.FLOAT) {
+		var e = expr_new_leaf(AstExprKind.FLOAT, tokp);
+		parser_bump(p);
+		return e;
+	}
 	if (k == TokKind.STRING) {
 		var e = expr_new_leaf(AstExprKind.STRING, tokp);
 		parser_bump(p);

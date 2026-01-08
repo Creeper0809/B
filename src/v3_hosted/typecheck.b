@@ -37,6 +37,10 @@ const TC_TY_CHAR = 11;
 // Untyped null literal (only valid with pointer context).
 const TC_TY_NULL = 12;
 
+// Floating-point types (Phase 6.6)
+const TC_TY_F32 = 13;
+const TC_TY_F64 = 14;
+
 // Pointer types (Phase 2.2)
 // Encoding: only supports pointers to named (non-pointer) base types for now.
 const TC_TY_PTR_BASE = 1000;
@@ -730,6 +734,9 @@ func tc_sizeof(ty) {
 	if (ty == TC_TY_U16 || ty == TC_TY_I16) { return 2; }
 	if (ty == TC_TY_U32 || ty == TC_TY_I32) { return 4; }
 	if (ty == TC_TY_U64 || ty == TC_TY_I64) { return 8; }
+	// Phase 6.6: floating-point
+	if (ty == TC_TY_F32) { return 4; }
+	if (ty == TC_TY_F64) { return 8; }
 	if (tc_is_ptr(ty) == 1) { return 8; }
 	if (tc_is_slice(ty) == 1) { return 16; }
 	if (tc_is_array(ty) == 1) {
@@ -747,6 +754,9 @@ func tc_alignof(ty) {
 	if (ty == TC_TY_U16 || ty == TC_TY_I16) { return 2; }
 	if (ty == TC_TY_U32 || ty == TC_TY_I32) { return 4; }
 	if (ty == TC_TY_U64 || ty == TC_TY_I64) { return 8; }
+	// Phase 6.6: floating-point
+	if (ty == TC_TY_F32) { return 4; }
+	if (ty == TC_TY_F64) { return 8; }
 	if (tc_is_ptr(ty) == 1) { return 8; }
 	if (tc_is_slice(ty) == 1) { return 8; }
 	if (tc_is_array(ty) == 1) { return tc_alignof(tc_array_elem(ty)); }
@@ -880,6 +890,9 @@ func tc_type_from_name(name_ptr, name_len) {
 	if (slice_eq_parts(name_ptr, name_len, "i32", 3) == 1) { return TC_TY_I32; }
 	if (slice_eq_parts(name_ptr, name_len, "i64", 3) == 1) { return TC_TY_I64; }
 	if (slice_eq_parts(name_ptr, name_len, "bool", 4) == 1) { return TC_TY_BOOL; }
+	// Phase 6.6: floating-point types
+	if (slice_eq_parts(name_ptr, name_len, "f32", 3) == 1) { return TC_TY_F32; }
+	if (slice_eq_parts(name_ptr, name_len, "f64", 3) == 1) { return TC_TY_F64; }
 	// Phase 3.4 MVP: accept bit-width integer aliases like `u3`/`i5`.
 	// For hosted tests we model them as full-width u64/i64.
 	if (name_len >= 2) {
@@ -921,6 +934,25 @@ func tc_is_int(ty) {
 	if (ty == TC_TY_I32) { return 1; }
 	if (ty == TC_TY_I64) { return 1; }
 	if (tc_is_enum(ty) == 1) { return 1; }
+	return 0;
+}
+
+// Phase 6.6: floating-point type checks
+func tc_is_float(ty) {
+	if (ty == TC_TY_F32) { return 1; }
+	if (ty == TC_TY_F64) { return 1; }
+	return 0;
+}
+
+func tc_float_bits(ty) {
+	if (ty == TC_TY_F32) { return 32; }
+	if (ty == TC_TY_F64) { return 64; }
+	return 0;
+}
+
+func tc_is_numeric(ty) {
+	if (tc_is_int(ty) == 1) { return 1; }
+	if (tc_is_float(ty) == 1) { return 1; }
 	return 0;
 }
 
@@ -1594,6 +1626,15 @@ func tc_expr_with_expected(env, e, expected) {
 		}
 		// Default: u64 for now.
 		return TC_TY_U64;
+	}
+
+	// Phase 6.6: floating-point literal
+	if (k == AstExprKind.FLOAT) {
+		// Default to f64, accept f32 or f64 context.
+		if (expected == TC_TY_F32) { return TC_TY_F32; }
+		if (expected == TC_TY_F64) { return TC_TY_F64; }
+		// Default without context.
+		return TC_TY_F64;
 	}
 
 	if (k == AstExprKind.UNARY) {
@@ -2440,6 +2481,9 @@ func tc_builtin_name_ptr_for_tctype(ty) {
 	if (ty == TC_TY_I64) { alias rdx : l7; l7 = 3; return "i64"; }
 	if (ty == TC_TY_BOOL) { alias rdx : l8; l8 = 4; return "bool"; }
 	if (ty == TC_TY_CHAR) { alias rdx : l9; l9 = 4; return "char"; }
+	// Phase 6.6: floating-point
+	if (ty == TC_TY_F32) { alias rdx : l10; l10 = 3; return "f32"; }
+	if (ty == TC_TY_F64) { alias rdx : l11; l11 = 3; return "f64"; }
 	alias rdx : z;
 	z = 0;
 	return 0;
@@ -3336,6 +3380,10 @@ func tc_expr(env, e) {
 	if (k == AstExprKind.INT) {
 		return TC_TY_U64;
 	}
+	// Phase 6.6: floating-point literal (default f64)
+	if (k == AstExprKind.FLOAT) {
+		return TC_TY_F64;
+	}
 	if (k == AstExprKind.STRING) {
 		// Phase 2.3: treat string literals as []u8 (ptr,len) conceptually.
 		return TC_TY_SLICE_BASE + TC_TY_U8;
@@ -3526,12 +3574,17 @@ func tc_expr(env, e) {
 			var lhs_ty0 = tc_expr(env, lhs);
 			var rhs_ty0 = tc_expr_with_expected(env, rhs, lhs_ty0);
 			// Check that the base operation is valid.
-			if (tc_is_int(lhs_ty0) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment expects integer lhs");
+			// Phase 6.6: allow float for +=, -=, *=, /=
+			var is_float_ok_compound = 0;
+			if (base_op == TokKind.PLUS || base_op == TokKind.MINUS || base_op == TokKind.STAR || base_op == TokKind.SLASH) {
+				is_float_ok_compound = 1;
+			}
+			if (tc_is_int(lhs_ty0) == 0 && (tc_is_float(lhs_ty0) == 0 || is_float_ok_compound == 0)) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment expects numeric lhs");
 				return TC_TY_INVALID;
 			}
-			if (tc_is_int(rhs_ty0) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment expects integer rhs");
+			if (tc_is_int(rhs_ty0) == 0 && tc_is_float(rhs_ty0) == 0) {
+				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment expects numeric rhs");
 				return TC_TY_INVALID;
 			}
 			if (lhs_ty0 != rhs_ty0) {
@@ -3666,6 +3719,22 @@ func tc_expr(env, e) {
 			}
 		}
 		if (is_int_op == 1) {
+			// Phase 6.6: floating-point arithmetic for +, -, *, /
+			var is_float_arith = 0;
+			if (op == TokKind.PLUS || op == TokKind.MINUS || op == TokKind.STAR || op == TokKind.SLASH) {
+				is_float_arith = 1;
+			}
+			if (tc_is_float(lhs_ty) == 1 && tc_is_float(rhs_ty) == 1) {
+				if (is_float_arith == 0) {
+					tc_err_at(ptr64[e + 64], ptr64[e + 72], "float only supports +, -, *, /");
+					return TC_TY_INVALID;
+				}
+				if (tc_type_eq(lhs_ty, rhs_ty) == 0) {
+					tc_err_at(ptr64[e + 64], ptr64[e + 72], "float operands must match");
+					return TC_TY_INVALID;
+				}
+				return lhs_ty;
+			}
 			if (tc_is_int(lhs_ty) == 0 || tc_is_int(rhs_ty) == 0) {
 				tc_err_at(ptr64[e + 64], ptr64[e + 72], "integer op expects integer operands");
 				return TC_TY_INVALID;

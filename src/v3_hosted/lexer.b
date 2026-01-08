@@ -259,7 +259,7 @@ func lexer_next(lex, tok_out) {
 		return kind;
 	}
 
-	// int (decimal or 0x..)
+	// int (decimal or 0x..) or float
 	var is_digit0 = 0;
 	if (ch0 >= 48) { if (ch0 <= 57) { is_digit0 = 1; } }
 	if (is_digit0 == 1) {
@@ -311,21 +311,89 @@ func lexer_next(lex, tok_out) {
 		}
 		}
 
+		// Consume integer part
 		while (cur < end) {
 			var d = ptr8[cur];
 			if (d < 48) { break; }
 			if (d > 57) { break; }
 			cur = cur + 1;
 		}
+
+		// Phase 6.6: Check for floating-point (. or e/E)
+		var is_float = 0;
+		if (cur < end) {
+			var ch_next = ptr8[cur];
+			// Check for decimal point followed by digit
+			if (ch_next == 46) {
+				// '.'
+				if (cur + 1 < end) {
+					var ch_after_dot = ptr8[cur + 1];
+					if (ch_after_dot >= 48) {
+						if (ch_after_dot <= 57) {
+							is_float = 1;
+							cur = cur + 1;
+							// Consume fractional digits
+							while (cur < end) {
+								var df = ptr8[cur];
+								if (df < 48) { break; }
+								if (df > 57) { break; }
+								cur = cur + 1;
+							}
+						}
+					}
+				}
+			}
+			// Check for exponent (e/E)
+			if (cur < end) {
+				var ch_exp = ptr8[cur];
+				if (ch_exp == 101 || ch_exp == 69) {
+					// 'e' or 'E'
+					is_float = 1;
+					cur = cur + 1;
+					// Optional sign
+					if (cur < end) {
+						var ch_sign = ptr8[cur];
+						if (ch_sign == 43 || ch_sign == 45) {
+							// '+' or '-'
+							cur = cur + 1;
+						}
+					}
+					// Exponent digits
+					while (cur < end) {
+						var de = ptr8[cur];
+						if (de < 48) { break; }
+						if (de > 57) { break; }
+						cur = cur + 1;
+					}
+				}
+			}
+			// Check for 'f' suffix (e.g., 3.14f)
+			if (cur < end) {
+				var ch_suf = ptr8[cur];
+				if (ch_suf == 102) {
+					// 'f'
+					is_float = 1;
+					cur = cur + 1;
+				}
+			}
+		}
+
 		ptr64[lex + 8] = cur;
 		ptr64[lex + 24] = line;
 		ptr64[lex + 32] = line_start;
-		ptr64[tok_out + 0] = TokKind.INT;
+		if (is_float == 1) {
+			ptr64[tok_out + 0] = TokKind.FLOAT;
+		} else {
+			ptr64[tok_out + 0] = TokKind.INT;
+		}
 		ptr64[tok_out + 8] = start;
 		ptr64[tok_out + 16] = cur - start;
 		ptr64[tok_out + 24] = line;
 		ptr64[tok_out + 32] = start - base;
 		ptr64[tok_out + 40] = (start - line_start) + 1;
+		if (is_float == 1) {
+			return TokKind.FLOAT;
+		}
 		return TokKind.INT;
 	}
 

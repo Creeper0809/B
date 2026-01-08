@@ -1,3 +1,6 @@
+---
+applyTo: '**'
+---
 # General Instructions
 - **Language**: Always answer in **Korean (한국어)**.
 - **Tone**: Be concise in conversation, but verbose and detailed in code comments and documentation.

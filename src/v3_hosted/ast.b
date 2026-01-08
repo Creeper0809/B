@@ -46,6 +46,8 @@ enum AstExprKind {
 	FIELD = 13,
 	// Lowering-only expression: a=AstType*
 	TYPE_LIT = 14,
+	// Phase 6.6: floating-point literal
+	FLOAT = 15,
 };
 
 struct AstExpr {

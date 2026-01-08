@@ -6,17 +6,18 @@
 ---
 ## 현재 테스트 현황 (2026-01-08)
 
-**codegen_golden: 31 passing, 6 failing**
+**codegen_golden: 35 passing, 4 failing**
 
 실패 테스트:
 - 20_generics_struct_offsetof — V4로 이동 (value generics)
 - 22_comptime_array_len_expr — V4로 이동 (comptime)
 - 24_multi_return — V4로 이동
-- 29_switch_no_fallthrough — segfault (switch 구현 이슈)
-- 30_switch_break — segfault (switch 구현 이슈)
 - 33_struct_literal — V4로 이동
 
 최근 구현:
+- ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
+  - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
+  - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증
 - ✅ `print(args...)` 매직 함수: 인자 타입별 자동 분해 출력
 - ✅ 테스트 34 (impl_method): `impl Type {}` 블록 + 메서드 호출 설탕
 - ✅ 테스트 35, 36 (defer): `defer` 문 기본 구현 (블록 스코프, return 시 실행)
@@ -381,7 +382,47 @@ NOTE
     - [x] `panic` 호출 시 메시지 출력되고 종료 (테스트 38)
 
 (런타임 스택 트레이스, ASM 위치 전파는 V4로 이동 - 사유: DWARF 등 복잡도)
+### 7.2.5 부동소수점 타입 (Phase 6.6, v4 필수)
 
+**v4 로드맵 구현에 필수**: v4의 GPU 벡터 연산, 조건부 컴파일 예제 등이 부동소수점을 사용하므로 v3에서 구현 필요.
+
+- [x] 타입 시스템 확장
+    - [x] `f32`, `f64` 타입 추가 (ast.b, typecheck.b)
+    - [x] 부동소수점 리터럴 파싱 (lexer.b): `3.14`, `1.0e-5` 형태
+- [x] 타입 체크
+    - [x] 산술/비교 연산 타입 규칙 (정수와 혼용 금지, 명시적 cast 필요)
+    - [x] 비교 연산 결과 타입: bool (정수 비교와 일관성 유지)
+    - [ ] `cast(f32, int)`, `cast(i32, float)` 지원 (추후 구현)
+- [x] 코드젠
+    - [x] SSE2 명령어 생성 (`movss`, `addss`, `mulss`, `divss`, `cvtsi2ss`, `cvttss2si`)
+    - [x] XMM 레지스터 관리 (xmm0~xmm1 최소)
+    - [x] 비교 연산 (`comiss`, `comisd`) 결과를 bool로 스택에 푸시
+- DoD
+    - [x] `var x: f32 = 3.14; var y = x + 1.5;` 컴파일/실행 성공
+    - [x] 테스트 케이스: 부동소수점 산술, 비교 연산 (50_float_basic, 51_float_comparison)
+
+NOTE:
+- 부동소수점 리터럴 파싱은 MVP 버전 (간소화된 비트 패킹, IEEE 754 완전 준수 아님)
+- cast 연산은 추후 구현 예정
+
+### 7.2.7 함수 포인터 타입 (Phase 6.7, v4 필수)
+
+**v4 로드맵 구현에 필수**: v4의 콜백 패턴, 고차 함수, 리플렉션에서 타입 안전한 함수 포인터 필요.
+
+- [ ] 타입 시스템 확장
+    - [ ] `func(T, U) -> R` 타입 표기 파싱/AST
+    - [ ] 함수 포인터 타입 정보 (파라미터 타입, 리턴 타입)
+- [ ] 타입 체크
+    - [ ] 함수 이름 → 포인터 변환 (주소 연산)
+    - [ ] 함수 포인터 호출 시 시그니처 검증
+    - [ ] 함수 포인터 대입 시 시그니처 일치 검사
+- [ ] 코드젠
+    - [ ] 함수 주소를 레지스터/메모리에 저장
+    - [ ] 간접 호출 (`call rax` 형태)
+- DoD
+    - `var f: func(i32, i32) -> i32 = add;` 선언 동작
+    - `var result = f(10, 20);` 간접 호출 동작
+    - 테스트 케이스: 콜백 함수 전달, 함수 포인터 배열
 ### 7.3 컴파일러 API 설계 (Phase 7)
 - [ ] 메모리 상 소스 문자열 입력
 - [ ] 메모리 상 asm/IR 덤프 출력

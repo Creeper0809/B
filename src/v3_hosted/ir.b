@@ -36,7 +36,20 @@ enum IrInstrKind {
 	PRINT_U64 = 27,
 	PANIC = 29,
 	PRINT_U64_NO_NL = 30,
-	PRINT_NL = 31
+	PRINT_NL = 31,
+	// Phase 6.6: floating-point
+	PUSH_IMM_F32 = 32,
+	PUSH_IMM_F64 = 33,
+	BINOP_F32 = 34,
+	BINOP_F64 = 35,
+	LOAD_MEM_F32 = 36,
+	LOAD_MEM_F64 = 37,
+	STORE_MEM_F32 = 38,
+	STORE_MEM_F64 = 39,
+	PUSH_LOCAL_F32 = 40,
+	PUSH_LOCAL_F64 = 41,
+	STORE_LOCAL_F32 = 42,
+	STORE_LOCAL_F64 = 43
 };
 
 struct IrInstr {

@@ -8,6 +8,7 @@ enum TokKind {
 	INT = 11,
 	STRING = 12,
 	CHAR = 13,
+	FLOAT = 14,  // Phase 6.6: floating-point literal (3.14, 1.0e-5)
 
 	LPAREN = 30,
 	RPAREN = 31,
