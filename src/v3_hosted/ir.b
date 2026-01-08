@@ -15,6 +15,7 @@ enum IrInstrKind {
 	LABEL = 7,
 	JMP = 8,
 	JZ = 9,
+	JNZ = 28,
 	RET = 10,
 	PRINT_STR = 11,
 	PUSH_LOCAL_ADDR = 12,
@@ -48,6 +49,7 @@ struct IrFunc {
 	frame_size: u64;
 	ret_label: u64;
 	instrs: u64; // Vec of IrInstr*
+	ret_reg: u64; // 0=rax (default), or reg_id for @reg return
 };
 
 struct IrProgram {
@@ -71,13 +73,14 @@ func ir_prog_new() {
 }
 
 func ir_func_new(name_ptr, name_len) {
-	var f = heap_alloc(40);
+	var f = heap_alloc(48);
 	if (f == 0) { return 0; }
 	ptr64[f + 0] = name_ptr;
 	ptr64[f + 8] = name_len;
 	ptr64[f + 16] = 0;
 	ptr64[f + 24] = 0;
 	ptr64[f + 32] = vec_new(64);
+	ptr64[f + 40] = 0; // ret_reg: 0=rax (default)
 	return f;
 }
 

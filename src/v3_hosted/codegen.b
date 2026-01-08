@@ -1730,8 +1730,64 @@ func cg_lower_stmt(ctx, st) {
 	}
 
 	if (k == AstStmtKind.SWITCH) {
-		// TODO: SWITCH codegen - disabled for v2 compiler compatibility
-		// Will be implemented when self-hosting with v3
+		// SWITCH: +8=cond, +16=cases, +24=default_body
+		// AstSwitchCase: +0=value_expr, +8=body
+		var sw_cond = ptr64[st + 8];
+		var sw_cases = ptr64[st + 16];
+		var sw_default = ptr64[st + 24];
+		
+		var end_lbl = cg_label_alloc(ctx);
+		vec_push(ptr64[ctx + 72], end_lbl); // push to end_stack for break
+		
+		// Generate labels for each case and default
+		var sw_n = 0;
+		if (sw_cases != 0) { sw_n = vec_len(sw_cases); }
+		var sw_lbls = vec_new(sw_n + 2);
+		var sw_i = 0;
+		while (sw_i < sw_n) {
+			vec_push(sw_lbls, cg_label_alloc(ctx));
+			sw_i = sw_i + 1;
+		}
+		var sw_def_lbl = cg_label_alloc(ctx);
+		
+		// Jump table: compare cond with each case value
+		sw_i = 0;
+		while (sw_i < sw_n) {
+			var sw_c = vec_get(sw_cases, sw_i);
+			var val_expr = ptr64[sw_c + 0];
+			cg_lower_expr(ctx, sw_cond);
+			cg_lower_expr(ctx, val_expr);
+			ir_emit(f, IrInstrKind.BINOP, 51, 0, 0); // TokKind.EQEQ = 51
+			ir_emit(f, IrInstrKind.JNZ, vec_get(sw_lbls, sw_i), 0, 0);
+			sw_i = sw_i + 1;
+		}
+		// Jump to default (or end if no default)
+		if (sw_default != 0) {
+			ir_emit(f, IrInstrKind.JMP, sw_def_lbl, 0, 0);
+		} else {
+			ir_emit(f, IrInstrKind.JMP, end_lbl, 0, 0);
+		}
+		
+		// Emit case bodies (NO fallthrough - each ends with JMP to end)
+		sw_i = 0;
+		while (sw_i < sw_n) {
+			var sw_c = vec_get(sw_cases, sw_i);
+			var sw_body = ptr64[sw_c + 8];
+			ir_emit(f, IrInstrKind.LABEL, vec_get(sw_lbls, sw_i), 0, 0);
+			if (sw_body != 0) { cg_lower_stmt(ctx, sw_body); }
+			ir_emit(f, IrInstrKind.JMP, end_lbl, 0, 0);
+			sw_i = sw_i + 1;
+		}
+		
+		// Default body
+		if (sw_default != 0) {
+			ir_emit(f, IrInstrKind.LABEL, sw_def_lbl, 0, 0);
+			cg_lower_stmt(ctx, sw_default);
+			ir_emit(f, IrInstrKind.JMP, end_lbl, 0, 0);
+		}
+		
+		ir_emit(f, IrInstrKind.LABEL, end_lbl, 0, 0);
+		vec_pop(ptr64[ctx + 72]); // pop from end_stack
 		return 0;
 	}
 
@@ -1934,16 +1990,18 @@ func cg_gen_asm(prog, ir_func) {
 	while (fi < fnc) {
 		var ir_func2 = vec_get(funcs, fi);
 		var ret_label = ptr64[ir_func2 + 24];
+		var fn_ret_reg = ptr64[ir_func2 + 40]; // ret_reg for @reg return
 
 		cg_emit_bytes(sb, ptr64[ir_func2 + 0], ptr64[ir_func2 + 8]);
 		cg_emit_line(sb, ":");
 		cg_emit_line(sb, "\tpush rbp");
 		cg_emit_line(sb, "\tmov rbp, rsp");
 		// Reserve callee-saved regs for nospill/@reg usage.
-		cg_emit_line(sb, "\tpush r12");
-		cg_emit_line(sb, "\tpush r13");
-		cg_emit_line(sb, "\tpush r14");
-		cg_emit_line(sb, "\tpush r15");
+		// Skip push if ret_reg uses that register (will be clobbered for return).
+		if (fn_ret_reg != 12) { cg_emit_line(sb, "\tpush r12"); }
+		if (fn_ret_reg != 13) { cg_emit_line(sb, "\tpush r13"); }
+		if (fn_ret_reg != 14) { cg_emit_line(sb, "\tpush r14"); }
+		if (fn_ret_reg != 15) { cg_emit_line(sb, "\tpush r15"); }
 
 		var frame = ptr64[ir_func2 + 16];
 		if (frame != 0) {
@@ -2041,6 +2099,13 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_line(sb, "\tpop rax");
 				cg_emit_line(sb, "\tcmp rax, 0");
 				cg_emit(sb, "\tje .L");
+				cg_emit_u64(sb, a);
+				cg_emit_nl(sb);
+			}
+			else if (k == IrInstrKind.JNZ) {
+				cg_emit_line(sb, "\tpop rax");
+				cg_emit_line(sb, "\tcmp rax, 0");
+				cg_emit(sb, "\tjne .L");
 				cg_emit_u64(sb, a);
 				cg_emit_nl(sb);
 			}
@@ -2230,10 +2295,11 @@ func cg_gen_asm(prog, ir_func) {
 			cg_emit_u64(sb, frame);
 			cg_emit_nl(sb);
 		}
-		cg_emit_line(sb, "\tpop r15");
-		cg_emit_line(sb, "\tpop r14");
-		cg_emit_line(sb, "\tpop r13");
-		cg_emit_line(sb, "\tpop r12");
+		// Pop in reverse order, skip if ret_reg uses that register.
+		if (fn_ret_reg != 15) { cg_emit_line(sb, "\tpop r15"); }
+		if (fn_ret_reg != 14) { cg_emit_line(sb, "\tpop r14"); }
+		if (fn_ret_reg != 13) { cg_emit_line(sb, "\tpop r13"); }
+		if (fn_ret_reg != 12) { cg_emit_line(sb, "\tpop r12"); }
 		cg_emit_line(sb, "\tmov rsp, rbp");
 		cg_emit_line(sb, "\tpop rbp");
 		cg_emit_line(sb, "\tret");
@@ -2332,6 +2398,7 @@ func v3h_codegen_program(ast_prog) {
 			ptr64[ctx + 8] = fn;
 			ptr64[ctx + 16] = vec_new(16);
 			ptr64[ctx + 56] = cg_decl_retreg(d);
+			ptr64[fn + 40] = ptr64[ctx + 56]; // Store ret_reg in IrFunc
 			// Scratch locals for wipe/secret lowering.
 			cg_local_add(ctx, "__v3h_wipe_ptr", 14);
 			cg_local_add(ctx, "__v3h_wipe_len", 14);
@@ -2488,6 +2555,7 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 			ptr64[ctx + 8] = fn;
 			ptr64[ctx + 16] = vec_new(16);
 			ptr64[ctx + 56] = cg_decl_retreg(d);
+			ptr64[fn + 40] = ptr64[ctx + 56]; // Store ret_reg in IrFunc
 			// Scratch locals for wipe/secret lowering.
 			cg_local_add(ctx, "__v3h_wipe_ptr", 14);
 			cg_local_add(ctx, "__v3h_wipe_len", 14);
