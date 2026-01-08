@@ -4334,7 +4334,7 @@ func tc_stmt(env, s) {
 		// Layout:
 		//  s->a: init stmt (0 allowed)
 		//  s->b: cond expr (0 means true)
-		//  s->c: post stmt (0 allowed)
+		//  s->c: post expr (0 allowed)
 		//  s->expr_ptr: body stmt
 		var init0 = ptr64[s + 8];
 		var cond0 = ptr64[s + 16];
@@ -4346,7 +4346,7 @@ func tc_stmt(env, s) {
 		tc_loop_depth = tc_loop_depth + 1;
 		tc_break_depth = tc_break_depth + 1;
 		if (body0 != 0) { tc_stmt(env, body0); }
-		if (post0 != 0) { tc_stmt(env, post0); }
+		if (post0 != 0) { tc_expr(env, post0); }
 		tc_break_depth = tc_break_depth - 1;
 		tc_loop_depth = tc_loop_depth - 1;
 		ptr64[env + 8] = saved;

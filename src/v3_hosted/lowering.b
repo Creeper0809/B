@@ -281,7 +281,7 @@ func lw_lower_stmt_in_place(s) {
 	if (k == AstStmtKind.FOR) {
 		lw_lower_stmt_in_place(ptr64[s + 8]);
 		lw_lower_expr_in_place(ptr64[s + 16]);
-		lw_lower_stmt_in_place(ptr64[s + 24]);
+		lw_lower_expr_in_place(ptr64[s + 24]);  // post is an expression, not statement
 		lw_lower_stmt_in_place(ptr64[s + 56]);
 		return 0;
 	}

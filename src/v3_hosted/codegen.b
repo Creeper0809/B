@@ -1498,7 +1498,10 @@ func cg_lower_stmt(ctx, st) {
 		}
 		if (body0 != 0) { cg_lower_stmt(ctx, body0); }
 		ir_emit(f, IrInstrKind.LABEL, post_id, 0, 0);
-		if (post0 != 0) { cg_lower_stmt(ctx, post0); }
+		if (post0 != 0) {
+			cg_lower_expr(ctx, post0);
+			ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+		}
 		ir_emit(f, IrInstrKind.JMP, start_id, 0, 0);
 		ir_emit(f, IrInstrKind.LABEL, end_id, 0, 0);
 		vec_pop(ptr64[ctx + 64]);
