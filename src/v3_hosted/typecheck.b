@@ -3333,6 +3333,8 @@ func tc_expr(env, e) {
 				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment type mismatch");
 				return TC_TY_INVALID;
 			}
+			// Store original op in extra for codegen to identify compound assignment.
+			ptr64[e + 32] = op;
 			// Store base_op in expr.op for codegen.
 			ptr64[e + 8] = base_op;
 			return lhs_ty0;

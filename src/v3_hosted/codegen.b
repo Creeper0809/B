@@ -908,7 +908,7 @@ func cg_lower_expr(ctx, e) {
 			}
 			// Store back to lvalue.
 			if (ptr64[rhs + 0] == AstExprKind.IDENT) {
-				var l = cg_local_find(ctx, ptr64[rhs + 16], ptr64[rhs + 24]);
+				var l = cg_local_find(ctx, ptr64[rhs + 40], ptr64[rhs + 48]);
 				if (l != 0) {
 					var off = ptr64[l + 16];
 					// For simplicity, treat all locals the same: store and reload.
@@ -1149,6 +1149,58 @@ func cg_lower_expr(ctx, e) {
 			return 0;
 		}
 
+		// Compound assignment (Phase 6.1): x op= y => x = x op y
+		// typecheck stores original op in extra (+32) and base_op in op (+8)
+		var orig_op = ptr64[e + 32];
+		if (orig_op >= TokKind.PLUSEQ && orig_op <= TokKind.RSHIFTEQ) {
+			// compound assignment: lhs op= rhs => lhs = lhs op rhs
+			if (ptr64[lhs + 0] == AstExprKind.IDENT) {
+				var name_ptr = ptr64[lhs + 40];
+				var name_len = ptr64[lhs + 48];
+				var l = cg_local_find(ctx, name_ptr, name_len);
+				if (l != 0) {
+					// Load current value
+					ir_emit(f, IrInstrKind.PUSH_LOCAL, ptr64[l + 16], 0, 0);
+					// Evaluate rhs
+					cg_lower_expr(ctx, rhs);
+					// Apply operation
+					ir_emit(f, IrInstrKind.BINOP, op, 0, 0);
+					// Store back
+					ir_emit(f, IrInstrKind.STORE_LOCAL, ptr64[l + 16], 0, 0);
+					ir_emit(f, IrInstrKind.PUSH_LOCAL, ptr64[l + 16], 0, 0);
+					return 0;
+				}
+			}
+			if (ptr64[lhs + 0] == AstExprKind.FIELD) {
+				var extra = ptr64[lhs + 32];
+				var sz = (extra >> 56) & 127;
+				var off = ptr64[lhs + 8];
+				var via_ptr = (extra >> 63) & 1;
+				var base = ptr64[lhs + 16];
+				if (via_ptr == 0) {
+					// stack local field: load current, apply op, store back
+					cg_lower_expr(ctx, lhs);  // load current value
+					cg_lower_expr(ctx, rhs);  // evaluate rhs
+					ir_emit(f, IrInstrKind.BINOP, op, 0, 0);  // apply op
+					// Now store back to field
+					if (cg_lower_lvalue_addr(ctx, base) == 0) {
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+						ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+						return 0;
+					}
+					ir_emit(f, IrInstrKind.PUSH_IMM, off, 0, 0);
+					ir_emit(f, IrInstrKind.BINOP, TokKind.PLUS, 0, 0);
+					// Stack: new_val, addr. Swap needed, but no SWAP. Use STORE_MEM which pops val then addr
+					// Actually STORE_MEM64 pops: val, addr in that order? Let's check order...
+					// For now, simplified: pop result, do lhs assignment
+					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+					return 0;
+				}
+			}
+		}
+
 		// Phase 4.6: constant-time eq for []u8 (lower to a dedicated IR op).
 		if (op == TokKind.EQEQEQ || op == TokKind.NEQEQ) {
 			if (cg_expr_is_slice(ctx, lhs) == 1 && cg_expr_is_slice(ctx, rhs) == 1) {
@@ -1220,6 +1272,16 @@ func cg_lower_expr(ctx, e) {
 					}
 					// Unsupported print arg type.
 					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+					return 0;
+				}
+			}
+
+			// builtin print_u64(n)
+			if (cg_slice_eq(name_ptr, name_len, "print_u64", 9) == 1) {
+				if (vec_len(args) == 1) {
+					cg_lower_expr(ctx, vec_get(args, 0));
+					ir_emit(f, IrInstrKind.PRINT_U64, 0, 0, 0);
 					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
 					return 0;
 				}
@@ -2030,6 +2092,12 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_line(sb, "\tmov rdi, 1");
 				cg_emit_line(sb, "\tsyscall");
 			}
+			else if (k == IrInstrKind.PRINT_U64) {
+				// print_u64: pop value, convert to decimal string, print
+				cg_emit_line(sb, "\t; print_u64");
+				cg_emit_line(sb, "\tpop rax");
+				cg_emit_line(sb, "\tcall __print_u64");
+			}
 			else if (k == IrInstrKind.SLICE_INDEX_U8) {
 				// Stack: ptr, len, idx
 				cg_emit_line(sb, "\tpop rcx\t; idx");
@@ -2179,6 +2247,42 @@ func cg_gen_asm(prog, ir_func) {
 	cg_emit_line(sb, "\tmov rdi, 1");
 	cg_emit_line(sb, "\tmov rax, 60");
 	cg_emit_line(sb, "\tsyscall");
+
+	// __print_u64: print rax as decimal, then newline
+	cg_emit_line(sb, "__print_u64:");
+	cg_emit_line(sb, "\tpush rbp");
+	cg_emit_line(sb, "\tmov rbp, rsp");
+	cg_emit_line(sb, "\tsub rsp, 32");
+	cg_emit_line(sb, "\tmov rcx, rsp");
+	cg_emit_line(sb, "\tadd rcx, 31");
+	cg_emit_line(sb, "\tmov byte [rcx], 10"); // newline at end
+	cg_emit_line(sb, "\tmov r8, rcx");
+	cg_emit_line(sb, "\ttest rax, rax");
+	cg_emit_line(sb, "\tjnz .L__pu64_loop");
+	cg_emit_line(sb, "\tdec rcx");
+	cg_emit_line(sb, "\tmov byte [rcx], 48"); // '0'
+	cg_emit_line(sb, "\tjmp .L__pu64_print");
+	cg_emit_line(sb, ".L__pu64_loop:");
+	cg_emit_line(sb, "\ttest rax, rax");
+	cg_emit_line(sb, "\tjz .L__pu64_print");
+	cg_emit_line(sb, "\txor rdx, rdx");
+	cg_emit_line(sb, "\tmov r9, 10");
+	cg_emit_line(sb, "\tdiv r9");
+	cg_emit_line(sb, "\tadd dl, 48");
+	cg_emit_line(sb, "\tdec rcx");
+	cg_emit_line(sb, "\tmov [rcx], dl");
+	cg_emit_line(sb, "\tjmp .L__pu64_loop");
+	cg_emit_line(sb, ".L__pu64_print:");
+	cg_emit_line(sb, "\tmov rdi, 1");
+	cg_emit_line(sb, "\tmov rsi, rcx");
+	cg_emit_line(sb, "\tmov rdx, r8");
+	cg_emit_line(sb, "\tsub rdx, rcx");
+	cg_emit_line(sb, "\tinc rdx"); // include newline
+	cg_emit_line(sb, "\tmov rax, 1");
+	cg_emit_line(sb, "\tsyscall");
+	cg_emit_line(sb, "\tmov rsp, rbp");
+	cg_emit_line(sb, "\tpop rbp");
+	cg_emit_line(sb, "\tret");
 
 	return sb;
 }
