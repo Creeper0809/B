@@ -1506,6 +1506,19 @@ func cg_lower_expr(ctx, e) {
 	return 0;
 }
 
+// Execute defers from defer_stack[to..from) in reverse order
+func cg_emit_defers(ctx, from, to) {
+	var ds = ptr64[ctx + 96];
+	if (ds == 0) { return 0; }
+	var i = from;
+	while (i > to) {
+		i = i - 1;
+		var inner = vec_get(ds, i);
+		if (inner != 0) { cg_lower_stmt(ctx, inner); }
+	}
+	return 0;
+}
+
 func cg_lower_stmt(ctx, st) {
 	var k = ptr64[st + 0];
 	var f = ptr64[ctx + 8];
@@ -1613,6 +1626,11 @@ func cg_lower_stmt(ctx, st) {
 	}
 
 	if (k == AstStmtKind.RETURN) {
+		// Execute all defers first
+		var ds2 = ptr64[ctx + 96];
+		if (ds2 != 0) {
+			cg_emit_defers(ctx, vec_len(ds2), 0);
+		}
 		// Phase 4.3: zeroize all live secrets on early exit.
 		var sv2 = ptr64[ctx + 40];
 		if (sv2 != 0) {
@@ -1668,12 +1686,22 @@ func cg_lower_stmt(ctx, st) {
 		var sv3 = ptr64[ctx + 40];
 		var saved = 0;
 		if (sv3 != 0) { saved = vec_len(sv3); }
+		// Save defer stack position
+		var ds = ptr64[ctx + 96];
+		var defer_saved = 0;
+		if (ds != 0) { defer_saved = vec_len(ds); }
 		var ss = ptr64[st + 8];
 		var n = vec_len(ss);
 		var i = 0;
 		while (i < n) {
 			cg_lower_stmt(ctx, vec_get(ss, i));
 			i = i + 1;
+		}
+		// Execute defers in reverse order
+		if (ds != 0) {
+			var defer_now = vec_len(ds);
+			cg_emit_defers(ctx, defer_now, defer_saved);
+			ptr64[ds + 8] = defer_saved; // restore defer stack
 		}
 		// Wipe secrets declared in this block.
 		if (sv3 != 0) {
@@ -1684,6 +1712,16 @@ func cg_lower_stmt(ctx, st) {
 				si3 = si3 + 1;
 			}
 			ptr64[sv3 + 8] = saved;
+		}
+		return 0;
+	}
+
+	if (k == AstStmtKind.DEFER) {
+		// st+8 = inner statement
+		var inner = ptr64[st + 8];
+		var ds = ptr64[ctx + 96];
+		if (ds != 0 && inner != 0) {
+			vec_push(ds, inner);
 		}
 		return 0;
 	}
@@ -2573,7 +2611,7 @@ func v3h_codegen_program(ast_prog) {
 	if (irp == 0) { return out; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(96);
+	var ctx = heap_alloc(104);
 	if (ctx == 0) { return out; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
@@ -2586,7 +2624,8 @@ func v3h_codegen_program(ast_prog) {
 	ptr64[ctx + 64] = vec_new(16);
 	ptr64[ctx + 72] = vec_new(16);
 	ptr64[ctx + 80] = vec_new(16);
-	ptr64[ctx + 88] = 0;
+	ptr64[ctx + 88] = 0; // loop_depth
+	ptr64[ctx + 96] = vec_new(16); // defer_stack
 
 	// Phase 3.5: synthesize default property hook functions.
 	cg_emit_default_property_hooks(ast_prog, ctx, irp);
@@ -2769,7 +2808,7 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 	if (irp == 0) { return 0; }
 
 	// ctx for lowering
-	var ctx = heap_alloc(64);
+	var ctx = heap_alloc(104);
 	if (ctx == 0) { return 0; }
 	ptr64[ctx + 0] = irp;
 	ptr64[ctx + 8] = 0;
@@ -2779,6 +2818,11 @@ func v3h_codegen_program_dump_ir(ast_prog) {
 	ptr64[ctx + 40] = vec_new(16);
 	ptr64[ctx + 48] = ast_prog;
 	ptr64[ctx + 56] = 0;
+	ptr64[ctx + 64] = 0;
+	ptr64[ctx + 72] = 0;
+	ptr64[ctx + 80] = 0;
+	ptr64[ctx + 88] = 0; // loop_depth
+	ptr64[ctx + 96] = vec_new(16); // defer_stack
 
 	// Phase 3.5: synthesize default property hook functions.
 	cg_emit_default_property_hooks(ast_prog, ctx, irp);

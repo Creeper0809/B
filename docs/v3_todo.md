@@ -4,7 +4,21 @@
 목표는 “v2로 v3 컴파일러를 부트스트랩”할 때, 구현 순서와 DoD(완료 정의)가 흔들리지 않게 만드는 것입니다.
 
 ---
+## 현재 테스트 현황 (2026-01-08)
 
+**codegen_golden: 31 passing, 4 failing**
+
+실패 테스트:
+- 20_generics_struct_offsetof — value generics + struct offsetof
+- 22_comptime_array_len_expr — comptime 배열 길이
+- 24_multi_return — 다중 반환 codegen
+- 33_struct_literal — struct literal expression (V4로 이동)
+
+최근 구현:
+- ✅ 테스트 34 (impl_method): `impl Type {}` 블록 + 메서드 호출 설탕
+- ✅ 테스트 35, 36 (defer): `defer` 문 기본 구현 (블록 스코프, return 시 실행)
+
+---
 ## 전제(Freeze 요약)
 
 v3 로드맵에서 이미 확정된 정책(문서에 반영된 내용)만 요약합니다.
@@ -254,33 +268,33 @@ NOTE
 ## Phase 5 — 편의/확장
 
 ### 5.1 제네릭(사용자 정의) + AST monomorphization
-- [ ] 문법: `func f[T](x: T) -> T`, `struct Vec[T] { ... }`
-- [ ] 인스턴스화: AST 단계 monomorph
-- [ ] 기본 타입 추론(호출 시 타입 인자 생략)
+- [x] 문법: `func f[T](x: T) -> T`, `struct Vec[T] { ... }` (파싱 구현됨)
+- [x] 인스턴스화: AST 단계 monomorph (기본 동작)
+- [x] 기본 타입 추론(호출 시 타입 인자 생략)
+- [ ] value generics: `func f[N: u64]()` (부분 구현)
 - DoD
-    - `id(10)`이 `id[u64](10)`로 monomorph
-    - 중복 인스턴스 캐시(동일 타입 인자) 동작
+    - [x] `id(10)`이 `id[u64](10)`로 monomorph
+    - [ ] 중복 인스턴스 캐시(동일 타입 인자) 동작
+    - [ ] value generics 완전 지원 (테스트 20, 21, 22 실패 중)
 
 ### 5.2 named args
-- [ ] 호출 파싱: `f(a: x, b: y)`
-- [ ] 검증: 파라미터명 일치, 순서 유지
-- [ ] 혼용 금지: all-named 또는 all-positional
+- [x] 호출 파싱: `f(a: x, b: y)`
+- [x] 검증: 파라미터명 일치, 순서 유지
+- [x] 혼용 금지: all-named 또는 all-positional
 - DoD
-    - `f(x, b: y)` 형태는 에러
-
-### 5.3 IR 필수 최적화(정리)
+    - [x] `f(x, b: y)` 형태는 에러
 - [ ] constant folding
 - [ ] DCE (단, `secure_store`는 제거 금지)
 - DoD
     - 간단한 입력에서 dead branch 제거 확인
 
 ### 5.4 multi-return(언어 표면 + IR + ABI)
-- [ ] 함수 선언: `-> (T0, T1)`
-- [ ] return 문장: `return a, b;`
-- [ ] destructuring: `var q, r = f();`, `q, r = f();`, `_` discard
-- [ ] IR: `ret v0, v1` (ret value_list)
-- [ ] ABI: `rax/rdx` 매핑
-- DoD
+- [x] 함수 선언: `-> (T0, T1)`
+- [x] return 문장: `return a, b;`
+- [x] destructuring: `var q, r = f();`, `q, r = f();`, `_` discard
+- [x] IR: `ret v0, v1` (ret value_list)
+- [x] ABI: `rax/rdx` 매핑
+- [ ] codegen golden 테스트 통과 (테스트 24 실패 중)
     - 2리턴 함수 호출/바인딩이 end-to-end로 동작
 
 ---
@@ -297,25 +311,27 @@ NOTE
     - [x] `x += 1;`이 `x = x + 1;`로 lowering 확인
     - [ ] `final` 변수 재대입 시 에러
 
-### 6.2 구조체/enum 리터럴 (Phase 1.3)
+### 6.2 구조체/enum 리터럴 (Phase 1.3) → V4로 이동
 - [ ] named: `Pair{ a: 1, b: 2 }`
 - [ ] positional: `Pair{ 1, 2 }`
-- [ ] enum: `Color.Red` (이미 구현, 문서화 확인)
+- [x] enum: `Color.Red` (구현됨)
+- 사유: typecheck 복잡도(필드 매칭, 순서 재정렬 등)
 - DoD
     - struct 리터럴로 값 생성/전달 동작
 
 ### 6.3 메서드/네임스페이스 (Phase 1.4)
-- [ ] 메서드 호출 설탕: `x.f(y)` ↔ `f(x, y)`
-- [ ] `impl Type { ... }` 블록
+- [x] 메서드 호출 설탕: `x.f(y)` ↔ `f(x, y)` (typecheck에서 변환)
+- [x] `impl Type { ... }` 블록 (parser에서 `TypeName_method`로 rename)
 - DoD
     - `x.add(y)`가 `add(x, y)` 호출로 lowering
 
 ### 6.4 자원 관리: `defer` (Phase 1.5)
-- [ ] `defer <stmt>;` 파싱/AST
-- [ ] 블록 스코프 종료 시 역순 실행
-- [ ] return/break/continue/panic 시 실행 보장
+- [x] `defer <stmt>;` 파싱/AST
+- [x] 블록 스코프 종료 시 역순 실행
+- [x] return 시 실행 보장
+- [ ] break/continue 시 실행 (미구현)
 - DoD
-    - `defer free(p);`가 블록 종료 시 실행됨
+    - [x] `defer free(p);`가 블록 종료 시 실행됨 (테스트 35, 36 통과)
 
 ### 6.5 함수 포인터 타입 (Phase 1.8)
 - [ ] 타입 표기: `func(T, U) -> R`
@@ -421,12 +437,41 @@ NOTE
 
 ---
 
+## Phase 8 — V4로 이동 예정 (Post-MVP)
+
+### 8.1 `comptime` 메타프로그래밍
+- [ ] 컴파일 타임 코드 실행
+- [ ] 상수 평가기(const-eval) 또는 제한 인터프리터
+- 사유: 실행기/VM 구현 블랙홀 리스크
+
+### 8.2 구조체 리터럴 expression (Phase 1.3)
+- [ ] named: `Pair{ a: 1, b: 2 }`
+- [ ] positional: `Pair{ 1, 2 }`
+- [ ] codegen: BRACE_INIT → 스택 초기화, sret 반환, VAR 초기화
+- 사유: typecheck 복잡도(필드 매칭, 순서 재정렬 등)
+
+### 8.3 조건부 컴파일 `@[cfg]` (Phase 1.7)
+- [ ] 문법: `@[cfg(target_os="linux")]`
+- [ ] 지원 대상: `target_os` (`linux`/`windows`)
+- [ ] 분기 범위: 선언 + 문장(statement) 레벨
+
+### 8.4 FFI extern 블록 (Phase 1.6)
+- [ ] 문법: `extern "C" { func ...; }`
+- [ ] 호출 규약: `extern "sysv"`, `extern "win64"`
+- [ ] 심볼 이름 매핑
+
+### 8.5 캡처 없는 익명 함수 (Phase 1.8)
+- [ ] `|x| x+1` 또는 `fn(x) { ... }` 형태
+- [ ] 클로저(캡처 있음)는 후순위
+
+---
+
 ## 부록: 빠른 스모크 예제(권장)
 
-- [ ] Phase 1: 산술/if/while/함수 호출/return
-- [ ] Phase 2: 포인터 null/unwrap_ptr, `[]u8` 문자열 리터럴, 배열 init
-- [ ] Phase 3: struct 레이아웃 + foreach + packed
-- [ ] Phase 4: secret/wipe/nospill
+- [x] Phase 1: 산술/if/while/함수 호출/return
+- [x] Phase 2: 포인터 null/unwrap_ptr, `[]u8` 문자열 리터럴, 배열 init
+- [x] Phase 3: struct 레이아웃 + foreach + packed
+- [x] Phase 4: secret/wipe/nospill
 - [ ] Phase 5: 제네릭 + named args + multi-return
 - [ ] Phase 6: final/복합대입/증감, struct 리터럴, defer, 함수 포인터
 - [ ] Phase 7: panic, 스택 트레이스

@@ -49,6 +49,7 @@ func keyword_kind(p, n) {
 			if (slice_eq_parts(p, n, "while", 5) == 1) { return TokKind.KW_WHILE; }
 			if (slice_eq_parts(p, n, "const", 5) == 1) { return TokKind.KW_CONST; }
 			if (slice_eq_parts(p, n, "break", 5) == 1) { return TokKind.KW_BREAK; }
+			if (slice_eq_parts(p, n, "defer", 5) == 1) { return TokKind.KW_DEFER; }
 			break;
 		}
 		case 6: {

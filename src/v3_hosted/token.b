@@ -96,6 +96,7 @@ enum TokKind {
 	KW_CASE = 124,
 	KW_DEFAULT = 125,
 	KW_IMPL = 126,
+	KW_DEFER = 127,
 };
 
 struct Token {

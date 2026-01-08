@@ -1543,6 +1543,28 @@ func parse_wipe_stmt(p) {
 	return stmt_new_wipe(a0, b0, kw_tok);
 }
 
+func parse_defer_stmt(p) {
+	var kw_tok = ptr64[p + 8];
+	parser_bump(p); // defer
+	// defer takes a single statement (usually a call)
+	var inner = parse_stmt(p);
+	// AstStmt layout: kind=0, a=8 (inner stmt), b=16, c=24, ...
+	var s = heap_alloc(88);
+	if (s == 0) { return 0; }
+	ptr64[s + 0] = AstStmtKind.DEFER;
+	ptr64[s + 8] = inner; // a = inner statement
+	ptr64[s + 16] = 0;
+	ptr64[s + 24] = 0;
+	ptr64[s + 32] = 0;
+	ptr64[s + 40] = 0;
+	ptr64[s + 48] = 0;
+	ptr64[s + 56] = 0;
+	ptr64[s + 64] = ptr64[kw_tok + 32];
+	ptr64[s + 72] = ptr64[kw_tok + 24];
+	ptr64[s + 80] = ptr64[kw_tok + 40];
+	return s;
+}
+
 func parse_bitand(p) {
 	var e = parse_eq(p);
 	while (ptr64[p + 16] == TokKind.AMP) {
@@ -2072,6 +2094,7 @@ func parse_stmt(p) {
 	if (k == TokKind.KW_BREAK) { return parse_break_stmt(p); }
 	if (k == TokKind.KW_CONTINUE) { return parse_continue_stmt(p); }
 	if (k == TokKind.KW_WIPE) { return parse_wipe_stmt(p); }
+	if (k == TokKind.KW_DEFER) { return parse_defer_stmt(p); }
 	if (k == TokKind.SEMI) { parser_bump(p); return 0; }
 
 	// expression statement

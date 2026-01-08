@@ -2991,6 +2991,14 @@ func tc_clone_stmt_subst(s, type_params, type_args_tc) {
 		ptr64[out + 56] = 0;
 		return out;
 	}
+	if (k == AstStmtKind.DEFER) {
+		// st+8 = inner statement
+		ptr64[out + 8] = tc_clone_stmt_subst(ptr64[s + 8], type_params, type_args_tc);
+		ptr64[out + 16] = 0;
+		ptr64[out + 48] = 0;
+		ptr64[out + 56] = 0;
+		return out;
+	}
 	if (k == AstStmtKind.WIPE) {
 		ptr64[out + 8] = tc_clone_expr_subst(ptr64[s + 8], type_params, type_args_tc);
 		ptr64[out + 16] = tc_clone_expr_subst(ptr64[s + 16], type_params, type_args_tc);
@@ -4525,6 +4533,12 @@ func tc_stmt(env, s) {
 
 		tc_break_depth = saved_break;
 		tc_switch_depth = saved_switch;
+		return 0;
+	}
+	if (k == AstStmtKind.DEFER) {
+		// st+8 = inner statement
+		var inner = ptr64[s + 8];
+		if (inner != 0) { tc_stmt(env, inner); }
 		return 0;
 	}
 	if (k == AstStmtKind.WIPE) {

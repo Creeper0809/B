@@ -88,6 +88,7 @@ enum AstStmtKind {
 	DESTRUCT = 11,
 	FOR = 12,
 	SWITCH = 13,
+	DEFER = 14,
 };
 
 struct AstStmt {
