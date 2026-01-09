@@ -14,6 +14,8 @@ enum AstTypeKind {
 	GENERIC = 7,
 	// Phase 3+: comptime type expression wrapper
 	COMPTIME_EXPR = 8,
+	// Phase 6.7: function pointer type func(T, U) -> R
+	FUNC_PTR = 9,
 };
 
 struct AstType {

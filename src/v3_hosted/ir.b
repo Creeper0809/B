@@ -49,7 +49,11 @@ enum IrInstrKind {
 	PUSH_LOCAL_F32 = 40,
 	PUSH_LOCAL_F64 = 41,
 	STORE_LOCAL_F32 = 42,
-	STORE_LOCAL_F64 = 43
+	STORE_LOCAL_F64 = 43,
+	// Phase 6.7: function pointer indirect call
+	CALL_INDIRECT = 44,
+	// Phase 6.7: push function address
+	PUSH_FUNC_ADDR = 45
 };
 
 struct IrInstr {

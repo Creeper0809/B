@@ -58,6 +58,8 @@ const TC_COMPOUND_ENUM = 90004;
 const TC_COMPOUND_TUPLE2 = 90005;
 // Phase 2.6: distinct type (strong typedef)
 const TC_COMPOUND_DISTINCT = 90006;
+// Phase 6.7: function pointer type
+const TC_COMPOUND_FUNC_PTR = 90007;
 
 // Global error counter (avoid taking addresses of locals; v2 compiler limitation).
 var tc_errors;
@@ -87,6 +89,14 @@ var tc_type_aliases_map;
 
 // Global pointer-type registry (Vec of compound ptr types).
 var tc_ptr_types;
+
+// Phase 6.7: Function pointer type registry (Vec of TcFuncPtrType*).
+// TcFuncPtrType layout (heap_alloc 32):
+//  +0  compound_kind = TC_COMPOUND_FUNC_PTR
+//  +8  param_types (Vec* of TC type ids)
+// +16  ret_type (TC type id, 0 = void)
+// +24  reserved
+var tc_func_ptr_types;
 
 // Global function signature registry (Vec of TcFuncSig*).
 // TcFuncSig layout (heap_alloc 64):
@@ -745,6 +755,8 @@ func tc_sizeof(ty) {
 	if (tc_is_struct(ty) == 1) { return tc_struct_size(ty); }
 	if (tc_is_enum(ty) == 1) { return 8; }
 	if (tc_is_tuple2(ty) == 1) { return 16; }
+	// Phase 6.7: function pointer (8 bytes like regular pointer)
+	if (tc_is_func_ptr(ty) == 1) { return 8; }
 	return 0;
 }
 
@@ -763,6 +775,8 @@ func tc_alignof(ty) {
 	if (tc_is_struct(ty) == 1) { return tc_struct_align(ty); }
 	if (tc_is_enum(ty) == 1) { return 8; }
 	if (tc_is_tuple2(ty) == 1) { return 8; }
+	// Phase 6.7: function pointer
+	if (tc_is_func_ptr(ty) == 1) { return 8; }
 	return 1;
 }
 
@@ -1427,6 +1441,76 @@ func tc_make_slice(elem_ty) {
 	return TC_TY_SLICE_BASE + elem_ty;
 }
 
+// Phase 6.7: Function pointer type support
+func tc_is_func_ptr(ty) {
+	if (ty == 0) { return 0; }
+	if (ty == TC_TY_INVALID) { return 0; }
+	if (tc_is_compound(ty) == 0) { return 0; }
+	if (ptr64[ty + 0] == TC_COMPOUND_FUNC_PTR) { return 1; }
+	return 0;
+}
+
+func tc_func_ptr_param_types(ty) {
+	// Returns Vec* of param TC types
+	return ptr64[ty + 8];
+}
+
+func tc_func_ptr_ret_type(ty) {
+	// Returns TC type id (0 = void)
+	return ptr64[ty + 16];
+}
+
+func tc_func_ptr_param_count(ty) {
+	var params = tc_func_ptr_param_types(ty);
+	if (params == 0) { return 0; }
+	return vec_len(params);
+}
+
+func tc_make_func_ptr(param_types_vec, ret_ty) {
+	// Intern: check existing func ptr types for match
+	if (tc_func_ptr_types != 0) {
+		var n = vec_len(tc_func_ptr_types);
+		var i = 0;
+		while (i < n) {
+			var fp = vec_get(tc_func_ptr_types, i);
+			if (ptr64[fp + 0] == TC_COMPOUND_FUNC_PTR) {
+				if (ptr64[fp + 16] == ret_ty) {
+					// Check param types match
+					var existing_params = ptr64[fp + 8];
+					var match = 1;
+					var pcount = 0;
+					if (param_types_vec != 0) { pcount = vec_len(param_types_vec); }
+					var ecount = 0;
+					if (existing_params != 0) { ecount = vec_len(existing_params); }
+					if (pcount != ecount) { match = 0; }
+					if (match == 1) {
+						var j = 0;
+						while (j < pcount) {
+							var pt = vec_get(param_types_vec, j);
+							var et = vec_get(existing_params, j);
+							if (tc_type_eq(pt, et) == 0) { match = 0; break; }
+							j = j + 1;
+						}
+					}
+					if (match == 1) { return fp; }
+				}
+			}
+			i = i + 1;
+		}
+	}
+	// Create new func ptr type
+	var t = heap_alloc(32);
+	if (t == 0) { return TC_TY_INVALID; }
+	ptr64[t + 0] = TC_COMPOUND_FUNC_PTR;
+	ptr64[t + 8] = param_types_vec;  // Vec* of param types (may be 0)
+	ptr64[t + 16] = ret_ty;
+	ptr64[t + 24] = 0;  // reserved
+	if (tc_func_ptr_types != 0) {
+		vec_push(tc_func_ptr_types, t);
+	}
+	return t;
+}
+
 func tc_is_compound(ty) {
 	// Heuristic: all builtin scalar/encoded types are small.
 	if (ty >= 4096) { return 1; }
@@ -1468,6 +1552,28 @@ func tc_type_eq(a, b) {
 	if (tc_is_tuple2(a) == 1 && tc_is_tuple2(b) == 1) {
 		if (tc_type_eq(tc_tuple2_a(a), tc_tuple2_a(b)) == 0) { return 0; }
 		return tc_type_eq(tc_tuple2_b(a), tc_tuple2_b(b));
+	}
+	// Phase 6.7: function pointer type equality
+	if (tc_is_func_ptr(a) == 1 && tc_is_func_ptr(b) == 1) {
+		// Compare return types
+		if (tc_type_eq(tc_func_ptr_ret_type(a), tc_func_ptr_ret_type(b)) == 0) { return 0; }
+		// Compare param counts
+		var pa = tc_func_ptr_param_types(a);
+		var pb = tc_func_ptr_param_types(b);
+		var ca = 0;
+		var cb = 0;
+		if (pa != 0) { ca = vec_len(pa); }
+		if (pb != 0) { cb = vec_len(pb); }
+		if (ca != cb) { return 0; }
+		// Compare param types
+		var i = 0;
+		while (i < ca) {
+			var pta = vec_get(pa, i);
+			var ptb = vec_get(pb, i);
+			if (tc_type_eq(pta, ptb) == 0) { return 0; }
+			i = i + 1;
+		}
+		return 1;
 	}
 	return 0;
 }
@@ -1994,6 +2100,41 @@ func tc_type_from_asttype(t) {
 			return TC_TY_INVALID;
 		}
 		return tc_tuple2_new(t0, t1);
+	}
+	// Phase 6.7: Function pointer type
+	if (kind == AstTypeKind.FUNC_PTR) {
+		var param_types_ast = ptr64[t + 8];  // Vec* of AstType*
+		var ret_type_ast = ptr64[t + 16];    // AstType* or 0
+		// Convert AST param types to TC types
+		var param_types_tc = 0;
+		if (param_types_ast != 0) {
+			var pcount = vec_len(param_types_ast);
+			if (pcount > 0) {
+				param_types_tc = vec_new(pcount);
+				if (param_types_tc == 0) { return TC_TY_INVALID; }
+				var i = 0;
+				while (i < pcount) {
+					var pat = vec_get(param_types_ast, i);
+					var pty = tc_type_from_asttype(pat);
+					if (pty == TC_TY_INVALID) {
+						tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: invalid function pointer param type");
+						return TC_TY_INVALID;
+					}
+					vec_push(param_types_tc, pty);
+					i = i + 1;
+				}
+			}
+		}
+		// Convert return type
+		var ret_ty = 0;
+		if (ret_type_ast != 0) {
+			ret_ty = tc_type_from_asttype(ret_type_ast);
+			if (ret_ty == TC_TY_INVALID) {
+				tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: invalid function pointer return type");
+				return TC_TY_INVALID;
+			}
+		}
+		return tc_make_func_ptr(param_types_tc, ret_ty);
 	}
 	tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unsupported kind");
 	return TC_TY_INVALID;
@@ -3431,6 +3572,25 @@ func tc_expr(env, e) {
 			}
 		}
 		if (ty == TC_TY_INVALID) {
+			// Phase 6.7: Check if identifier is a function name
+			var func_sig = tc_func_lookup(name_ptr, name_len);
+			if (func_sig != 0) {
+				// Found function signature - create function pointer type
+				// TcFuncSig layout: +24=param_count, +32=p0_ty, +40=p1_ty, +48=ret_ty
+				var pcount = ptr64[func_sig + 24];
+				var ret_ty = ptr64[func_sig + 48];
+				var param_types = 0;
+				if (pcount > 0) {
+					param_types = vec_new(pcount);
+					if (pcount >= 1) { vec_push(param_types, ptr64[func_sig + 32]); }
+					if (pcount >= 2) { vec_push(param_types, ptr64[func_sig + 40]); }
+					// MVP: only support up to 2 params for function pointers
+				}
+				var fptr_ty = tc_make_func_ptr(param_types, ret_ty);
+				// Mark this expr as function reference for codegen (use extra field +32)
+				ptr64[e + 32] = func_sig;  // store func_sig for codegen in extra field
+				return fptr_ty;
+			}
 			tc_err_at(ptr64[e + 64], ptr64[e + 72], "unknown identifier");
 			return TC_TY_INVALID;
 		}
@@ -3836,6 +3996,37 @@ func tc_expr(env, e) {
 				var ret_ast = ptr64[fd + 32];
 				if (ret_ast != 0) { return tc_type_from_asttype(ret_ast); }
 				return 0;
+			}
+			// Phase 6.7: Check if callee is a function pointer variable
+			var fptr_ty = tc_env_get(env, fn_name_ptr, fn_name_len);
+			if (tc_is_func_ptr(fptr_ty) == 1) {
+				// Capture e, fptr_ty, args before calling other functions (caller-save registers may be clobbered)
+				var e_saved = e;
+				var fptr_ty_saved = fptr_ty;
+				var args_saved = args;
+				
+				// Type check arguments against function pointer param types
+				var fptr_params = tc_func_ptr_param_types(fptr_ty_saved);
+				var pn = 0;
+				var an = 0;
+				if (fptr_params != 0) { pn = vec_len(fptr_params); }
+				if (args_saved != 0) { an = vec_len(args_saved); }
+				if (an != pn) {
+					tc_err_at(ptr64[e_saved + 64], ptr64[e_saved + 72], "func ptr call: argument count mismatch");
+					return TC_TY_INVALID;
+				}
+				var env_saved = env;
+				var i3 = 0;
+				while (i3 < an) {
+					var a0 = vec_get(args_saved, i3);
+					var pty = vec_get(fptr_params, i3);
+					if (pty != TC_TY_INVALID) { tc_expr_with_expected(env_saved, a0, pty); }
+					else { tc_expr(env_saved, a0); }
+					i3 = i3 + 1;
+				}
+				// Mark this call expr as indirect call for codegen
+				ptr64[e_saved + 8] = fptr_ty_saved;  // store func ptr type for codegen
+				return tc_func_ptr_ret_type(fptr_ty_saved);
 			}
 		}
 
@@ -4827,8 +5018,16 @@ func typecheck_program(prog) {
 	if (tc_ptr_types == 0) {
 		return 1;
 	}
+	// Phase 6.7: function pointer types
+	tc_func_ptr_types = vec_new(8);
+	if (tc_func_ptr_types == 0) {
+		return 1;
+	}
 	tc_type_aliases = vec_new(8);
 	if (tc_type_aliases == 0) { return 1; }
+	// Phase 6.7: function signatures for function pointer support
+	tc_funcs = vec_new(8);
+	if (tc_funcs == 0) { return 1; }
 
 	// Initialize HashMap tables for O(1) lookup
 	tc_structs_map = hashmap_new(16);
@@ -4865,6 +5064,9 @@ func typecheck_program(prog) {
 		}
 		i0 = i0 + 1;
 	}
+
+	// Pass 0.7: collect function signatures (for function pointer support)
+	tc_collect_func_sigs_from_prog(prog, 0);
 
 	// Pass 0.5 reserved for Phase 3.5 property hook validation.
 
@@ -4996,6 +5198,9 @@ func tc_typecheck_all_modules() {
 	if (tc_enums == 0) { return 1; }
 	tc_ptr_types = vec_new(8);
 	if (tc_ptr_types == 0) { return 1; }
+	// Phase 6.7: function pointer types
+	tc_func_ptr_types = vec_new(8);
+	if (tc_func_ptr_types == 0) { return 1; }
 	tc_type_aliases = vec_new(8);
 	if (tc_type_aliases == 0) { return 1; }
 

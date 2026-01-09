@@ -9,6 +9,17 @@ import v3_hosted.token;
 import v3_hosted.ir;
 import v3_hosted.typecheck;
 
+// Phase 6.7: Temporary global for function pointer calls (to survive function calls)
+var cg_fptr_arg_bytes;
+var cg_fptr_ctx;
+var cg_fptr_offset;
+var cg_fptr_local;
+// Phase 6.7: Also save call name for regular function calls
+var cg_call_name_ptr;
+var cg_call_name_len;
+var cg_call_decl;
+var cg_call_args;
+
 struct CgLocal {
 	name_ptr: u64;
 	name_len: u64;
@@ -1025,6 +1036,12 @@ func cg_lower_expr(ctx, e) {
 		var name_len = ptr64[e + 48];
 		var l = cg_local_find(ctx, name_ptr, name_len);
 		if (l == 0) {
+			// Phase 6.7: Check if identifier is a function name (for function pointer)
+			if (cg_ast_has_func(ptr64[ctx + 48], name_ptr, name_len) == 1) {
+				// Emit load of function address (lea)
+				ir_emit(f, IrInstrKind.PUSH_FUNC_ADDR, name_ptr, name_len, 0);
+				return 0;
+			}
 			// Unresolved ident: leave 0
 			ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
 			return 0;
@@ -1537,49 +1554,81 @@ func cg_lower_expr(ctx, e) {
 					return 0;
 				}
 			}
+			// Phase 6.7: Save all variables to globals before any function calls
+			// (to survive function call clobbering of local variables)
+			cg_call_name_ptr = name_ptr2;
+			cg_call_name_len = name_len2;
+			cg_call_decl = decl;
+			cg_call_args = args;
+			cg_fptr_ctx = ctx;
+			
+			// Check if callee is a function pointer local variable BEFORE processing args
+			cg_fptr_local = 0;
+			cg_fptr_offset = 0;
+			if (cg_call_decl == 0) {
+				var l0 = cg_local_find(cg_fptr_ctx, cg_call_name_ptr, cg_call_name_len);
+				if (l0 != 0) {
+					cg_fptr_local = l0;
+					cg_fptr_offset = ptr64[l0 + 16];
+				}
+			}
+			
 			var narg = 0;
-			if (args != 0) { narg = vec_len(args); }
+			if (cg_call_args != 0) { narg = vec_len(cg_call_args); }
 			// Get param types from decl to handle struct by-value
 			var params_decl = 0;
 			var pn_decl = 0;
-			if (decl != 0) {
-				params_decl = ptr64[decl + 24];
+			if (cg_call_decl != 0) {
+				params_decl = ptr64[cg_call_decl + 24];
 				if (params_decl != 0) { pn_decl = vec_len(params_decl); }
 			}
+			var ast_prog_saved = ptr64[cg_fptr_ctx + 48];
 			var idx = narg;
-			var arg_bytes = 0;
+			cg_fptr_arg_bytes = 0;  // Use global for arg_bytes
 			while (idx != 0) {
 				idx = idx - 1;
-				var a0 = vec_get(args, idx);
+				var a0 = vec_get(cg_call_args, idx);
 				// Check if param is struct type (by-value)
 				var param_sz = 8;
 				if (params_decl != 0 && idx < pn_decl) {
 					var pst0 = vec_get(params_decl, idx);
 					if (pst0 != 0) {
 						var pty0 = ptr64[pst0 + 48];
-						param_sz = cg_type_size_bytes_prog(ast_prog, pty0);
+						param_sz = cg_type_size_bytes_prog(ast_prog_saved, pty0);
 					}
 				}
 				if (param_sz > 8 && param_sz != 24) {
 					// Struct by-value: for now, use the cg_lower_struct_by_value helper
-					var pushed = cg_lower_struct_arg(ctx, a0, param_sz);
+					var pushed = cg_lower_struct_arg(cg_fptr_ctx, a0, param_sz);
 					if (pushed != 0) {
-						arg_bytes = arg_bytes + param_sz;
+						cg_fptr_arg_bytes = cg_fptr_arg_bytes + param_sz;
 					} else {
-						cg_lower_expr(ctx, a0);
-						arg_bytes = arg_bytes + 8;
+						cg_lower_expr(cg_fptr_ctx, a0);
+						cg_fptr_arg_bytes = cg_fptr_arg_bytes + 8;
 					}
 				}
-				else if (cg_expr_is_slice(ctx, a0) == 1) {
-					cg_lower_expr(ctx, a0);
-					arg_bytes = arg_bytes + 16;
+				else if (cg_expr_is_slice(cg_fptr_ctx, a0) == 1) {
+					cg_lower_expr(cg_fptr_ctx, a0);
+					cg_fptr_arg_bytes = cg_fptr_arg_bytes + 16;
 				}
 				else {
-					cg_lower_expr(ctx, a0);
-					arg_bytes = arg_bytes + 8;
+					cg_lower_expr(cg_fptr_ctx, a0);
+					cg_fptr_arg_bytes = cg_fptr_arg_bytes + 8;
 				}
 			}
-			ir_emit(f, IrInstrKind.CALL, name_ptr2, name_len2, arg_bytes);
+			// Phase 6.7: Check if callee is a function pointer local variable
+			if (cg_fptr_local != 0) {
+				// Function pointer indirect call: push function ptr value, then call indirect
+				var f_s = ptr64[cg_fptr_ctx + 8];
+				ir_emit(f_s, IrInstrKind.PUSH_LOCAL, cg_fptr_offset, 0, 0);
+				// Re-read f from ctx after ir_emit (locals may be clobbered)
+				var f_s2 = ptr64[cg_fptr_ctx + 8];
+				ir_emit(f_s2, IrInstrKind.CALL_INDIRECT, cg_fptr_arg_bytes, 0, 0);
+				return 0;
+			}
+			// Regular function call - use global variables since locals may have been clobbered
+			var f_final = ptr64[cg_fptr_ctx + 8];
+			ir_emit(f_final, IrInstrKind.CALL, cg_call_name_ptr, cg_call_name_len, cg_fptr_arg_bytes);
 			return 0;
 		}
 		// Unsupported call: leave 0
@@ -2666,6 +2715,13 @@ func cg_gen_asm(prog, ir_func) {
 				cg_emit_line(sb, "]");
 				cg_emit_line(sb, "\tpush rax");
 			}
+			// Phase 6.7: Push function address for function pointers
+			else if (k == IrInstrKind.PUSH_FUNC_ADDR) {
+				cg_emit(sb, "\tlea rax, [rel ");
+				cg_emit_bytes(sb, a, b);
+				cg_emit_line(sb, "]");
+				cg_emit_line(sb, "\tpush rax");
+			}
 			else if (k == IrInstrKind.PRINT_SLICE) {
 				cg_emit_line(sb, "\t; print slice bytes");
 				cg_emit_line(sb, "\tpop rdx\t; len");
@@ -2747,6 +2803,18 @@ func cg_gen_asm(prog, ir_func) {
 				if (c != 0) {
 					cg_emit(sb, "\tadd rsp, ");
 					cg_emit_u64(sb, c);
+					cg_emit_nl(sb);
+				}
+				cg_emit_line(sb, "\tpush rax");
+			}
+			// Phase 6.7: Indirect call through function pointer
+			else if (k == IrInstrKind.CALL_INDIRECT) {
+				// Stack top has function pointer value
+				cg_emit_line(sb, "\tpop rax\t; func ptr");
+				cg_emit_line(sb, "\tcall rax");
+				if (a != 0) {
+					cg_emit(sb, "\tadd rsp, ");
+					cg_emit_u64(sb, a);
 					cg_emit_nl(sb);
 				}
 				cg_emit_line(sb, "\tpush rax");

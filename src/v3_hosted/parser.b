@@ -726,6 +726,23 @@ func type_new_generic(base_type, type_args, tokp) {
 	return t;
 }
 
+// Phase 6.7: function pointer type: func(T, U) -> R
+// param_types: Vec* of AstType* (parameter types)
+// ret_type: AstType* (return type, may be 0 for void)
+func type_new_func_ptr(param_types, ret_type, tokp) {
+	var t = heap_alloc(64);
+	if (t == 0) { return 0; }
+	ptr64[t + 0] = AstTypeKind.FUNC_PTR;
+	ptr64[t + 8] = param_types;   // Vec* of param types
+	ptr64[t + 16] = ret_type;     // return type (or 0)
+	ptr64[t + 24] = ptr64[tokp + 32];
+	ptr64[t + 32] = ptr64[tokp + 24];
+	ptr64[t + 40] = ptr64[tokp + 40];
+	ptr64[t + 48] = 0;
+	ptr64[t + 56] = 0;
+	return t;
+}
+
 func expr_new_leaf(kind, tokp) {
 	var e = heap_alloc(80);
 	if (e == 0) { return 0; }
@@ -1100,6 +1117,39 @@ func parse_type(p) {
 			parser_bump(p);
 		}
 		return type_new_ptr(inner, nullable, tokp);
+	}
+	// Phase 6.7: Function pointer type: func(T, U) -> R
+	if (k == TokKind.KW_FUNC) {
+		parser_bump(p); // consume 'func'
+		if (parser_match(p, TokKind.LPAREN) == 0) {
+			parser_err_here(p, "func type: expected '('");
+			return 0;
+		}
+		
+		var param_types = vec_new(4);
+		// Parse parameter types
+		while (ptr64[p + 16] != TokKind.RPAREN && ptr64[p + 16] != TokKind.EOF) {
+			var ptype = parse_type(p);
+			if (ptype != 0) { vec_push(param_types, ptype); }
+			if (ptr64[p + 16] == TokKind.COMMA) {
+				parser_bump(p);
+				continue;
+			}
+			break;
+		}
+		if (parser_match(p, TokKind.RPAREN) == 0) {
+			parser_err_here(p, "func type: expected ')'");
+			return 0;
+		}
+		
+		// Parse return type (optional)
+		var ret_type = 0;
+		if (ptr64[p + 16] == TokKind.ARROW) {
+			parser_bump(p); // '->'
+			ret_type = parse_type(p);
+		}
+		
+		return type_new_func_ptr(param_types, ret_type, tokp);
 	}
 	if (k == TokKind.IDENT) {
 		var name0_ptr = ptr64[tokp + 8];
