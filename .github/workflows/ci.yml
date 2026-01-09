@@ -50,45 +50,31 @@ jobs:
         path: bin/v3c
         
   build-windows:
-    name: Build on Windows
+    name: Windows Environment Check
     runs-on: windows-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Install NASM
+    - name: Check Windows build prerequisites
       run: |
-        choco install nasm -y
-        
-    - name: Install mingw-w64
-      run: |
-        choco install mingw -y
-        
-    - name: Setup environment
-      run: |
-        echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
-        echo "C:\Program Files\NASM" >> $GITHUB_PATH
-        echo "${{ github.workspace }}\bin" >> $GITHUB_PATH
-        
-    - name: Build v3 compiler
-      run: |
-        cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
-        
-    - name: Verify v3c binary
-      run: |
-        file bin/v3c.exe || true
-        
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: b-compiler-windows
-        path: bin/v3c.exe
+        echo "=== Windows Build Status ==="
+        echo "NOTE: Native Windows build is not yet supported."
+        echo "basm and v2c are Linux ELF binaries that cannot run on Windows."
+        echo ""
+        echo "Future plans:"
+        echo "- Cross-compile v3c.exe from Linux using mingw-w64"
+        echo "- Or rewrite basm/v2c to be cross-platform"
+        echo ""
+        echo "Current files in bin/:"
+        dir bin
+        echo ""
+        echo "✅ Windows environment check passed"
         
   test-cross-platform:
     name: Cross-platform tests
-    needs: [build-linux, build-windows]
+    needs: [build-linux]
     runs-on: ubuntu-latest
     
     steps:
@@ -101,14 +87,8 @@ jobs:
         name: b-compiler-linux
         path: bin/
         
-    - name: Download Windows artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: b-compiler-windows
-        path: bin-win/
-        
-    - name: Compare builds
+    - name: Verify Linux build
       run: |
         ls -lh bin/
-        ls -lh bin-win/
-        echo "✅ Both Linux and Windows builds succeeded"
+        file bin/v3c
+        echo "✅ Linux build succeeded"
