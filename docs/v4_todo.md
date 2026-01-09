@@ -10,6 +10,67 @@ v4_roadmap.md의 실행 계획. 기능을 의존성과 우선순위에 따라 �
 
 ---
 
+## Breaking Change: 파일 확장자 변경
+
+**v4.0부터 `.b` → `.bpp`로 변경**
+
+### 마이그레이션 작업 (v4.0)
+
+**전략**: v3와 v4를 별도 폴더로 분리하여 점진적 전환
+
+- [ ] **bpp/ 폴더 구조 생성**
+  - [ ] `bpp/` 루트 폴더 생성
+  - [ ] `bpp/src/` 생성 (v4 컴파일러)
+  - [ ] `bpp/std/` 생성 (v4 표준 라이브러리)
+  - [ ] `bpp/examples/` 생성 (v4 예제)
+  - [ ] `bpp/test/` 생성 (v4 테스트)
+  - [ ] `bpp/README.md` 생성 (v4 개발 가이드)
+
+- [ ] **컴파일러 업데이트**
+  - [ ] `.bpp` 확장자 인식 추가
+  - [ ] `.b` 파일 처리 시 deprecation 경고 출력
+  - [ ] 하위 호환: `.b`와 `.bpp` 모두 컴파일 가능
+  - [ ] `bpp/` 폴더 경로 인식
+
+- [ ] **v4 코드베이스 개발**
+  - [ ] `bpp/src/`에서 v4 컴파일러 개발 시작
+  - [ ] `bpp/std/`에서 v4 표준 라이브러리 개발
+  - [ ] `bpp/examples/`에 v4 기능 예제 작성
+  - [ ] `bpp/test/`에 v4 테스트 작성
+  - [ ] **주의**: 상위 폴더의 v3 코드는 그대로 유지
+
+- [ ] **빌드 시스템 업데이트**
+  - [ ] Makefile/빌드 스크립트에 `bpp/` 타곃 추가
+  - [ ] `make v3` (v3 컴파일러), `make v4` (v4 컴파일러) 분리
+  - [ ] CI/CD 파이프라인에 bpp/ 폴더 포함
+
+- [ ] **문서 업데이트**
+  - [ ] README.md에 v3/v4 폴더 구조 설명 추가
+  - [ ] docs/에 v4 개발 가이드 작성
+  - [ ] CHANGELOG.md에 breaking change 기록
+
+**폴더 구조**:
+```
+B/
+├── src/          # v3 컴파일러 (.b) - 유지
+├── std/          # v3 표준 라이브러리 (.b) - 유지
+├── examples/     # v3 예제 (.b) - 유지
+├── test/         # v3 테스트 (.b) - 유지
+└── bpp/          # v4 전용 폴더 (신규)
+    ├── src/      # v4 컴파일러 (.bpp)
+    ├── std/      # v4 표준 라이브러리 (.bpp)
+    ├── examples/ # v4 예제 (.bpp)
+    └── test/     # v4 테스트 (.bpp)
+```
+
+### v4.1에서 완전 전환
+
+- [ ] `.b` 지원 완전 제거
+- [ ] 컴파일러가 `.bpp`만 인식
+- [ ] 에러 메시지: "File extension '.b' is no longer supported. Use '.bpp' instead."
+
+---
+
 ## Critical Path Analysis
 
 ### Path 1: 문법 완성 (Core Language)
@@ -44,12 +105,30 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
 **우선순위**: [MEDIUM] (v4.2, Optional)
 **위험도**: [MEDIUM] (복잡도 높음)
 
-### Path 6: 최적화 (Optimization)
+### Path 6: 최적화 (Optimization) - 3단계 분산
 ```
-SSA IR 전환 → Dominance Tree → 최적화 패스들
+[1단계 v4.0] Constant Folding, 기본 DCE, Peephole
+    ↓
+[2단계 v4.2] Copy Propagation, Dead Store, Strength Reduction
+    ↓
+[3단계 v4.4] SSA 전환 → GCSE, GVN, SCCP → Loop 최적화
 ```
-**우선순위**: [LOW] (v4.4+, Optional)
-**위험도**: [MEDIUM] (SSA 전환 복잡)
+**우선순위**: [분산] (각 버전에 점진적 배치)
+**위험도**: [LOW→MEDIUM→HIGH] (단계별 증가)
+
+### Path 7: 빌트인 함수 (Builtin Functions) - 4단계 분산
+```
+[v4.0] 타입 정보 + 검증/단언 + 디버깅 (기초)
+    ↓
+[v4.1] Volatile + 비트 조작 + Introspection (확장)
+    ↓
+[v4.3] 암호/알고리즘 Intrinsics (기본) + Atomic (기본)
+    ↓
+[v4.5+] Multi-precision + 암호 전용 Intrinsics (고급)
+```
+**우선순위**: [분산] (각 버전에 점진적 배치)
+**위험도**: [LOW→LOW→MEDIUM→HIGH] (단계별 증가)
+**철학**: 컴파일러 코어 기능과 병렬 진행 가능
 
 ---
 
@@ -180,7 +259,29 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
   - DoD: 문자열 표준 타입
   - 참조: v4_roadmap.md 섹션 2.1
 
-#### Phase 4.0.4: 기타 제약 해제 (1-2개월)
+#### Phase 4.0.4: 주석 확장 (1개월)
+
+**참고**: 컴파일러 코어가 아니라 렉서/파서 레벨 작업이므로 병렬 진행 가능
+
+- [ ] **문서화 주석 (Documentation Comments)**
+  - [ ] 렉서: `///`, `/**` 토큰 인식
+  - [ ] 파서: AST 노드에 `doc_comment` 필드 추가
+  - [ ] 주석 토큰 보존 (파서에 전달)
+  - DoD: 함수/구조체에 문서화 주석 첨부 가능
+  - 참조: v4_roadmap.md 섹션 0.1
+
+- [ ] **중첩 블록 주석 (Nested Block Comments)**
+  - [ ] 렉서: depth 카운터 추가
+  - [ ] `/*` 마다 +1, `*/` 마다 -1
+  - DoD: `/* /* 중첩 */ */` 정상 동작
+  - 참조: v4_roadmap.md 섹션 0.1
+
+**주석 확장 DoD**:
+- [ ] `///` 주석이 AST에 저장됨
+- [ ] 중첩 블록 주석 파싱 성공
+- [ ] 테스트 통과
+
+#### Phase 4.0.5: 기타 제약 해제 (1-2개월)
 
 - [ ] Struct 리터럴 expression
   - [ ] Named: Point{x: 1, y: 2}
@@ -189,7 +290,64 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 
 - [ ] 파라미터 7개 이상 지원 (스택 전달)
 - [ ] defer break/continue 지원
-  - 참조: v4_roadmap.md 섹션 0.8
+  - 참조: v4_roadmap.md 섹션 0.9
+
+#### Phase 4.0.6: 빌트인 함수 기초 (1-2개월)
+
+**참고**: 코어 언어 기능과 병렬 진행 가능
+
+- [ ] **타입 정보 빌트인**
+  - [ ] `typeof(x)` 구현
+  - [ ] `alignof(T)` 구현
+  - [ ] `size_of_val(x)` 구현
+  - DoD: 컴파일 타임 타입 정보 조회
+  - 참조: v4_roadmap.md 내장 함수 섹션
+
+- [ ] **검증 및 단언**
+  - [ ] `assert(cond, msg)` 구현 (디버그 전용)
+  - [ ] `debug_assert()` 별칭
+  - [ ] `static_assert()` 컴파일 타임 검증
+  - [ ] `unreachable(msg)` 구현
+  - DoD: 런타임/컴파일 타임 검증 작동
+  - 참조: v4_roadmap.md 내장 함수 섹션
+
+- [ ] **디버깅 빌트인**
+  - [ ] `line()`, `file()`, `function()` 구현
+  - [ ] `breakpoint()` 구현 (x86: int3)
+  - DoD: 소스 위치 정보 출력 가능
+  - 참조: v4_roadmap.md 내장 함수 섹션
+
+**빌트인 함수 기초 DoD**:
+- [ ] 타입 정보 함수 작동
+- [ ] assert 계열 작동
+- [ ] 디버깅 함수 작동
+
+#### Phase 4.0.7: 최적화 1단계 - 기본 (1-2개월)
+
+**철학**: SSA 없이도 구현 가능한 기본 최적화. 기본기를 다진 후 시작.
+
+- [ ] **문서화 주석 + 중첩 블록 주석 지원**
+- [ ] **기본 빌트인 함수 구현 (타입 정보, 검증, 디버깅)**
+- [ ] v3의 모든 제약사항 해제
+- [ ] **1단계 최적화 (Constant Folding, 기본 DCE)** 타임에 계산됨
+  - 참조: v4_roadmap.md 섹션 6.2
+
+- [ ] **Dead Code Elimination (기본)**
+  - [ ] 사용되지 않는 변수 제거
+  - [ ] unreachable 코드 제거 (if (false) { ... })
+  - DoD: 명백한 dead code 제거
+  - 참조: v4_roadmap.md 섹션 6.2
+
+- [ ] **간단한 Peephole Optimization**
+  - [ ] x * 1 → x
+  - [ ] x + 0 → x
+  - [ ] x * 2 → x << 1
+  - DoD: 기본 연산 최적화
+
+**1단계 최적화 DoD**:
+- [ ] 상수 폴딩 작동
+- [ ] 기본 DCE 작동
+- [ ] Golden test 통과 (최적화 전후 동일)
 
 **v4.0 DoD**:
 - [ ] match로 모든 제어 흐름 처리
@@ -198,6 +356,9 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 - [ ] constructor/destructor로 객체 생명주기 관리
 - [ ] Result<T,E>로 에러 처리
 - [ ] String 타입 사용 가능
+- [ ] v3의 모든 제약사항 해제
+- [ ] **1단계 최적화 (Constant Folding, 기본 DCE)**
+- [ ] Golden test 추가 + 통과
 - [ ] v3의 모든 제약사항 해제
 - [ ] Golden test 추가 + 통과
 
@@ -281,8 +442,36 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 - [ ] 기본 comptime 계산 지원
 - [ ] **Explicit SIMD 타입 및 인트린식 지원**
 - [ ] **std.simd 기본 연산 가능**
+- [ ] **빌트인 함수 확장 (volatile, bit manipulation, introspection)**
 
 **블로커**: v4.0 미완료
+
+#### Phase 4.1.4: 빌트인 함수 확장 (1-2개월)
+
+**참고**: 제네릭/comptime 기능 활용하여 추가 빌트인 구현
+
+- [ ] **Volatile 연산**
+  - [ ] `volatile_load(ptr)` 구현
+  - [ ] `volatile_store(ptr, value)` 구현
+  - DoD: 컴파일러 최적화 방지
+  - 참조: v4_roadmap.md 내장 함수 섹션
+
+- [ ] **비트 조작**
+  - [ ] `rotl(x, n)`, `rotr(x, n)` 구현
+  - [ ] `bswap(x)` 구현
+  - DoD: 로테이션/바이트 스왑 작동
+  - 참조: v4_roadmap.md 내장 함수 섹션
+
+- [ ] **Introspection**
+  - [ ] `has_method(T, "name")` 구현
+  - [ ] `impls(T, Trait)` 구현
+  - DoD: 컴파일 타임 타입 검사
+  - 참조: v4_roadmap.md 내장 함수 섹션
+
+**빌트인 함수 확장 DoD**:
+- [ ] volatile 연산 작동
+- [ ] 비트 조작 작동
+- [ ] introspection 작동
 
 ---
 
@@ -334,8 +523,40 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 - [ ] trait 구현 및 VTable 생성
 - [ ] 다형성 호출 가능
 - [ ] 성능 측정 (vtable 오버헤드 < 5%)
+- [ ] **2단계 최적화 (Copy Propagation, 고급 DCE)**
 
 **블로커**: v4.1 미완료
+
+#### Phase 4.2.3: 최적화 2단계 - 중급 (2-3개월)
+
+**철학**: SSA 없이 구현 가능한 데이터플로우 분석 기반 최적화.
+
+- [ ] **Copy Propagation (복사 전파)**
+  - [ ] x = y; z = x + 1; → z = y + 1;
+  - [ ] 단순 변수 복사 제거
+  - DoD: 불필요한 변수 복사 제거
+  - 참조: v4_roadmap.md 섹션 6.2
+
+- [ ] **Dead Store Elimination**
+  - [ ] 사용되지 않는 대입 제거
+  - [ ] x = 10; x = 20; → x = 20;
+  - DoD: 중복 대입 제거
+
+- [ ] **고급 Dead Code Elimination**
+  - [ ] 제어흐름 분석 기반 DCE
+  - [ ] if (const_true) { A } else { B } → A
+  - DoD: 조건분기 기반 dead code 제거
+
+- [ ] **Strength Reduction (기본)**
+  - [ ] x * 4 → x << 2
+  - [ ] x / 2 → x >> 1 (부호 없는 정수)
+  - DoD: 비용이 큰 연산을 저렴한 연산으로 대체
+
+**2단계 최적화 DoD**:
+- [ ] Copy Propagation 작동
+- [ ] Dead Store Elimination 작동
+- [ ] 성능 벤치마크 (10-15% 향상)
+- [ ] Golden test 통과 (최적화 전후 동일)
 
 **재검토 포인트**: 
 - 실제로 다형성이 필요한 use case가 있는가?
@@ -395,6 +616,8 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 - [ ] Reflection 기반 메타프로그래밍
 - [ ] 조건부 컴파일 작동
 - [ ] 컴파일 속도 측정 (< 2배 느림)
+- [ ] **암호/알고리즘 Intrinsics - 기본 구현 (일부)**
+- [ ] **Atomic 빌트인 함수 (기본)**
 
 **블로커**: v4.1 미완료, 컴파일러 재설계 미완료
 
@@ -404,56 +627,99 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 - 개발 비용 vs 실용성 비교
 - 대안: Rust 스타일 매크로 시스템 검토
 
+#### Phase 4.3.4: 빌트인 함수 확장 - 고급 (2-3개월)
+
+**참고**: CTFE 기능과 결합하여 고급 빌트인 구현
+
+- [ ] **암호 및 알고리즘 Intrinsics (기본)**
+  - [ ] `sha256_compress(state, block)` 구현 (v4.3)
+  - [ ] `aes_encrypt_block(key, block)` 구현 (v4.3)
+  - DoD: 기본 암호 알고리즘 인트린식 작동
+  - 참조: v4_roadmap.md 내장 함수 섹션 (암호 및 알고리즘)
+
+- [ ] **Atomic 빌트인 (기본)**
+  - [ ] `atomic_load(ptr, order)` 구현
+  - [ ] `atomic_store(ptr, val, order)` 구현
+  - [ ] `atomic_cmpxchg(ptr, old, new, order)` 구현
+  - DoD: 기본 원자 연산 작동
+  - 참조: v4_roadmap.md 내장 함수 섹션
+
+**빌트인 함수 고급 DoD**:
+- [ ] 기본 암호 인트린식 작동
+- [ ] 기본 atomic 연산 작동
+
 ---
 
-### v4.4 Optimization (Optional)
+### v4.4 Optimization 3단계 - SSA 기반 (Optional)
 **기간**: 2029+ (12-18개월)
-**목표**: 성능 개선
+**목표**: SSA IR 전환 및 고급 최적화
 **상태**: [PLANNED]
 **위험도**: [MEDIUM] (SSA 전환 복잡)
 
-**의존성**: v4.0 완료 (SSA는 기존 IR 위에 구축 가능)
+**의존성**: v4.2 완료 (2단계 최적화 경험 필요)
 
-**주의**: 최적화는 **가장 마지막**에 합니다. 언어 기능이 안정된 후에만 시작.
+**철학**: 언어 기능이 안정된 후에만 SSA로 전환. 성능보다 정확성 우선.
 
 #### Phase 4.4.1: SSA IR 전환 (6-8개월)
 
 - [ ] **SSA 변환**
   - [ ] SSAValue, Phi Node 정의
   - [ ] Dominance Tree 계산
-  - [ ] SSA Construction
+  - [ ] SSA Construction (Cytron Algorithm)
+  - DoD: 기본 블록 SSA 변환
   - 참조: v4_roadmap.md 섹션 5
 
 - [ ] **SSA Destruction**
   - [ ] 레지스터 할당 준비
-  - [ ] Phi Node 제거
+  - [ ] Phi Node 제거 (Critical Edge Splitting)
+  - DoD: SSA에서 다시 일반 IR로 변환
 
-#### Phase 4.4.2: 최적화 패스 (6-8개월)
+#### Phase 4.4.2: SSA 기반 최적화 (4-6개월)
 
-- [ ] **Local Optimization**
-  - [ ] Constant Folding
-  - [ ] Dead Code Elimination
-  - [ ] Copy Propagation
-  - 참조: v4_roadmap.md 섹션 6
+- [ ] **Global Common Subexpression Elimination (GCSE)**
+  - [ ] 여러 블록에 걸쳤 동일 표현식 제거
+  - DoD: cross-block CSE 작동
+  - 참조: v4_roadmap.md 섹션 6.3
 
-- [ ] **Global Optimization**
-  - [ ] Common Subexpression Elimination
-  - [ ] Global Value Numbering
-  - [ ] Sparse Conditional Constant Propagation
-  - 참조: v4_roadmap.md 섹션 6
+- [ ] **Global Value Numbering (GVN)**
+  - [ ] Hash-based value numbering
+  - [ ] 동일 값을 가진 변수 통합
+  - DoD: 멀리 떨어진 동일 표현식 발견
+  - 참조: v4_roadmap.md 섹션 6.3
+
+- [ ] **Sparse Conditional Constant Propagation (SCCP)**
+  - [ ] 조건분기를 고려한 상수 전파
+  - [ ] 절대 실행되지 않는 블록 제거
+  - DoD: 콘텍스트 기반 상수 최적화
+  - 참조: v4_roadmap.md 섹션 6.3
+
+#### Phase 4.4.3: 고급 최적화 (4-6개월)
 
 - [ ] **Loop Optimization**
-  - [ ] Loop Invariant Code Motion
-  - [ ] Strength Reduction
-  - [ ] Loop Unrolling
+  - [ ] Loop Invariant Code Motion (LICM)
+  - [ ] Loop Unrolling (고정 회수 루프)
+  - [ ] Loop Strength Reduction
+  - DoD: 루프 성능 향상
+  - 참조: v4_roadmap.md 섹션 6.4
+
+- [ ] **Inlining**
+  - [ ] 작은 함수 자동 인라인
+  - [ ] @[inline] 힌트 지원
+  - [ ] 호출 비용 vs 코드 크기 휴리스틱
+  - DoD: 함수 호출 오버헤드 감소
+
+- [ ] **Tail Call Optimization**
+  - [ ] 꼬리 재귀 호출 점프로 변환
+  - DoD: 재귀 함수 스택 오버플로우 방지
 
 **v4.4 DoD**:
 - [ ] SSA IR 완성
-- [ ] 최적화 패스 작동
+- [ ] SSA 기반 최적화 패스 작동
+- [ ] 루프 최적화 작동
 - [ ] 성능 벤치마크 (최소 30% 향상)
 - [ ] Golden test 통과 (최적화 전후 동일)
 
-**블로커**: v4.0 미완료
+**블로커**: v4.2 미완료
 
 ---
 
@@ -462,6 +728,13 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 **상태**: [IDEATION]
 
 다음 기능들은 **아직 확정되지 않았으며**, 실제 필요성이 검증된 후에만 진행합니다:
+
+- [ ] **고급 암호/알고리즘 Intrinsics (v4.5+)**
+  - [ ] Multi-precision 연산 (mpadd_u256, mpmul_u256)
+  - [ ] 암호 전용 인트린식 (poly1305_*, chacha20_stream)
+  - [ ] Primality test (is_prime, miller_rabin)
+  - 참조: v4_roadmap.md 내장 함수 섹션
+  - 우선순위: v4.2 (Multi-precision), v4.3 (암호 전용)
 
 - [ ] async/await (비동기 I/O)
   - 참조: v4_roadmap.md 섹션 3
@@ -490,14 +763,20 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 ```
 2026 Q1   : v3.5 std 라이브러리       [6-8주] [IN PROGRESS]
 2026 Q2   : v3.9 컴파일러 Self-Host   [8-10주] [PLANNED]
-2026 Q3-Q4: v4.0 Foundation           [6-9개월] [PLANNED]
-2027 Q1-Q2: v4.1 Generics & SIMD      [6-9개월] [PLANNED]
-2027 Q3-Q4: v4.2 Traits (Optional)    [12-15개월] [PLANNED]
-2028 Q2-Q4: v4.3 True CTFE (Optional) [9-12개월] [IDEATION]
-2029+:      v4.4 Optimization         [12-18개월] [IDEATION]
+2026 Q3-Q4: v4.0 Foundation + 최적화1 [6-9개월] [PLANNED]
+2027 Q1-Q2: v4.1 Generics & SIMD + 빌트인 확장 [6-9개월] [PLANNED]
+2027 Q3-Q4: v4.2 Traits + 최적화2    [12-15개월] [PLANNED]
+2028 Q2-Q4: v4.3 True CTFE + 빌트인 고급 (Optional) [9-12개월] [IDEATION]
+2029+:      v4.4 SSA + 최적화3       [12-18개월] [IDEATION]
 ```
 
 **총 예상 기간**: 3-4년 (v3 Self-Hosting부터 v4.3까지)
+
+**빌트인 함수 전략**:
+- **v4.0**: 타입 정보, 검증/단언, 디버깅 (기초)
+- **v4.1**: Volatile, 비트 조작, Introspection (확장)
+- **v4.3**: 암호/알고리즘 Intrinsics (기본), Atomic (기본)
+- **v4.5+**: Multi-precision, 암호 전용 (고급)
 
 ---
 
@@ -515,9 +794,26 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 
 ### 안전한 기능
 - [LOW] **v4.0 Core**: 문법 확장, 기존 패턴 반복
+- [LOW] **v4.0 최적화 1단계**: Constant Folding, 기본 DCE - SSA 불필요
 - [LOW] **v4.1 Generics**: 기존 제네릭 개선
 - [LOW] **v4.1 Explicit SIMD**: 인트린식 래핑만, 구현 단순
+- [LOW] **v4.2 최적화 2단계**: Copy Propagation, DSE - SSA 불필요
 - [LOW] **표준 라이브러리**: 독립적 개발 가능
+
+---
+
+## 최적화 3단계 요약
+
+| 단계 | 버전 | 최적화 | SSA 필요 | 난이도 |
+|------|------|--------|----------|--------|
+| **1단계** | v4.0 | Constant Folding, 기본 DCE, Peephole | X | [LOW] |
+| **2단계** | v4.2 | Copy Propagation, Dead Store, Strength Reduction | X | [LOW] |
+| **3단계** | v4.4 | GCSE, GVN, SCCP, Loop Opt, Inlining | O | [MEDIUM] |
+
+**철학**: 
+- SSA 전환은 마지막에 (언어 안정 후)
+- 각 버전마다 점진적 성능 향상
+- 1단계만으로도 10-15% 성능 향상 기대
 
 ---
 
@@ -534,21 +830,31 @@ SSA IR 전환 → Dominance Tree → 최적화 패스들
 - **기간**: 8-10주
 - **블로커**: v3.5 완료
 
-### Phase 1 (2026 하반기): v4.0 Core
-- **목표**: match, enum, union, new/delete, constructor/destructor
+### Phase 1 (2026 하반기): v4.0 Core + 최적화 1단계
+- **목표**: match, enum, union, new/delete, constructor/destructor, **기본 최적화**
 - **기간**: 6-9개월
 - **블로커**: v3 Self-Hosting 완료
+- **최적화**: Constant Folding, 기본 DCE, Peephole (SSA 불필요)
 
-### Phase 2 (2027 상반기): v4.1 Generics & SIMD
-- **목표**: 타입 추론, Value generics, 기본 comptime, **Explicit SIMD**
+### Phase 2 (2027 상반기): v4.1 Generics & SIMD & 빌트인 확장
+- **목표**: 타입 추론, Value generics, 기본 comptime, **Explicit SIMD**, **빌트인 함수 확장**
 - **기간**: 6-9개월
 - **블로커**: v4.0 완료
-- **신규**: SIMD를 v4.5에서 v4.1로 앞당김 (해커 정체성)
+- **신규**: 
+  - SIMD를 v4.5에서 v4.1로 앞당김 (해커 정체성)
+  - Volatile, 비트 조작, Introspection 빌트인 추가
 
-### Phase 3+ (2027 하반기~): Optional Features
-- **v4.2 Traits**: 필요성 재검토 후 진행
-- **v4.3 CTFE**: 위험도 높음, 신중히 접근
-- **v4.4 Optimization**: 언어 안정 후 진행
+### Phase 3 (2027 하반기): v4.2 Traits + 최적화 2단계
+- **목표**: Trait/상속, **중급 최적화**
+- **기간**: 12-15개월
+- **블로커**: v4.1 완료
+- **최적화**: Copy Propagation, Dead Store, Strength Reduction (SSA 불필요)
+
+### Phase 4+ (2028~): Optional Features
+- **v4.3 CTFE + 빌트인 고급**: 위험도 높음, 신중히 접근
+  - 암호/알고리즘 Intrinsics (기본), Atomic 빌트인 추가
+- **v4.4 SSA + 최적화 3단계**: GCSE, GVN, SCCP, Loop Opt (SSA 필요)
+- **v4.5+ 빌트인 고급**: Multi-precision, 암호 전용 Intrinsics
 
 ---
 

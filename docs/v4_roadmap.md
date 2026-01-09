@@ -9,6 +9,63 @@ v4는 v3(MVP)에서 의도적으로 뒤로 미룬 “블랙홀 위험 기능”�
 - 컴파일러 내부 실행기/검증/퍼징은 쉽게 규모가 커지므로, 결정성/샌드박스/리소스 제한을 최우선으로 둔다.
 
 ---
+## Breaking Change: 파일 확장자 변경
+
+**v4부터 B 언어 파일 확장자가 `.b`에서 `.bpp`로 변경됩니다.**
+
+### 이유
+
+1. **언어 진화 표시**: v4는 v3 MVP와 달리 완전한 언어로 성장
+2. **다른 언어와의 충돌 방지**: 
+   - `.b` = Brainfuck, B (historic language), Boo 등 다수 언어 사용
+   - `.bpp` = B++ (B Plus Plus), 고유한 확장자
+3. **프로젝트 구분 명확화**:
+   - v3 이전: `.b` (프로토타입)
+   - v4 이후: `.bpp` (정식 버전)
+
+### 마이그레이션
+
+**폴더 구조**:
+```
+B/
+├── src/          # v3 컴파일러 (.b 파일)
+├── std/          # v3 표준 라이브러리 (.b 파일)
+├── examples/     # v3 예제 (.b 파일)
+├── test/         # v3 테스트 (.b 파일)
+└── bpp/          # v4 전용 폴더 (v4부터 모든 개발은 여기서)
+    ├── src/      # v4 컴파일러 (.bpp 파일)
+    ├── std/      # v4 표준 라이브러리 (.bpp 파일)
+    ├── examples/ # v4 예제 (.bpp 파일)
+    └── test/     # v4 테스트 (.bpp 파일)
+```
+
+**이유**:
+1. **v3와 v4 명확한 분리**: 기존 v3 코드 보존
+2. **점진적 전환**: v4 개발을 별도로 진행하면서 v3 유지보수 가능
+3. **테스트 분리**: v3 golden test와 v4 테스트 별도 관리
+4. **클린 트리**: 프로젝트 구조 명확화
+
+**v4.0 출시 시점**:
+- [ ] `bpp/` 폴더 생성
+- [ ] `bpp/src/`, `bpp/std/`, `bpp/examples/`, `bpp/test/` 생성
+- [ ] v4 컴파일러를 `bpp/src/`에서 개발 시작
+- [ ] v4 표준 라이브러리를 `bpp/std/`에서 개발
+- [ ] 컴파일러가 `.b`와 `.bpp` 모두 인식 (하위 호환)
+- [ ] 경고 메시지: "`.b` is deprecated, use `.bpp` instead"
+- [ ] 빌드 시스템: `bpp/` 폴더 지원 추가
+
+**v4.1 출시 시점**:
+- [ ] `.b` 지원 완전 제거
+- [ ] `.bpp`만 인식
+- [ ] 상위 폴더 `.b` 파일들은 유지 (v3 아카이브)
+
+**파일명 예시**:
+```
+이전: main.b, vec.b, test_parser.b
+이후: main.bpp, vec.bpp, test_parser.bpp
+```
+
+---
 ## 0) v3 기능 현황 및 v4 확장
 
 ### v3에서 완료된 기능 (v4 Base)
@@ -1072,6 +1129,9 @@ draw_fn(cast(*void, &c));
   ```
 
 #### 내장 함수/연산자
+
+##### 타입 정보 (Type Information)
+
 - [ ] **`typeof`**: 타입 얻기
   ```b
   var x: u64 = 10;
@@ -1083,6 +1143,14 @@ draw_fn(cast(*void, &c));
   const ALIGN: u64 = alignof(MyStruct);
   ```
 
+- [ ] **`size_of_val`**: 값의 실제 크기 (동적 크기 타입용)
+  ```b
+  var slice: []u8 = get_slice();
+  var size = size_of_val(slice);  // 슬라이스가 가리키는 데이터 크기
+  ```
+
+##### 검증 및 단언 (Assertions)
+
 - [ ] **`assert`**: 런타임 검증 (디버그 빌드 전용)
   ```b
   func divide(a: i32, b: i32) -> i32 {
@@ -1091,6 +1159,16 @@ draw_fn(cast(*void, &c));
   }
   
   // 릴리스 빌드에서는 제거됨 (zero-cost)
+  ```
+
+- [ ] **`debug_assert`**: assert의 명시적 별칭 (더 명확한 의도 표현)
+  ```b
+  debug_assert(ptr != null, "Null pointer");
+  ```
+
+- [ ] **`static_assert`**: 컴파일 타임 검증 (comptime_assert 별칭)
+  ```b
+  static_assert(sizeof(Packet) == 64, "Packet must be 64 bytes");
   ```
 
 - [ ] **`comptime_assert`**: 컴파일 타임 검증
@@ -1102,6 +1180,17 @@ draw_fn(cast(*void, &c));
   
   // 컴파일 타임에 검사, 런타임 비용 없음
   ```
+
+- [ ] **`unreachable`**: 도달 불가능 코드 표시 (최적화 힌트 + 런타임 검증)
+  ```b
+  match opcode {
+      0x01 => handle_add(),
+      0x02 => handle_sub(),
+      _ => unreachable("Invalid opcode"),  // 디버그: panic, 릴리스: undefined behavior
+  }
+  ```
+
+##### Comptime 메타프로그래밍 (Metaprogramming)
 
 - [ ] **`has_method`**: 타입이 메서드를 가지는지 검사 (comptime 전용)
   ```b
@@ -1117,26 +1206,366 @@ draw_fn(cast(*void, &c));
   comptime_assert(impls(T, Iterator), "T must implement Iterator");
   ```
 
-- [ ] **`assert_eq`**: 값 비교 검증 (테스트 전용)
+- [ ] **`is_const`**: 변수가 컴파일 타임 상수인지 검사
+  ```b
+  comptime {
+      if (is_const(N)) {
+          // N은 컴파일 타임에 결정됨
+      }
+  }
+  ```
+
+- [ ] **`is_type`**: 값이 타입인지 검사 (comptime 전용)
+  ```b
+  comptime {
+      if (is_type(T)) {
+          // T는 타입
+      }
+  }
+  ```
+
+##### 테스트 헬퍼 (Testing Helpers)
+
+**참고**: 테스트 관련 매크로는 `std.test` 모듈에서 제공됩니다. 여기서는 컴파일러가 특별히 알아야 하는 것만 포함합니다.
+
+- [ ] **`@[test]`**: 테스트 함수 표시 (속성, 컴파일러가 인식)
   ```b
   @[test]
   func test_addition() {
-      assert_eq(2 + 2, 4);
-      assert_eq(add(10, 20), 30);
+      assert(2 + 2 == 4);
   }
   ```
 
-- [ ] **`assert_ok`**: Result 타입 검증 (테스트 전용)
+**Stdlib로 이동**: `assert_eq`, `assert_ne`, `assert_ok`, `assert_err`는 `std.test` 모듈에서 제네릭 함수로 제공됩니다.
+
+##### 메모리 및 포인터 (Memory & Pointers)
+
+- [ ] **`volatile_read`**: volatile 메모리 읽기 (컴파일러 최적화 방지)
   ```b
-  @[test]
-  func test_parse() {
-      var result = parse_int("42");
-      assert_ok(result);  // Result.Ok인지 검증
-      assert_eq(result.unwrap(), 42);
+  var status = volatile_read(device_register);
+  // MMIO 레지스터 접근 시 필수
+  ```
+
+- [ ] **`volatile_write`**: volatile 메모리 쓰기
+  ```b
+  volatile_write(device_register, 0xFF);
+  ```
+
+- [ ] **`prefetch`**: 메모리 프리페치 힌트 (캐시 최적화)
+  ```b
+  prefetch(next_node);  // 다음 노드를 L1 캐시로 미리 로드
+  // x86: prefetch 명령어
+  ```
+
+- [ ] **`fence`**: 메모리 펜스 (순서 보장)
+  ```b
+  fence_acquire();  // 읽기 펜스
+  fence_release();  // 쓰기 펜스
+  fence_seq_cst();  // 완전 순서 펜스
+  ```
+
+**참고**: `ptr_add`, `ptr_sub`, `addr_of` 등은 빌트인이 아니라 언어 연산자(`ptr + n`, `ptr - n`, `&var`)로 제공됩니다.
+
+##### 비트 조작 (Bit Manipulation)
+
+- [ ] **`rotl`**: 왼쪽 비트 로테이션
+  ```b
+  var result = rotl(value, 5);  // value를 5비트 왼쪽 회전
+  ```
+
+- [ ] **`rotr`**: 오른쪽 비트 로테이션
+  ```b
+  var result = rotr(value, 3);
+  ```
+
+- [ ] **`reverse_bits`**: 비트 순서 반전
+  ```b
+  var reversed = reverse_bits(0b10110001);  // 0b10001101
+  ```
+
+- [ ] **`parity`**: 패리티 비트 계산 (비트 1의 개수가 홀수인지)
+  ```b
+  var is_odd = parity(value);  // true if odd number of 1s
+  ```
+
+##### 디버깅 및 진단 (Debugging & Diagnostics)
+
+- [ ] **`breakpoint`**: 디버거 중단점 삽입
+  ```b
+  if (suspicious_condition) {
+      breakpoint();  // 디버거가 여기서 멈춤 (x86: int3)
   }
   ```
+
+- [ ] **`line`**: 현재 줄 번호 (컴파일 타임)
+  ```b
+  const LINE: u32 = line();
+  ```
+
+- [ ] **`file`**: 현재 파일 이름 (컴파일 타임)
+  ```b
+  const FILE: []u8 = file();
+  ```
+
+- [ ] **`function`**: 현재 함수 이름 (컴파일 타임)
+  ```b
+  const FUNC: []u8 = function();
+  ```
+
+- [ ] **`print_trace`**: 스택 트레이스 출력 (디버그 빌드)
+  ```b
+  func handle_error() {
+      print_trace();  // 현재 호출 스택 출력
+  }
+  ```
+
+##### 원자적 연산 (Atomic Operations)
+
+- [ ] **`atomic_load`**: 원자적 읽기
+  ```b
+  var value = atomic_load(&counter);
+  ```
+
+- [ ] **`atomic_store`**: 원자적 쓰기
+  ```b
+  atomic_store(&counter, 42);
+  ```
+
+- [ ] **`atomic_add`**: 원자적 덧셈 (fetch-and-add)
+  ```b
+  var old_val = atomic_add(&counter, 1);  // counter++, 이전 값 반환
+  ```
+
+- [ ] **`atomic_sub`**: 원자적 뺄셈
+  ```b
+  var old_val = atomic_sub(&counter, 1);  // counter--
+  ```
+
+- [ ] **`atomic_cmpxchg`**: Compare-and-Swap (CAS)
+  ```b
+  var success = atomic_cmpxchg(&ptr, expected, new_value);
+  ```
+
+- [ ] **`atomic_fence`**: 원자적 펜스
+  ```b
+  atomic_fence_acquire();
+  atomic_fence_release();
+  ```
+
+##### 수학 및 부동소수점 (Math & Float)
+
+**참고**: 일반적인 수학 함수(`abs`, `min`, `max`, `clamp`)는 `std.math` 모듈에서 제공됩니다. 여기는 CPU 명령어나 특수 처리가 필요한 것만 포함합니다.
+
+- [ ] **`sqrt`**: 제곱근 (CPU 명령어)
+  ```b
+  var result = sqrt(16.0);  // 4.0
+  // x86: sqrtsd 명령어 직접 사용
+  ```
+
+- [ ] **`is_nan`**: NaN 검사 (부동소수점 예외 처리)
+  ```b
+  if (is_nan(result)) { panic("Invalid float"); }
+  // 순서 비교로는 검사 불가 (NaN != NaN)
+  ```
+
+- [ ] **`is_inf`**: 무한대 검사
+  ```b
+  if (is_inf(result)) { panic("Overflow"); }
+  ```
+
+**Stdlib로 이동**: 
+- `abs`, `min`, `max`, `clamp` → `std.math` (제네릭 함수)
+- `float_to_bits`, `bits_to_float` → `std.bit` (union 기반 Type Punning)
+
+##### 시스템 및 플랫폼 (System & Platform)
+
+- [ ] **`syscall`**: 직접 시스템 콜 (리눅스)
+  ```b
+  var result = syscall(SYS_write, fd, buffer, len);
+  ```
+
+- [ ] **`cpu_relax`**: CPU 힌트 (스핀락 최적화)
+  ```b
+  while (atomic_load(&lock) != 0) {
+      cpu_relax();  // x86: pause 명령
+  }
+  ```
+
+- [ ] **`likely`**: 분기 예측 힌트 (조건이 참일 가능성 높음)
+  ```b
+  if (likely(ptr != null)) {
+      // 이 경로가 대부분 실행됨
+  }
+  ```
+
+- [ ] **`unlikely`**: 분기 예측 힌트 (조건이 거짓일 가능성 높음)
+  ```b
+  if (unlikely(error)) {
+      handle_error();
+  }
+  ```
+
+- [ ] **`assume`**: 컴파일러에게 조건이 항상 참이라고 알림 (최적화 힌트)
+  ```b
+  assume(len > 0);  // 컴파일러가 len <= 0 케이스를 고려 안 함
+  ```
+
+##### 암호 및 알고리즘 Intrinsics (Cryptographic & Algorithm Intrinsics)
+
+**바이트 순서 및 비트 연산 (Byte Order & Bit Operations)**:
+
+- [ ] **`bswap16/32/64`**: 바이트 스왑 (엔디안 변환)
+  ```b
+  var be_value = bswap32(le_value);  // Little → Big Endian
+  // x86: bswap 명령어
+  ```
+
+- [ ] **`popcnt`**: 비트 카운트 (1의 개수)
+  ```b
+  var count = popcnt(0b10110101);  // 5
+  // x86: popcnt 명령어
+  ```
+
+- [ ] **`ctz`**: Trailing Zero Count (오른쪽부터 0의 개수)
+  ```b
+  var zeros = ctz(0b10110000);  // 4
+  // x86: tzcnt 명령어
+  // 용도: 비트 스캔, 2의 거듭제곱 검사
+  ```
+
+- [ ] **`clz`**: Leading Zero Count (왼쪽부터 0의 개수)
+  ```b
+  var zeros = clz(0b00001011);  // 4 (32비트 기준)
+  // x86: lzcnt 명령어
+  // 용도: 로그2 계산, 최상위 비트 찾기
+  ```
+
+**다중 정밀도 연산 (Multi-Precision Arithmetic)**:
+
+- [ ] **`addc`**: Add with Carry (캐리 있는 덧셈)
+  ```b
+  var carry_out: u8;
+  var result = addc(a, b, carry_in, &carry_out);
+  // x86: adc 명령어
+  // 용도: 큰 정수 연산 (256비트+ 정수 라이브러리)
+  ```
+
+- [ ] **`subb`**: Subtract with Borrow (보로우 있는 뺄셈)
+  ```b
+  var borrow_out: u8;
+  var result = subb(a, b, borrow_in, &borrow_out);
+  // x86: sbb 명령어
+  ```
+
+- [ ] **`umul_wide`**: Unsigned Wide Multiply (전체 결과 반환)
+  ```b
+  var hi: u64;
+  var lo = umul_wide(a, b, &hi);  // a*b의 128비트 결과
+  // x86: mul 명령어 (rdx:rax)
+  // 용도: 오버플로우 검사, 큰 정수 곱셈
+  ```
+
+- [ ] **`smul_wide`**: Signed Wide Multiply
+  ```b
+  var hi: i64;
+  var lo = smul_wide(a, b, &hi);
+  // x86: imul 명령어
+  ```
+
+- [ ] **`udiv_wide`**: Wide Divide (128비트 / 64비트)
+  ```b
+  var quotient = udiv_wide(hi, lo, divisor, &remainder);
+  // x86: div 명령어
+  ```
+
+**상수시간 연산 (Constant-Time Operations)**:
+
+- [ ] **`ct_select`**: 상수시간 선택 (분기 없음)
+  ```b
+  var result = ct_select(condition, if_true, if_false);
+  // x86: cmov 명령어
+  // 조건이 0이면 if_false, 아니면 if_true
+  // 실행 시간이 condition 값에 무관 (타이밍 공격 방지)
+  ```
+
+- [ ] **`ct_eq`**: 상수시간 비교 (같음)
+  ```b
+  var is_equal = ct_eq(a, b);  // 0 또는 1 반환
+  // 분기 없이 비교, 실행 시간 일정
+  ```
+
+- [ ] **`ct_ne`**: 상수시간 비교 (다름)
+  ```b
+  var is_different = ct_ne(a, b);
+  ```
+
+- [ ] **`ct_lt`**: 상수시간 비교 (작음)
+  ```b
+  var is_less = ct_lt(a, b);
+  ```
+
+**암호학 특화 (Cryptographic Specialized)**:
+
+- [ ] **`clmul`**: Carry-less Multiply (GF(2) 곱셈)
+  ```b
+  var result = clmul(a, b);
+  // x86: pclmulqdq 명령어 (AES-NI)
+  // 용도: AES-GCM, CRC, 해시 함수
+  ```
+
+- [ ] **`crc32`**: CRC32 계산 (하드웨어 가속)
+  ```b
+  var checksum = crc32(data, len);
+  // x86: crc32 명령어 (SSE4.2)
+  // 용도: 체크섬, 무결성 검증
+  ```
+
+- [ ] **`aes_enc`**: AES 암호화 라운드 (하드웨어 가속)
+  ```b
+  var ciphertext = aes_enc(plaintext, round_key);
+  // x86: aesenc 명령어 (AES-NI)
+  // 용도: AES 블록 암호 구현
+  ```
+
+- [ ] **`aes_dec`**: AES 복호화 라운드
+  ```b
+  var plaintext = aes_dec(ciphertext, round_key);
+  // x86: aesdec 명령어
+  ```
+
+- [ ] **`sha256_round`**: SHA-256 압축 함수 (하드웨어 가속)
+  ```b
+  sha256_round(&state, block);
+  // x86: sha256rnds2 명령어 (SHA Extensions)
+  // 용도: SHA-256 해시 함수 구현
+  ```
+
+**난수 생성 (Random Number Generation)**:
+
+- [ ] **`rdrand`**: 하드웨어 난수 생성기 (NIST SP 800-90)
+  ```b
+  var random: u64;
+  var success = rdrand(&random);  // true if successful
+  // x86: rdrand 명령어
+  // 용도: 암호학적 난수, 키 생성
+  ```
+
+- [ ] **`rdseed`**: 하드웨어 시드 생성기 (진정한 난수)
+  ```b
+  var seed: u64;
+  var success = rdseed(&seed);
+  // x86: rdseed 명령어
+  // rdrand보다 더 느리지만 더 강력한 엔트로피
+  ```
+
+**구현 우선순위**:
+- **v4.1** (기본): `bswap`, `popcnt`, `ctz`, `clz`, `ct_select`, `ct_eq`, `addc`, `subb`
+- **v4.2** (다중 정밀도): `umul_wide`, `smul_wide`, `udiv_wide`, `rdrand`, `rdseed`
+- **v4.3** (암호학): `clmul`, `crc32`, `aes_enc`, `aes_dec`, `sha256_round`
 
 #### 속성 (Attributes)
+
+**참고**: 속성은 컴파일러가 직접 인식하고 처리해야 하므로 빌트인입니다.
 - [ ] **`@[inline]`**: 함수 인라이닝 힌트
 - [ ] **`@[no_inline]`**: 인라이닝 금지
 - [ ] **`@[deprecated]`**: 폐기 예정 경고
@@ -1173,7 +1602,272 @@ draw_fn(cast(*void, &c));
 
 ---
 
-### 0.1) 구조체 리터럴 expression
+### 0.1) 주석 확장 (Comment Extensions)
+
+v3는 기본적인 단일 라인 주석(`//`)과 블록 주석(`/* */`)만 지원합니다.
+v4에서는 **문서화(Documentation)**, **IDE 지원**, **컴파일러 지시(Directives)** 등을 위한 주석 시스템을 확장합니다.
+
+#### 현재 지원 (v3)
+
+```b
+// 단일 라인 주석
+var x = 10;  // 코드 뒤 주석
+
+/*
+ * 블록 주석
+ * 여러 줄에 걸쳐 작성 가능
+ */
+```
+
+#### 확장 1: 문서화 주석 (Documentation Comments)
+
+**구문**: `///` (단일 라인) 또는 `/** */` (블록)
+
+**목적**: 
+- 함수, 구조체, 모듈에 대한 공식 문서 생성
+- IDE 툴팁/자동완성에 표시
+- `bdoc` 도구로 HTML/Markdown 문서 추출
+
+**예제**:
+```b
+/// Circle 구조체는 2D 원을 표현합니다.
+/// 
+/// # 필드
+/// - `center`: 원의 중심점 좌표
+/// - `radius`: 원의 반지름 (양수여야 함)
+/// 
+/// # 예제
+/// ```b
+/// var c = Circle{ center: Point{0, 0}, radius: 10.0 };
+/// var area = c.area();  // 314.159...
+/// ```
+struct Circle {
+    center: Point;
+    radius: f64;
+}
+
+/// 원의 넓이를 계산합니다.
+/// 
+/// # 반환값
+/// - 넓이 (π * r²)
+/// 
+/// # 패닉
+/// - `radius`가 음수인 경우 패닉 발생
+func (c: *Circle) area() -> f64 {
+    if (c.radius < 0) { panic("Negative radius"); }
+    return 3.141592653589793 * c.radius * c.radius;
+}
+```
+
+**블록 문서화 주석**:
+```b
+/**
+ * 파일을 엽니다.
+ * 
+ * @param path 파일 경로
+ * @param mode 열기 모드 ("r", "w", "a")
+ * @return 파일 핸들 또는 에러
+ * 
+ * @example
+ * var file = open("/tmp/test.txt", "r");
+ * match file {
+ *     Result.Ok(f) => process(f),
+ *     Result.Err(e) => println("Error: ", e),
+ * }
+ */
+func open(path: []u8, mode: []u8) -> Result<*File, str> {
+    // ...
+}
+```
+
+**IDE 통합**:
+- 함수 호출 시 자동으로 문서화 주석 표시
+- `Ctrl+Space` 자동완성에 설명 표시
+- Hover 시 전체 문서 표시
+
+#### 확장 2: 내부 문서 주석 (Inner Doc Comments)
+
+**구문**: `//!` (단일 라인) 또는 `/*! */` (블록)
+
+**목적**: 
+- 모듈/파일 전체를 설명
+- 파일 최상단에 작성
+
+**예제**:
+```b
+//! # vec 모듈
+//! 
+//! 동적 크기 배열(Vector) 구현을 제공합니다.
+//! 
+//! ## 특징
+//! - 자동 크기 조절 (capacity doubling)
+//! - Generic 타입 지원 (`Vec<T>`)
+//! - 슬라이스 뷰 (`as_slice()`)
+//! 
+//! ## 사용 예제
+//! ```b
+//! var v: Vec<u64> = vec_new();
+//! vec_push(&v, 10);
+//! vec_push(&v, 20);
+//! println(v.len);  // 2
+//! ```
+
+import mem;
+import builtin;
+
+struct Vec<T> {
+    // ...
+}
+```
+
+#### 확장 3: 중첩 블록 주석 (Nested Block Comments)
+
+**v3 제약**: `/* /* 중첩 불가 */ */` 구문 에러
+
+**v4 확장**: 중첩 블록 주석 지원
+
+**목적**: 
+- 큰 코드 블록을 주석 처리할 때 기존 블록 주석을 덮어쓸 수 있음
+
+**예제**:
+```b
+/*
+    var x = 10;
+    
+    /* 이 부분도 주석 처리됨
+       var y = 20;
+    */
+    
+    var z = 30;  // 전체가 주석 처리됨
+*/
+```
+
+**구현**: 
+- 렉서에서 주석 깊이(depth) 카운터 추가
+- `/*`마다 +1, `*/`마다 -1
+- depth가 0이 되면 주석 종료
+
+**우선순위**: v4.0 (구현 비용 낮고 효용성 매우 높음)
+
+#### 확장 4: TODO/FIXME/NOTE 태그 (Annotation Tags)
+
+**구문**: `// TODO:`, `// FIXME:`, `// NOTE:`, `// HACK:`, `// XXX:`
+
+**목적**: 
+- 코드베이스 내 할 일 추적
+- IDE/에디터가 자동으로 목록화
+
+**예제**:
+```b
+// TODO: 에러 처리 개선 필요
+func parse_file(path: []u8) -> *Ast {
+    // ...
+}
+
+// FIXME: 메모리 릭 발생 (2026-01-09)
+func allocate_buffer(size: u64) -> *u8 {
+    // ...
+}
+
+// NOTE: 이 알고리즘은 O(n²)이지만 n < 100이므로 괜찮음
+func sort_small_array(arr: []u32) {
+    // ...
+}
+
+// HACK: 임시 우회책, v4.2에서 제거 예정
+func workaround_compiler_bug() {
+    // ...
+}
+```
+
+**IDE 통합**:
+- VS Code의 "Problems" 패널에 표시
+- `Tasks: Run Task` → `Show TODO comments` 자동 생성
+
+#### 구현 전략
+
+**렉서(Lexer) 확장**:
+1. `//`, `/*`, `///`, `/**`, `//!`, `/*!`, `//@` 인식
+2. 문서화 주석은 토큰으로 유지 (파서에 전달)
+3. 일반 주석은 버림
+
+**파서(Parser) 통합**:
+1. 문서화 주석을 AST 노드에 첨부
+   - `struct Node { ..., doc_comment: []u8? }`
+2. 함수/구조체/모듈 선언 직전의 `///` 주석 수집
+
+**코드 생성(Codegen)**:
+1. 문서화 주석은 기계어에 영향 없음
+2. 디버그 정보에 포함 (DWARF)
+
+**문서 생성기 (bdoc)**:
+1. AST를 순회하며 `doc_comment` 필드 추출
+2. Markdown 또는 HTML로 변환
+3. Cross-reference 링크 생성
+
+#### 설계 원칙 (Design Principles)
+
+**주석 vs 속성의 명확한 구분**:
+
+> **"주석은 설명, 속성은 제어"**
+
+- **주석 (`///`, `//!`)**: 문서화 전용. 제거해도 프로그램 동작은 동일.
+- **속성 (`@[...]`)**: 컴파일 결과에 영향. 제거하면 바이너리가 달라짐.
+
+**잘못된 설계 (Anti-Pattern)**:
+```b
+// Bad: 주석으로 컴파일러 제어 (혼란스러움)
+//! inline(always)
+func foo() { }
+
+//@ cfg(target_os="linux")
+func bar() { }
+```
+
+**올바른 설계**:
+```b
+// Good: 속성으로 컴파일러 제어 (명시적)
+@[inline]
+func foo() { }
+
+@[cfg(target_os="linux")]
+func bar() { }
+```
+
+**철학**:
+- B 언어는 "명시성(Explicitness)"을 최우선으로 합니다.
+- 코드 동작에 영향을 주는 것은 **코드 문법(속성)**이어야 하며, **주석에 숨겨져서는 안 됩니다**.
+- 주석은 오직 **사람을 위한 설명**과 **도구 연동(IDE, bdoc)**에만 사용됩니다.
+
+#### 우선순위
+
+- **v4.0** (Lexer/Parser 기반): 
+  - [ ] `///`, `/**` 문서화 주석 기본 지원
+  - [ ] 렉서/파서에서 주석 토큰 보존
+  - [ ] AST 노드에 `doc_comment` 필드 추가
+  - [ ] **중첩 블록 주석** (`/* /* */ */`) 지원 (depth 카운터)
+  
+- **v4.1** (표준 라이브러리 문서화):
+  - [ ] `//!`, `/*!` 내부 문서 주석 (모듈/파일 설명)
+  - [ ] TODO/FIXME/NOTE 태그 인식 (IDE 연동)
+  - [ ] 표준 라이브러리 전체 문서 작성
+  
+- **v4.2** (속성 시스템 강화):
+  - [ ] `@[inline]`, `@[no_inline]` 속성 구현
+  - [ ] `@[cfg(...)]` 조건부 컴파일 속성 구현
+  - [ ] `@[allow(...)]` 경고 억제 속성 구현
+  - [ ] `@[deprecated(...)]` 폐기 경고 속성 구현
+  
+- **v4.3** (도구 생태계):
+  - [ ] `bdoc` 문서 생성기 구현
+  - [ ] HTML 템플릿 + 검색 기능
+  - [ ] Language Server Protocol (LSP) 통합
+  - [ ] IDE에서 Hover 시 문서 표시
+  - [ ] IDE 통합 (Language Server Protocol)
+
+---
+
+### 0.2) 구조체 리터럴 expression
 
 v3 테스트 33에서 실패. typecheck 복잡도(필드 매칭, 순서 재정렬, 타입 추론 등)가 크기 때문에 v4로 이동.
 
@@ -1184,7 +1878,7 @@ v3 테스트 33에서 실패. typecheck 복잡도(필드 매칭, 순서 재정�
     - struct 리터럴로 값 생성/전달 동작
     - 필드 순서와 무관하게 named init 동작 (e.g., `{ b: 2, a: 1 }`)
 
-### 0.2) 조건부 컴파일 `@[cfg]`
+### 0.3) 조건부 컴파일 `@[cfg]`
 
 플랫폼별 분기가 필요하지만, v3 MVP 범위에서는 단일 타겟(Linux x86-64)만 지원.
 
@@ -1194,7 +1888,7 @@ v3 테스트 33에서 실패. typecheck 복잡도(필드 매칭, 순서 재정�
 - DoD
     - `@[cfg(target_os="linux")]` 붙은 함수가 Linux에서만 컴파일됨
 
-### 0.3) FFI extern 블록
+### 0.4) FFI extern 블록
 
 v3에서는 단순 `extern func` 선언만 지원. 블록 방식 + 호출 규약 지정은 v4.
 
@@ -1204,7 +1898,7 @@ v3에서는 단순 `extern func` 선언만 지원. 블록 방식 + 호출 규약
 - DoD
     - C 라이브러리 함수 호출 예제 동작
 
-### 0.4) 익명 함수 / 클로저
+### 0.5) 익명 함수 / 클로저
 
 **참고**: 함수 포인터 타입은 v3에서 이미 구현됨 (`func(T, U) -> R`, 테스트 55).
 
@@ -1217,7 +1911,7 @@ v3에서는 단순 `extern func` 선언만 지원. 블록 방식 + 호출 규약
     - 익명 함수 리터럴 동작
     - 클로저 변수 캡처 동작
 
-### 0.5) Named Arguments
+### 0.6) Named Arguments
 
 v3 테스트 23에서 실패. parser 미구현(typecheck 준비는 완료)으로 인해 v4로 이동.
 
@@ -1229,7 +1923,7 @@ v3 테스트 23에서 실패. parser 미구현(typecheck 준비는 완료)으로
     - `f(a: 1, b: 2)` 호출이 `f(1, 2)`와 동일하게 동작
     - `f(x, b: y)` 혼용은 컴파일 에러
 
-### 0.6) 다중 리턴 (Multi-Return)
+### 0.7) 다중 리턴 (Multi-Return)
 
 v3 테스트 24에서 실패. codegen 복잡도(rax/rdx 매핑, destructuring 등)로 인해 v4로 이동.
 
@@ -1241,7 +1935,7 @@ v3 테스트 24에서 실패. codegen 복잡도(rax/rdx 매핑, destructuring �
 - DoD
     - 2리턴 함수 호출/바인딩이 end-to-end로 동작
 
-### 0.7) 최적화 패스 (Constant Folding / DCE)
+### 0.8) 최적화 패스 (Constant Folding / DCE)
 
 v3 MVP에서는 최적화 없이 직접 코드젠. 최적화는 v4에서 IR 패스로 추가.
 
@@ -1252,7 +1946,7 @@ v3 MVP에서는 최적화 없이 직접 코드젠. 최적화는 v4에서 IR 패�
     - 간단한 입력에서 dead branch 제거 확인
     - IR 덤프에서 상수 계산 결과 확인
 
-### 0.8) `defer` break/continue 지원
+### 0.9) `defer` break/continue 지원
 
 v3에서는 defer의 블록 스코프/return 시 실행만 구현. break/continue 시 defer 실행은 제어 흐름 복잡도로 인해 v4로 이동.
 
@@ -1264,7 +1958,7 @@ v3에서는 defer의 블록 스코프/return 시 실행만 구현. break/continu
     - `while { defer f(); if (c) break; }` 형태에서 break 시 f() 호출 확인
     - 중첩 루프 + break 2 시 올바른 defer 스택 정리
 
-### 0.9) 정수 비트 슬라이싱 (Bit Slicing)
+### 0.10) 정수 비트 슬라이싱 (Bit Slicing)
 
 v3에서는 MVP 범위 밖. 암호/저수준 비트 조작이 필요한 경우 v4에서 추가.
 
@@ -1276,7 +1970,7 @@ v3에서는 MVP 범위 밖. 암호/저수준 비트 조작이 필요한 경우 v
     - `inst[31:26]` 같은 RISC 명령어 디코딩 패턴 동작
     - `flags[7:4]` 비트 필드 추출 동작
 
-### 0.10) 런타임 디버깅 인프라 (Location Info 고급)
+### 0.11) 런타임 디버깅 인프라 (Location Info 고급)
 
 v3에서는 컴파일 에러 위치만 지원. 런타임 위치 정보는 DWARF 등 복잡도로 인해 v4로 이동.
 
@@ -1287,7 +1981,7 @@ v3에서는 컴파일 에러 위치만 지원. 런타임 위치 정보는 DWARF 
 - DoD
     - 패닉 메시지에 소스 위치 + 호출 스택 출력
 
-### 0.11) 강제 Tail Call
+### 0.12) 강제 Tail Call
 
 v3에서는 MVP 범위 밖. 재귀 최적화가 필요한 경우 v4에서 추가.
 
@@ -1298,7 +1992,7 @@ v3에서는 MVP 범위 밖. 재귀 최적화가 필요한 경우 v4에서 추가
 - DoD
     - tail call이 stack frame 안 쌓는지 확인
 
-### 0.12) Inline ASM 개선
+### 0.13) Inline ASM 개선
 
 v3에서는 기본 `asm { ... }` 블록만 지원. 레지스터 템플릿 치환은 v4에서 추가.
 
@@ -1308,7 +2002,7 @@ v3에서는 기본 `asm { ... }` 블록만 지원. 레지스터 템플릿 치환
 - DoD
     - `mov {tmp}, 0` 같은 템플릿 동작
 
-### 0.13) 어노테이션 시스템
+### 0.14) 어노테이션 시스템
 
 v3에서는 제한적 어노테이션만 지원. 전체 시스템은 v4에서 구축.
 
@@ -1317,7 +2011,7 @@ v3에서는 제한적 어노테이션만 지원. 전체 시스템은 v4에서 �
 - DoD
     - 기본 어노테이션이 파싱/검증됨
 
-### 0.14) 파서 내장 유틸
+### 0.15) 파서 내장 유틸
 
 v3에서는 MVP 범위 밖. 편의 기능은 v4에서 추가.
 
@@ -1326,22 +2020,6 @@ v3에서는 MVP 범위 밖. 편의 기능은 v4에서 추가.
 - [ ] `@trng` 하드웨어 난수
 - DoD
     - `print(123)`와 `print("hi")`가 다르게 동작
-
-### 0.15) 암호/알고리즘 Builtin Intrinsics
-
-v3에서는 MVP 범위 밖. 저수준 최적화가 필요한 경우 v4에서 추가.
-
-- [ ] `bswap(x)` - 바이트 스왑 (x86: `bswap`)
-- [ ] `popcnt(x)` - 비트 카운트 (x86: `popcnt`)
-- [ ] `ctz(x)`, `clz(x)` - trailing/leading zero count (x86: `tzcnt`/`lzcnt`)
-- [ ] `addc(a, b, c)`, `subb(a, b, b)` - carry/borrow 연산 (x86: `adc`/`sbb`)
-- [ ] `umul_wide(a, b)`, `smul_wide(a, b)` - wide multiply (x86: `mul`/`imul`)
-- [ ] `ct_select(mask, a, b)` - 상수시간 선택 (x86: `cmov`)
-- [ ] (후순위) `clmul` - carry-less multiply (AES-GCM 등)
-- [ ] (후순위) `crc32` - CRC32 명령어
-- DoD
-    - 각 intrinsic이 올바른 x86-64 명령으로 lowering
-    - 암호 라이브러리에서 실제 사용 가능
 
 ### 0.16) 불변 바인딩 (`final`)
 
@@ -1355,7 +2033,7 @@ v3에서는 MVP 범위 밖. 타입 시스템 확장이 필요하여 v4로 이동
     - `final var x = 10; x = 20;` 컴파일 에러
     - 루프 변수에 `final` 사용 시 동작 검증
 
-### 0.17) Value Generics (값 제네릭)
+### 0.18) Value Generics (값 제네릭)
 
 v3 테스트 20, 21, 22에서 실패. comptime 의존성과 타입 시스템 확장이 필요하여 v4로 이동.
 
@@ -1375,7 +2053,7 @@ v3 테스트 20, 21, 22에서 실패. comptime 의존성과 타입 시스템 확
     - `Buffer<1024>` 같은 인스턴스화 가능
     - 테스트 20, 21, 22 통과
 
-### 0.18) 제네릭 타입 추론 (Generic Type Inference)
+### 0.19) 제네릭 타입 추론 (Generic Type Inference)
 
 v3 테스트 19에서 실패. typecheck에 부분 구현되어 있으나 미완성. 호출 시 타입 인자 생략을 지원하기 위해 v4로 이동.
 
@@ -1389,7 +2067,7 @@ v3 테스트 19에서 실패. typecheck에 부분 구현되어 있으나 미완�
     - 타입 불일치 시 "cannot infer type args" 에러
     - 테스트 19 통과
 
-### 0.19) 구시대 문법 제거 (v4 Clean-up)
+### 0.20) 구시대 문법 제거 (v4 Clean-up)
 
 v2 매직 식별자 등 구시대적 문법은 v4에서 완전히 제거합니다.
 
