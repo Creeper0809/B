@@ -1,0 +1,2 @@
+type error at 6:1: global init type mismatch
+type_errors=1

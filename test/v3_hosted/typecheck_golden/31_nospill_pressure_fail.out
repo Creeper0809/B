@@ -1,0 +1,2 @@
+type error at 7:2: nospill: register pressure exceeded
+type_errors=1

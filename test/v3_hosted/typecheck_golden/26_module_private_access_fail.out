@@ -1,0 +1,2 @@
+type error at 4:26: module symbol is private
+type_errors=1

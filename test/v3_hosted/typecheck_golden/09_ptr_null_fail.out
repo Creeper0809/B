@@ -1,0 +1,2 @@
+type error at 1:14: null requires nullable pointer type
+type_errors=1

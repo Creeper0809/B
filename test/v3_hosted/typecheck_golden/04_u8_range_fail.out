@@ -1,0 +1,2 @@
+type error at 1:13: integer literal out of range
+type_errors=1

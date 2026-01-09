@@ -1,0 +1,3 @@
+type error at 2:19: only 0 is allowed for nullable pointer
+type error at 2:20: pointer arithmetic requires non-null pointer
+type_errors=2

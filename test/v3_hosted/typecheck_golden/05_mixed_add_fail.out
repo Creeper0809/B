@@ -1,0 +1,2 @@
+type error at 3:19: integer operands must match
+type_errors=1

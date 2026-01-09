@@ -1,0 +1,2 @@
+type error at 4:20: type is private
+type_errors=1

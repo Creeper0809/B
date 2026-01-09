@@ -1,0 +1,5 @@
+line=1:1 kind=104 off=0 text="var"
+line=1:5 kind=10 off=4 text="s"
+line=1:7 kind=50 off=6 text="="
+line=1:9 kind=12 off=8 text=""abc""
+line=1:14 kind=36 off=13 text=";"

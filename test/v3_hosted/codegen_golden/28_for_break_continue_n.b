@@ -1,0 +1,10 @@
+func main() {
+	var sum = 0;
+	for (var i = 0; i < 10; i = i + 1) {
+		if (i == 2) { continue; }
+		if (i == 5) { break; }
+		sum = sum + i;
+	}
+	// 0+1+3+4 = 8
+	return sum;
+}
