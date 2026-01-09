@@ -14,16 +14,20 @@ endif()
 if(WIN32)
     set(TARGET_OS "windows")
     set(EXECUTABLE_SUFFIX ".exe")
+    # Windows에서는 bash를 통해 v2c 스크립트 실행
+    find_program(BASH_PROGRAM bash)
+    if(NOT BASH_PROGRAM)
+        message(FATAL_ERROR "bash not found. Please install Git Bash or WSL.")
+    endif()
+    set(V2C_COMPILER ${BASH_PROGRAM} "${CMAKE_SOURCE_DIR}/bin/v2c")
 else()
     set(TARGET_OS "linux")
     set(EXECUTABLE_SUFFIX "")
+    set(V2C_COMPILER "${CMAKE_SOURCE_DIR}/bin/v2c")
 endif()
 
 message(STATUS "Building for ${TARGET_OS}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-
-# v2 컴파일러 경로 (기존 바이너리)
-set(V2C_COMPILER "${CMAKE_SOURCE_DIR}/bin/v2c${EXECUTABLE_SUFFIX}")
 
 # v3 소스 파일 목록
 set(V3_SOURCES
