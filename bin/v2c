@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 스크립트 디렉토리 찾기
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root_dir="$(cd "$script_dir/.." && pwd)"
 out_dir="$root_dir/build"
+
+# basm 경로 설정 (v2c와 같은 디렉토리)
+BASM="$script_dir/basm"
+if [[ ! -x "$BASM" ]]; then
+  # Windows/Git Bash 환경에서 .exe 확장자 시도
+  BASM="$script_dir/basm.exe"
+  if [[ ! -x "$BASM" ]]; then
+    echo "Error: basm not found in $script_dir" >&2
+    exit 1
+  fi
+fi
 
 # v2 compiler driver build inputs (mirrors v2 smoke harness)
 prelude="$root_dir/src/v1/prelude.b"
@@ -58,7 +71,7 @@ build_driver() {
     "$parse_expr" "$parse_cond" "$parse_stmt" "$parse_func" \
     "$driver_main" > "$merged"
 
-  basm "$merged" -o "$drv_asm" >/dev/null
+  "$BASM" "$merged" -o "$drv_asm" >/dev/null
   # Stage1 heap: basm emits a fixed-size HEAP_SIZE (default 1 MiB).
   # Hosted-v3 builds have grown; bump the driver heap to avoid OOM->NULL deref.
   sed -i 's/%define HEAP_SIZE 1048576/%define HEAP_SIZE 16777216/' "$drv_asm"
