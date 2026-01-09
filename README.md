@@ -6,6 +6,17 @@ B 언어는 Bpp를 만들기 위한 두 번째 단계입니다.
 
 B로 작성되었으며 부트스트래핑하여 메이저 B를 제작합니다.
 
+## Platform Support
+
+- ✅ **Linux** (x86-64, fully supported)
+- 🚧 **Windows** (x86-64, Phase 0 in progress)
+  - CMake build system ✅
+  - OS abstraction layer ✅
+  - PE32+ file format ✅
+  - Full Windows API integration ⏳
+
+See [Windows Support Guide](docs/windows_support.md) for details.
+
 ## Why?
 
 이 세상에는 없어져야 더 행복해질 수 있는 것들이 잔뜩있습니다.
@@ -74,4 +85,48 @@ if (rax > 5) {
 
 
 ## Build & Run
+
+### Linux
+```bash
+# Install dependencies
+sudo apt-get install nasm cmake build-essential
+
+# Build
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+
+# Run
+./bin/v3c input.b
+```
+
+### Windows
+```powershell
+# Install dependencies (using Chocolatey)
+choco install nasm mingw cmake -y
+
+# Build
+cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+
+# Run
+.\bin\v3c.exe input.b
+```
+
+### Tests
+```bash
+# Linux
+bash test/v3_hosted/run_lexer_golden.sh
+bash test/v3_hosted/run_codegen_golden.sh
+
+# Windows (coming soon)
+# .\test\v3_hosted\run_lexer_golden.ps1
+```
+
+## CI/CD
+
+GitHub Actions automatically builds and tests on:
+- Ubuntu (latest)
+- Windows Server 2022
+
+See `.github/workflows/ci.yml` for configuration.
 
