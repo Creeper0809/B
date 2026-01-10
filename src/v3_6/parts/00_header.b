@@ -1,0 +1,106 @@
+// v3.6 Compiler - Pointer Support
+// Part 0: Header - Constants and Token/AST definitions
+
+import io;
+
+// ============================================
+// Token Types
+// ============================================
+const TOKEN_EOF = 0;
+const TOKEN_IDENTIFIER = 10;
+const TOKEN_NUMBER = 11;
+
+// Keywords
+const TOKEN_FUNC = 20;
+const TOKEN_VAR = 21;
+const TOKEN_CONST = 22;
+const TOKEN_RETURN = 23;
+const TOKEN_IF = 24;
+const TOKEN_ELSE = 25;
+const TOKEN_WHILE = 26;
+const TOKEN_IMPORT = 27;
+const TOKEN_FOR = 28;
+const TOKEN_SWITCH = 29;
+const TOKEN_CASE = 30;
+const TOKEN_DEFAULT = 31;
+const TOKEN_BREAK = 32;
+
+// Type keywords
+const TOKEN_U8 = 40;
+const TOKEN_U16 = 41;
+const TOKEN_U32 = 42;
+const TOKEN_U64 = 43;
+const TOKEN_I64 = 44;
+
+// Delimiters
+const TOKEN_LPAREN = 100;
+const TOKEN_RPAREN = 101;
+const TOKEN_LBRACE = 102;
+const TOKEN_RBRACE = 103;
+const TOKEN_LBRACKET = 104;
+const TOKEN_RBRACKET = 105;
+const TOKEN_SEMICOLON = 106;
+const TOKEN_COLON = 107;
+const TOKEN_COMMA = 108;
+const TOKEN_DOT = 109;
+const TOKEN_ARROW = 110;
+
+// Operators
+const TOKEN_PLUS = 60;
+const TOKEN_MINUS = 61;
+const TOKEN_STAR = 62;
+const TOKEN_SLASH = 63;
+const TOKEN_AMPERSAND = 64;
+const TOKEN_EQ = 65;
+const TOKEN_EQEQ = 66;
+const TOKEN_BANGEQ = 67;
+const TOKEN_LT = 68;
+const TOKEN_GT = 69;
+const TOKEN_LTEQ = 70;
+const TOKEN_GTEQ = 71;
+
+// ============================================
+// AST Node Types
+// ============================================
+
+// Expressions
+const AST_LITERAL = 100;
+const AST_IDENT = 101;
+const AST_BINARY = 102;
+const AST_UNARY = 103;
+const AST_CALL = 104;
+const AST_ADDR_OF = 105;
+const AST_DEREF = 106;
+// AST_INDEX = 107 removed - use *ptr dereference instead
+const AST_CAST = 108;
+
+// Statements
+const AST_RETURN = 200;
+const AST_VAR_DECL = 201;
+const AST_CONST_DECL = 206;
+const AST_ASSIGN = 202;
+const AST_EXPR_STMT = 203;
+const AST_IF = 204;
+const AST_WHILE = 205;
+const AST_FOR = 207;
+const AST_SWITCH = 208;
+const AST_CASE = 209;
+const AST_BREAK = 211;
+const AST_BLOCK = 210;
+
+// Top-level
+const AST_FUNC = 300;
+const AST_PROGRAM = 301;
+const AST_IMPORT = 302;
+
+// ============================================
+// Type Constants
+// ============================================
+const TYPE_VOID = 0;
+const TYPE_U8 = 1;
+const TYPE_U16 = 2;
+const TYPE_U32 = 3;
+const TYPE_U64 = 4;
+const TYPE_I64 = 5;
+const TYPE_PTR = 10;
+

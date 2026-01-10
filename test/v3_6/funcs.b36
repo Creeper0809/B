@@ -1,0 +1,14 @@
+// v3.6 test: multiple functions
+func add(a: i64, b: i64) {
+    return a + b;
+}
+
+func mul(a: i64, b: i64) {
+    return a * b;
+}
+
+func main() {
+    var x: i64 = add(3, 4);
+    var y: i64 = mul(x, 2);
+    return y;
+}

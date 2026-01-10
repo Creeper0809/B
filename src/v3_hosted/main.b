@@ -9,6 +9,7 @@ import v3_hosted.ast;
 import v3_hosted.parser;
 import v3_hosted.typecheck;
 import v3_hosted.codegen;
+import v3_hosted.import_resolver;
 
 func main(argc, argv) {
 	if (argc < 2) {
@@ -18,69 +19,55 @@ func main(argc, argv) {
 	alias rdx : n_reg;
 
 	var path = ptr64[argv + 8];
-	if (ptr8[path] == 45) {
-		if (ptr8[path + 1] == 0) {
-			var p = read_stdin_cap(1048576);
-			var n = n_reg;
-
-			var lex = heap_alloc(40);
-			var tok = heap_alloc(48);
-			var prs = heap_alloc(40);
-			var prog = heap_alloc(16);
-			if (lex == 0) { return 3; }
-			if (tok == 0) { return 4; }
-			if (prs == 0) { return 5; }
-			if (prog == 0) { return 6; }
-
-			lexer_init(lex, p, n);
-			parser_init(prs, lex, tok);
-			parse_program(prs, prog);
-
-			var parse_errors = ptr64[prog + 8];
-			if (parse_errors != 0) { return 1; }
-
-			var ty_errors = typecheck_program(prog);
-			if (ty_errors != 0) { return 1; }
-
-			var bytes = v3h_codegen_program(prog);
-			if (bytes == 0) { return 2; }
-			var out_p = ptr64[bytes + 0];
-			var out_n = ptr64[bytes + 8];
-			if (out_p == 0) { return 2; }
-			sys_write(1, out_p, out_n);
-			return 0;
-		} else {
-			return 1;
-		}
+	
+	// stdin not supported with imports (would need to resolve relative paths)
+	if (ptr8[path] == 45 && ptr8[path + 1] == 0) {
+		// Error: stdin mode not supported
+		return 1;
 	}
 
-	var p = read_file(path);
-	var n = n_reg;
-
-	var lex = heap_alloc(40);
-	var tok = heap_alloc(48);
-	var prs = heap_alloc(40);
-	var prog = heap_alloc(16);
-	if (lex == 0) { return 3; }
-	if (tok == 0) { return 4; }
-	if (prs == 0) { return 5; }
-	if (prog == 0) { return 6; }
-
-	lexer_init(lex, p, n);
-	parser_init(prs, lex, tok);
-	parse_program(prs, prog);
-
-	var parse_errors = ptr64[prog + 8];
-	if (parse_errors != 0) { return 1; }
-
+	// Create import resolver
+	var ir = import_resolver_new();
+	if (ir == 0) {
+		return 3;
+	}
+	
+	// Get path length
+	var path_len = 0;
+	while (ptr8[path + path_len] != 0) {
+		path_len = path_len + 1;
+	}
+	
+	// Resolve all imports starting from main file
+	var ok = import_resolver_resolve(ir, path, path_len);
+	if (ok == 0) {
+		return 4;
+	}
+	
+	// Create merged program
+	var prog = import_resolver_create_program(ir);
+	if (prog == 0) {
+		return 5;
+	}
+	
+	// Typecheck
 	var ty_errors = typecheck_program(prog);
-	if (ty_errors != 0) { return 1; }
+	if (ty_errors != 0) {
+		return 1;
+	}
 
+	// Codegen
 	var bytes = v3h_codegen_program(prog);
-	if (bytes == 0) { return 2; }
+	if (bytes == 0) {
+		return 2;
+	}
+	
 	var out_p = ptr64[bytes + 0];
 	var out_n = ptr64[bytes + 8];
-	if (out_p == 0) { return 2; }
+	if (out_p == 0) {
+		return 2;
+	}
+	
 	sys_write(1, out_p, out_n);
 	return 0;
 }
