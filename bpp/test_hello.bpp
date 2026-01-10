@@ -1,0 +1,7 @@
+// Simple test
+import std.io;
+
+func main() {
+    print_str("Hello from v3!\n");
+    return 0;
+}

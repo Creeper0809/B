@@ -1,0 +1,115 @@
+// v2 library: file helpers
+//
+// Intended for v2-compiled output binaries.
+
+import std.io;
+import std.panic;
+
+func file_exists(path) {
+	// Returns: rax=1 if openable, else 0
+	asm {
+		push rbx
+		mov rbx, rdi
+		xor rsi, rsi
+		xor rdx, rdx
+		call sys_open
+		test rax, rax
+		js .no
+		mov rdi, rax
+		call sys_close
+		mov rax, 1
+		jmp .done
+		.no:
+		xor eax, eax
+		.done:
+		pop rbx
+	}
+	return;
+}
+
+func read_file(path) {
+	// Returns: rax=ptr, rdx=len
+	// Dies on errors.
+	asm {
+		sub rsp, 48
+		mov [rsp+40], rdi
+
+		mov rdi, [rsp+40]
+		xor rsi, rsi
+		xor rdx, rdx
+		call sys_open
+		test rax, rax
+		jns .open_ok
+		call die_read_file_open_fail
+		.open_ok:
+		mov [rsp+0], rax
+
+		mov rdi, 144
+		call heap_alloc
+		test rax, rax
+		jnz .stbuf_ok
+		call die_read_file_oom
+		.stbuf_ok:
+		mov [rsp+8], rax
+
+		mov rdi, [rsp+0]
+		mov rsi, [rsp+8]
+		call sys_fstat
+		test rax, rax
+		jns .fstat_ok
+		call die_read_file_fstat_fail
+		.fstat_ok:
+
+		mov r8, [rsp+8]
+		mov r9, [r8+48]
+		mov [rsp+16], r9
+
+		mov rdi, r9
+		inc rdi
+		call heap_alloc
+		test rax, rax
+		jnz .buf_ok
+		call die_read_file_oom
+		.buf_ok:
+		mov [rsp+24], rax
+
+		mov rcx, [rsp+16]
+		mov r8,  [rsp+24]
+		mov byte [r8+rcx], 0
+
+		mov qword [rsp+32], 0
+
+		.loop:
+		mov r10, [rsp+32]
+		mov r11, [rsp+16]
+		cmp r10, r11
+		jae .done
+
+		mov rdx, r11
+		sub rdx, r10
+
+		mov rdi, [rsp+0]
+		mov r8,  [rsp+24]
+		lea rsi, [r8+r10]
+		call sys_read
+		test rax, rax
+		jz .done
+		js .read_err
+
+		add r10, rax
+		mov [rsp+32], r10
+		jmp .loop
+
+		.read_err:
+		call die_read_file_read_fail
+
+		.done:
+		mov rdi, [rsp+0]
+		call sys_close
+
+		mov rax, [rsp+24]
+		mov rdx, [rsp+32]
+		add rsp, 48
+	}
+	return;
+}

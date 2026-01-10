@@ -87,21 +87,19 @@ enum TokKind {
 	KW_RETURN = 114,
 	KW_NULL = 115,
 	KW_PUBLIC = 116,
-	KW_PACKED = 117,    // v4: packed struct - REMOVED from v3
-	KW_WIPE = 118,      // v4: wipe - REMOVED from v3
-	KW_SECRET = 119,    // v4: secret - REMOVED from v3
-	KW_NOSPILL = 120,   // v4: nospill - REMOVED from v3
-	KW_EXTERN = 121,    // v4: extern - REMOVED from v3
+	KW_PACKED = 117,
+	KW_WIPE = 118,
+	KW_SECRET = 119,
+	KW_NOSPILL = 120,
+	KW_EXTERN = 121,
 	KW_TYPE = 122,
-	KW_DISTINCT = 123,  // v4: distinct - REMOVED from v3
+	KW_DISTINCT = 123,
 	KW_CASE = 124,
 	KW_DEFAULT = 125,
 	KW_IMPL = 126,
 	KW_DEFER = 127,
 	KW_PRINT = 128,
 	KW_PRINTLN = 129,
-	KW_ASM = 130,
-	KW_ALIAS = 131,
 };
 
 struct Token {

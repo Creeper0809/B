@@ -1,0 +1,80 @@
+// v3_hosted: Full pipeline compiler (lex → parse → typecheck → codegen)
+//
+// Usage: v3c <file.b>
+
+import std.io;
+import std.file;
+import lexer;
+import token;
+import parser;
+import typecheck;
+import codegen;
+
+func main(argc, argv) {
+	if (argc < 2) {
+		print_str("usage: v3c <file.b>\n");
+		return 1;
+	}
+
+	var path = *cast(*u64, argv + 8);
+	if (path == 0) {
+		print_str("error: no file path\n");
+		return 1;
+	}
+
+	// Read source file
+	var file_p = read_file(path);
+	if (file_p == 0) {
+		print_str("error: failed to read file\n");
+		return 1;
+	}
+
+	// Lex
+	var lex = heap_alloc(40);
+	var tok = heap_alloc(48);
+	if (lex == 0 || tok == 0) {
+		print_str("error: allocation failed\n");
+		return 1;
+	}
+
+	lexer_init(lex, file_p, 0);
+	
+	// Parse
+	var prs = heap_alloc(40);
+	var prog = heap_alloc(16);
+	if (prs == 0 || prog == 0) {
+		print_str("error: allocation failed\n");
+		return 1;
+	}
+
+	parser_init(prs, lex, tok);
+	parse_program(prs, prog);
+	
+	if (*cast(*u64, prog + 8) != 0) {
+		print_str("error: parse errors\n");
+		return 1;
+	}
+
+	// Typecheck
+	var tc_errors = typecheck_program(prog);
+	if (tc_errors != 0) {
+		print_str("error: typecheck errors\n");
+		return 1;
+	}
+
+	// Codegen
+	var asm_out = v3h_codegen_program(prog);
+	if (asm_out == 0) {
+		print_str("error: codegen failed\n");
+		return 1;
+	}
+	var asm_ptr = *cast(*u64, asm_out + 0);
+	var asm_len = *cast(*u64, asm_out + 8);
+	if (asm_ptr == 0 || asm_len == 0) {
+		print_str("error: no output generated\n");
+		return 1;
+	}
+	print_str_len(asm_ptr, asm_len);
+
+	return 0;
+}

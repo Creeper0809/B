@@ -332,24 +332,35 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
 **목표**: std만 v3로 재작성, v2 컴파일러로 검증
 **이유**: 컴파일러와 라이브러리를 동시에 바꾸면 버그 원인 파악 어려움
 
-- [ ] **v3 std 라이브러리 작성**
-  - [ ] Vec<T> v3 재작성 (동적 배열)
-  - [ ] HashMap<K,V> v3 재작성
-  - [ ] String v3 재작성 (기본 구현)
-  - [ ] mem v3 재작성 (malloc/free/memcpy)
-  - [ ] io v3 재작성 (파일 I/O)
-  - [ ] str v3 재작성 (문자열 유틸리티)
+- [x] **v3 std 라이브러리 작성**
+  - [x] Vec<T> v3 재작성 (동적 배열)
+  - [x] HashMap<K,V> v3 재작성
+  - [x] String v3 재작성 (기본 구현)
+  - [x] mem v3 재작성 (malloc/free/memcpy)
+  - [x] io v3 재작성 (파일 I/O)
+  - [x] str v3 재작성 (문자열 유틸리티)
+  - **주의**: `.?` 연산자 미구현으로 `*T?` 대신 `*T` + `cast(u64, ptr) == 0` 사용
 
-- [ ] **v2 컴파일러로 v3 std 검증**
-  - [ ] v2 컴파일러가 v3 std를 컴파일 가능한지 확인
+- [ ] **v3 컴파일러로 v3 std 검증** (In Progress)
+  - [x] v3_hosted main.b 업그레이드 (full pipeline: lex→parse→typecheck→codegen)
+  - [x] asm 키워드/토큰/파싱/타입체크/코드젠 추가
+  - [x] `*ptr` 역참조 (v3 스타일) 지원 추가
+  - [x] void return (`return;`) 지원 추가
+  - [x] bool 리터럴 (`true`/`false`) 타입 시스템 추가
+  - [x] 배열 변수 주소 (`&buf`) 지원 추가
+  - [x] 배열 인덱스 주소 (`&buf[i]`) 지원 추가
+  - [x] switch 문 case body codegen 버그 수정 (v2c workaround)
+  - [x] `cast()` 내장 함수 지원 추가
+  - [x] v3 std 파일들 컴파일 테스트 (6/6 성공: str, mem, io, string, hashmap, vec)
+    - vec.b를 비제네릭 버전으로 재작성 (hashmap.b와 동일 패턴)
   - [ ] std 단위 테스트 작성 및 통과
   - [ ] Golden test 중 std 의존 테스트 통과 확인
 
 **v3.5 DoD**:
 - [ ] v3 문법으로 작성된 std 라이브러리 완성
-- [ ] v2 컴파일러로 v3 std 컴파일 성공
+- [ ] v3 컴파일러로 v3 std 컴파일 성공
 - [ ] std 단위 테스트 모두 통과
-- [ ] 기존 v2 컴파일러가 v3 std를 사용하여 정상 동작
+- [ ] 기존 v3 컴파일러가 v3 std를 사용하여 정상 동작
 
 **블로커**: 없음 (즉시 시작 가능)
 
@@ -408,6 +419,22 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
   - 참조: v4_roadmap.md 섹션 0.0
 
 #### Phase 4.0.2: 메모리 관리 (2-3개월)
+
+- [ ] **Safe Navigation 연산자 (`.?`, `->?`)**
+  - [ ] 렉서: `.?`, `->?` 토큰 추가
+  - [ ] 파서: MemberAccess, DerefMemberAccess에 nullable variant 추가
+  - [ ] 타입 체크: `*T?` 타입에서만 허용, 결과 타입도 nullable
+  - [ ] Codegen: null 체크 + 조건부 접근 코드 생성
+  - [ ] 연산자 체이닝: `a?.b?.c` 형태 지원
+  - DoD: `*T?` 포인터에서 안전한 필드 접근 가능
+  - **배경**: v3 std 라이브러리에서 `*T?` 문법은 있으나 `.?` 연산자 미구현으로 사용 불가
+  - **현재 우회**: `cast(u64, ptr) == 0` 체크 + `*T` 사용
+
+- [ ] **Optional Indexing (`?[idx]`)**
+  - [ ] 슬라이스/배열에서 bounds 체크 + Optional 반환
+  - [ ] `arr?[i]` → Some(value) 또는 None
+  - DoD: safe indexing 가능
+  - 의존성: Option<T> 구현 필요 (Phase 4.0.3)
 
 - [ ] **new/delete 키워드**
   - [ ] 파서: new <Type>, delete ptr

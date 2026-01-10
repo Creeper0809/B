@@ -8,13 +8,13 @@ enum AstTypeKind {
 	SLICE = 3,
 	ARRAY = 4,
 	QUAL_NAME = 5,
-	// v4: tuple types (multi-return) - REMOVED from v3
+	// Phase 5+: tuple types (used for multi-return)
 	TUPLE = 6,
-	// v4: generic instantiation wrapper - REMOVED from v3
+	// Phase 4+: generic instantiation wrapper
 	GENERIC = 7,
-	// v4: comptime type expression wrapper - REMOVED from v3
+	// Phase 3+: comptime type expression wrapper
 	COMPTIME_EXPR = 8,
-	// v4: function pointer type func(T, U) -> R - REMOVED from v3
+	// Phase 6.7: function pointer type func(T, U) -> R
 	FUNC_PTR = 9,
 };
 
@@ -95,8 +95,6 @@ enum AstStmtKind {
 	DEFER = 14,
 	PRINT = 15,
 	PRINTLN = 16,
-	ASM = 17,
-	ALIAS = 18,
 };
 
 struct AstStmt {

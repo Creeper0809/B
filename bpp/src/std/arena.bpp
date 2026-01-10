@@ -1,0 +1,57 @@
+// v2 library: Arena (bump allocator)
+//
+// This version is intended for *v2-compiled output binaries*.
+// It does NOT depend on Stage1-only builtins; it uses heap_alloc from `io`.
+
+import std.io;
+
+struct Arena {
+	base: u64;
+	cap: u64;
+	off: u64;
+};
+
+func arena_new(cap) {
+	// Returns: Arena* (0 on OOM)
+	var a = heap_alloc(24);
+	if (a == 0) {
+		return 0;
+	}
+
+	var buf = heap_alloc(cap + 15);
+	if (buf == 0) {
+		return 0;
+	}
+
+	var base = (buf + 15) & (~15);
+	*cast(*u64, a + 0) = base;
+	*cast(*u64, a + 8) = cap;
+	*cast(*u64, a + 16) = 0;
+	return a;
+}
+
+func arena_reset(a) {
+	*cast(*u64, a + 16) = 0;
+	return 0;
+}
+
+func arena_alloc(a, size, align_pow2) {
+	// Returns: ptr (0 on OOM)
+	var base = *cast(*u64, a + 0);
+	var cap = *cast(*u64, a + 8);
+	var off = *cast(*u64, a + 16);
+
+	var align = align_pow2;
+	if (align == 0) {
+		align = 1;
+	}
+	var mask = align - 1;
+	var aligned = (off + mask) & (~mask);
+	var new_off = aligned + size;
+	if (new_off > cap) {
+		return 0;
+	}
+
+	*cast(*u64, a + 16) = new_off;
+	return base + aligned;
+}

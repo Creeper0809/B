@@ -4,17 +4,17 @@
 // - Resolve imports to sibling .b files
 // - Build deterministic module order (deps first)
 
-import io;
-import file;
+import std.io;
+import std.file;
 
-import v3_hosted.lexer;
-import v3_hosted.token;
+import lexer;
+import token;
 
-import vec;
+import std.vec;
 
 func v3h_cstr_len(s) {
 	var n = 0;
-	while (ptr8[s + n] != 0) {
+	while (*cast(*u8, s + n) != 0) {
 		n = n + 1;
 	}
 	return n;
@@ -23,8 +23,8 @@ func v3h_cstr_len(s) {
 func v3h_cstr_eq(a, b) {
 	var i = 0;
 	while (1) {
-		var ac = ptr8[a + i];
-		var bc = ptr8[b + i];
+		var ac = *cast(*u8, a + i);
+		var bc = *cast(*u8, b + i);
 		if (ac != bc) { return 0; }
 		if (ac == 0) { return 1; }
 		i = i + 1;
@@ -44,8 +44,8 @@ func v3h_vec_contains_cstr(v, s) {
 }
 
 func v3h_diag_err_at_tok(tokp, msg) {
-	var line = ptr64[tokp + 24];
-	var col = ptr64[tokp + 40];
+	var line = *cast(*u64, tokp + 24);
+	var col = *cast(*u64, tokp + 40);
 	print_str("error at ");
 	print_u64(line);
 	print_str(":");
@@ -63,7 +63,7 @@ func v3h_path_dir_len(path) {
 	var last_slash = 0;
 	var saw = 0;
 	while (i < n) {
-		if (ptr8[path + i] == 47) { // '/'
+		if (*cast(*u8, path + i) == 47) { // '/'
 			last_slash = i;
 			saw = 1;
 		}
@@ -79,7 +79,7 @@ func v3h_path_basename_no_ext(path) {
 	var start = path;
 	var i = 0;
 	while (i < n) {
-		if (ptr8[path + i] == 47) { // '/'
+		if (*cast(*u8, path + i) == 47) { // '/'
 			start = path + i + 1;
 		}
 		i = i + 1;
@@ -87,18 +87,17 @@ func v3h_path_basename_no_ext(path) {
 	// Find last '.' after start.
 	var dot = 0;
 	var j = 0;
-	while (ptr8[start + j] != 0) {
-		if (ptr8[start + j] == 46) { dot = start + j; }
+	while (*cast(*u8, start + j) != 0) {
+		if (*cast(*u8, start + j) == 46) { dot = start + j; }
 		j = j + 1;
 	}
 	var end = start + j;
 	if (dot != 0) {
 		// Only strip a trailing ".b".
-		if (ptr8[dot + 1] == 98) { // 'b'
-			if (ptr8[dot + 2] == 0) { end = dot; }
+		if (*cast(*u8, dot + 1) == 98) { // 'b'
+			if (*cast(*u8, dot + 2) == 0) { end = dot; }
 		}
 	}
-	alias rdx : out_len;
 	out_len = end - start;
 	return start;
 }
@@ -111,24 +110,23 @@ func v3h_make_sibling_module_path(cur_path, mod_ptr, mod_len) {
 
 	var i = 0;
 	while (i < dir_len) {
-		ptr8[buf + i] = ptr8[cur_path + i];
+		*cast(*u8, buf + i) = *cast(*u8, cur_path + i);
 		i = i + 1;
 	}
 	var j = 0;
 	while (j < mod_len) {
-		ptr8[buf + dir_len + j] = ptr8[mod_ptr + j];
+		*cast(*u8, buf + dir_len + j) = *cast(*u8, mod_ptr + j);
 		j = j + 1;
 	}
-	ptr8[buf + dir_len + mod_len + 0] = 46; // '.'
-	ptr8[buf + dir_len + mod_len + 1] = 98; // 'b'
-	ptr8[buf + dir_len + mod_len + 2] = 0;
+	*cast(*u8, buf + dir_len + mod_len + 0) = 46; // '.'
+	*cast(*u8, buf + dir_len + mod_len + 1) = 98; // 'b'
+	*cast(*u8, buf + dir_len + mod_len + 2) = 0;
 	return buf;
 }
 
 func v3h_scan_leading_imports(path, imports_out) {
 	// Returns number of errors.
 	var p = read_file(path);
-	alias rdx : n_reg;
 	var n = n_reg;
 	if (p == 0) {
 		print_str("error: failed to read file\n");
@@ -158,19 +156,13 @@ func v3h_scan_leading_imports(path, imports_out) {
 			if (k == TokKind.KW_IMPORT) {
 				var kw_tok = tok;
 				var k2 = lexer_next(lex, tok);
-				// Support both: import name; and import "path";
-				if (k2 != TokKind.IDENT && k2 != TokKind.STRING) {
-					v3h_diag_err_at_tok(tok, "import: expected module name or path");
+				if (k2 != TokKind.IDENT) {
+					v3h_diag_err_at_tok(tok, "import: expected module name");
 					errs = errs + 1;
 					continue;
 				}
-				var name_ptr = ptr64[tok + 8];
-				var name_len = ptr64[tok + 16];
-				// For STRING, strip quotes
-				if (k2 == TokKind.STRING && name_len >= 2) {
-					name_ptr = name_ptr + 1;
-					name_len = name_len - 2;
-				}
+				var name_ptr = *cast(*u64, tok + 8);
+				var name_len = *cast(*u64, tok + 16);
 
 				var k3 = lexer_next(lex, tok);
 				if (k3 != TokKind.SEMI) {
@@ -179,29 +171,7 @@ func v3h_scan_leading_imports(path, imports_out) {
 					continue;
 				}
 
-				var imp_path = 0;
-				// If path contains '/' or '.', treat as direct path
-				var is_path = 0;
-				var ci = 0;
-				while (ci < name_len) {
-					var cc = ptr8[name_ptr + ci];
-					if (cc == 47 || cc == 46) { is_path = 1; break; }
-					ci = ci + 1;
-				}
-				if (is_path == 1) {
-					// Direct path: copy and add NUL
-					imp_path = heap_alloc(name_len + 1);
-					if (imp_path != 0) {
-						var pi = 0;
-						while (pi < name_len) {
-							ptr8[imp_path + pi] = ptr8[name_ptr + pi];
-							pi = pi + 1;
-						}
-						ptr8[imp_path + name_len] = 0;
-					}
-				} else {
-					imp_path = v3h_make_sibling_module_path(path, name_ptr, name_len);
-				}
+				var imp_path = v3h_make_sibling_module_path(path, name_ptr, name_len);
 				if (imp_path == 0) { return errs + 1; }
 				vec_push(imports_out, imp_path);
 				continue;

@@ -5,18 +5,18 @@
 // - Minimal checking for `var x: u64 = <expr>;`
 // - Skeleton support for `cast(Type, expr)`.
 
-import v3_hosted.ast;
-import v3_hosted.lexer;
-import v3_hosted.token;
-import v3_hosted.driver;
-import v3_hosted.parser;
-import v3_hosted.lowering;
+import ast;
+import lexer;
+import token;
+import driver;
+import parser;
+import lowering;
 
-import file;
+import std.file;
 
-import io;
-import vec;
-import hashmap;
+import std.io;
+import std.vec;
+import std.hashmap;
 
 const TC_TY_INVALID = 0;
 
@@ -111,8 +111,6 @@ var tc_funcs;
 // HashMap for O(1) function lookup
 var tc_funcs_map;
 
-// NOTE: nospill/secret tracking disabled in v3 simplification (moved to v4)
-// The variables and functions are kept for compatibility but checking is disabled.
 // Phase 4.4 nospill (hosted-friendly approximation):
 // Treat `nospill` locals as requiring a dedicated register. If more than
 // TC_NOSPILL_LIMIT are declared in a function, report an error.
@@ -133,7 +131,7 @@ func tc_nospill_reset() {
 	tc_nospill_overflow_line = 0;
 	tc_nospill_overflow_col = 0;
 	if (tc_nospill_vars == 0) { tc_nospill_vars = vec_new(8); }
-	if (tc_nospill_vars != 0) { ptr64[tc_nospill_vars + 8] = 0; }
+	if (tc_nospill_vars != 0) { *cast(*u64, tc_nospill_vars + 8) = 0; }
 	return 0;
 }
 
@@ -144,7 +142,7 @@ func tc_is_nospill_name(name_ptr, name_len) {
 	while (i < n) {
 		var v = vec_get(tc_nospill_vars, i);
 		if (v != 0) {
-			if (slice_eq_parts(ptr64[v + 0], ptr64[v + 8], name_ptr, name_len) == 1) { return 1; }
+			if (slice_eq_parts(*cast(*u64, v + 0), *cast(*u64, v + 8), name_ptr, name_len) == 1) { return 1; }
 		}
 		i = i + 1;
 	}
@@ -156,9 +154,9 @@ func tc_record_nospill_var(name_ptr, name_len, ty) {
 	if (tc_nospill_vars == 0) { return 0; }
 	var v = heap_alloc(24);
 	if (v == 0) { return 0; }
-	ptr64[v + 0] = name_ptr;
-	ptr64[v + 8] = name_len;
-	ptr64[v + 16] = ty;
+	*cast(*u64, v + 0) = name_ptr;
+	*cast(*u64, v + 8) = name_len;
+	*cast(*u64, v + 16) = ty;
 	vec_push(tc_nospill_vars, v);
 	return 0;
 }
@@ -183,7 +181,7 @@ const TC_DECL_FLAG_GENERIC_TEMPLATE = 2;
 const TC_DECL_RETREG_SHIFT = 8;
 
 func tc_decl_retreg(d) {
-	return (ptr64[d + 80] >> TC_DECL_RETREG_SHIFT) & 255;
+	return (*cast(*u64, d + 80) >> TC_DECL_RETREG_SHIFT) & 255;
 }
 
 func tc_has_param_reg_anno(params) {
@@ -193,7 +191,7 @@ func tc_has_param_reg_anno(params) {
 	while (pi < pn) {
 		var ps = vec_get(params, pi);
 		if (ps != 0) {
-			if (ptr64[ps + 16] != 0) { return 1; }
+			if (*cast(*u64, ps + 16) != 0) { return 1; }
 		}
 		pi = pi + 1;
 	}
@@ -202,15 +200,15 @@ func tc_has_param_reg_anno(params) {
 
 func tc_validate_reg_anno_in_func(d) {
 	// Phase 4.5: @reg is extern-only.
-	var flags = ptr64[d + 80];
+	var flags = *cast(*u64, d + 80);
 	var is_extern = flags & TC_DECL_FLAG_EXTERN;
-	var params = ptr64[d + 24];
+	var params = *cast(*u64, d + 24);
 	var has_param_reg = tc_has_param_reg_anno(params);
 	var ret_reg = tc_decl_retreg(d);
 	var has_ret_reg = ret_reg != 0;
 	if (has_param_reg == 0 && has_ret_reg == 0) { return 0; }
 	if (is_extern == 0) {
-		tc_err_at(ptr64[d + 56], ptr64[d + 64], "@reg is only allowed on extern functions");
+		tc_err_at(*cast(*u64, d + 56), *cast(*u64, d + 64), "@reg is only allowed on extern functions");
 		return 0;
 	}
 	// If any param uses @reg, require all params to have it (MVP simplicity).
@@ -220,18 +218,18 @@ func tc_validate_reg_anno_in_func(d) {
 		while (pi < pn) {
 			var ps = vec_get(params, pi);
 			if (ps != 0) {
-				if (ptr64[ps + 16] == 0) {
-					tc_err_at(ptr64[ps + 72], ptr64[ps + 80], "@reg: all params must be annotated (extern MVP)");
+				if (*cast(*u64, ps + 16) == 0) {
+					tc_err_at(*cast(*u64, ps + 72), *cast(*u64, ps + 80), "@reg: all params must be annotated (extern MVP)");
 				}
 				var pty = TC_TY_INVALID;
-				if (ptr64[ps + 48] != 0) { pty = tc_type_from_asttype(ptr64[ps + 48]); }
+				if (*cast(*u64, ps + 48) != 0) { pty = tc_type_from_asttype(*cast(*u64, ps + 48)); }
 				if (pty != TC_TY_INVALID) {
 					// Only 8-byte values supported for register ABI.
 					if (tc_is_slice(pty) == 1 || tc_is_array(pty) == 1 || tc_is_struct(pty) == 1 || tc_is_tuple2(pty) == 1) {
-						tc_err_at(ptr64[ps + 72], ptr64[ps + 80], "@reg: aggregate params are not supported");
+						tc_err_at(*cast(*u64, ps + 72), *cast(*u64, ps + 80), "@reg: aggregate params are not supported");
 					}
 					if (tc_sizeof(pty) != 8) {
-						tc_err_at(ptr64[ps + 72], ptr64[ps + 80], "@reg: only 8-byte params are supported");
+						tc_err_at(*cast(*u64, ps + 72), *cast(*u64, ps + 80), "@reg: only 8-byte params are supported");
 					}
 				}
 			}
@@ -240,17 +238,17 @@ func tc_validate_reg_anno_in_func(d) {
 	}
 	// Return reg annotation only supported for single 8-byte return (MVP).
 	if (has_ret_reg == 1) {
-		var ret_ast = ptr64[d + 32];
+		var ret_ast = *cast(*u64, d + 32);
 		if (ret_ast == 0) {
-			tc_err_at(ptr64[d + 56], ptr64[d + 64], "@reg: return register requires a return type");
+			tc_err_at(*cast(*u64, d + 56), *cast(*u64, d + 64), "@reg: return register requires a return type");
 		}
 		else {
 			var rty = tc_type_from_asttype(ret_ast);
 			if (tc_is_slice(rty) == 1 || tc_is_array(rty) == 1 || tc_is_struct(rty) == 1 || tc_is_tuple2(rty) == 1) {
-				tc_err_at(ptr64[d + 56], ptr64[d + 64], "@reg: aggregate return is not supported");
+				tc_err_at(*cast(*u64, d + 56), *cast(*u64, d + 64), "@reg: aggregate return is not supported");
 			}
 			if (tc_sizeof(rty) != 8) {
-				tc_err_at(ptr64[d + 56], ptr64[d + 64], "@reg: only 8-byte return is supported");
+				tc_err_at(*cast(*u64, d + 56), *cast(*u64, d + 64), "@reg: only 8-byte return is supported");
 			}
 		}
 	}
@@ -261,14 +259,14 @@ func tc_validate_reg_anno_in_func(d) {
 // Transforms s.method(args) -> TypeName_method(s, args)
 // Returns 1 if transformation was performed, 0 otherwise.
 func tc_try_method_call(env, e) {
-	var callee = ptr64[e + 16];
-	var args = ptr64[e + 32];
+	var callee = *cast(*u64, e + 16);
+	var args = *cast(*u64, e + 32);
 	if (callee == 0) { return 0; }
-	if (ptr64[callee + 0] != AstExprKind.FIELD) { return 0; }
-	var base_expr = ptr64[callee + 16];
+	if (*cast(*u64, callee + 0) != AstExprKind.FIELD) { return 0; }
+	var base_expr = *cast(*u64, callee + 16);
 	if (base_expr == 0) { return 0; }
-	var meth_ptr = ptr64[callee + 24];
-	var packed0 = ptr64[callee + 32];
+	var meth_ptr = *cast(*u64, callee + 24);
+	var packed0 = *cast(*u64, callee + 32);
 	var meth_len = packed0 >> 2;
 	var base_ty = tc_expr(env, base_expr);
 	var struct_ty = 0;
@@ -280,27 +278,27 @@ func tc_try_method_call(env, e) {
 	}
 	if (struct_ty == 0) { return 0; }
 	if (tc_is_struct(struct_ty) == 0) { return 0; }
-	var sn_ptr = ptr64[struct_ty + 8];
-	var sn_len = ptr64[struct_ty + 16];
+	var sn_ptr = *cast(*u64, struct_ty + 8);
+	var sn_len = *cast(*u64, struct_ty + 16);
 	var total_len = sn_len + 1 + meth_len;
 	var mn_buf = heap_alloc(total_len + 1);
 	if (mn_buf == 0) { return 0; }
 	var wi = 0;
 	while (wi < sn_len) {
-		ptr8[mn_buf + wi] = ptr8[sn_ptr + wi];
+		*cast(*u8, mn_buf + wi) = *cast(*u8, sn_ptr + wi);
 		wi = wi + 1;
 	}
-	ptr8[mn_buf + sn_len] = 95;
+	*cast(*u8, mn_buf + sn_len) = 95;
 	wi = 0;
 	while (wi < meth_len) {
-		ptr8[mn_buf + sn_len + 1 + wi] = ptr8[meth_ptr + wi];
+		*cast(*u8, mn_buf + sn_len + 1 + wi) = *cast(*u8, meth_ptr + wi);
 		wi = wi + 1;
 	}
 	var fd = tc_find_func_decl_in_prog(tc_cur_ast_prog, mn_buf, total_len);
 	if (fd == 0) { return 0; }
-	ptr64[callee + 0] = AstExprKind.IDENT;
-	ptr64[callee + 40] = mn_buf;
-	ptr64[callee + 48] = total_len;
+	*cast(*u64, callee + 0) = AstExprKind.IDENT;
+	*cast(*u64, callee + 40) = mn_buf;
+	*cast(*u64, callee + 48) = total_len;
 	var new_args = vec_new(8);
 	vec_push(new_args, base_expr);
 	var an = 0;
@@ -310,7 +308,7 @@ func tc_try_method_call(env, e) {
 		vec_push(new_args, vec_get(args, ai));
 		ai = ai + 1;
 	}
-	ptr64[e + 32] = new_args;
+	*cast(*u64, e + 32) = new_args;
 	return 1;
 }
 
@@ -349,7 +347,6 @@ var tc_debug_ident;
 func tc_env_find_index(env, name_ptr, name_len) {
 	// Returns: rax=index, rdx=ok
 	if (env == 0) {
-		alias rdx : ok0;
 		ok0 = 0;
 		return 0;
 	}
@@ -358,28 +355,26 @@ func tc_env_find_index(env, name_ptr, name_len) {
 		n = n - 1;
 		var ent = vec_get(env, n);
 		if (ent != 0) {
-			if (slice_eq_parts(ptr64[ent + 0], ptr64[ent + 8], name_ptr, name_len) == 1) {
-				alias rdx : ok1;
+			if (slice_eq_parts(*cast(*u64, ent + 0), *cast(*u64, ent + 8), name_ptr, name_len) == 1) {
 				ok1 = 1;
 				return n;
 			}
 		}
 	}
-	alias rdx : ok2;
 	ok2 = 0;
 	return 0;
 }
 
 func tc_find_const_decl_in_prog(prog, name_ptr, name_len) {
 	if (prog == 0) { return 0; }
-	var decls = ptr64[prog + 0];
+	var decls = *cast(*u64, prog + 0);
 	if (decls == 0) { return 0; }
 	var n = vec_len(decls);
 	var i = 0;
 	while (i < n) {
 		var d = vec_get(decls, i);
-		if (d != 0 && ptr64[d + 0] == AstDeclKind.CONST) {
-			if (slice_eq_parts(ptr64[d + 8], ptr64[d + 16], name_ptr, name_len) == 1) {
+		if (d != 0 && *cast(*u64, d + 0) == AstDeclKind.CONST) {
+			if (slice_eq_parts(*cast(*u64, d + 8), *cast(*u64, d + 16), name_ptr, name_len) == 1) {
 				return d;
 			}
 		}
@@ -391,23 +386,20 @@ func tc_find_const_decl_in_prog(prog, name_ptr, name_len) {
 func tc_const_eval_u64_expr_mvp(e) {
 	// Returns: rax=value, rdx=ok
 	if (e == 0) {
-		alias rdx : ok0;
 		ok0 = 0;
 		return 0;
 	}
-	var k = ptr64[e + 0];
+	var k = *cast(*u64, e + 0);
 	if (k == AstExprKind.INT) {
-		var v0 = tc_parse_u64_literal(ptr64[e + 40], ptr64[e + 48]);
-		alias rdx : ok1;
+		var v0 = tc_parse_u64_literal(*cast(*u64, e + 40), *cast(*u64, e + 48));
 		ok1 = 1;
 		return v0;
 	}
 	if (k == AstExprKind.UNARY) {
-		if (ptr64[e + 8] == TokKind.MINUS) {
-			var rhs = ptr64[e + 16];
-			if (rhs != 0 && ptr64[rhs + 0] == AstExprKind.INT) {
-				var v1 = tc_parse_u64_literal(ptr64[rhs + 40], ptr64[rhs + 48]);
-				alias rdx : ok2;
+		if (*cast(*u64, e + 8) == TokKind.MINUS) {
+			var rhs = *cast(*u64, e + 16);
+			if (rhs != 0 && *cast(*u64, rhs + 0) == AstExprKind.INT) {
+				var v1 = tc_parse_u64_literal(*cast(*u64, rhs + 40), *cast(*u64, rhs + 48));
 				ok2 = 1;
 				return 0 - v1;
 			}
@@ -415,49 +407,46 @@ func tc_const_eval_u64_expr_mvp(e) {
 	}
 	if (k == AstExprKind.FIELD) {
 		// Enum variant access (Color.Red) is marked as immediate (size=127).
-		var extra = ptr64[e + 32];
+		var extra = *cast(*u64, e + 32);
 		var sz = (extra >> 56) & 127;
 		if (sz == 127) {
-			alias rdx : ok3;
 			ok3 = 1;
-			return ptr64[e + 8];
+			return *cast(*u64, e + 8);
 		}
 	}
 	if (k == AstExprKind.IDENT) {
 		// If already marked immediate, reuse.
-		var extra2 = ptr64[e + 32];
+		var extra2 = *cast(*u64, e + 32);
 		var sz2 = (extra2 >> 56) & 127;
 		if (sz2 == 127) {
-			alias rdx : ok4;
 			ok4 = 1;
-			return ptr64[e + 8];
+			return *cast(*u64, e + 8);
 		}
 	}
-	alias rdx : ok5;
 	ok5 = 0;
 	return 0;
 }
 
 func tc_switch_case_is_const(e) {
 	if (e == 0) { return 0; }
-	var k = ptr64[e + 0];
+	var k = *cast(*u64, e + 0);
 	if (k == AstExprKind.INT) { return 1; }
 	if (k == AstExprKind.IDENT) {
 		// Global const identifiers are marked immediate (extra size=127).
-		var extra0 = ptr64[e + 32];
+		var extra0 = *cast(*u64, e + 32);
 		var sz0 = (extra0 >> 56) & 127;
 		if (sz0 == 127) { return 1; }
 	}
 	if (k == AstExprKind.UNARY) {
-		if (ptr64[e + 8] == TokKind.MINUS) {
-			var rhs = ptr64[e + 16];
-			if (rhs != 0 && ptr64[rhs + 0] == AstExprKind.INT) { return 1; }
+		if (*cast(*u64, e + 8) == TokKind.MINUS) {
+			var rhs = *cast(*u64, e + 16);
+			if (rhs != 0 && *cast(*u64, rhs + 0) == AstExprKind.INT) { return 1; }
 			if (tc_switch_case_is_const(rhs) == 1) { return 1; }
 		}
 	}
 	if (k == AstExprKind.FIELD) {
 		// Enum variant access (Color.Red) is marked as immediate (size=127).
-		var extra = ptr64[e + 32];
+		var extra = *cast(*u64, e + 32);
 		var sz = (extra >> 56) & 127;
 		if (sz == 127) { return 1; }
 	}
@@ -480,27 +469,27 @@ var ct_tmp_type_args_tc;
 // We normalize them into positional order (matching param order) before further processing.
 func tc_normalize_named_call_args(env, call_expr) {
 	if (call_expr == 0) { return 0; }
-	if (ptr64[call_expr + 0] != AstExprKind.CALL) { return 0; }
-	var names = ptr64[call_expr + 8];
+	if (*cast(*u64, call_expr + 0) != AstExprKind.CALL) { return 0; }
+	var names = *cast(*u64, call_expr + 8);
 	if (names == 0) { return 0; }
-	var callee = ptr64[call_expr + 16];
-	var args = ptr64[call_expr + 32];
-	if (callee == 0 || ptr64[callee + 0] != AstExprKind.IDENT) {
+	var callee = *cast(*u64, call_expr + 16);
+	var args = *cast(*u64, call_expr + 32);
+	if (callee == 0 || *cast(*u64, callee + 0) != AstExprKind.IDENT) {
 		// Still typecheck args for recovery.
 		var i0 = 0;
 		var n0 = 0;
 		if (args != 0) { n0 = vec_len(args); }
 		while (i0 < n0) { tc_expr(env, vec_get(args, i0)); i0 = i0 + 1; }
-		tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "named args require identifier callee");
-		ptr64[call_expr + 8] = 0;
+		tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "named args require identifier callee");
+		*cast(*u64, call_expr + 8) = 0;
 		return 1;
 	}
 	if (tc_cur_ast_prog == 0) {
-		ptr64[call_expr + 8] = 0;
+		*cast(*u64, call_expr + 8) = 0;
 		return 0;
 	}
-	var fn_name_ptr = ptr64[callee + 40];
-	var fn_name_len = ptr64[callee + 48];
+	var fn_name_ptr = *cast(*u64, callee + 40);
+	var fn_name_len = *cast(*u64, callee + 48);
 	var fd = tc_find_func_decl_in_prog(tc_cur_ast_prog, fn_name_ptr, fn_name_len);
 	if (fd == 0) {
 		// Unknown function: cannot map named args.
@@ -508,23 +497,23 @@ func tc_normalize_named_call_args(env, call_expr) {
 		var n1 = 0;
 		if (args != 0) { n1 = vec_len(args); }
 		while (i1 < n1) { tc_expr(env, vec_get(args, i1)); i1 = i1 + 1; }
-		tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "named args require known function");
-		ptr64[call_expr + 8] = 0;
+		tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "named args require known function");
+		*cast(*u64, call_expr + 8) = 0;
 		return 1;
 	}
-	var params = ptr64[fd + 24];
+	var params = *cast(*u64, fd + 24);
 	var pn = 0;
 	var an = 0;
 	if (params != 0) { pn = vec_len(params); }
 	if (args != 0) { an = vec_len(args); }
 	var nn = vec_len(names);
 	if (nn != (an * 2)) {
-		tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "named args: internal name vector mismatch");
-		ptr64[call_expr + 8] = 0;
+		tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "named args: internal name vector mismatch");
+		*cast(*u64, call_expr + 8) = 0;
 		return 1;
 	}
 	if (an != pn) {
-		tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "named args: wrong number of arguments");
+		tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "named args: wrong number of arguments");
 		// Still proceed best-effort.
 	}
 	// used flags: Vec(u64) of 0/1.
@@ -538,7 +527,7 @@ func tc_normalize_named_call_args(env, call_expr) {
 		if (params != 0) { ps = vec_get(params, pi); }
 		var pname_ptr = 0;
 		var pname_len = 0;
-		if (ps != 0) { pname_ptr = ptr64[ps + 32]; pname_len = ptr64[ps + 40]; }
+		if (ps != 0) { pname_ptr = *cast(*u64, ps + 32); pname_len = *cast(*u64, ps + 40); }
 		var found = 18446744073709551615; // -1
 		var ai = 0;
 		while (ai < an) {
@@ -552,16 +541,16 @@ func tc_normalize_named_call_args(env, call_expr) {
 			ai = ai + 1;
 		}
 		if (found == 18446744073709551615) {
-			tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "named args: missing argument");
+			tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "named args: missing argument");
 			// Push dummy to keep vector length.
 			if (new_args != 0) { vec_push(new_args, 0); }
 		} else {
 			if (used != 0 && vec_get(used, found) != 0) {
-				tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "named args: duplicate argument");
+				tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "named args: duplicate argument");
 			}
 			if (used != 0) {
-				var ubuf = ptr64[used + 0];
-				ptr64[ubuf + (found * 8)] = 1;
+				var ubuf = *cast(*u64, used + 0);
+				*cast(*u64, ubuf + (found * 8)) = 1;
 			}
 			var av = vec_get(args, found);
 			if (new_args != 0) { vec_push(new_args, av); }
@@ -574,14 +563,14 @@ func tc_normalize_named_call_args(env, call_expr) {
 		var u = 0;
 		if (used != 0) { u = vec_get(used, ai2); }
 		if (u == 0) {
-			tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "named args: unknown argument name");
+			tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "named args: unknown argument name");
 			break;
 		}
 		ai2 = ai2 + 1;
 	}
 	// Replace args and clear name metadata.
-	if (new_args != 0) { ptr64[call_expr + 32] = new_args; }
-	ptr64[call_expr + 8] = 0;
+	if (new_args != 0) { *cast(*u64, call_expr + 32) = new_args; }
+	*cast(*u64, call_expr + 8) = 0;
 	return 1;
 }
 
@@ -602,13 +591,13 @@ func tc_module_cur() {
 func tc_module_name_ptr(mod_id) {
 	var m = vec_get(tc_modules, mod_id);
 	if (m == 0) { return 0; }
-	return ptr64[m + 0];
+	return *cast(*u64, m + 0);
 }
 
 func tc_module_name_len(mod_id) {
 	var m = vec_get(tc_modules, mod_id);
 	if (m == 0) { return 0; }
-	return ptr64[m + 8];
+	return *cast(*u64, m + 8);
 }
 
 func tc_module_lookup(name_ptr, name_len) {
@@ -619,7 +608,7 @@ func tc_module_lookup(name_ptr, name_len) {
 	while (i < n) {
 		var m = vec_get(tc_modules, i);
 		if (m != 0) {
-			if (slice_eq_parts(ptr64[m + 0], ptr64[m + 8], name_ptr, name_len) == 1) {
+			if (slice_eq_parts(*cast(*u64, m + 0), *cast(*u64, m + 8), name_ptr, name_len) == 1) {
 				return i;
 			}
 		}
@@ -635,7 +624,7 @@ func tc_imports_contains(imports, name_ptr, name_len) {
 	while (i < n) {
 		var it = vec_get(imports, i);
 		if (it != 0) {
-			if (slice_eq_parts(ptr64[it + 0], ptr64[it + 8], name_ptr, name_len) == 1) {
+			if (slice_eq_parts(*cast(*u64, it + 0), *cast(*u64, it + 8), name_ptr, name_len) == 1) {
 				return 1;
 			}
 		}
@@ -652,91 +641,91 @@ func tc_align_up(x, a) {
 
 func tc_is_struct(ty) {
 	if (tc_is_compound(ty) == 0) { return 0; }
-	if (ptr64[ty + 0] == TC_COMPOUND_STRUCT) { return 1; }
+	if (*cast(*u64, ty + 0) == TC_COMPOUND_STRUCT) { return 1; }
 	return 0;
 }
 func tc_is_enum(ty) {
 	if (tc_is_compound(ty) == 0) { return 0; }
-	if (ptr64[ty + 0] == TC_COMPOUND_ENUM) { return 1; }
+	if (*cast(*u64, ty + 0) == TC_COMPOUND_ENUM) { return 1; }
 	return 0;
 }
 
 func tc_enum_variants(ty) {
-	return ptr64[ty + 24];
+	return *cast(*u64, ty + 24);
 }
 
 func tc_struct_fields(ty) {
-	return ptr64[ty + 24];
+	return *cast(*u64, ty + 24);
 }
 
 func tc_struct_size(ty) {
-	return ptr64[ty + 32];
+	return *cast(*u64, ty + 32);
 }
 
 func tc_struct_align(ty) {
-	return ptr64[ty + 40];
+	return *cast(*u64, ty + 40);
 }
 
 func tc_struct_mod_id(ty) {
-	return ptr64[ty + 48];
+	return *cast(*u64, ty + 48);
 }
 
 func tc_struct_is_public(ty) {
-	return ptr64[ty + 56];
+	return *cast(*u64, ty + 56);
 }
 
 func tc_struct_field_is_public(f) {
-	return ptr64[f + 32];
+	return *cast(*u64, f + 32);
 }
 
 func tc_enum_mod_id(ty) {
-	return ptr64[ty + 32];
+	return *cast(*u64, ty + 32);
 }
 
 func tc_enum_is_public(ty) {
-	return ptr64[ty + 40];
+	return *cast(*u64, ty + 40);
 }
 
 func tc_is_tuple2(ty) {
 	if (tc_is_compound(ty) == 0) { return 0; }
-	if (ptr64[ty + 0] == TC_COMPOUND_TUPLE2) { return 1; }
+	if (*cast(*u64, ty + 0) == TC_COMPOUND_TUPLE2) { return 1; }
 	return 0;
 }
 
 func tc_is_distinct(ty) {
 	if (tc_is_compound(ty) == 0) { return 0; }
-	if (ptr64[ty + 0] == TC_COMPOUND_DISTINCT) { return 1; }
+	if (*cast(*u64, ty + 0) == TC_COMPOUND_DISTINCT) { return 1; }
 	return 0;
 }
 
 func tc_distinct_base(ty) {
-	return ptr64[ty + 8];
+	return *cast(*u64, ty + 8);
 }
 
 func tc_distinct_new(base_ty) {
 	if (base_ty == TC_TY_INVALID) { return TC_TY_INVALID; }
 	var t = heap_alloc(24);
 	if (t == 0) { return TC_TY_INVALID; }
-	ptr64[t + 0] = TC_COMPOUND_DISTINCT;
-	ptr64[t + 8] = base_ty;
-	ptr64[t + 16] = 0;
+	*cast(*u64, t + 0) = TC_COMPOUND_DISTINCT;
+	*cast(*u64, t + 8) = base_ty;
+	*cast(*u64, t + 16) = 0;
 	return t;
 }
 
 func tc_tuple2_a(ty) {
-	return ptr64[ty + 8];
+	return *cast(*u64, ty + 8);
 }
 
 func tc_tuple2_b(ty) {
-	return ptr64[ty + 16];
+	return *cast(*u64, ty + 16);
 }
 
 func tc_tuple2_new(a_ty, b_ty) {
 	var t = heap_alloc(24);
 	if (t == 0) { return TC_TY_INVALID; }
-	ptr64[t + 0] = TC_COMPOUND_TUPLE2;
-	ptr64[t + 8] = a_ty;
-	ptr64[t + 16] = b_ty;
+	*cast(*u64, t + 0) = TC_COMPOUND_TUPLE2;
+	*cast(*u64, t + 8) = a_ty;
+	*cast(*u64, t + 16) = b_ty;
 	return t;
 }
 
@@ -798,11 +787,11 @@ func tc_make_key(mod_id, name_ptr, name_len) {
 	var digits = 0;
 	var tmp_buf = p + 270; // temp area at end of buffer
 	if (m == 0) {
-		ptr8[tmp_buf] = 48; // '0'
+		*cast(*u8, tmp_buf) = 48; // '0'
 		digits = 1;
 	} else {
 		while (m > 0) {
-			ptr8[tmp_buf + digits] = 48 + (m % 10);
+			*cast(*u8, tmp_buf + digits) = 48 + (m % 10);
 			m = m / 10;
 			digits = digits + 1;
 		}
@@ -810,20 +799,19 @@ func tc_make_key(mod_id, name_ptr, name_len) {
 	// Reverse digits into p
 	var di = 0;
 	while (di < digits) {
-		ptr8[p + di] = ptr8[tmp_buf + (digits - 1 - di)];
+		*cast(*u8, p + di) = *cast(*u8, tmp_buf + (digits - 1 - di));
 		di = di + 1;
 	}
 	// Write ':'
-	ptr8[p + digits] = 58;
+	*cast(*u8, p + digits) = 58;
 	var pos = digits + 1;
 	// Copy name
 	var ni = 0;
 	while (ni < name_len) {
-		ptr8[p + pos] = ptr8[name_ptr + ni];
+		*cast(*u8, p + pos) = *cast(*u8, name_ptr + ni);
 		ni = ni + 1;
 		pos = pos + 1;
 	}
-	alias rdx : out_len;
 	out_len = pos;
 	return p;
 }
@@ -831,9 +819,7 @@ func tc_make_key(mod_id, name_ptr, name_len) {
 func tc_struct_lookup_mod(mod_id, name_ptr, name_len) {
 	if (tc_structs_map != 0) {
 		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
-		alias rdx : key_len;
 		var result = hashmap_get(tc_structs_map, key_ptr, key_len);
-		alias rdx : ok;
 		if (ok != 0) { return result; }
 		return 0;
 	}
@@ -844,8 +830,8 @@ func tc_struct_lookup_mod(mod_id, name_ptr, name_len) {
 	while (i < n) {
 		var t = vec_get(tc_structs, i);
 		if (t != 0) {
-			if (ptr64[t + 48] == mod_id) {
-				if (slice_eq_parts(ptr64[t + 8], ptr64[t + 16], name_ptr, name_len) == 1) {
+			if (*cast(*u64, t + 48) == mod_id) {
+				if (slice_eq_parts(*cast(*u64, t + 8), *cast(*u64, t + 16), name_ptr, name_len) == 1) {
 					return t;
 				}
 			}
@@ -870,7 +856,7 @@ func tc_struct_find_field(ty, field_ptr, field_len) {
 	var i = 0;
 	while (i < n) {
 		var f = vec_get(fields, i);
-		if (slice_eq_parts(ptr64[f + 0], ptr64[f + 8], field_ptr, field_len) == 1) {
+		if (slice_eq_parts(*cast(*u64, f + 0), *cast(*u64, f + 8), field_ptr, field_len) == 1) {
 			return f;
 		}
 		i = i + 1;
@@ -912,7 +898,7 @@ func tc_type_from_name(name_ptr, name_len) {
 	// Phase 3.4 MVP: accept bit-width integer aliases like `u3`/`i5`.
 	// For hosted tests we model them as full-width u64/i64.
 	if (name_len >= 2) {
-		var c0 = ptr8[name_ptr];
+		var c0 = *cast(*u8, name_ptr);
 		var is_bit = 0;
 		if (c0 == 117) { is_bit = 1; } // 'u'
 		if (c0 == 105) { is_bit = 1; } // 'i'
@@ -921,7 +907,7 @@ func tc_type_from_name(name_ptr, name_len) {
 			var bits = 0;
 			var ok = 1;
 			while (i < name_len) {
-				var ch = ptr8[name_ptr + i];
+				var ch = *cast(*u8, name_ptr + i);
 				if (ch < 48) { ok = 0; break; }
 				if (ch > 57) { ok = 0; break; }
 				bits = (bits * 10) + (ch - 48);
@@ -1002,7 +988,7 @@ func tc_is_ptr(ty) {
 		}
 	}
 	if (tc_is_compound(ty) == 1) {
-		if (ptr64[ty + 0] == TC_COMPOUND_PTR) { return 1; }
+		if (*cast(*u64, ty + 0) == TC_COMPOUND_PTR) { return 1; }
 	}
 	return 0;
 }
@@ -1010,9 +996,7 @@ func tc_is_ptr(ty) {
 func tc_enum_lookup_mod(mod_id, name_ptr, name_len) {
 	if (tc_enums_map != 0) {
 		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
-		alias rdx : key_len;
 		var result = hashmap_get(tc_enums_map, key_ptr, key_len);
-		alias rdx : ok;
 		if (ok != 0) { return result; }
 		return 0;
 	}
@@ -1023,8 +1007,8 @@ func tc_enum_lookup_mod(mod_id, name_ptr, name_len) {
 	while (i < n) {
 		var t = vec_get(tc_enums, i);
 		if (t != 0) {
-			if (ptr64[t + 32] == mod_id) {
-				if (slice_eq_parts(ptr64[t + 8], ptr64[t + 16], name_ptr, name_len) == 1) {
+			if (*cast(*u64, t + 32) == mod_id) {
+				if (slice_eq_parts(*cast(*u64, t + 8), *cast(*u64, t + 16), name_ptr, name_len) == 1) {
 					return t;
 				}
 			}
@@ -1041,9 +1025,7 @@ func tc_enum_lookup(name_ptr, name_len) {
 func tc_type_alias_lookup_mod(mod_id, name_ptr, name_len) {
 	if (tc_type_aliases_map != 0) {
 		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
-		alias rdx : key_len;
 		var result = hashmap_get(tc_type_aliases_map, key_ptr, key_len);
-		alias rdx : ok;
 		if (ok != 0) { return result; }
 		return 0;
 	}
@@ -1054,8 +1036,8 @@ func tc_type_alias_lookup_mod(mod_id, name_ptr, name_len) {
 	while (i < n) {
 		var a = vec_get(tc_type_aliases, i);
 		if (a != 0) {
-			if (ptr64[a + 16] == mod_id) {
-				if (slice_eq_parts(ptr64[a + 0], ptr64[a + 8], name_ptr, name_len) == 1) {
+			if (*cast(*u64, a + 16) == mod_id) {
+				if (slice_eq_parts(*cast(*u64, a + 0), *cast(*u64, a + 8), name_ptr, name_len) == 1) {
 					return a;
 				}
 			}
@@ -1075,10 +1057,10 @@ func tc_register_type_alias_decl(d, mod_id, is_public) {
 	//  a: aliased AstType* (d+24)
 	//  b: is_distinct (0/1) (d+32)
 	if (d == 0) { return 0; }
-	var name_ptr = ptr64[d + 8];
-	var name_len = ptr64[d + 16];
-	var err_line = ptr64[d + 56];
-	var err_col = ptr64[d + 64];
+	var name_ptr = *cast(*u64, d + 8);
+	var name_len = *cast(*u64, d + 16);
+	var err_line = *cast(*u64, d + 56);
+	var err_col = *cast(*u64, d + 64);
 	if (tc_type_aliases == 0) { return 0; }
 	// Disallow conflicts with existing aliases/structs/enums in same module.
 	if (tc_type_alias_lookup_mod(mod_id, name_ptr, name_len) != 0) {
@@ -1094,8 +1076,8 @@ func tc_register_type_alias_decl(d, mod_id, is_public) {
 		return 0;
 	}
 
-	var aliased_ast = ptr64[d + 24];
-	var is_distinct0 = ptr64[d + 32];
+	var aliased_ast = *cast(*u64, d + 24);
+	var is_distinct0 = *cast(*u64, d + 32);
 	var base_ty = tc_type_from_asttype(aliased_ast);
 	if (base_ty == TC_TY_INVALID) {
 		return 0;
@@ -1110,18 +1092,17 @@ func tc_register_type_alias_decl(d, mod_id, is_public) {
 	}
 	var rec = heap_alloc(56);
 	if (rec == 0) { return 0; }
-	ptr64[rec + 0] = name_ptr;
-	ptr64[rec + 8] = name_len;
-	ptr64[rec + 16] = mod_id;
-	ptr64[rec + 24] = is_public;
-	ptr64[rec + 32] = out_ty;
-	ptr64[rec + 40] = base_ty;
-	ptr64[rec + 48] = is_distinct0;
+	*cast(*u64, rec + 0) = name_ptr;
+	*cast(*u64, rec + 8) = name_len;
+	*cast(*u64, rec + 16) = mod_id;
+	*cast(*u64, rec + 24) = is_public;
+	*cast(*u64, rec + 32) = out_ty;
+	*cast(*u64, rec + 40) = base_ty;
+	*cast(*u64, rec + 48) = is_distinct0;
 	vec_push(tc_type_aliases, rec);
 	// HashMap insert for O(1) lookup
 	if (tc_type_aliases_map != 0) {
 		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
-		alias rdx : key_len;
 		hashmap_put(tc_type_aliases_map, key_ptr, key_len, rec);
 	}
 	return 0;
@@ -1135,7 +1116,7 @@ func tc_enum_find_variant(ty, name_ptr, name_len) {
 	while (i < n) {
 		var v = vec_get(vs, i);
 		// Variant node layout: {name_ptr, name_len, value}
-		if (slice_eq_parts(ptr64[v + 0], ptr64[v + 8], name_ptr, name_len) == 1) { return v; }
+		if (slice_eq_parts(*cast(*u64, v + 0), *cast(*u64, v + 8), name_ptr, name_len) == 1) { return v; }
 		i = i + 1;
 	}
 	return 0;
@@ -1144,9 +1125,7 @@ func tc_enum_find_variant(ty, name_ptr, name_len) {
 func tc_func_lookup_mod(mod_id, name_ptr, name_len) {
 	if (tc_funcs_map != 0) {
 		var key_ptr = tc_make_key(mod_id, name_ptr, name_len);
-		alias rdx : key_len;
 		var result = hashmap_get(tc_funcs_map, key_ptr, key_len);
-		alias rdx : ok;
 		if (ok != 0) { return result; }
 		return 0;
 	}
@@ -1157,8 +1136,8 @@ func tc_func_lookup_mod(mod_id, name_ptr, name_len) {
 	while (i < n) {
 		var f = vec_get(tc_funcs, i);
 		if (f != 0) {
-			if (ptr64[f + 16] == mod_id) {
-				if (slice_eq_parts(ptr64[f + 0], ptr64[f + 8], name_ptr, name_len) == 1) {
+			if (*cast(*u64, f + 16) == mod_id) {
+				if (slice_eq_parts(*cast(*u64, f + 0), *cast(*u64, f + 8), name_ptr, name_len) == 1) {
 					return f;
 				}
 			}
@@ -1170,21 +1149,21 @@ func tc_func_lookup_mod(mod_id, name_ptr, name_len) {
 
 func tc_collect_func_sigs_from_prog(prog, mod_id) {
 	if (prog == 0) { return 0; }
-	var decls = ptr64[prog + 0];
+	var decls = *cast(*u64, prog + 0);
 	if (decls == 0) { return 0; }
 	var n = vec_len(decls);
 	var i = 0;
 	while (i < n) {
 		var d = vec_get(decls, i);
-		if (d != 0 && ptr64[d + 0] == AstDeclKind.FUNC) {
+		if (d != 0 && *cast(*u64, d + 0) == AstDeclKind.FUNC) {
 			// Phase 5.1: skip generic templates; they are instantiated at call sites.
-			var tflag0 = ptr64[d + 80] & TC_DECL_FLAG_GENERIC_TEMPLATE;
-			var tparams0 = ptr64[d + 96];
+			var tflag0 = *cast(*u64, d + 80) & TC_DECL_FLAG_GENERIC_TEMPLATE;
+			var tparams0 = *cast(*u64, d + 96);
 			if (tflag0 != 0 || tparams0 != 0) { i = i + 1; continue; }
-			var name_ptr = ptr64[d + 8];
-			var name_len = ptr64[d + 16];
-			var params = ptr64[d + 24];
-			var ret_ast = ptr64[d + 32];
+			var name_ptr = *cast(*u64, d + 8);
+			var name_len = *cast(*u64, d + 16);
+			var params = *cast(*u64, d + 24);
+			var ret_ast = *cast(*u64, d + 32);
 			var pc = 0;
 			var p0 = TC_TY_INVALID;
 			var p1 = TC_TY_INVALID;
@@ -1192,11 +1171,11 @@ func tc_collect_func_sigs_from_prog(prog, mod_id) {
 				pc = vec_len(params);
 				if (pc > 0) {
 					var ps0 = vec_get(params, 0);
-					if (ps0 != 0 && ptr64[ps0 + 48] != 0) { p0 = tc_type_from_asttype(ptr64[ps0 + 48]); }
+					if (ps0 != 0 && *cast(*u64, ps0 + 48) != 0) { p0 = tc_type_from_asttype(*cast(*u64, ps0 + 48)); }
 				}
 				if (pc > 1) {
 					var ps1 = vec_get(params, 1);
-					if (ps1 != 0 && ptr64[ps1 + 48] != 0) { p1 = tc_type_from_asttype(ptr64[ps1 + 48]); }
+					if (ps1 != 0 && *cast(*u64, ps1 + 48) != 0) { p1 = tc_type_from_asttype(*cast(*u64, ps1 + 48)); }
 				}
 			}
 			var ret_ty = 0;
@@ -1204,19 +1183,18 @@ func tc_collect_func_sigs_from_prog(prog, mod_id) {
 
 			var sig = heap_alloc(64);
 			if (sig != 0) {
-				ptr64[sig + 0] = name_ptr;
-				ptr64[sig + 8] = name_len;
-				ptr64[sig + 16] = mod_id;
-				ptr64[sig + 24] = pc;
-				ptr64[sig + 32] = p0;
-				ptr64[sig + 40] = p1;
-				ptr64[sig + 48] = ret_ty;
-				ptr64[sig + 56] = 0;
+				*cast(*u64, sig + 0) = name_ptr;
+				*cast(*u64, sig + 8) = name_len;
+				*cast(*u64, sig + 16) = mod_id;
+				*cast(*u64, sig + 24) = pc;
+				*cast(*u64, sig + 32) = p0;
+				*cast(*u64, sig + 40) = p1;
+				*cast(*u64, sig + 48) = ret_ty;
+				*cast(*u64, sig + 56) = 0;
 				vec_push(tc_funcs, sig);
 				// HashMap insert for O(1) lookup
 				if (tc_funcs_map != 0) {
 					var key_ptr_f = tc_make_key(mod_id, name_ptr, name_len);
-					alias rdx : key_len_f;
 					hashmap_put(tc_funcs_map, key_ptr_f, key_len_f, sig);
 				}
 			}
@@ -1228,33 +1206,31 @@ func tc_collect_func_sigs_from_prog(prog, mod_id) {
 
 func tc_build_hook_name(struct_ty0, field_meta0, is_set0) {
 	// Returns: rax=ptr, rdx=len (not NUL-terminated)
-	var sn_ptr0 = ptr64[struct_ty0 + 8];
-	var sn_len0 = ptr64[struct_ty0 + 16];
-	var fn_ptr0 = ptr64[field_meta0 + 0];
-	var fn_len0 = ptr64[field_meta0 + 8];
+	var sn_ptr0 = *cast(*u64, struct_ty0 + 8);
+	var sn_len0 = *cast(*u64, struct_ty0 + 16);
+	var fn_ptr0 = *cast(*u64, field_meta0 + 0);
+	var fn_len0 = *cast(*u64, field_meta0 + 8);
 	var out_len0 = sn_len0 + 5 + fn_len0;
 	var out_ptr0 = heap_alloc(out_len0);
 	if (out_ptr0 == 0) {
-		alias rdx : out_len_z;
 		out_len_z = 0;
 		return 0;
 	}
 	var i0 = 0;
-	while (i0 < sn_len0) { ptr8[out_ptr0 + i0] = ptr8[sn_ptr0 + i0]; i0 = i0 + 1; }
-	ptr8[out_ptr0 + sn_len0 + 0] = 95; // '_'
+	while (i0 < sn_len0) { *cast(*u8, out_ptr0 + i0) = *cast(*u8, sn_ptr0 + i0); i0 = i0 + 1; }
+	*cast(*u8, out_ptr0 + sn_len0 + 0) = 95; // '_'
 	if (is_set0 == 1) {
-		ptr8[out_ptr0 + sn_len0 + 1] = 115; // 's'
-		ptr8[out_ptr0 + sn_len0 + 2] = 101; // 'e'
-		ptr8[out_ptr0 + sn_len0 + 3] = 116; // 't'
+		*cast(*u8, out_ptr0 + sn_len0 + 1) = 115; // 's'
+		*cast(*u8, out_ptr0 + sn_len0 + 2) = 101; // 'e'
+		*cast(*u8, out_ptr0 + sn_len0 + 3) = 116; // 't'
 	} else {
-		ptr8[out_ptr0 + sn_len0 + 1] = 103; // 'g'
-		ptr8[out_ptr0 + sn_len0 + 2] = 101; // 'e'
-		ptr8[out_ptr0 + sn_len0 + 3] = 116; // 't'
+		*cast(*u8, out_ptr0 + sn_len0 + 1) = 103; // 'g'
+		*cast(*u8, out_ptr0 + sn_len0 + 2) = 101; // 'e'
+		*cast(*u8, out_ptr0 + sn_len0 + 3) = 116; // 't'
 	}
-	ptr8[out_ptr0 + sn_len0 + 4] = 95; // '_'
+	*cast(*u8, out_ptr0 + sn_len0 + 4) = 95; // '_'
 	var j0 = 0;
-	while (j0 < fn_len0) { ptr8[out_ptr0 + sn_len0 + 5 + j0] = ptr8[fn_ptr0 + j0]; j0 = j0 + 1; }
-	alias rdx : out_len_ret;
+	while (j0 < fn_len0) { *cast(*u8, out_ptr0 + sn_len0 + 5 + j0) = *cast(*u8, fn_ptr0 + j0); j0 = j0 + 1; }
 	out_len_ret = out_len0;
 	return out_ptr0;
 }
@@ -1265,35 +1241,35 @@ func tc_validate_property_hooks_mod(mod_id) {
 	var tsi = 0;
 	while (tsi < tsn) {
 		var st = vec_get(tc_structs, tsi);
-		if (st != 0 && ptr64[st + 0] == TC_COMPOUND_STRUCT && ptr64[st + 48] == mod_id) {
-			var fields0 = ptr64[st + 24];
+		if (st != 0 && *cast(*u64, st + 0) == TC_COMPOUND_STRUCT && *cast(*u64, st + 48) == mod_id) {
+			var fields0 = *cast(*u64, st + 24);
 			var fnn0 = 0;
 			if (fields0 != 0) { fnn0 = vec_len(fields0); }
 			var fi0 = 0;
 			while (fi0 < fnn0) {
 				var fm = vec_get(fields0, fi0);
 				if (fm != 0) {
-					var fattr0 = ptr64[fm + 40];
-					var fty0 = ptr64[fm + 16];
+					var fattr0 = *cast(*u64, fm + 40);
+					var fty0 = *cast(*u64, fm + 16);
 					var fsz0 = tc_sizeof(fty0);
-					var eline = ptr64[fm + 80];
-					var ecol = ptr64[fm + 88];
+					var eline = *cast(*u64, fm + 80);
+					var ecol = *cast(*u64, fm + 88);
 
 					var has_getter0 = fattr0 & 1;
 					var has_setter0 = fattr0 & 2;
 
 					// getter
 					if (has_getter0 != 0) {
-						var gptr = ptr64[fm + 48];
-						var glen = ptr64[fm + 56];
+						var gptr = *cast(*u64, fm + 48);
+						var glen = *cast(*u64, fm + 56);
 						if (gptr != 0 && glen != 0) {
 							var sigg = tc_func_lookup_mod(mod_id, gptr, glen);
 							if (sigg == 0) {
 								tc_err_at(eline, ecol, "getter hook: unknown function");
 							} else {
-								var pcg = ptr64[sigg + 24];
-								var p0g = ptr64[sigg + 32];
-								var rg = ptr64[sigg + 48];
+								var pcg = *cast(*u64, sigg + 24);
+								var p0g = *cast(*u64, sigg + 32);
+								var rg = *cast(*u64, sigg + 48);
 								var want_self = tc_make_ptr(st, 0);
 								if (pcg != 1) {
 									tc_err_at(eline, ecol, "getter hook: signature mismatch");
@@ -1309,7 +1285,6 @@ func tc_validate_property_hooks_mod(mod_id) {
 								tc_err_at(eline, ecol, "getter hook: auto hook unsupported field type");
 							} else {
 								tc_build_hook_name(st, fm, 0);
-									alias rdx : glen2;
 									gptr = rax;
 									glen = glen2;
 								if (gptr != 0 && glen != 0) {
@@ -1323,17 +1298,17 @@ func tc_validate_property_hooks_mod(mod_id) {
 
 					// setter
 					if (has_setter0 != 0) {
-						var sptr = ptr64[fm + 64];
-						var slen = ptr64[fm + 72];
+						var sptr = *cast(*u64, fm + 64);
+						var slen = *cast(*u64, fm + 72);
 						if (sptr != 0 && slen != 0) {
 							var sigs = tc_func_lookup_mod(mod_id, sptr, slen);
 							if (sigs == 0) {
 								tc_err_at(eline, ecol, "setter hook: unknown function");
 							} else {
-								var pcs = ptr64[sigs + 24];
-								var p0s = ptr64[sigs + 32];
-								var p1s = ptr64[sigs + 40];
-								var rs = ptr64[sigs + 48];
+								var pcs = *cast(*u64, sigs + 24);
+								var p0s = *cast(*u64, sigs + 32);
+								var p1s = *cast(*u64, sigs + 40);
+								var rs = *cast(*u64, sigs + 48);
 								var want_self = tc_make_ptr(st, 0);
 								if (pcs != 2) {
 									tc_err_at(eline, ecol, "setter hook: signature mismatch");
@@ -1350,7 +1325,6 @@ func tc_validate_property_hooks_mod(mod_id) {
 								tc_err_at(eline, ecol, "setter hook: auto hook unsupported field type");
 							} else {
 								tc_build_hook_name(st, fm, 1);
-								alias rdx : slen2;
 								sptr = rax;
 								slen = slen2;
 								if (sptr != 0 && slen != 0) {
@@ -1375,8 +1349,8 @@ func tc_is_ptr_nullable(ty) {
 		if (ty < (TC_TY_PTR_NULLABLE_BASE + 256)) { return 1; }
 	}
 	if (tc_is_compound(ty) == 1) {
-		if (ptr64[ty + 0] == TC_COMPOUND_PTR) {
-			return ptr64[ty + 16] == 1;
+		if (*cast(*u64, ty + 0) == TC_COMPOUND_PTR) {
+			return *cast(*u64, ty + 16) == 1;
 		}
 	}
 	return 0;
@@ -1385,7 +1359,7 @@ func tc_is_ptr_nullable(ty) {
 func tc_ptr_base(ty) {
 	if (tc_is_compound(ty) == 1) {
 		// {kind, inner, nullable}
-		return ptr64[ty + 8];
+		return *cast(*u64, ty + 8);
 	}
 	if (tc_is_ptr_nullable(ty) == 1) { return ty - TC_TY_PTR_NULLABLE_BASE; }
 	return ty - TC_TY_PTR_BASE;
@@ -1407,9 +1381,9 @@ func tc_make_ptr(base_ty, nullable) {
 			var i = 0;
 			while (i < n) {
 				var pt = vec_get(tc_ptr_types, i);
-				if (ptr64[pt + 0] == TC_COMPOUND_PTR) {
-					if (ptr64[pt + 8] == base_ty) {
-						if (ptr64[pt + 16] == nullable) { return pt; }
+				if (*cast(*u64, pt + 0) == TC_COMPOUND_PTR) {
+					if (*cast(*u64, pt + 8) == base_ty) {
+						if (*cast(*u64, pt + 16) == nullable) { return pt; }
 					}
 				}
 				i = i + 1;
@@ -1417,9 +1391,9 @@ func tc_make_ptr(base_ty, nullable) {
 		}
 		var t = heap_alloc(24);
 		if (t == 0) { return TC_TY_INVALID; }
-		ptr64[t + 0] = TC_COMPOUND_PTR;
-		ptr64[t + 8] = base_ty;
-		ptr64[t + 16] = nullable;
+		*cast(*u64, t + 0) = TC_COMPOUND_PTR;
+		*cast(*u64, t + 8) = base_ty;
+		*cast(*u64, t + 16) = nullable;
 		vec_push(tc_ptr_types, t);
 		return t;
 	}
@@ -1448,18 +1422,18 @@ func tc_is_func_ptr(ty) {
 	if (ty == 0) { return 0; }
 	if (ty == TC_TY_INVALID) { return 0; }
 	if (tc_is_compound(ty) == 0) { return 0; }
-	if (ptr64[ty + 0] == TC_COMPOUND_FUNC_PTR) { return 1; }
+	if (*cast(*u64, ty + 0) == TC_COMPOUND_FUNC_PTR) { return 1; }
 	return 0;
 }
 
 func tc_func_ptr_param_types(ty) {
 	// Returns Vec* of param TC types
-	return ptr64[ty + 8];
+	return *cast(*u64, ty + 8);
 }
 
 func tc_func_ptr_ret_type(ty) {
 	// Returns TC type id (0 = void)
-	return ptr64[ty + 16];
+	return *cast(*u64, ty + 16);
 }
 
 func tc_func_ptr_param_count(ty) {
@@ -1475,10 +1449,10 @@ func tc_make_func_ptr(param_types_vec, ret_ty) {
 		var i = 0;
 		while (i < n) {
 			var fp = vec_get(tc_func_ptr_types, i);
-			if (ptr64[fp + 0] == TC_COMPOUND_FUNC_PTR) {
-				if (ptr64[fp + 16] == ret_ty) {
+			if (*cast(*u64, fp + 0) == TC_COMPOUND_FUNC_PTR) {
+				if (*cast(*u64, fp + 16) == ret_ty) {
 					// Check param types match
-					var existing_params = ptr64[fp + 8];
+					var existing_params = *cast(*u64, fp + 8);
 					var match = 1;
 					var pcount = 0;
 					if (param_types_vec != 0) { pcount = vec_len(param_types_vec); }
@@ -1503,10 +1477,10 @@ func tc_make_func_ptr(param_types_vec, ret_ty) {
 	// Create new func ptr type
 	var t = heap_alloc(32);
 	if (t == 0) { return TC_TY_INVALID; }
-	ptr64[t + 0] = TC_COMPOUND_FUNC_PTR;
-	ptr64[t + 8] = param_types_vec;  // Vec* of param types (may be 0)
-	ptr64[t + 16] = ret_ty;
-	ptr64[t + 24] = 0;  // reserved
+	*cast(*u64, t + 0) = TC_COMPOUND_FUNC_PTR;
+	*cast(*u64, t + 8) = param_types_vec;  // Vec* of param types (may be 0)
+	*cast(*u64, t + 16) = ret_ty;
+	*cast(*u64, t + 24) = 0;  // reserved
 	if (tc_func_ptr_types != 0) {
 		vec_push(tc_func_ptr_types, t);
 	}
@@ -1521,24 +1495,24 @@ func tc_is_compound(ty) {
 
 func tc_is_array(ty) {
 	if (tc_is_compound(ty) == 0) { return 0; }
-	if (ptr64[ty + 0] == TC_COMPOUND_ARRAY) { return 1; }
+	if (*cast(*u64, ty + 0) == TC_COMPOUND_ARRAY) { return 1; }
 	return 0;
 }
 
 func tc_array_elem(ty) {
-	return ptr64[ty + 8];
+	return *cast(*u64, ty + 8);
 }
 
 func tc_array_len(ty) {
-	return ptr64[ty + 16];
+	return *cast(*u64, ty + 16);
 }
 
 func tc_array_new(elem_ty, len) {
 	var t = heap_alloc(24);
 	if (t == 0) { return TC_TY_INVALID; }
-	ptr64[t + 0] = TC_COMPOUND_ARRAY;
-	ptr64[t + 8] = elem_ty;
-	ptr64[t + 16] = len;
+	*cast(*u64, t + 0) = TC_COMPOUND_ARRAY;
+	*cast(*u64, t + 8) = elem_ty;
+	*cast(*u64, t + 16) = len;
 	return t;
 }
 
@@ -1585,8 +1559,8 @@ func tc_parse_u64_literal(p, n) {
 	var i = 0;
 	var base = 10;
 	if (n >= 2) {
-		if (ptr8[p + 0] == 48) {
-			var c1 = ptr8[p + 1];
+		if (*cast(*u8, p + 0) == 48) {
+			var c1 = *cast(*u8, p + 1);
 			if (c1 == 120 || c1 == 88) {
 				base = 16;
 				i = 2;
@@ -1597,7 +1571,7 @@ func tc_parse_u64_literal(p, n) {
 	var v = 0;
 	var any = 0;
 	while (i < n) {
-		var ch = ptr8[p + i];
+		var ch = *cast(*u8, p + i);
 		var digit = 18446744073709551615; // -1
 		if (ch >= 48) { if (ch <= 57) { digit = ch - 48; } }
 		if (base == 16) {
@@ -1614,8 +1588,6 @@ func tc_parse_u64_literal(p, n) {
 		v = (v * base) + digit;
 		i = i + 1;
 	}
-
-	alias rdx : ok;
 	ok = any;
 	return v;
 }
@@ -1689,22 +1661,21 @@ func tc_check_int_literal_range_signed_neg(mag, bits) {
 func tc_expr_with_expected(env, e, expected) {
 	// Like tc_expr, but uses `expected` for context-based literal typing.
 	if (e == 0) { return TC_TY_INVALID; }
-	var k = ptr64[e + 0];
+	var k = *cast(*u64, e + 0);
 
 	if (k == AstExprKind.NULL) {
 		if (tc_is_ptr_nullable(expected) == 1) {
 			return expected;
 		}
-		tc_err_at(ptr64[e + 64], ptr64[e + 72], "null requires nullable pointer type");
+		tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "null requires nullable pointer type");
 		return TC_TY_INVALID;
 	}
 
 	if (k == AstExprKind.INT) {
 		// INT tokens include full slice (decimal or 0x..).
-		var tok_ptr = ptr64[e + 40];
-		var tok_len = ptr64[e + 48];
+		var tok_ptr = *cast(*u64, e + 40);
+		var tok_len = *cast(*u64, e + 48);
 		var v = tc_parse_u64_literal(tok_ptr, tok_len);
-		alias rdx : ok;
 		if (ok == 0) {
 			return TC_TY_INVALID;
 		}
@@ -1714,14 +1685,14 @@ func tc_expr_with_expected(env, e, expected) {
 			if (tc_is_signed_int(expected) == 1) {
 				// Non-negative literal in signed context.
 				if (tc_check_int_literal_range_signed_pos(v, bits) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "integer literal out of range");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "integer literal out of range");
 					return TC_TY_INVALID;
 				}
 				return expected;
 			}
 			// Unsigned.
 			if (tc_check_int_literal_range_unsigned(v, bits) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "integer literal out of range");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "integer literal out of range");
 				return TC_TY_INVALID;
 			}
 			return expected;
@@ -1729,7 +1700,7 @@ func tc_expr_with_expected(env, e, expected) {
 		// Allow integer 0 as null for nullable pointers.
 		if (tc_is_ptr_nullable(expected) == 1) {
 			if (v == 0) { return expected; }
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "only 0 is allowed for nullable pointer");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "only 0 is allowed for nullable pointer");
 			return TC_TY_INVALID;
 		}
 		// Default: u64 for now.
@@ -1746,19 +1717,18 @@ func tc_expr_with_expected(env, e, expected) {
 	}
 
 	if (k == AstExprKind.UNARY) {
-		var op = ptr64[e + 8];
+		var op = *cast(*u64, e + 8);
 		// Handle negative integer literals in signed context: -<int>
 		if (op == TokKind.MINUS && tc_is_signed_int(expected) == 1) {
-			var rhs = ptr64[e + 16];
-			if (rhs != 0 && ptr64[rhs + 0] == AstExprKind.INT) {
-				var tok_ptr2 = ptr64[rhs + 40];
-				var tok_len2 = ptr64[rhs + 48];
+			var rhs = *cast(*u64, e + 16);
+			if (rhs != 0 && *cast(*u64, rhs + 0) == AstExprKind.INT) {
+				var tok_ptr2 = *cast(*u64, rhs + 40);
+				var tok_len2 = *cast(*u64, rhs + 48);
 				var mag = tc_parse_u64_literal(tok_ptr2, tok_len2);
-				alias rdx : ok2;
 				if (ok2 == 0) { return TC_TY_INVALID; }
 				var bits2 = tc_int_bits(expected);
 				if (tc_check_int_literal_range_signed_neg(mag, bits2) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "integer literal out of range");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "integer literal out of range");
 					return TC_TY_INVALID;
 				}
 				// Treat as expected signed int.
@@ -1768,69 +1738,69 @@ func tc_expr_with_expected(env, e, expected) {
 		if (op == TokKind.DOLLAR) {
 			// Phase 4.1: unsafe deref/load: $ptr
 			// Allows nullable pointers (no implicit null check).
-			var rhs_ty2 = tc_expr(env, ptr64[e + 16]);
+			var rhs_ty2 = tc_expr(env, *cast(*u64, e + 16));
 			if (tc_is_ptr(rhs_ty2) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'$' expects pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "'$' expects pointer");
 				return TC_TY_INVALID;
 			}
 			var base_ty = tc_ptr_base(rhs_ty2);
 			var sz = tc_sizeof(base_ty);
-			ptr64[e + 32] = sz; // for codegen: 1 or 8 supported
+			*cast(*u64, e + 32) = sz; // for codegen: 1 or 8 supported
 			return base_ty;
 		}
 		if (op == TokKind.AMP) {
 			// Address-of should not push expected into operand; it creates a pointer.
-			var rhs2 = ptr64[e + 16];
+			var rhs2 = *cast(*u64, e + 16);
 			var rhs_ty3 = tc_expr(env, rhs2);
 			if (rhs2 == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "'&' expects lvalue");
 				return TC_TY_INVALID;
 			}
-			var rk2 = ptr64[rhs2 + 0];
+			var rk2 = *cast(*u64, rhs2 + 0);
 			if (rk2 != AstExprKind.IDENT && rk2 != AstExprKind.FIELD) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "'&' expects lvalue");
 				return TC_TY_INVALID;
 			}
 			if (rk2 == AstExprKind.IDENT) {
-				var nm_ptr = ptr64[rhs2 + 40];
-				var nm_len = ptr64[rhs2 + 48];
+				var nm_ptr = *cast(*u64, rhs2 + 40);
+				var nm_len = *cast(*u64, rhs2 + 48);
 				if (tc_is_nospill_name(nm_ptr, nm_len) == 1) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot take address of nospill local");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "cannot take address of nospill local");
 					return TC_TY_INVALID;
 				}
 			}
 			var pty2 = tc_make_ptr(rhs_ty3, 0);
 			if (pty2 == TC_TY_INVALID) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot take address of this type");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "cannot take address of this type");
 				return TC_TY_INVALID;
 			}
 			return pty2;
 		}
 		if (op == TokKind.STAR) {
 			// Deref should not push expected into operand; it consumes a pointer.
-			var rhs_ty4 = tc_expr(env, ptr64[e + 16]);
+			var rhs_ty4 = tc_expr(env, *cast(*u64, e + 16));
 			if (tc_is_ptr(rhs_ty4) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "deref expects pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "deref expects pointer");
 				return TC_TY_INVALID;
 			}
 			if (tc_is_ptr_nullable(rhs_ty4) == 1) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot deref nullable pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "cannot deref nullable pointer");
 				return TC_TY_INVALID;
 			}
 			return tc_ptr_base(rhs_ty4);
 		}
 		// Fallback: type-check rhs normally.
-		var rhs_ty = tc_expr_with_expected(env, ptr64[e + 16], expected);
+		var rhs_ty = tc_expr_with_expected(env, *cast(*u64, e + 16), expected);
 		if (op == TokKind.BANG) {
 			if (rhs_ty != TC_TY_BOOL) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'!' expects bool");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "'!' expects bool");
 				return TC_TY_INVALID;
 			}
 			return TC_TY_BOOL;
 		}
 		if (op == TokKind.PLUS || op == TokKind.MINUS || op == TokKind.TILDE) {
 			if (tc_is_int(rhs_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "unary op expects integer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "unary op expects integer");
 				return TC_TY_INVALID;
 			}
 			return rhs_ty;
@@ -1840,26 +1810,26 @@ func tc_expr_with_expected(env, e, expected) {
 
 	if (k == AstExprKind.BRACE_INIT) {
 		// Phase 3.6: typed brace init (struct literal) has an AstType in a.
-		if (ptr64[e + 16] != 0) {
+		if (*cast(*u64, e + 16) != 0) {
 			var ty0 = tc_expr(env, e);
 			if (expected != 0 && expected != TC_TY_INVALID) {
 				if (tc_type_eq(ty0, expected) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "brace-init type mismatch");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "brace-init type mismatch");
 					return TC_TY_INVALID;
 				}
 			}
 			return ty0;
 		}
 		if (tc_is_array(expected) == 0) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "brace-init requires array type context");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "brace-init requires array type context");
 			return TC_TY_INVALID;
 		}
-		var elems = ptr64[e + 32];
+		var elems = *cast(*u64, e + 32);
 		var n = 0;
 		if (elems != 0) { n = vec_len(elems); }
 		var want = tc_array_len(expected);
 		if (n != want) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "array init element count mismatch");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "array init element count mismatch");
 			return TC_TY_INVALID;
 		}
 		var elem_ty = tc_array_elem(expected);
@@ -1867,7 +1837,7 @@ func tc_expr_with_expected(env, e, expected) {
 		while (i < n) {
 			var et = tc_expr_with_expected(env, vec_get(elems, i), elem_ty);
 			if (tc_type_eq(et, elem_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "array init element type mismatch");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "array init element type mismatch");
 				return TC_TY_INVALID;
 			}
 			i = i + 1;
@@ -1882,40 +1852,40 @@ func tc_expr_with_expected(env, e, expected) {
 
 func tc_type_from_asttype(t) {
 	if (t == 0) { return TC_TY_INVALID; }
-	var kind = ptr64[t + 0];
+	var kind = *cast(*u64, t + 0);
 	if (kind == AstTypeKind.COMPTIME_EXPR) {
 		// Lowered comptime type expression. MVP: __typefn$Name(...) calls.
-		var e = ptr64[t + 8];
+		var e = *cast(*u64, t + 8);
 		if (e == 0) { return TC_TY_INVALID; }
 		ct_eval_failed = 0;
 		ct_eval_steps = 0;
 		if (ct_eval_step_limit == 0) { ct_eval_step_limit = 100000; }
 		if (ct_eval_step() != 0) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "comptime: step limit exceeded");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "comptime: step limit exceeded");
 			return TC_TY_INVALID;
 		}
-		if (ptr64[e + 0] != AstExprKind.CALL) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "comptime: expected typefn call");
+		if (*cast(*u64, e + 0) != AstExprKind.CALL) {
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "comptime: expected typefn call");
 			ct_eval_failed = 1;
 			return TC_TY_INVALID;
 		}
-		var callee = ptr64[e + 16];
-		if (callee == 0 || ptr64[callee + 0] != AstExprKind.IDENT) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "comptime: unsupported call target");
+		var callee = *cast(*u64, e + 16);
+		if (callee == 0 || *cast(*u64, callee + 0) != AstExprKind.IDENT) {
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "comptime: unsupported call target");
 			ct_eval_failed = 1;
 			return TC_TY_INVALID;
 		}
-		var np = ptr64[callee + 40];
-		var nl = ptr64[callee + 48];
+		var np = *cast(*u64, callee + 40);
+		var nl = *cast(*u64, callee + 48);
 		if (nl < 9 || slice_eq_parts(np, 9, "__typefn$", 9) == 0) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "comptime: only __typefn$ calls are supported");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "comptime: only __typefn$ calls are supported");
 			ct_eval_failed = 1;
 			return TC_TY_INVALID;
 		}
 		var name_ptr = np + 9;
 		var name_len = nl - 9;
 
-		var args = ptr64[e + 32];
+		var args = *cast(*u64, e + 32);
 		var args_mixed = vec_new(4);
 		if (args_mixed == 0) { ct_eval_failed = 1; return TC_TY_INVALID; }
 		var type_args_tc = vec_new(4);
@@ -1925,14 +1895,14 @@ func tc_type_from_asttype(t) {
 		var i = 0;
 		while (i < argc) {
 			if (ct_eval_step() != 0) {
-				tc_err_at(ptr64[t + 32], ptr64[t + 40], "comptime: step limit exceeded");
+				tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "comptime: step limit exceeded");
 				ct_eval_failed = 1;
 				return TC_TY_INVALID;
 			}
 			var ae = vec_get(args, i);
 			if (ae == 0) { ct_eval_failed = 1; return TC_TY_INVALID; }
-			if (ptr64[ae + 0] == AstExprKind.TYPE_LIT) {
-				var ty = tc_type_from_asttype(ptr64[ae + 16]);
+			if (*cast(*u64, ae + 0) == AstExprKind.TYPE_LIT) {
+				var ty = tc_type_from_asttype(*cast(*u64, ae + 16));
 				if (ty == TC_TY_INVALID) { ct_eval_failed = 1; return TC_TY_INVALID; }
 				var mix = ty * 2;
 				vec_push(args_mixed, mix);
@@ -1950,16 +1920,15 @@ func tc_type_from_asttype(t) {
 
 		var ent = lw_find_generic_struct_typefn_entry(tc_cur_ast_prog, name_ptr, name_len);
 		if (ent == 0) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "comptime: unknown typefn");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "comptime: unknown typefn");
 			ct_eval_failed = 1;
 			return TC_TY_INVALID;
 		}
 		var templ = lw_typefn_entry_templ_decl(ent);
 		var new_name_ptr = tc_mangle_generic_inst_name_mixed(name_ptr, name_len, args_mixed);
-		alias rdx : new_name_len_reg;
 		var new_name_len = new_name_len_reg;
 		if (new_name_ptr == 0) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "comptime: failed to mangle instantiation name");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "comptime: failed to mangle instantiation name");
 			ct_eval_failed = 1;
 			return TC_TY_INVALID;
 		}
@@ -1974,50 +1943,50 @@ func tc_type_from_asttype(t) {
 		return ct_eval_type_from_asttype(t);
 	}
 	if (kind == AstTypeKind.NAME) {
-		var name_ptr = ptr64[t + 8];
-		var name_len = ptr64[t + 16];
+		var name_ptr = *cast(*u64, t + 8);
+		var name_len = *cast(*u64, t + 16);
 		// Optional alias: `str` == `[]u8`.
 		if (slice_eq_parts(name_ptr, name_len, "str", 3) == 1) {
 			return TC_TY_SLICE_BASE + TC_TY_U8;
 		}
 		// Phase 2.6: type alias / distinct
 		var a0 = tc_type_alias_lookup(name_ptr, name_len);
-		if (a0 != 0) { return ptr64[a0 + 32]; }
+		if (a0 != 0) { return *cast(*u64, a0 + 32); }
 		var ty = tc_type_from_name(name_ptr, name_len);
 		if (ty == TC_TY_INVALID) {
 			var st = tc_struct_lookup(name_ptr, name_len);
 			if (st != 0) { return st; }
 				var en = tc_enum_lookup(name_ptr, name_len);
 				if (en != 0) { return en; }
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unknown name");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: unknown name");
 		}
 		return ty;
 	}
 	if (kind == AstTypeKind.PTR) {
-		var inner = ptr64[t + 8];
-		var nullable = ptr64[t + 16];
+		var inner = *cast(*u64, t + 8);
+		var nullable = *cast(*u64, t + 16);
 		var inner_ty = tc_type_from_asttype(inner);
 		var ptr_ty = tc_make_ptr(inner_ty, nullable);
 		if (ptr_ty == TC_TY_INVALID) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unsupported pointer base");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: unsupported pointer base");
 			return TC_TY_INVALID;
 		}
 		return ptr_ty;
 	}
 	if (kind == AstTypeKind.SLICE) {
-		var inner2 = ptr64[t + 8];
+		var inner2 = *cast(*u64, t + 8);
 		var elem_ty = tc_type_from_asttype(inner2);
 		var slice_ty = tc_make_slice(elem_ty);
 		if (slice_ty == TC_TY_INVALID) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unsupported slice element");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: unsupported slice element");
 			return TC_TY_INVALID;
 		}
 		return slice_ty;
 	}
 	if (kind == AstTypeKind.ARRAY) {
-		var inner3 = ptr64[t + 8];
-		var len = ptr64[t + 16];
-		var len_expr = ptr64[t + 48];
+		var inner3 = *cast(*u64, t + 8);
+		var len = *cast(*u64, t + 16);
+		var len_expr = *cast(*u64, t + 48);
 		if (len_expr != 0) {
 			ct_eval_failed = 0;
 			ct_eval_steps = 0;
@@ -2029,27 +1998,27 @@ func tc_type_from_asttype(t) {
 		return tc_array_new(elem_ty2, len);
 	}
 	if (kind == AstTypeKind.QUAL_NAME) {
-		var mod_ptr = ptr64[t + 8];
-		var mod_len = ptr64[t + 16];
-		var name_ptr = ptr64[t + 48];
-		var name_len = ptr64[t + 56];
+		var mod_ptr = *cast(*u64, t + 8);
+		var mod_len = *cast(*u64, t + 16);
+		var name_ptr = *cast(*u64, t + 48);
+		var name_len = *cast(*u64, t + 56);
 		if (tc_modules == 0) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: module-qualified name not supported here");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: module-qualified name not supported here");
 			return TC_TY_INVALID;
 		}
 		var mod_id = tc_module_lookup(mod_ptr, mod_len);
 		if (mod_id == 18446744073709551615) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unknown module");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: unknown module");
 			return TC_TY_INVALID;
 		}
 		if (mod_id != tc_cur_mod && tc_imports_contains(tc_cur_imports, mod_ptr, mod_len) == 0) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: module not imported");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: module not imported");
 			return TC_TY_INVALID;
 		}
 		var st = tc_struct_lookup_mod(mod_id, name_ptr, name_len);
 		if (st != 0) {
 			if (mod_id != tc_cur_mod && tc_struct_is_public(st) == 0) {
-				tc_err_at(ptr64[t + 32], ptr64[t + 40], "type is private");
+				tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type is private");
 				return TC_TY_INVALID;
 			}
 			return st;
@@ -2057,26 +2026,26 @@ func tc_type_from_asttype(t) {
 		var en = tc_enum_lookup_mod(mod_id, name_ptr, name_len);
 		if (en != 0) {
 			if (mod_id != tc_cur_mod && tc_enum_is_public(en) == 0) {
-				tc_err_at(ptr64[t + 32], ptr64[t + 40], "type is private");
+				tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type is private");
 				return TC_TY_INVALID;
 			}
 			return en;
 		}
 		var a1 = tc_type_alias_lookup_mod(mod_id, name_ptr, name_len);
 		if (a1 != 0) {
-			if (mod_id != tc_cur_mod && ptr64[a1 + 24] == 0) {
-				tc_err_at(ptr64[t + 32], ptr64[t + 40], "type is private");
+			if (mod_id != tc_cur_mod && *cast(*u64, a1 + 24) == 0) {
+				tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type is private");
 				return TC_TY_INVALID;
 			}
-			return ptr64[a1 + 32];
+			return *cast(*u64, a1 + 32);
 		}
-		tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unknown name");
+		tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: unknown name");
 		return TC_TY_INVALID;
 	}
 	if (kind == AstTypeKind.TUPLE) {
-		var elems = ptr64[t + 48];
+		var elems = *cast(*u64, t + 48);
 		if (elems == 0 || vec_len(elems) != 2) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: tuple must have 2 elements");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: tuple must have 2 elements");
 			return TC_TY_INVALID;
 		}
 		var t0 = tc_type_from_asttype(vec_get(elems, 0));
@@ -2086,27 +2055,27 @@ func tc_type_from_asttype(t) {
 		var sz0 = tc_sizeof(t0);
 		var sz1 = tc_sizeof(t1);
 		if (sz0 == 0 || sz1 == 0 || sz0 > 8 || sz1 > 8) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: tuple return elements must be <= 8 bytes");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: tuple return elements must be <= 8 bytes");
 			return TC_TY_INVALID;
 		}
 		if (tc_is_slice(t0) == 1 || tc_is_slice(t1) == 1) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: tuple return elements cannot be slices");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: tuple return elements cannot be slices");
 			return TC_TY_INVALID;
 		}
 		if (tc_is_struct(t0) == 1 || tc_is_struct(t1) == 1) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: tuple return elements cannot be structs");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: tuple return elements cannot be structs");
 			return TC_TY_INVALID;
 		}
 		if (tc_is_array(t0) == 1 || tc_is_array(t1) == 1) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: tuple return elements cannot be arrays");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: tuple return elements cannot be arrays");
 			return TC_TY_INVALID;
 		}
 		return tc_tuple2_new(t0, t1);
 	}
 	// Phase 6.7: Function pointer type
 	if (kind == AstTypeKind.FUNC_PTR) {
-		var param_types_ast = ptr64[t + 8];  // Vec* of AstType*
-		var ret_type_ast = ptr64[t + 16];    // AstType* or 0
+		var param_types_ast = *cast(*u64, t + 8);  // Vec* of AstType*
+		var ret_type_ast = *cast(*u64, t + 16);    // AstType* or 0
 		// Convert AST param types to TC types
 		var param_types_tc = 0;
 		if (param_types_ast != 0) {
@@ -2119,7 +2088,7 @@ func tc_type_from_asttype(t) {
 					var pat = vec_get(param_types_ast, i);
 					var pty = tc_type_from_asttype(pat);
 					if (pty == TC_TY_INVALID) {
-						tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: invalid function pointer param type");
+						tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: invalid function pointer param type");
 						return TC_TY_INVALID;
 					}
 					vec_push(param_types_tc, pty);
@@ -2132,61 +2101,61 @@ func tc_type_from_asttype(t) {
 		if (ret_type_ast != 0) {
 			ret_ty = tc_type_from_asttype(ret_type_ast);
 			if (ret_ty == TC_TY_INVALID) {
-				tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: invalid function pointer return type");
+				tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: invalid function pointer return type");
 				return TC_TY_INVALID;
 			}
 		}
 		return tc_make_func_ptr(param_types_tc, ret_ty);
 	}
-	tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unsupported kind");
+	tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: unsupported kind");
 	return TC_TY_INVALID;
 }
 func ct_eval_type_from_asttype(t) {
 	// MVP: comptime type-evaluator.
 	// Today it only covers AstTypeKind.GENERIC (generic struct instantiation).
 	if (t == 0) { return TC_TY_INVALID; }
-	if (ptr64[t + 0] != AstTypeKind.GENERIC) {
-		tc_err_at(ptr64[t + 32], ptr64[t + 40], "comptime type eval: unsupported kind");
+	if (*cast(*u64, t + 0) != AstTypeKind.GENERIC) {
+		tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "comptime type eval: unsupported kind");
 		return TC_TY_INVALID;
 	}
 
 	// AstType.GENERIC: name_ptr=base AstType*, qual_ptr=args Vec(AstType*).
-	var base_ast = ptr64[t + 8];
-	var args_ast = ptr64[t + 48];
+	var base_ast = *cast(*u64, t + 8);
+	var args_ast = *cast(*u64, t + 48);
 	if (base_ast == 0 || args_ast == 0) {
-		tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: malformed generic type");
+		tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: malformed generic type");
 		return TC_TY_INVALID;
 	}
-	var base_kind = ptr64[base_ast + 0];
+	var base_kind = *cast(*u64, base_ast + 0);
 	var mod_id = tc_cur_mod;
 	var name_ptr = 0;
 	var name_len = 0;
 	var templ_prog = tc_cur_ast_prog;
 	if (base_kind == AstTypeKind.NAME) {
-		name_ptr = ptr64[base_ast + 8];
-		name_len = ptr64[base_ast + 16];
+		name_ptr = *cast(*u64, base_ast + 8);
+		name_len = *cast(*u64, base_ast + 16);
 	} else if (base_kind == AstTypeKind.QUAL_NAME) {
-		var mod_ptr = ptr64[base_ast + 8];
-		var mod_len = ptr64[base_ast + 16];
-		name_ptr = ptr64[base_ast + 48];
-		name_len = ptr64[base_ast + 56];
+		var mod_ptr = *cast(*u64, base_ast + 8);
+		var mod_len = *cast(*u64, base_ast + 16);
+		name_ptr = *cast(*u64, base_ast + 48);
+		name_len = *cast(*u64, base_ast + 56);
 		if (tc_modules == 0) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: module-qualified name not supported here");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: module-qualified name not supported here");
 			return TC_TY_INVALID;
 		}
 		mod_id = tc_module_lookup(mod_ptr, mod_len);
 		if (mod_id == 18446744073709551615) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unknown module");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: unknown module");
 			return TC_TY_INVALID;
 		}
 		if (mod_id != tc_cur_mod && tc_imports_contains(tc_cur_imports, mod_ptr, mod_len) == 0) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: module not imported");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: module not imported");
 			return TC_TY_INVALID;
 		}
 		var m = vec_get(tc_modules, mod_id);
-		if (m != 0) { templ_prog = ptr64[m + 16]; }
+		if (m != 0) { templ_prog = *cast(*u64, m + 16); }
 	} else {
-		tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: generic base must be a name");
+		tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: generic base must be a name");
 		return TC_TY_INVALID;
 	}
 
@@ -2209,9 +2178,8 @@ func ct_eval_type_from_asttype(t) {
 			var aty = tc_type_from_asttype(raw);
 			if (aty == TC_TY_INVALID) { return TC_TY_INVALID; }
 			var p = tc_builtin_name_ptr_for_tctype(aty);
-			alias rdx : tl;
 			if (p == 0 || tl == 0) {
-				tc_err_at(ptr64[t + 32], ptr64[t + 40], "generic type arg: unsupported (MVP builtin-only)");
+				tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "generic type arg: unsupported (MVP builtin-only)");
 				return TC_TY_INVALID;
 			}
 			var mix = aty * 2;
@@ -2239,7 +2207,7 @@ func ct_eval_type_from_asttype(t) {
 	if (ent != 0) {
 		var want = lw_typefn_entry_arity(ent);
 		if (want != argc_total) {
-			tc_err_at(ptr64[t + 32], ptr64[t + 40], "generic struct: type arg count mismatch");
+			tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "generic struct: type arg count mismatch");
 			return TC_TY_INVALID;
 		}
 		// Keep the synthetic decl reachable for future evaluator integration.
@@ -2249,14 +2217,13 @@ func ct_eval_type_from_asttype(t) {
 
 	// Mangle instantiated type name and return existing instance if present.
 	var new_name_ptr = tc_mangle_generic_inst_name_mixed(name_ptr, name_len, ct_tmp_args_mixed);
-	alias rdx : new_name_len_reg;
 	var new_name_len = new_name_len_reg;
 	if (new_name_ptr == 0) {
-		tc_err_at(ptr64[t + 32], ptr64[t + 40], "generic struct: failed to mangle instantiation name (ptr)");
+		tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "generic struct: failed to mangle instantiation name (ptr)");
 		return TC_TY_INVALID;
 	}
 	if (new_name_len == 0) {
-		tc_err_at(ptr64[t + 32], ptr64[t + 40], "generic struct: failed to mangle instantiation name (len)");
+		tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "generic struct: failed to mangle instantiation name (len)");
 		return TC_TY_INVALID;
 	}
 	var existing = tc_struct_lookup_mod(mod_id, new_name_ptr, new_name_len);
@@ -2266,12 +2233,12 @@ func ct_eval_type_from_asttype(t) {
 	if (ent != 0) { templ = lw_typefn_entry_templ_decl(ent); }
 	if (templ == 0) { templ = tc_find_generic_struct_template_decl(templ_prog, name_ptr, name_len); }
 	if (templ == 0) {
-		tc_err_at(ptr64[t + 32], ptr64[t + 40], "type: unknown generic struct template");
+		tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type: unknown generic struct template");
 		return TC_TY_INVALID;
 	}
-	var is_public = ptr64[templ + 72];
+	var is_public = *cast(*u64, templ + 72);
 	if (mod_id != tc_cur_mod && is_public == 0) {
-		tc_err_at(ptr64[t + 32], ptr64[t + 40], "type is private");
+		tc_err_at(*cast(*u64, t + 32), *cast(*u64, t + 40), "type is private");
 		return TC_TY_INVALID;
 	}
 	return tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, ct_tmp_args_mixed, ct_tmp_type_args_tc, mod_id);
@@ -2284,17 +2251,17 @@ func tc_find_generic_struct_template_decl(prog, name_ptr, name_len) {
 	if (d0 != 0) { return d0; }
 
 	if (prog == 0) { return 0; }
-	var decls = ptr64[prog + 0];
+	var decls = *cast(*u64, prog + 0);
 	if (decls == 0) { return 0; }
 	var n = vec_len(decls);
 	var i = 0;
 	while (i < n) {
 		var d = vec_get(decls, i);
-		if (d != 0 && ptr64[d + 0] == AstDeclKind.STRUCT) {
-			if (slice_eq_parts(ptr64[d + 8], ptr64[d + 16], name_ptr, name_len) == 1) {
-				var flags = ptr64[d + 80];
+		if (d != 0 && *cast(*u64, d + 0) == AstDeclKind.STRUCT) {
+			if (slice_eq_parts(*cast(*u64, d + 8), *cast(*u64, d + 16), name_ptr, name_len) == 1) {
+				var flags = *cast(*u64, d + 80);
 				var tflag0 = flags & TC_DECL_FLAG_GENERIC_TEMPLATE;
-				var tparams = ptr64[d + 96];
+				var tparams = *cast(*u64, d + 96);
 				if (tflag0 != 0 || tparams != 0) {
 					return d;
 				}
@@ -2308,15 +2275,15 @@ func tc_find_generic_struct_template_decl(prog, name_ptr, name_len) {
 func tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, args_mixed, type_args_tc, mod_id) {
 	// Returns instantiated TC_COMPOUND_STRUCT type pointer (or TC_TY_INVALID on error).
 	if (templ == 0) { return TC_TY_INVALID; }
-	var is_public = ptr64[templ + 72];
+	var is_public = *cast(*u64, templ + 72);
 	var existing = tc_struct_lookup_mod(mod_id, new_name_ptr, new_name_len);
 	if (existing != 0) { return existing; }
 
-	var type_params = ptr64[templ + 96];
+	var type_params = *cast(*u64, templ + 96);
 	if (type_params == 0 || args_mixed == 0 || type_args_tc == 0) { return TC_TY_INVALID; }
 	var argc_total = vec_len(args_mixed);
 	if (vec_len(type_params) != argc_total) {
-		tc_err_at(ptr64[templ + 56], ptr64[templ + 64], "generic struct: type arg count mismatch");
+		tc_err_at(*cast(*u64, templ + 56), *cast(*u64, templ + 64), "generic struct: type arg count mismatch");
 		return TC_TY_INVALID;
 	}
 
@@ -2327,28 +2294,28 @@ func tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, args_
 	while (pi0 < argc_total) {
 		var ent0 = vec_get(type_params, pi0);
 		var ann = 0;
-		if (ent0 != 0) { ann = ptr64[ent0 + 16]; }
+		if (ent0 != 0) { ann = *cast(*u64, ent0 + 16); }
 		var arg0 = vec_get(args_mixed, pi0);
 		var arg_tag = arg0 & 1;
 		if (ann != 0) {
 			// value param; currently only allow u64
 			var ann_tc = tc_type_from_asttype(ann);
 			if (ann_tc != TC_TY_U64) {
-				tc_err_at(ptr64[templ + 56], ptr64[templ + 64], "generic struct: value params must be u64 (MVP)");
+				tc_err_at(*cast(*u64, templ + 56), *cast(*u64, templ + 64), "generic struct: value params must be u64 (MVP)");
 				ct_value_env = saved_env;
 				return TC_TY_INVALID;
 			}
 			if (arg_tag == 0) {
-				tc_err_at(ptr64[templ + 56], ptr64[templ + 64], "generic struct: expected value arg");
+				tc_err_at(*cast(*u64, templ + 56), *cast(*u64, templ + 64), "generic struct: expected value arg");
 				ct_value_env = saved_env;
 				return TC_TY_INVALID;
 			}
 			var v0 = arg0 / 2;
-			ct_env_u64_push(ptr64[ent0 + 0], ptr64[ent0 + 8], v0);
+			ct_env_u64_push(*cast(*u64, ent0 + 0), *cast(*u64, ent0 + 8), v0);
 		} else {
 			// type param
 			if (arg_tag != 0) {
-				tc_err_at(ptr64[templ + 56], ptr64[templ + 64], "generic struct: expected type arg");
+				tc_err_at(*cast(*u64, templ + 56), *cast(*u64, templ + 64), "generic struct: expected type arg");
 				ct_value_env = saved_env;
 				return TC_TY_INVALID;
 			}
@@ -2356,7 +2323,7 @@ func tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, args_
 		pi0 = pi0 + 1;
 	}
 
-	var ast_fields = ptr64[templ + 24];
+	var ast_fields = *cast(*u64, templ + 24);
 	var fields = vec_new(8);
 	if (fields == 0) { ct_value_env = saved_env; return TC_TY_INVALID; }
 
@@ -2367,19 +2334,19 @@ func tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, args_
 	var i = 0;
 	while (i < n) {
 		var st = vec_get(ast_fields, i);
-		var fname_ptr = ptr64[st + 32];
-		var fname_len = ptr64[st + 40];
-		var fpublic = ptr64[st + 8];
-		var fattr = ptr64[st + 16];
-		var fattr_args = ptr64[st + 24];
-		var fty_ast0 = ptr64[st + 48];
+		var fname_ptr = *cast(*u64, st + 32);
+		var fname_len = *cast(*u64, st + 40);
+		var fpublic = *cast(*u64, st + 8);
+		var fattr = *cast(*u64, st + 16);
+		var fattr_args = *cast(*u64, st + 24);
+		var fty_ast0 = *cast(*u64, st + 48);
 		var fty_ast = tc_clone_type_subst(fty_ast0, type_params, type_args_tc);
 		var fty = tc_type_from_asttype(fty_ast);
 		if (fty == TC_TY_INVALID) { i = i + 1; continue; }
 		var f_align = tc_alignof(fty);
 		var f_size = tc_sizeof(fty);
 		if (f_size == 0) {
-			tc_err_at(ptr64[st + 72], ptr64[st + 80], "struct field: unsupported type");
+			tc_err_at(*cast(*u64, st + 72), *cast(*u64, st + 80), "struct field: unsupported type");
 			i = i + 1;
 			continue;
 		}
@@ -2390,24 +2357,24 @@ func tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, args_
 
 		var f = heap_alloc(96);
 		if (f == 0) { ct_value_env = saved_env; return TC_TY_INVALID; }
-		ptr64[f + 0] = fname_ptr;
-		ptr64[f + 8] = fname_len;
-		ptr64[f + 16] = fty;
-		ptr64[f + 24] = off;
-		ptr64[f + 32] = fpublic;
-		ptr64[f + 40] = fattr;
-		ptr64[f + 48] = 0;
-		ptr64[f + 56] = 0;
-		ptr64[f + 64] = 0;
-		ptr64[f + 72] = 0;
+		*cast(*u64, f + 0) = fname_ptr;
+		*cast(*u64, f + 8) = fname_len;
+		*cast(*u64, f + 16) = fty;
+		*cast(*u64, f + 24) = off;
+		*cast(*u64, f + 32) = fpublic;
+		*cast(*u64, f + 40) = fattr;
+		*cast(*u64, f + 48) = 0;
+		*cast(*u64, f + 56) = 0;
+		*cast(*u64, f + 64) = 0;
+		*cast(*u64, f + 72) = 0;
 		if (fattr_args != 0) {
-			ptr64[f + 48] = ptr64[fattr_args + 0];
-			ptr64[f + 56] = ptr64[fattr_args + 8];
-			ptr64[f + 64] = ptr64[fattr_args + 16];
-			ptr64[f + 72] = ptr64[fattr_args + 24];
+			*cast(*u64, f + 48) = *cast(*u64, fattr_args + 0);
+			*cast(*u64, f + 56) = *cast(*u64, fattr_args + 8);
+			*cast(*u64, f + 64) = *cast(*u64, fattr_args + 16);
+			*cast(*u64, f + 72) = *cast(*u64, fattr_args + 24);
 		}
-		ptr64[f + 80] = ptr64[st + 72];
-		ptr64[f + 88] = ptr64[st + 80];
+		*cast(*u64, f + 80) = *cast(*u64, st + 72);
+		*cast(*u64, f + 88) = *cast(*u64, st + 80);
 		vec_push(fields, f);
 		i = i + 1;
 	}
@@ -2418,19 +2385,18 @@ func tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, args_
 	var size = tc_align_up(cur, align);
 	var t = heap_alloc(64);
 	if (t == 0) { ct_value_env = saved_env; return TC_TY_INVALID; }
-	ptr64[t + 0] = TC_COMPOUND_STRUCT;
-	ptr64[t + 8] = new_name_ptr;
-	ptr64[t + 16] = new_name_len;
-	ptr64[t + 24] = fields;
-	ptr64[t + 32] = size;
-	ptr64[t + 40] = align;
-	ptr64[t + 48] = mod_id;
-	ptr64[t + 56] = is_public;
+	*cast(*u64, t + 0) = TC_COMPOUND_STRUCT;
+	*cast(*u64, t + 8) = new_name_ptr;
+	*cast(*u64, t + 16) = new_name_len;
+	*cast(*u64, t + 24) = fields;
+	*cast(*u64, t + 32) = size;
+	*cast(*u64, t + 40) = align;
+	*cast(*u64, t + 48) = mod_id;
+	*cast(*u64, t + 56) = is_public;
 	vec_push(tc_structs, t);
 	// HashMap insert for O(1) lookup
 	if (tc_structs_map != 0) {
 		var key_ptr_s = tc_make_key(mod_id, new_name_ptr, new_name_len);
-		alias rdx : key_len_s;
 		hashmap_put(tc_structs_map, key_ptr_s, key_len_s, t);
 	}
 	return t;
@@ -2438,14 +2404,14 @@ func tc_instantiate_generic_struct_decl(templ, new_name_ptr, new_name_len, args_
 
 func tc_register_struct_decl(d, mod_id, is_public) {
 	// Returns 1 if an error occurred.
-	var name_ptr = ptr64[d + 8];
-	var name_len = ptr64[d + 16];
+	var name_ptr = *cast(*u64, d + 8);
+	var name_len = *cast(*u64, d + 16);
 	if (tc_struct_lookup_mod(mod_id, name_ptr, name_len) != 0) {
-		tc_err_at(ptr64[d + 56], ptr64[d + 64], "duplicate struct name");
+		tc_err_at(*cast(*u64, d + 56), *cast(*u64, d + 64), "duplicate struct name");
 		return 1;
 	}
 
-	var ast_fields = ptr64[d + 24]; // Vec of AstStmt(VAR)*
+	var ast_fields = *cast(*u64, d + 24); // Vec of AstStmt(VAR)*
 	var fields = vec_new(8);
 	if (fields == 0) { return 1; }
 
@@ -2456,12 +2422,12 @@ func tc_register_struct_decl(d, mod_id, is_public) {
 	var i = 0;
 	while (i < n) {
 		var st = vec_get(ast_fields, i);
-		var fname_ptr = ptr64[st + 32];
-		var fname_len = ptr64[st + 40];
-		var fpublic = ptr64[st + 8];
-		var fattr = ptr64[st + 16];
-		var fattr_args = ptr64[st + 24];
-		var fty_ast = ptr64[st + 48];
+		var fname_ptr = *cast(*u64, st + 32);
+		var fname_len = *cast(*u64, st + 40);
+		var fpublic = *cast(*u64, st + 8);
+		var fattr = *cast(*u64, st + 16);
+		var fattr_args = *cast(*u64, st + 24);
+		var fty_ast = *cast(*u64, st + 48);
 		var fty = tc_type_from_asttype(fty_ast);
 		if (fty == TC_TY_INVALID) {
 			// error already reported
@@ -2471,7 +2437,7 @@ func tc_register_struct_decl(d, mod_id, is_public) {
 		var f_align = tc_alignof(fty);
 		var f_size = tc_sizeof(fty);
 		if (f_size == 0) {
-			tc_err_at(ptr64[st + 72], ptr64[st + 80], "struct field: unsupported type");
+			tc_err_at(*cast(*u64, st + 72), *cast(*u64, st + 80), "struct field: unsupported type");
 			i = i + 1;
 			continue;
 		}
@@ -2482,26 +2448,26 @@ func tc_register_struct_decl(d, mod_id, is_public) {
 
 		var f = heap_alloc(96);
 		if (f == 0) { return 1; }
-		ptr64[f + 0] = fname_ptr;
-		ptr64[f + 8] = fname_len;
-		ptr64[f + 16] = fty;
-		ptr64[f + 24] = off;
-		ptr64[f + 32] = fpublic;
-		ptr64[f + 40] = fattr;
+		*cast(*u64, f + 0) = fname_ptr;
+		*cast(*u64, f + 8) = fname_len;
+		*cast(*u64, f + 16) = fty;
+		*cast(*u64, f + 24) = off;
+		*cast(*u64, f + 32) = fpublic;
+		*cast(*u64, f + 40) = fattr;
 		// Optional property hook target functions from parser: @[getter(func)] / @[setter(func)]
-		ptr64[f + 48] = 0;
-		ptr64[f + 56] = 0;
-		ptr64[f + 64] = 0;
-		ptr64[f + 72] = 0;
+		*cast(*u64, f + 48) = 0;
+		*cast(*u64, f + 56) = 0;
+		*cast(*u64, f + 64) = 0;
+		*cast(*u64, f + 72) = 0;
 		if (fattr_args != 0) {
-			ptr64[f + 48] = ptr64[fattr_args + 0];
-			ptr64[f + 56] = ptr64[fattr_args + 8];
-			ptr64[f + 64] = ptr64[fattr_args + 16];
-			ptr64[f + 72] = ptr64[fattr_args + 24];
+			*cast(*u64, f + 48) = *cast(*u64, fattr_args + 0);
+			*cast(*u64, f + 56) = *cast(*u64, fattr_args + 8);
+			*cast(*u64, f + 64) = *cast(*u64, fattr_args + 16);
+			*cast(*u64, f + 72) = *cast(*u64, fattr_args + 24);
 		}
 		// Store source location for diagnostics.
-		ptr64[f + 80] = ptr64[st + 72];
-		ptr64[f + 88] = ptr64[st + 80];
+		*cast(*u64, f + 80) = *cast(*u64, st + 72);
+		*cast(*u64, f + 88) = *cast(*u64, st + 80);
 		vec_push(fields, f);
 		i = i + 1;
 	}
@@ -2509,19 +2475,18 @@ func tc_register_struct_decl(d, mod_id, is_public) {
 	var size = tc_align_up(cur, align);
 	var t = heap_alloc(64);
 	if (t == 0) { return 1; }
-	ptr64[t + 0] = TC_COMPOUND_STRUCT;
-	ptr64[t + 8] = name_ptr;
-	ptr64[t + 16] = name_len;
-	ptr64[t + 24] = fields;
-	ptr64[t + 32] = size;
-	ptr64[t + 40] = align;
-	ptr64[t + 48] = mod_id;
-	ptr64[t + 56] = is_public;
+	*cast(*u64, t + 0) = TC_COMPOUND_STRUCT;
+	*cast(*u64, t + 8) = name_ptr;
+	*cast(*u64, t + 16) = name_len;
+	*cast(*u64, t + 24) = fields;
+	*cast(*u64, t + 32) = size;
+	*cast(*u64, t + 40) = align;
+	*cast(*u64, t + 48) = mod_id;
+	*cast(*u64, t + 56) = is_public;
 	vec_push(tc_structs, t);
 	// HashMap insert for O(1) lookup
 	if (tc_structs_map != 0) {
 		var key_ptr_s = tc_make_key(mod_id, name_ptr, name_len);
-		alias rdx : key_len_s;
 		hashmap_put(tc_structs_map, key_ptr_s, key_len_s, t);
 	}
 	return 0;
@@ -2529,30 +2494,29 @@ func tc_register_struct_decl(d, mod_id, is_public) {
 
 func tc_register_enum_decl(d, mod_id, is_public) {
 	// Returns 1 if an error occurred.
-	var name_ptr = ptr64[d + 8];
-	var name_len = ptr64[d + 16];
+	var name_ptr = *cast(*u64, d + 8);
+	var name_len = *cast(*u64, d + 16);
 	if (tc_enum_lookup_mod(mod_id, name_ptr, name_len) != 0) {
-		tc_err_at(ptr64[d + 56], ptr64[d + 64], "duplicate enum name");
+		tc_err_at(*cast(*u64, d + 56), *cast(*u64, d + 64), "duplicate enum name");
 		return 1;
 	}
 	if (tc_struct_lookup_mod(mod_id, name_ptr, name_len) != 0) {
-		tc_err_at(ptr64[d + 56], ptr64[d + 64], "enum name conflicts with struct");
+		tc_err_at(*cast(*u64, d + 56), *cast(*u64, d + 64), "enum name conflicts with struct");
 		return 1;
 	}
-	var variants = ptr64[d + 24];
+	var variants = *cast(*u64, d + 24);
 	var t = heap_alloc(48);
 	if (t == 0) { return 1; }
-	ptr64[t + 0] = TC_COMPOUND_ENUM;
-	ptr64[t + 8] = name_ptr;
-	ptr64[t + 16] = name_len;
-	ptr64[t + 24] = variants;
-	ptr64[t + 32] = mod_id;
-	ptr64[t + 40] = is_public;
+	*cast(*u64, t + 0) = TC_COMPOUND_ENUM;
+	*cast(*u64, t + 8) = name_ptr;
+	*cast(*u64, t + 16) = name_len;
+	*cast(*u64, t + 24) = variants;
+	*cast(*u64, t + 32) = mod_id;
+	*cast(*u64, t + 40) = is_public;
 	vec_push(tc_enums, t);
 	// HashMap insert for O(1) lookup
 	if (tc_enums_map != 0) {
 		var key_ptr_e = tc_make_key(mod_id, name_ptr, name_len);
-		alias rdx : key_len_e;
 		hashmap_put(tc_enums_map, key_ptr_e, key_len_e, t);
 	}
 	return 0;
@@ -2571,9 +2535,9 @@ func tc_env_push(env, name_ptr, name_len, ty) {
 
 	var ent = heap_alloc(24);
 	if (ent == 0) { return 0; }
-	ptr64[ent + 0] = name_ptr2;
-	ptr64[ent + 8] = name_len2;
-	ptr64[ent + 16] = ty2;
+	*cast(*u64, ent + 0) = name_ptr2;
+	*cast(*u64, ent + 8) = name_len2;
+	*cast(*u64, ent + 16) = ty2;
 	vec_push(env2, ent);
 	return 0;
 }
@@ -2584,22 +2548,22 @@ func tc_env_get(env, name_ptr, name_len) {
 	// env 조회가 실패할 수 있다. 여기서는 Vec 레이아웃을 직접 읽고 비교도 인라인한다.
 	if (env == 0) { return TC_TY_INVALID; }
 	if (name_ptr == 0) { return TC_TY_INVALID; }
-	var buf = ptr64[env + 0];
-	var n = ptr64[env + 8];
+	var buf = *cast(*u64, env + 0);
+	var n = *cast(*u64, env + 8);
 	while (n != 0) {
 		n = n - 1;
-		var ent = ptr64[buf + (n * 8)];
+		var ent = *cast(*u64, buf + (n * 8));
 		if (ent != 0) {
-			var enp = ptr64[ent + 0];
-			var enl = ptr64[ent + 8];
+			var enp = *cast(*u64, ent + 0);
+			var enl = *cast(*u64, ent + 8);
 			if (enl == name_len && enp != 0) {
 				var i = 0;
 				var ok = 1;
 				while (i < name_len) {
-					if (ptr8[enp + i] != ptr8[name_ptr + i]) { ok = 0; break; }
+					if (*cast(*u8, enp + i) != *cast(*u8, name_ptr + i)) { ok = 0; break; }
 					i = i + 1;
 				}
-				if (ok == 1) { return ptr64[ent + 16]; }
+				if (ok == 1) { return *cast(*u64, ent + 16); }
 			}
 		}
 	}
@@ -2627,7 +2591,6 @@ func tc_builtin_name_ptr_for_tctype(ty) {
 	// Phase 6.6: floating-point
 	if (ty == TC_TY_F32) { alias rdx : l10; l10 = 3; return "f32"; }
 	if (ty == TC_TY_F64) { alias rdx : l11; l11 = 3; return "f64"; }
-	alias rdx : z;
 	z = 0;
 	return 0;
 }
@@ -2637,9 +2600,9 @@ func ct_env_u64_push(name_ptr, name_len, value_u64) {
 	if (ct_value_env == 0) { return 0; }
 	var ent = heap_alloc(24);
 	if (ent == 0) { return 0; }
-	ptr64[ent + 0] = name_ptr;
-	ptr64[ent + 8] = name_len;
-	ptr64[ent + 16] = value_u64;
+	*cast(*u64, ent + 0) = name_ptr;
+	*cast(*u64, ent + 8) = name_len;
+	*cast(*u64, ent + 16) = value_u64;
 	vec_push(ct_value_env, ent);
 	return 0;
 }
@@ -2654,8 +2617,8 @@ func ct_env_u64_lookup(name_ptr, name_len) {
 		while (i < n) {
 			var ent = vec_get(ct_value_env, i);
 			if (ent != 0) {
-				if (slice_eq_parts(ptr64[ent + 0], ptr64[ent + 8], name_ptr, name_len) == 1) {
-					v = ptr64[ent + 16];
+				if (slice_eq_parts(*cast(*u64, ent + 0), *cast(*u64, ent + 8), name_ptr, name_len) == 1) {
+					v = *cast(*u64, ent + 16);
 					ok0 = 1;
 					break;
 				}
@@ -2663,7 +2626,6 @@ func ct_env_u64_lookup(name_ptr, name_len) {
 			i = i + 1;
 		}
 	}
-	alias rdx : ok;
 	ok = ok0;
 	return v;
 }
@@ -2675,20 +2637,19 @@ func ct_eval_u64_expr(e) {
 	}
 	if (ct_eval_step_limit == 0) { ct_eval_step_limit = 100000; }
 	if (ct_eval_step() != 0) {
-		tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: step limit exceeded");
+		tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: step limit exceeded");
 		ct_eval_failed = 1;
 		return 0;
 	}
-	var k = ptr64[e + 0];
+	var k = *cast(*u64, e + 0);
 	if (k == AstExprKind.INT) {
 		ct_eval_failed = 0;
-		return tc_parse_u64_literal(ptr64[e + 40], ptr64[e + 48]);
+		return tc_parse_u64_literal(*cast(*u64, e + 40), *cast(*u64, e + 48));
 	}
 	if (k == AstExprKind.IDENT) {
-		var v0 = ct_env_u64_lookup(ptr64[e + 40], ptr64[e + 48]);
-		alias rdx : ok0;
+		var v0 = ct_env_u64_lookup(*cast(*u64, e + 40), *cast(*u64, e + 48));
 		if (ok0 == 0) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: unknown identifier");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: unknown identifier");
 			ct_eval_failed = 1;
 			return 0;
 		}
@@ -2696,12 +2657,12 @@ func ct_eval_u64_expr(e) {
 		return v0;
 	}
 	if (k == AstExprKind.UNARY) {
-		var op = ptr64[e + 8];
-		var rhs = ct_eval_u64_expr(ptr64[e + 16]);
+		var op = *cast(*u64, e + 8);
+		var rhs = ct_eval_u64_expr(*cast(*u64, e + 16));
 		if (ct_eval_failed != 0) { return 0; }
 		if (op == TokKind.PLUS) { ct_eval_failed = 0; return rhs; }
 		if (op == TokKind.MINUS) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: unary '-' not allowed for u64");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: unary '-' not allowed for u64");
 			ct_eval_failed = 1;
 			return 0;
 		}
@@ -2711,15 +2672,15 @@ func ct_eval_u64_expr(e) {
 			ct_eval_failed = 0;
 			return 0;
 		}
-		tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: unsupported unary op");
+		tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: unsupported unary op");
 		ct_eval_failed = 1;
 		return 0;
 	}
 	if (k == AstExprKind.BINARY) {
-		var op2 = ptr64[e + 8];
-		var lhs = ct_eval_u64_expr(ptr64[e + 16]);
+		var op2 = *cast(*u64, e + 8);
+		var lhs = ct_eval_u64_expr(*cast(*u64, e + 16));
 		if (ct_eval_failed != 0) { return 0; }
-		var rhs2 = ct_eval_u64_expr(ptr64[e + 24]);
+		var rhs2 = ct_eval_u64_expr(*cast(*u64, e + 24));
 		if (ct_eval_failed != 0) { return 0; }
 		// Boolean-y operators return 0/1.
 		if (op2 == TokKind.EQEQ) { ct_eval_failed = 0; if (lhs == rhs2) { return 1; } return 0; }
@@ -2733,7 +2694,7 @@ func ct_eval_u64_expr(e) {
 		if (op2 == TokKind.PLUS) { ct_eval_failed = 0; return lhs + rhs2; }
 		if (op2 == TokKind.MINUS) {
 			if (lhs < rhs2) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: u64 underflow");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: u64 underflow");
 				ct_eval_failed = 1;
 				return 0;
 			}
@@ -2743,7 +2704,7 @@ func ct_eval_u64_expr(e) {
 		if (op2 == TokKind.STAR) { ct_eval_failed = 0; return lhs * rhs2; }
 		if (op2 == TokKind.SLASH) {
 			if (rhs2 == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: division by zero");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: division by zero");
 				ct_eval_failed = 1;
 				return 0;
 			}
@@ -2752,7 +2713,7 @@ func ct_eval_u64_expr(e) {
 		}
 		if (op2 == TokKind.PERCENT) {
 			if (rhs2 == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: mod by zero");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: mod by zero");
 				ct_eval_failed = 1;
 				return 0;
 			}
@@ -2764,7 +2725,7 @@ func ct_eval_u64_expr(e) {
 		if (op2 == TokKind.CARET) { ct_eval_failed = 0; return lhs ^ rhs2; }
 		if (op2 == TokKind.LSHIFT) {
 			if (rhs2 >= 64) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: shift amount too large");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: shift amount too large");
 				ct_eval_failed = 1;
 				return 0;
 			}
@@ -2773,18 +2734,18 @@ func ct_eval_u64_expr(e) {
 		}
 		if (op2 == TokKind.RSHIFT) {
 			if (rhs2 >= 64) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: shift amount too large");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: shift amount too large");
 				ct_eval_failed = 1;
 				return 0;
 			}
 			ct_eval_failed = 0;
 			return lhs >> rhs2;
 		}
-		tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: unsupported binary op");
+		tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: unsupported binary op");
 		ct_eval_failed = 1;
 		return 0;
 	}
-	tc_err_at(ptr64[e + 64], ptr64[e + 72], "comptime: unsupported expression");
+	tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comptime: unsupported expression");
 	ct_eval_failed = 1;
 	return 0;
 }
@@ -2807,7 +2768,7 @@ func tc_write_u64_dec(buf, off, v) {
 		v = v / 10;
 		var pos = len - 1;
 		pos = pos - i;
-		ptr8[buf + off + pos] = 48 + digit;
+		*cast(*u8, buf + off + pos) = 48 + digit;
 		i = i + 1;
 	}
 	return len;
@@ -2816,12 +2777,10 @@ func tc_write_u64_dec(buf, off, v) {
 func tc_mangle_generic_inst_name_mixed(base_ptr, base_len, args_mixed) {
 	// Returns: rax=ptr, rdx=len
 	if (base_ptr == 0 || base_len == 0) {
-		alias rdx : z;
 		z = 0;
 		return 0;
 	}
 	if (args_mixed == 0) {
-		alias rdx : out0;
 		out0 = base_len;
 		return base_ptr;
 	}
@@ -2834,9 +2793,7 @@ func tc_mangle_generic_inst_name_mixed(base_ptr, base_len, args_mixed) {
 		if (tag0 == 0) {
 			var ty = arg0 / 2;
 			var tptr = tc_builtin_name_ptr_for_tctype(ty);
-			alias rdx : tlen;
 			if (tptr == 0 || tlen == 0) {
-				alias rdx : z2;
 				z2 = 0;
 				return 0;
 			}
@@ -2851,13 +2808,12 @@ func tc_mangle_generic_inst_name_mixed(base_ptr, base_len, args_mixed) {
 	if (alloc_len < 16) { alloc_len = 16; }
 	var out_ptr = heap_alloc(alloc_len);
 	if (out_ptr == 0) {
-		alias rdx : z3;
 		z3 = 0;
 		return 0;
 	}
 	var j = 0;
 	while (j < base_len) {
-		ptr8[out_ptr + j] = ptr8[base_ptr + j];
+		*cast(*u8, out_ptr + j) = *cast(*u8, base_ptr + j);
 		j = j + 1;
 	}
 	var off0 = base_len;
@@ -2866,47 +2822,45 @@ func tc_mangle_generic_inst_name_mixed(base_ptr, base_len, args_mixed) {
 		var arg1 = vec_get(args_mixed, i);
 		var tag1 = arg1 & 1;
 		if (tag1 == 0) {
-			ptr8[out_ptr + off0 + 0] = 95;
-			ptr8[out_ptr + off0 + 1] = 95;
+			*cast(*u8, out_ptr + off0 + 0) = 95;
+			*cast(*u8, out_ptr + off0 + 1) = 95;
 			off0 = off0 + 2;
 			var ty2 = arg1 / 2;
 			var tptr2 = tc_builtin_name_ptr_for_tctype(ty2);
-			alias rdx : tlen2;
 			var k = 0;
 			while (k < tlen2) {
-				ptr8[out_ptr + off0 + k] = ptr8[tptr2 + k];
+				*cast(*u8, out_ptr + off0 + k) = *cast(*u8, tptr2 + k);
 				k = k + 1;
 			}
 			off0 = off0 + tlen2;
 		} else {
-			ptr8[out_ptr + off0 + 0] = 95;
-			ptr8[out_ptr + off0 + 1] = 95;
-			ptr8[out_ptr + off0 + 2] = 118; // 'v'
+			*cast(*u8, out_ptr + off0 + 0) = 95;
+			*cast(*u8, out_ptr + off0 + 1) = 95;
+			*cast(*u8, out_ptr + off0 + 2) = 118; // 'v'
 			off0 = off0 + 3;
 			var v1 = arg1 / 2;
 			off0 = off0 + tc_write_u64_dec(out_ptr, off0, v1);
 		}
 		i = i + 1;
 	}
-	alias rdx : out_len_ret;
 	out_len_ret = out_len;
 	return out_ptr;
 }
 
 func tc_find_generic_func_template_decl(prog, name_ptr, name_len) {
 	if (prog == 0) { return 0; }
-	var decls = ptr64[prog + 0];
+	var decls = *cast(*u64, prog + 0);
 	if (decls == 0) { return 0; }
 	var n = vec_len(decls);
 	var i = 0;
 	while (i < n) {
 		var d = vec_get(decls, i);
-		if (d != 0 && ptr64[d + 0] == AstDeclKind.FUNC) {
-			var flags = ptr64[d + 80];
+		if (d != 0 && *cast(*u64, d + 0) == AstDeclKind.FUNC) {
+			var flags = *cast(*u64, d + 80);
 			var tflag0 = flags & TC_DECL_FLAG_GENERIC_TEMPLATE;
-			var tparams0 = ptr64[d + 96];
+			var tparams0 = *cast(*u64, d + 96);
 			if (tflag0 != 0 || tparams0 != 0) {
-				if (slice_eq_parts(ptr64[d + 8], ptr64[d + 16], name_ptr, name_len) == 1) {
+				if (slice_eq_parts(*cast(*u64, d + 8), *cast(*u64, d + 16), name_ptr, name_len) == 1) {
 					return d;
 				}
 			}
@@ -2918,14 +2872,14 @@ func tc_find_generic_func_template_decl(prog, name_ptr, name_len) {
 
 func tc_ast_prog_has_func_name(prog, name_ptr, name_len) {
 	if (prog == 0) { return 0; }
-	var decls = ptr64[prog + 0];
+	var decls = *cast(*u64, prog + 0);
 	if (decls == 0) { return 0; }
 	var n = vec_len(decls);
 	var i = 0;
 	while (i < n) {
 		var d = vec_get(decls, i);
-		if (d != 0 && ptr64[d + 0] == AstDeclKind.FUNC) {
-			if (slice_eq_parts(ptr64[d + 8], ptr64[d + 16], name_ptr, name_len) == 1) { return 1; }
+		if (d != 0 && *cast(*u64, d + 0) == AstDeclKind.FUNC) {
+			if (slice_eq_parts(*cast(*u64, d + 8), *cast(*u64, d + 16), name_ptr, name_len) == 1) { return 1; }
 		}
 		i = i + 1;
 	}
@@ -2940,9 +2894,7 @@ func tc_mangle_generic_inst_name(base_ptr, base_len, type_args_tc, type_argc) {
 	while (i < type_argc) {
 		var ty = vec_get(type_args_tc, i);
 		var tptr = tc_builtin_name_ptr_for_tctype(ty);
-		alias rdx : tlen;
 		if (tptr == 0 || tlen == 0) {
-			alias rdx : z;
 			z = 0;
 			return 0;
 		}
@@ -2953,27 +2905,24 @@ func tc_mangle_generic_inst_name(base_ptr, base_len, type_args_tc, type_argc) {
 	if (alloc_len < 16) { alloc_len = 16; }
 	var out_ptr = heap_alloc(alloc_len);
 	if (out_ptr == 0) {
-		alias rdx : z2;
 		z2 = 0;
 		return 0;
 	}
 	var j = 0;
-	while (j < base_len) { ptr8[out_ptr + j] = ptr8[base_ptr + j]; j = j + 1; }
+	while (j < base_len) { *cast(*u8, out_ptr + j) = *cast(*u8, base_ptr + j); j = j + 1; }
 	var off = base_len;
 	i = 0;
 	while (i < type_argc) {
-		ptr8[out_ptr + off + 0] = 95;
-		ptr8[out_ptr + off + 1] = 95;
+		*cast(*u8, out_ptr + off + 0) = 95;
+		*cast(*u8, out_ptr + off + 1) = 95;
 		off = off + 2;
 		var ty2 = vec_get(type_args_tc, i);
 		var tptr2 = tc_builtin_name_ptr_for_tctype(ty2);
-		alias rdx : tlen2;
 		var k = 0;
-		while (k < tlen2) { ptr8[out_ptr + off + k] = ptr8[tptr2 + k]; k = k + 1; }
+		while (k < tlen2) { *cast(*u8, out_ptr + off + k) = *cast(*u8, tptr2 + k); k = k + 1; }
 		off = off + tlen2;
 		i = i + 1;
 	}
-	alias rdx : out_len_ret;
 	out_len_ret = out_len;
 	return out_ptr;
 }
@@ -2983,28 +2932,27 @@ func tc_clone_type_subst(t, type_params, type_args_tc) {
 	if (t == 0) { return 0; }
 	var out = heap_alloc(64);
 	if (out == 0) { return 0; }
-	ptr64[out + 0] = ptr64[t + 0];
-	ptr64[out + 8] = ptr64[t + 8];
-	ptr64[out + 16] = ptr64[t + 16];
-	ptr64[out + 24] = ptr64[t + 24];
-	ptr64[out + 32] = ptr64[t + 32];
-	ptr64[out + 40] = ptr64[t + 40];
-	ptr64[out + 48] = ptr64[t + 48];
-	ptr64[out + 56] = ptr64[t + 56];
+	*cast(*u64, out + 0) = *cast(*u64, t + 0);
+	*cast(*u64, out + 8) = *cast(*u64, t + 8);
+	*cast(*u64, out + 16) = *cast(*u64, t + 16);
+	*cast(*u64, out + 24) = *cast(*u64, t + 24);
+	*cast(*u64, out + 32) = *cast(*u64, t + 32);
+	*cast(*u64, out + 40) = *cast(*u64, t + 40);
+	*cast(*u64, out + 48) = *cast(*u64, t + 48);
+	*cast(*u64, out + 56) = *cast(*u64, t + 56);
 
-	if (ptr64[t + 0] == AstTypeKind.NAME && type_params != 0 && type_args_tc != 0) {
+	if (*cast(*u64, t + 0) == AstTypeKind.NAME && type_params != 0 && type_args_tc != 0) {
 		var n = vec_len(type_params);
 		var i = 0;
 		while (i < n) {
 			var ent = vec_get(type_params, i);
 			if (ent != 0) {
-				if (slice_eq_parts(ptr64[t + 8], ptr64[t + 16], ptr64[ent + 0], ptr64[ent + 8]) == 1) {
+				if (slice_eq_parts(*cast(*u64, t + 8), *cast(*u64, t + 16), *cast(*u64, ent + 0), *cast(*u64, ent + 8)) == 1) {
 					var ty = vec_get(type_args_tc, i);
 					var np = tc_builtin_name_ptr_for_tctype(ty);
-					alias rdx : nl;
 					if (np != 0 && nl != 0) {
-						ptr64[out + 8] = np;
-						ptr64[out + 16] = nl;
+						*cast(*u64, out + 8) = np;
+						*cast(*u64, out + 16) = nl;
 					}
 					return out;
 				}
@@ -3012,21 +2960,21 @@ func tc_clone_type_subst(t, type_params, type_args_tc) {
 			i = i + 1;
 		}
 	}
-	if (ptr64[t + 0] == AstTypeKind.PTR) {
-		ptr64[out + 8] = tc_clone_type_subst(ptr64[t + 8], type_params, type_args_tc);
-		ptr64[out + 16] = ptr64[t + 16];
+	if (*cast(*u64, t + 0) == AstTypeKind.PTR) {
+		*cast(*u64, out + 8) = tc_clone_type_subst(*cast(*u64, t + 8), type_params, type_args_tc);
+		*cast(*u64, out + 16) = *cast(*u64, t + 16);
 	}
-	if (ptr64[t + 0] == AstTypeKind.SLICE) {
-		ptr64[out + 8] = tc_clone_type_subst(ptr64[t + 8], type_params, type_args_tc);
-		ptr64[out + 16] = 0;
+	if (*cast(*u64, t + 0) == AstTypeKind.SLICE) {
+		*cast(*u64, out + 8) = tc_clone_type_subst(*cast(*u64, t + 8), type_params, type_args_tc);
+		*cast(*u64, out + 16) = 0;
 	}
-	if (ptr64[t + 0] == AstTypeKind.ARRAY) {
-		ptr64[out + 8] = tc_clone_type_subst(ptr64[t + 8], type_params, type_args_tc);
-		ptr64[out + 16] = ptr64[t + 16];
+	if (*cast(*u64, t + 0) == AstTypeKind.ARRAY) {
+		*cast(*u64, out + 8) = tc_clone_type_subst(*cast(*u64, t + 8), type_params, type_args_tc);
+		*cast(*u64, out + 16) = *cast(*u64, t + 16);
 	}
-	if (ptr64[t + 0] == AstTypeKind.GENERIC) {
-		ptr64[out + 8] = tc_clone_type_subst(ptr64[t + 8], type_params, type_args_tc);
-		var args0 = ptr64[t + 48];
+	if (*cast(*u64, t + 0) == AstTypeKind.GENERIC) {
+		*cast(*u64, out + 8) = tc_clone_type_subst(*cast(*u64, t + 8), type_params, type_args_tc);
+		var args0 = *cast(*u64, t + 48);
 		if (args0 != 0) {
 			var out_args = vec_new(4);
 			if (out_args != 0) {
@@ -3044,11 +2992,11 @@ func tc_clone_type_subst(t, type_params, type_args_tc) {
 					i0 = i0 + 1;
 				}
 			}
-			ptr64[out + 48] = out_args;
+			*cast(*u64, out + 48) = out_args;
 		}
 	}
-	if (ptr64[t + 0] == AstTypeKind.TUPLE) {
-		var elems = ptr64[t + 48];
+	if (*cast(*u64, t + 0) == AstTypeKind.TUPLE) {
+		var elems = *cast(*u64, t + 48);
 		if (elems != 0) {
 			var out_elems = vec_new(2);
 			if (out_elems != 0) {
@@ -3058,7 +3006,7 @@ func tc_clone_type_subst(t, type_params, type_args_tc) {
 					vec_push(out_elems, tc_clone_type_subst(vec_get(elems, i1), type_params, type_args_tc));
 					i1 = i1 + 1;
 				}
-				ptr64[out + 48] = out_elems;
+				*cast(*u64, out + 48) = out_elems;
 			}
 		}
 	}
@@ -3069,31 +3017,31 @@ func tc_clone_expr_subst(e, type_params, type_args_tc) {
 	if (e == 0) { return 0; }
 	var out = heap_alloc(80);
 	if (out == 0) { return 0; }
-	var k = ptr64[e + 0];
-	ptr64[out + 0] = k;
-	ptr64[out + 8] = ptr64[e + 8];
-	ptr64[out + 40] = ptr64[e + 40];
-	ptr64[out + 48] = ptr64[e + 48];
-	ptr64[out + 56] = ptr64[e + 56];
-	ptr64[out + 64] = ptr64[e + 64];
-	ptr64[out + 72] = ptr64[e + 72];
+	var k = *cast(*u64, e + 0);
+	*cast(*u64, out + 0) = k;
+	*cast(*u64, out + 8) = *cast(*u64, e + 8);
+	*cast(*u64, out + 40) = *cast(*u64, e + 40);
+	*cast(*u64, out + 48) = *cast(*u64, e + 48);
+	*cast(*u64, out + 56) = *cast(*u64, e + 56);
+	*cast(*u64, out + 64) = *cast(*u64, e + 64);
+	*cast(*u64, out + 72) = *cast(*u64, e + 72);
 
 	if (k == AstExprKind.UNARY) {
-		ptr64[out + 16] = tc_clone_expr_subst(ptr64[e + 16], type_params, type_args_tc);
-		ptr64[out + 24] = 0;
-		ptr64[out + 32] = 0;
+		*cast(*u64, out + 16) = tc_clone_expr_subst(*cast(*u64, e + 16), type_params, type_args_tc);
+		*cast(*u64, out + 24) = 0;
+		*cast(*u64, out + 32) = 0;
 		return out;
 	}
 	if (k == AstExprKind.BINARY) {
-		ptr64[out + 16] = tc_clone_expr_subst(ptr64[e + 16], type_params, type_args_tc);
-		ptr64[out + 24] = tc_clone_expr_subst(ptr64[e + 24], type_params, type_args_tc);
-		ptr64[out + 32] = 0;
+		*cast(*u64, out + 16) = tc_clone_expr_subst(*cast(*u64, e + 16), type_params, type_args_tc);
+		*cast(*u64, out + 24) = tc_clone_expr_subst(*cast(*u64, e + 24), type_params, type_args_tc);
+		*cast(*u64, out + 32) = 0;
 		return out;
 	}
 	if (k == AstExprKind.CALL) {
-		ptr64[out + 16] = tc_clone_expr_subst(ptr64[e + 16], type_params, type_args_tc);
+		*cast(*u64, out + 16) = tc_clone_expr_subst(*cast(*u64, e + 16), type_params, type_args_tc);
 		// Clone type args vector
-		var ta = ptr64[e + 24];
+		var ta = *cast(*u64, e + 24);
 		if (ta != 0) {
 			var tavec = vec_new(2);
 			if (tavec != 0) {
@@ -3104,10 +3052,10 @@ func tc_clone_expr_subst(e, type_params, type_args_tc) {
 					vec_push(tavec, tc_clone_type_subst(t0, type_params, type_args_tc));
 					ti = ti + 1;
 				}
-				ptr64[out + 24] = tavec;
-			} else { ptr64[out + 24] = 0; }
-		} else { ptr64[out + 24] = 0; }
-		var args = ptr64[e + 32];
+				*cast(*u64, out + 24) = tavec;
+			} else { *cast(*u64, out + 24) = 0; }
+		} else { *cast(*u64, out + 24) = 0; }
+		var args = *cast(*u64, e + 32);
 		if (args != 0) {
 			var out_args = vec_new(4);
 			if (out_args != 0) {
@@ -3117,25 +3065,25 @@ func tc_clone_expr_subst(e, type_params, type_args_tc) {
 					vec_push(out_args, tc_clone_expr_subst(vec_get(args, i), type_params, type_args_tc));
 					i = i + 1;
 				}
-				ptr64[out + 32] = out_args;
-			} else { ptr64[out + 32] = 0; }
-		} else { ptr64[out + 32] = 0; }
+				*cast(*u64, out + 32) = out_args;
+			} else { *cast(*u64, out + 32) = 0; }
+		} else { *cast(*u64, out + 32) = 0; }
 		return out;
 	}
 	if (k == AstExprKind.CAST) {
-		ptr64[out + 16] = tc_clone_type_subst(ptr64[e + 16], type_params, type_args_tc);
-		ptr64[out + 24] = tc_clone_expr_subst(ptr64[e + 24], type_params, type_args_tc);
-		ptr64[out + 32] = 0;
+		*cast(*u64, out + 16) = tc_clone_type_subst(*cast(*u64, e + 16), type_params, type_args_tc);
+		*cast(*u64, out + 24) = tc_clone_expr_subst(*cast(*u64, e + 24), type_params, type_args_tc);
+		*cast(*u64, out + 32) = 0;
 		return out;
 	}
 	if (k == AstExprKind.INDEX) {
-		ptr64[out + 16] = tc_clone_expr_subst(ptr64[e + 16], type_params, type_args_tc);
-		ptr64[out + 24] = tc_clone_expr_subst(ptr64[e + 24], type_params, type_args_tc);
-		ptr64[out + 32] = 0;
+		*cast(*u64, out + 16) = tc_clone_expr_subst(*cast(*u64, e + 16), type_params, type_args_tc);
+		*cast(*u64, out + 24) = tc_clone_expr_subst(*cast(*u64, e + 24), type_params, type_args_tc);
+		*cast(*u64, out + 32) = 0;
 		return out;
 	}
 	if (k == AstExprKind.BRACE_INIT) {
-		var elems = ptr64[e + 32];
+		var elems = *cast(*u64, e + 32);
 		if (elems != 0) {
 			var out_elems = vec_new(4);
 			if (out_elems != 0) {
@@ -3145,33 +3093,33 @@ func tc_clone_expr_subst(e, type_params, type_args_tc) {
 					vec_push(out_elems, tc_clone_expr_subst(vec_get(elems, i2), type_params, type_args_tc));
 					i2 = i2 + 1;
 				}
-				ptr64[out + 32] = out_elems;
-			} else { ptr64[out + 32] = 0; }
-		} else { ptr64[out + 32] = 0; }
+				*cast(*u64, out + 32) = out_elems;
+			} else { *cast(*u64, out + 32) = 0; }
+		} else { *cast(*u64, out + 32) = 0; }
 		// Preserve typed init AstType (a) and any op metadata.
-		var t0 = ptr64[e + 16];
-		if (t0 != 0) { ptr64[out + 16] = tc_clone_type_subst(t0, type_params, type_args_tc); }
-		else { ptr64[out + 16] = 0; }
-		ptr64[out + 24] = 0;
-		ptr64[out + 8] = ptr64[e + 8];
+		var t0 = *cast(*u64, e + 16);
+		if (t0 != 0) { *cast(*u64, out + 16) = tc_clone_type_subst(t0, type_params, type_args_tc); }
+		else { *cast(*u64, out + 16) = 0; }
+		*cast(*u64, out + 24) = 0;
+		*cast(*u64, out + 8) = *cast(*u64, e + 8);
 		return out;
 	}
 	if (k == AstExprKind.OFFSETOF) {
-		ptr64[out + 16] = tc_clone_type_subst(ptr64[e + 16], type_params, type_args_tc);
-		ptr64[out + 24] = ptr64[e + 24];
-		ptr64[out + 32] = ptr64[e + 32];
+		*cast(*u64, out + 16) = tc_clone_type_subst(*cast(*u64, e + 16), type_params, type_args_tc);
+		*cast(*u64, out + 24) = *cast(*u64, e + 24);
+		*cast(*u64, out + 32) = *cast(*u64, e + 32);
 		return out;
 	}
 	if (k == AstExprKind.FIELD) {
-		ptr64[out + 16] = tc_clone_expr_subst(ptr64[e + 16], type_params, type_args_tc);
-		ptr64[out + 24] = ptr64[e + 24];
-		ptr64[out + 32] = ptr64[e + 32];
+		*cast(*u64, out + 16) = tc_clone_expr_subst(*cast(*u64, e + 16), type_params, type_args_tc);
+		*cast(*u64, out + 24) = *cast(*u64, e + 24);
+		*cast(*u64, out + 32) = *cast(*u64, e + 32);
 		return out;
 	}
 	// IDENT/INT/STRING/CHAR/NULL and fallback
-	ptr64[out + 16] = ptr64[e + 16];
-	ptr64[out + 24] = ptr64[e + 24];
-	ptr64[out + 32] = ptr64[e + 32];
+	*cast(*u64, out + 16) = *cast(*u64, e + 16);
+	*cast(*u64, out + 24) = *cast(*u64, e + 24);
+	*cast(*u64, out + 32) = *cast(*u64, e + 32);
 	return out;
 }
 
@@ -3179,20 +3127,20 @@ func tc_clone_stmt_subst(s, type_params, type_args_tc) {
 	if (s == 0) { return 0; }
 	var out = heap_alloc(96);
 	if (out == 0) { return 0; }
-	var k = ptr64[s + 0];
-	ptr64[out + 0] = k;
-	ptr64[out + 8] = ptr64[s + 8];
-	ptr64[out + 16] = ptr64[s + 16];
-	ptr64[out + 24] = ptr64[s + 24];
-	ptr64[out + 32] = ptr64[s + 32];
-	ptr64[out + 40] = ptr64[s + 40];
-	ptr64[out + 64] = ptr64[s + 64];
-	ptr64[out + 72] = ptr64[s + 72];
-	ptr64[out + 80] = ptr64[s + 80];
-	ptr64[out + 88] = ptr64[s + 88];
+	var k = *cast(*u64, s + 0);
+	*cast(*u64, out + 0) = k;
+	*cast(*u64, out + 8) = *cast(*u64, s + 8);
+	*cast(*u64, out + 16) = *cast(*u64, s + 16);
+	*cast(*u64, out + 24) = *cast(*u64, s + 24);
+	*cast(*u64, out + 32) = *cast(*u64, s + 32);
+	*cast(*u64, out + 40) = *cast(*u64, s + 40);
+	*cast(*u64, out + 64) = *cast(*u64, s + 64);
+	*cast(*u64, out + 72) = *cast(*u64, s + 72);
+	*cast(*u64, out + 80) = *cast(*u64, s + 80);
+	*cast(*u64, out + 88) = *cast(*u64, s + 88);
 
 	if (k == AstStmtKind.BLOCK) {
-		var stmts = ptr64[s + 8];
+		var stmts = *cast(*u64, s + 8);
 		if (stmts != 0) {
 			var out_stmts = vec_new(8);
 			if (out_stmts != 0) {
@@ -3202,26 +3150,26 @@ func tc_clone_stmt_subst(s, type_params, type_args_tc) {
 					vec_push(out_stmts, tc_clone_stmt_subst(vec_get(stmts, i), type_params, type_args_tc));
 					i = i + 1;
 				}
-				ptr64[out + 8] = out_stmts;
+				*cast(*u64, out + 8) = out_stmts;
 			}
 		}
 		// zero unused
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = 0;
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = 0;
 		return out;
 	}
 	if (k == AstStmtKind.VAR) {
-		ptr64[out + 48] = tc_clone_type_subst(ptr64[s + 48], type_params, type_args_tc);
-		ptr64[out + 56] = tc_clone_expr_subst(ptr64[s + 56], type_params, type_args_tc);
+		*cast(*u64, out + 48) = tc_clone_type_subst(*cast(*u64, s + 48), type_params, type_args_tc);
+		*cast(*u64, out + 56) = tc_clone_expr_subst(*cast(*u64, s + 56), type_params, type_args_tc);
 		return out;
 	}
 	if (k == AstStmtKind.EXPR) {
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = tc_clone_expr_subst(ptr64[s + 56], type_params, type_args_tc);
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = tc_clone_expr_subst(*cast(*u64, s + 56), type_params, type_args_tc);
 		return out;
 	}
 	if (k == AstStmtKind.RETURN) {
-		var es = ptr64[s + 8];
+		var es = *cast(*u64, s + 8);
 		if (es != 0) {
 			var out_es = vec_new(2);
 			if (out_es != 0) {
@@ -3231,47 +3179,47 @@ func tc_clone_stmt_subst(s, type_params, type_args_tc) {
 					vec_push(out_es, tc_clone_expr_subst(vec_get(es, i0), type_params, type_args_tc));
 					i0 = i0 + 1;
 				}
-				ptr64[out + 8] = out_es;
+				*cast(*u64, out + 8) = out_es;
 			}
-			ptr64[out + 48] = 0;
-			ptr64[out + 56] = 0;
+			*cast(*u64, out + 48) = 0;
+			*cast(*u64, out + 56) = 0;
 			return out;
 		}
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = tc_clone_expr_subst(ptr64[s + 56], type_params, type_args_tc);
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = tc_clone_expr_subst(*cast(*u64, s + 56), type_params, type_args_tc);
 		return out;
 	}
 	if (k == AstStmtKind.DESTRUCT) {
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = tc_clone_expr_subst(ptr64[s + 56], type_params, type_args_tc);
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = tc_clone_expr_subst(*cast(*u64, s + 56), type_params, type_args_tc);
 		return out;
 	}
 	if (k == AstStmtKind.IF) {
-		ptr64[out + 8] = tc_clone_expr_subst(ptr64[s + 8], type_params, type_args_tc);
-		ptr64[out + 16] = tc_clone_stmt_subst(ptr64[s + 16], type_params, type_args_tc);
-		ptr64[out + 24] = tc_clone_stmt_subst(ptr64[s + 24], type_params, type_args_tc);
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = 0;
+		*cast(*u64, out + 8) = tc_clone_expr_subst(*cast(*u64, s + 8), type_params, type_args_tc);
+		*cast(*u64, out + 16) = tc_clone_stmt_subst(*cast(*u64, s + 16), type_params, type_args_tc);
+		*cast(*u64, out + 24) = tc_clone_stmt_subst(*cast(*u64, s + 24), type_params, type_args_tc);
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = 0;
 		return out;
 	}
 	if (k == AstStmtKind.WHILE) {
-		ptr64[out + 8] = tc_clone_expr_subst(ptr64[s + 8], type_params, type_args_tc);
-		ptr64[out + 16] = tc_clone_stmt_subst(ptr64[s + 16], type_params, type_args_tc);
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = 0;
+		*cast(*u64, out + 8) = tc_clone_expr_subst(*cast(*u64, s + 8), type_params, type_args_tc);
+		*cast(*u64, out + 16) = tc_clone_stmt_subst(*cast(*u64, s + 16), type_params, type_args_tc);
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = 0;
 		return out;
 	}
 	if (k == AstStmtKind.FOREACH) {
-		ptr64[out + 8] = ptr64[s + 8];
-		ptr64[out + 16] = tc_clone_expr_subst(ptr64[s + 16], type_params, type_args_tc);
-		ptr64[out + 24] = tc_clone_stmt_subst(ptr64[s + 24], type_params, type_args_tc);
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = 0;
+		*cast(*u64, out + 8) = *cast(*u64, s + 8);
+		*cast(*u64, out + 16) = tc_clone_expr_subst(*cast(*u64, s + 16), type_params, type_args_tc);
+		*cast(*u64, out + 24) = tc_clone_stmt_subst(*cast(*u64, s + 24), type_params, type_args_tc);
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = 0;
 		return out;
 	}
 	if (k == AstStmtKind.SWITCH) {
-		ptr64[out + 8] = tc_clone_expr_subst(ptr64[s + 8], type_params, type_args_tc);
-		var cases = ptr64[s + 16];
+		*cast(*u64, out + 8) = tc_clone_expr_subst(*cast(*u64, s + 8), type_params, type_args_tc);
+		var cases = *cast(*u64, s + 16);
 		if (cases != 0) {
 			var out_cases = vec_new(4);
 			if (out_cases != 0) {
@@ -3282,42 +3230,42 @@ func tc_clone_stmt_subst(s, type_params, type_args_tc) {
 					if (c != 0) {
 						var c2 = heap_alloc(40);
 						if (c2 != 0) {
-							ptr64[c2 + 0] = tc_clone_expr_subst(ptr64[c + 0], type_params, type_args_tc);
-							ptr64[c2 + 8] = tc_clone_stmt_subst(ptr64[c + 8], type_params, type_args_tc);
-							ptr64[c2 + 16] = ptr64[c + 16];
-							ptr64[c2 + 24] = ptr64[c + 24];
-							ptr64[c2 + 32] = ptr64[c + 32];
+							*cast(*u64, c2 + 0) = tc_clone_expr_subst(*cast(*u64, c + 0), type_params, type_args_tc);
+							*cast(*u64, c2 + 8) = tc_clone_stmt_subst(*cast(*u64, c + 8), type_params, type_args_tc);
+							*cast(*u64, c2 + 16) = *cast(*u64, c + 16);
+							*cast(*u64, c2 + 24) = *cast(*u64, c + 24);
+							*cast(*u64, c2 + 32) = *cast(*u64, c + 32);
 							vec_push(out_cases, c2);
 						}
 					}
 					i = i + 1;
 				}
-				ptr64[out + 16] = out_cases;
+				*cast(*u64, out + 16) = out_cases;
 			}
 		}
-		ptr64[out + 24] = tc_clone_stmt_subst(ptr64[s + 24], type_params, type_args_tc);
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = 0;
+		*cast(*u64, out + 24) = tc_clone_stmt_subst(*cast(*u64, s + 24), type_params, type_args_tc);
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = 0;
 		return out;
 	}
 	if (k == AstStmtKind.DEFER) {
 		// st+8 = inner statement
-		ptr64[out + 8] = tc_clone_stmt_subst(ptr64[s + 8], type_params, type_args_tc);
-		ptr64[out + 16] = 0;
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = 0;
+		*cast(*u64, out + 8) = tc_clone_stmt_subst(*cast(*u64, s + 8), type_params, type_args_tc);
+		*cast(*u64, out + 16) = 0;
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = 0;
 		return out;
 	}
 	if (k == AstStmtKind.WIPE) {
-		ptr64[out + 8] = tc_clone_expr_subst(ptr64[s + 8], type_params, type_args_tc);
-		ptr64[out + 16] = tc_clone_expr_subst(ptr64[s + 16], type_params, type_args_tc);
-		ptr64[out + 56] = tc_clone_expr_subst(ptr64[s + 56], type_params, type_args_tc);
-		ptr64[out + 48] = 0;
+		*cast(*u64, out + 8) = tc_clone_expr_subst(*cast(*u64, s + 8), type_params, type_args_tc);
+		*cast(*u64, out + 16) = tc_clone_expr_subst(*cast(*u64, s + 16), type_params, type_args_tc);
+		*cast(*u64, out + 56) = tc_clone_expr_subst(*cast(*u64, s + 56), type_params, type_args_tc);
+		*cast(*u64, out + 48) = 0;
 		return out;
 	}
 	if (k == AstStmtKind.PRINT || k == AstStmtKind.PRINTLN) {
 		// a = Vec* of AstExpr* args
-		var old_args = ptr64[s + 8];
+		var old_args = *cast(*u64, s + 8);
 		var new_args = vec_new(4);
 		if (new_args != 0 && old_args != 0) {
 			var n = vec_len(old_args);
@@ -3328,21 +3276,21 @@ func tc_clone_stmt_subst(s, type_params, type_args_tc) {
 				i = i + 1;
 			}
 		}
-		ptr64[out + 8] = new_args;
-		ptr64[out + 48] = 0;
-		ptr64[out + 56] = 0;
+		*cast(*u64, out + 8) = new_args;
+		*cast(*u64, out + 48) = 0;
+		*cast(*u64, out + 56) = 0;
 		return out;
 	}
 	// default
-	ptr64[out + 48] = ptr64[s + 48];
-	ptr64[out + 56] = ptr64[s + 56];
+	*cast(*u64, out + 48) = *cast(*u64, s + 48);
+	*cast(*u64, out + 56) = *cast(*u64, s + 56);
 	return out;
 }
 
 func tc_instantiate_generic_func_decl(templ, type_args_tc, type_argc, new_name_ptr, new_name_len) {
 	if (tc_cur_ast_prog == 0 || templ == 0) { return 0; }
-	var type_params = ptr64[templ + 96];
-	var params0 = ptr64[templ + 24];
+	var type_params = *cast(*u64, templ + 96);
+	var params0 = *cast(*u64, templ + 24);
 	var params2 = 0;
 	if (params0 != 0) {
 		params2 = vec_new(4);
@@ -3360,51 +3308,51 @@ func tc_instantiate_generic_func_decl(templ, type_args_tc, type_argc, new_name_p
 			}
 		}
 	}
-	var ret2 = tc_clone_type_subst(ptr64[templ + 32], type_params, type_args_tc);
-	var body2 = tc_clone_stmt_subst(ptr64[templ + 40], type_params, type_args_tc);
+	var ret2 = tc_clone_type_subst(*cast(*u64, templ + 32), type_params, type_args_tc);
+	var body2 = tc_clone_stmt_subst(*cast(*u64, templ + 40), type_params, type_args_tc);
 
 	var d = heap_alloc(104);
 	if (d == 0) { return 0; }
-	ptr64[d + 0] = AstDeclKind.FUNC;
-	ptr64[d + 8] = new_name_ptr;
-	ptr64[d + 16] = new_name_len;
-	ptr64[d + 24] = params2;
-	ptr64[d + 32] = ret2;
-	ptr64[d + 40] = body2;
-	ptr64[d + 48] = ptr64[templ + 48];
-	ptr64[d + 56] = ptr64[templ + 56];
-	ptr64[d + 64] = ptr64[templ + 64];
-	ptr64[d + 72] = ptr64[templ + 72];
-	var flags0 = ptr64[templ + 80];
+	*cast(*u64, d + 0) = AstDeclKind.FUNC;
+	*cast(*u64, d + 8) = new_name_ptr;
+	*cast(*u64, d + 16) = new_name_len;
+	*cast(*u64, d + 24) = params2;
+	*cast(*u64, d + 32) = ret2;
+	*cast(*u64, d + 40) = body2;
+	*cast(*u64, d + 48) = *cast(*u64, templ + 48);
+	*cast(*u64, d + 56) = *cast(*u64, templ + 56);
+	*cast(*u64, d + 64) = *cast(*u64, templ + 64);
+	*cast(*u64, d + 72) = *cast(*u64, templ + 72);
+	var flags0 = *cast(*u64, templ + 80);
 	var tflag1 = flags0 & TC_DECL_FLAG_GENERIC_TEMPLATE;
 	if (tflag1 != 0) { flags0 = flags0 - TC_DECL_FLAG_GENERIC_TEMPLATE; }
-	ptr64[d + 80] = flags0;
-	ptr64[d + 88] = 0;
-	ptr64[d + 96] = 0;
-	vec_push(ptr64[tc_cur_ast_prog + 0], d);
+	*cast(*u64, d + 80) = flags0;
+	*cast(*u64, d + 88) = 0;
+	*cast(*u64, d + 96) = 0;
+	vec_push(*cast(*u64, tc_cur_ast_prog + 0), d);
 	return d;
 }
 
 func tc_try_monomorphize_call(env, call_expr) {
 	if (call_expr == 0) { return 0; }
 	if (tc_cur_ast_prog == 0) { return 0; }
-	var callee = ptr64[call_expr + 16];
-	if (callee == 0 || ptr64[callee + 0] != AstExprKind.IDENT) { return 0; }
-	var name_ptr = ptr64[callee + 40];
-	var name_len = ptr64[callee + 48];
+	var callee = *cast(*u64, call_expr + 16);
+	if (callee == 0 || *cast(*u64, callee + 0) != AstExprKind.IDENT) { return 0; }
+	var name_ptr = *cast(*u64, callee + 40);
+	var name_len = *cast(*u64, callee + 48);
 	var templ = tc_find_generic_func_template_decl(tc_cur_ast_prog, name_ptr, name_len);
 	if (templ == 0) { return 0; }
-	var type_params = ptr64[templ + 96];
+	var type_params = *cast(*u64, templ + 96);
 	var tp_n = 0;
 	if (type_params != 0) { tp_n = vec_len(type_params); }
 	if (tp_n == 0) { return 0; }
 
 	// Determine concrete type args.
-	var explicit_ta = ptr64[call_expr + 24];
+	var explicit_ta = *cast(*u64, call_expr + 24);
 	var type_args_tc = 0;
 	if (explicit_ta != 0) {
 		if (vec_len(explicit_ta) != tp_n) {
-			tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "generic call: wrong number of type args");
+			tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "generic call: wrong number of type args");
 			return 0;
 		}
 		type_args_tc = vec_new(tp_n);
@@ -3420,8 +3368,8 @@ func tc_try_monomorphize_call(env, call_expr) {
 		if (type_args_tc == 0) { return 0; }
 		var zi = 0;
 		while (zi < tp_n) { vec_push(type_args_tc, TC_TY_INVALID); zi = zi + 1; }
-		var params = ptr64[templ + 24];
-		var args = ptr64[call_expr + 32];
+		var params = *cast(*u64, templ + 24);
+		var args = *cast(*u64, call_expr + 32);
 		var pn = 0;
 		var an = 0;
 		if (params != 0) { pn = vec_len(params); }
@@ -3433,15 +3381,15 @@ func tc_try_monomorphize_call(env, call_expr) {
 			var ps = vec_get(params, pi);
 			var arg_e = vec_get(args, pi);
 			var pty_ast = 0;
-			if (ps != 0) { pty_ast = ptr64[ps + 48]; }
-			if (pty_ast != 0 && ptr64[pty_ast + 0] == AstTypeKind.NAME) {
-				var pnm_ptr = ptr64[pty_ast + 8];
-				var pnm_len = ptr64[pty_ast + 16];
+			if (ps != 0) { pty_ast = *cast(*u64, ps + 48); }
+			if (pty_ast != 0 && *cast(*u64, pty_ast + 0) == AstTypeKind.NAME) {
+				var pnm_ptr = *cast(*u64, pty_ast + 8);
+				var pnm_len = *cast(*u64, pty_ast + 16);
 				var tpi = 0;
 				while (tpi < tp_n) {
 					var ent = vec_get(type_params, tpi);
 					if (ent != 0) {
-						if (slice_eq_parts(pnm_ptr, pnm_len, ptr64[ent + 0], ptr64[ent + 8]) == 1) {
+						if (slice_eq_parts(pnm_ptr, pnm_len, *cast(*u64, ent + 0), *cast(*u64, ent + 8)) == 1) {
 							var aty = tc_expr(env, arg_e);
 							var cur = vec_get(type_args_tc, tpi);
 							if (cur == TC_TY_INVALID) {
@@ -3457,7 +3405,7 @@ func tc_try_monomorphize_call(env, call_expr) {
 								type_args_tc = tmp;
 							} else {
 								if (tc_type_eq(cur, aty) == 0) {
-									tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "generic call: cannot infer consistent type args");
+									tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "generic call: cannot infer consistent type args");
 								}
 							}
 						}
@@ -3473,7 +3421,7 @@ func tc_try_monomorphize_call(env, call_expr) {
 		var k = 0;
 		while (k < tp_n) {
 			if (vec_get(type_args_tc, k) == TC_TY_INVALID) {
-				tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "generic call: could not infer type args");
+				tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "generic call: could not infer type args");
 				return 0;
 			}
 			k = k + 1;
@@ -3481,33 +3429,32 @@ func tc_try_monomorphize_call(env, call_expr) {
 	}
 
 	var new_ptr = tc_mangle_generic_inst_name(name_ptr, name_len, type_args_tc, tp_n);
-	alias rdx : new_len_reg;
 	var new_len = new_len_reg;
 	if (new_ptr == 0 || new_len == 0) {
-		tc_err_at(ptr64[call_expr + 64], ptr64[call_expr + 72], "generic call: unsupported type args");
+		tc_err_at(*cast(*u64, call_expr + 64), *cast(*u64, call_expr + 72), "generic call: unsupported type args");
 		return 0;
 	}
 	if (tc_ast_prog_has_func_name(tc_cur_ast_prog, new_ptr, new_len) == 0) {
 		tc_instantiate_generic_func_decl(templ, type_args_tc, tp_n, new_ptr, new_len);
 	}
 	// Rewrite callee identifier to instantiated name.
-	ptr64[callee + 40] = new_ptr;
-	ptr64[callee + 48] = new_len;
+	*cast(*u64, callee + 40) = new_ptr;
+	*cast(*u64, callee + 48) = new_len;
 	// Clear stored type args on call.
-	ptr64[call_expr + 24] = 0;
+	*cast(*u64, call_expr + 24) = 0;
 	return 0;
 }
 
 func tc_find_func_decl_in_prog(prog, name_ptr, name_len) {
 	if (prog == 0) { return 0; }
-	var decls = ptr64[prog + 0];
+	var decls = *cast(*u64, prog + 0);
 	if (decls == 0) { return 0; }
 	var n = vec_len(decls);
 	var i = 0;
 	while (i < n) {
 		var d = vec_get(decls, i);
-		if (d != 0 && ptr64[d + 0] == AstDeclKind.FUNC) {
-			if (slice_eq_parts(ptr64[d + 8], ptr64[d + 16], name_ptr, name_len) == 1) {
+		if (d != 0 && *cast(*u64, d + 0) == AstDeclKind.FUNC) {
+			if (slice_eq_parts(*cast(*u64, d + 8), *cast(*u64, d + 16), name_ptr, name_len) == 1) {
 				return d;
 			}
 		}
@@ -3518,7 +3465,7 @@ func tc_find_func_decl_in_prog(prog, name_ptr, name_len) {
 
 func tc_expr(env, e) {
 	if (e == 0) { return TC_TY_INVALID; }
-	var k = ptr64[e + 0];
+	var k = *cast(*u64, e + 0);
 
 	if (k == AstExprKind.INT) {
 		return TC_TY_U64;
@@ -3538,8 +3485,8 @@ func tc_expr(env, e) {
 		return TC_TY_NULL;
 	}
 	if (k == AstExprKind.IDENT) {
-		var name_ptr = ptr64[e + 40];
-		var name_len = ptr64[e + 48];
+		var name_ptr = *cast(*u64, e + 40);
+		var name_len = *cast(*u64, e + 48);
 		// If this identifier refers to a global const with a simple constant initializer,
 		// mark it as an immediate for codegen (only for rvalues).
 		//
@@ -3547,17 +3494,15 @@ func tc_expr(env, e) {
 		// 모든 호출 이후에 다시 로드해 반환한다(레지스터/로컬 클로버 회피).
 		if (tc_cur_ast_prog != 0) {
 			var idx0 = tc_env_find_index(env, name_ptr, name_len);
-			alias rdx : ok_idx;
 			if (ok_idx != 0) {
 				if (idx0 < tc_env_global_len) {
 					var cd0 = tc_find_const_decl_in_prog(tc_cur_ast_prog, name_ptr, name_len);
 					if (cd0 != 0) {
-						var init0 = ptr64[cd0 + 32];
+						var init0 = *cast(*u64, cd0 + 32);
 						var cv0 = tc_const_eval_u64_expr_mvp(init0);
-						alias rdx : ok_cv;
 						if (ok_cv != 0) {
-							ptr64[e + 8] = cv0;
-							ptr64[e + 32] = (127 << 56);
+							*cast(*u64, e + 8) = cv0;
+							*cast(*u64, e + 32) = (127 << 56);
 						}
 					}
 				}
@@ -3565,7 +3510,7 @@ func tc_expr(env, e) {
 		}
 		var ty = tc_env_get(env, name_ptr, name_len);
 		if (tc_debug_ident != 0) {
-			if (name_len == 1 && name_ptr != 0 && ptr8[name_ptr] == 115) {
+			if (name_len == 1 && name_ptr != 0 && *cast(*u8, name_ptr) == 115) {
 				print_str("DEBUG ident s: ty=");
 				print_u64(ty);
 				print_str(" env_len=");
@@ -3579,97 +3524,97 @@ func tc_expr(env, e) {
 			if (func_sig != 0) {
 				// Found function signature - create function pointer type
 				// TcFuncSig layout: +24=param_count, +32=p0_ty, +40=p1_ty, +48=ret_ty
-				var pcount = ptr64[func_sig + 24];
-				var ret_ty = ptr64[func_sig + 48];
+				var pcount = *cast(*u64, func_sig + 24);
+				var ret_ty = *cast(*u64, func_sig + 48);
 				var param_types = 0;
 				if (pcount > 0) {
 					param_types = vec_new(pcount);
-					if (pcount >= 1) { vec_push(param_types, ptr64[func_sig + 32]); }
-					if (pcount >= 2) { vec_push(param_types, ptr64[func_sig + 40]); }
+					if (pcount >= 1) { vec_push(param_types, *cast(*u64, func_sig + 32)); }
+					if (pcount >= 2) { vec_push(param_types, *cast(*u64, func_sig + 40)); }
 					// MVP: only support up to 2 params for function pointers
 				}
 				var fptr_ty = tc_make_func_ptr(param_types, ret_ty);
 				// Mark this expr as function reference for codegen (use extra field +32)
-				ptr64[e + 32] = func_sig;  // store func_sig for codegen in extra field
+				*cast(*u64, e + 32) = func_sig;  // store func_sig for codegen in extra field
 				return fptr_ty;
 			}
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "unknown identifier");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "unknown identifier");
 			return TC_TY_INVALID;
 		}
 		return ty;
 	}
 	if (k == AstExprKind.UNARY) {
-		var rhs_ty = tc_expr(env, ptr64[e + 16]);
-		var op = ptr64[e + 8];
+		var rhs_ty = tc_expr(env, *cast(*u64, e + 16));
+		var op = *cast(*u64, e + 8);
 		if (op == TokKind.DOLLAR) {
 			// Phase 4.1: unsafe deref/load/store operand.
 			// Allows nullable pointers (no implicit null check).
 			if (tc_is_ptr(rhs_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'$' expects pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "'$' expects pointer");
 				return TC_TY_INVALID;
 			}
 			var base_ty = tc_ptr_base(rhs_ty);
 			var sz0 = tc_sizeof(base_ty);
-			ptr64[e + 32] = sz0; // for codegen: 1 or 8 supported
+			*cast(*u64, e + 32) = sz0; // for codegen: 1 or 8 supported
 			return base_ty;
 		}
 		if (op == TokKind.STAR) {
 			if (tc_is_ptr(rhs_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "deref expects pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "deref expects pointer");
 				return TC_TY_INVALID;
 			}
 			if (tc_is_ptr_nullable(rhs_ty) == 1) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot deref nullable pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "cannot deref nullable pointer");
 				return TC_TY_INVALID;
 			}
 			return tc_ptr_base(rhs_ty);
 		}
 		if (op == TokKind.BANG) {
 			if (rhs_ty != TC_TY_BOOL) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'!' expects bool");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "'!' expects bool");
 				return TC_TY_INVALID;
 			}
 			return TC_TY_BOOL;
 		}
 		if (op == TokKind.AMP) {
-			var rhs = ptr64[e + 16];
+			var rhs = *cast(*u64, e + 16);
 			if (rhs == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "'&' expects lvalue");
 				return TC_TY_INVALID;
 			}
-			var rk = ptr64[rhs + 0];
+			var rk = *cast(*u64, rhs + 0);
 			if (rk != AstExprKind.IDENT && rk != AstExprKind.FIELD) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "'&' expects lvalue");
 				return TC_TY_INVALID;
 			}
 			var pty = tc_make_ptr(rhs_ty, 0);
 			if (pty == TC_TY_INVALID) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot take address of this type");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "cannot take address of this type");
 				return TC_TY_INVALID;
 			}
 			return pty;
 		}
 		if (op == TokKind.PLUS || op == TokKind.MINUS || op == TokKind.TILDE) {
 			if (tc_is_int(rhs_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "unary op expects integer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "unary op expects integer");
 				return TC_TY_INVALID;
 			}
 			return rhs_ty;
 		}
 		// Postfix ++ / -- (Phase 6.1)
 		if (op == TokKind.PLUSPLUS || op == TokKind.MINUSMINUS) {
-			var rhs = ptr64[e + 16];
+			var rhs = *cast(*u64, e + 16);
 			if (rhs == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "increment/decrement expects lvalue");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "increment/decrement expects lvalue");
 				return TC_TY_INVALID;
 			}
-			var rk = ptr64[rhs + 0];
+			var rk = *cast(*u64, rhs + 0);
 			if (rk != AstExprKind.IDENT && rk != AstExprKind.FIELD) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "increment/decrement expects lvalue");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "increment/decrement expects lvalue");
 				return TC_TY_INVALID;
 			}
 			if (tc_is_int(rhs_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "increment/decrement expects integer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "increment/decrement expects integer");
 				return TC_TY_INVALID;
 			}
 			return rhs_ty;
@@ -3677,22 +3622,22 @@ func tc_expr(env, e) {
 		return rhs_ty;
 	}
 	if (k == AstExprKind.BINARY) {
-		var op = ptr64[e + 8];
+		var op = *cast(*u64, e + 8);
 
 		// Assignment: lhs must be an identifier and rhs must match lhs type.
 		if (op == TokKind.EQ) {
-			var lhs = ptr64[e + 16];
-			var rhs = ptr64[e + 24];
+			var lhs = *cast(*u64, e + 16);
+			var rhs = *cast(*u64, e + 24);
 			if (lhs == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "assignment lhs must be identifier or field");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "assignment lhs must be identifier or field");
 				return TC_TY_INVALID;
 			}
-			var lk = ptr64[lhs + 0];
+			var lk = *cast(*u64, lhs + 0);
 			if (lk != AstExprKind.IDENT) {
 				if (lk != AstExprKind.FIELD) {
 					// Phase 4.1: allow $ptr = v stores.
-					if (lk != AstExprKind.UNARY || ptr64[lhs + 8] != TokKind.DOLLAR) {
-						tc_err_at(ptr64[e + 64], ptr64[e + 72], "assignment lhs must be identifier, field, or $ptr");
+					if (lk != AstExprKind.UNARY || *cast(*u64, lhs + 8) != TokKind.DOLLAR) {
+						tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "assignment lhs must be identifier, field, or $ptr");
 						return TC_TY_INVALID;
 					}
 				}
@@ -3700,7 +3645,7 @@ func tc_expr(env, e) {
 			var lhs_ty0 = tc_expr(env, lhs);
 			var rhs_ty0 = tc_expr_with_expected(env, rhs, lhs_ty0);
 			if (lhs_ty0 != TC_TY_INVALID && rhs_ty0 != TC_TY_INVALID && tc_type_eq(lhs_ty0, rhs_ty0) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "assignment type mismatch");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "assignment type mismatch");
 				return TC_TY_INVALID;
 			}
 			return lhs_ty0;
@@ -3722,15 +3667,15 @@ func tc_expr(env, e) {
 		else if (op == TokKind.RSHIFTEQ) { is_compound = 1; base_op = TokKind.RSHIFT; }
 
 		if (is_compound == 1) {
-			var lhs = ptr64[e + 16];
-			var rhs = ptr64[e + 24];
+			var lhs = *cast(*u64, e + 16);
+			var rhs = *cast(*u64, e + 24);
 			if (lhs == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment lhs must be identifier or field");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "compound assignment lhs must be identifier or field");
 				return TC_TY_INVALID;
 			}
-			var lk = ptr64[lhs + 0];
+			var lk = *cast(*u64, lhs + 0);
 			if (lk != AstExprKind.IDENT && lk != AstExprKind.FIELD) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment lhs must be identifier or field");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "compound assignment lhs must be identifier or field");
 				return TC_TY_INVALID;
 			}
 			var lhs_ty0 = tc_expr(env, lhs);
@@ -3742,29 +3687,29 @@ func tc_expr(env, e) {
 				is_float_ok_compound = 1;
 			}
 			if (tc_is_int(lhs_ty0) == 0 && (tc_is_float(lhs_ty0) == 0 || is_float_ok_compound == 0)) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment expects numeric lhs");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "compound assignment expects numeric lhs");
 				return TC_TY_INVALID;
 			}
 			if (tc_is_int(rhs_ty0) == 0 && tc_is_float(rhs_ty0) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment expects numeric rhs");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "compound assignment expects numeric rhs");
 				return TC_TY_INVALID;
 			}
 			if (lhs_ty0 != rhs_ty0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "compound assignment type mismatch");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "compound assignment type mismatch");
 				return TC_TY_INVALID;
 			}
 			// Store original op in extra for codegen to identify compound assignment.
-			ptr64[e + 32] = op;
+			*cast(*u64, e + 32) = op;
 			// Store base_op in expr.op for codegen.
-			ptr64[e + 8] = base_op;
+			*cast(*u64, e + 8) = base_op;
 			return lhs_ty0;
 		}
 
-		var lhs = ptr64[e + 16];
-		var rhs = ptr64[e + 24];
+		var lhs = *cast(*u64, e + 16);
+		var rhs = *cast(*u64, e + 24);
 		var lhs_ty = tc_expr(env, lhs);
 		var rhs_ty = tc_expr_with_expected(env, rhs, lhs_ty);
-		var op = ptr64[e + 8];
+		var op = *cast(*u64, e + 8);
 
 		// If lhs is untyped null, try to type it from rhs for ==/!=.
 		if (lhs_ty == TC_TY_NULL) {
@@ -3774,7 +3719,7 @@ func tc_expr(env, e) {
 					// treat as (rhs == null)
 					return TC_TY_BOOL;
 				}
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "null compare requires nullable pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "null compare requires nullable pointer");
 				return TC_TY_INVALID;
 			}
 		}
@@ -3782,7 +3727,7 @@ func tc_expr(env, e) {
 		// Short-circuit logical ops.
 		if (op == TokKind.ANDAND || op == TokKind.OROR) {
 			if (lhs_ty != TC_TY_BOOL || rhs_ty != TC_TY_BOOL) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "logical op expects bool");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "logical op expects bool");
 				return TC_TY_INVALID;
 			}
 			return TC_TY_BOOL;
@@ -3804,12 +3749,12 @@ func tc_expr(env, e) {
 			if (rhs_ty == TC_TY_NULL) {
 				if (op == TokKind.EQEQ || op == TokKind.NEQ) {
 					if (tc_is_ptr_nullable(lhs_ty) == 1) { return TC_TY_BOOL; }
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "null compare requires nullable pointer");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "null compare requires nullable pointer");
 					return TC_TY_INVALID;
 				}
 			}
 			if (lhs_ty != rhs_ty) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "comparison operands must match");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "comparison operands must match");
 				return TC_TY_INVALID;
 			}
 			// Phase 4.6: constant-time eq operators.
@@ -3817,7 +3762,7 @@ func tc_expr(env, e) {
 				if (tc_is_int(lhs_ty) == 1) { return TC_TY_BOOL; }
 				if (tc_is_slice(lhs_ty) == 1) {
 					if (tc_slice_elem(lhs_ty) != TC_TY_U8) {
-						tc_err_at(ptr64[e + 64], ptr64[e + 72], "constant-time eq expects []u8");
+						tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "constant-time eq expects []u8");
 						return TC_TY_INVALID;
 					}
 					return TC_TY_BOOL;
@@ -3825,12 +3770,12 @@ func tc_expr(env, e) {
 				if (tc_is_array(lhs_ty) == 1) {
 					var elem_ty = tc_array_elem(lhs_ty);
 					if (elem_ty != TC_TY_U8) {
-						tc_err_at(ptr64[e + 64], ptr64[e + 72], "constant-time eq expects [N]u8");
+						tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "constant-time eq expects [N]u8");
 						return TC_TY_INVALID;
 					}
 					return TC_TY_BOOL;
 				}
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "constant-time eq expects integer or byte sequence");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "constant-time eq expects integer or byte sequence");
 				return TC_TY_INVALID;
 			}
 			return TC_TY_BOOL;
@@ -3856,7 +3801,7 @@ func tc_expr(env, e) {
 		if (op == TokKind.PLUS || op == TokKind.MINUS) {
 			if (tc_is_ptr(lhs_ty) == 1) {
 				if (tc_is_ptr_nullable(lhs_ty) == 1) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "pointer arithmetic requires non-null pointer");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "pointer arithmetic requires non-null pointer");
 					return TC_TY_INVALID;
 				}
 				if (op == TokKind.PLUS) {
@@ -3866,17 +3811,17 @@ func tc_expr(env, e) {
 					if (tc_is_int(rhs_ty) == 1) { return lhs_ty; }
 					if (tc_is_ptr(rhs_ty) == 1) {
 						if (tc_is_ptr_nullable(rhs_ty) == 1) {
-							tc_err_at(ptr64[e + 64], ptr64[e + 72], "pointer arithmetic requires non-null pointer");
+							tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "pointer arithmetic requires non-null pointer");
 							return TC_TY_INVALID;
 						}
 						if (lhs_ty != rhs_ty) {
-							tc_err_at(ptr64[e + 64], ptr64[e + 72], "pointer operands must match");
+							tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "pointer operands must match");
 							return TC_TY_INVALID;
 						}
 						return TC_TY_U64;
 					}
 				}
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "pointer arithmetic expects integer offset");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "pointer arithmetic expects integer offset");
 				return TC_TY_INVALID;
 			}
 		}
@@ -3888,21 +3833,21 @@ func tc_expr(env, e) {
 			}
 			if (tc_is_float(lhs_ty) == 1 && tc_is_float(rhs_ty) == 1) {
 				if (is_float_arith == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "float only supports +, -, *, /");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "float only supports +, -, *, /");
 					return TC_TY_INVALID;
 				}
 				if (tc_type_eq(lhs_ty, rhs_ty) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "float operands must match");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "float operands must match");
 					return TC_TY_INVALID;
 				}
 				return lhs_ty;
 			}
 			if (tc_is_int(lhs_ty) == 0 || tc_is_int(rhs_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "integer op expects integer operands");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "integer op expects integer operands");
 				return TC_TY_INVALID;
 			}
 			if (tc_type_eq(lhs_ty, rhs_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "integer operands must match");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "integer operands must match");
 				return TC_TY_INVALID;
 			}
 			return lhs_ty;
@@ -3919,22 +3864,22 @@ func tc_expr(env, e) {
 		// Phase 5.1: call-site monomorphization for generic templates.
 		tc_try_monomorphize_call(env, e);
 		// Builtin: unwrap_ptr(p: *T?) -> *T
-		var callee = ptr64[e + 16];
-		var args = ptr64[e + 32];
-		if (callee != 0 && ptr64[callee + 0] == AstExprKind.IDENT) {
-			var name_ptr = ptr64[callee + 40];
-			var name_len = ptr64[callee + 48];
+		var callee = *cast(*u64, e + 16);
+		var args = *cast(*u64, e + 32);
+		if (callee != 0 && *cast(*u64, callee + 0) == AstExprKind.IDENT) {
+			var name_ptr = *cast(*u64, callee + 40);
+			var name_len = *cast(*u64, callee + 48);
 			if (slice_eq_parts(name_ptr, name_len, "unwrap_ptr", 10) == 1) {
 				var n = 0;
 				if (args != 0) { n = vec_len(args); }
 				if (n != 1) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "unwrap_ptr expects 1 argument");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "unwrap_ptr expects 1 argument");
 					return TC_TY_INVALID;
 				}
 				var arg0 = vec_get(args, 0);
 				var arg_ty = tc_expr(env, arg0);
 				if (tc_is_ptr_nullable(arg_ty) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "unwrap_ptr expects nullable pointer");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "unwrap_ptr expects nullable pointer");
 					return TC_TY_INVALID;
 				}
 				return TC_TY_PTR_BASE + tc_ptr_base(arg_ty);
@@ -3943,7 +3888,7 @@ func tc_expr(env, e) {
 				var n = 0;
 				if (args != 0) { n = vec_len(args); }
 				if (n != 2) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "slice_from_ptr_len expects 2 arguments");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "slice_from_ptr_len expects 2 arguments");
 					return TC_TY_INVALID;
 				}
 				var a0 = vec_get(args, 0);
@@ -3951,17 +3896,17 @@ func tc_expr(env, e) {
 				var pty = tc_expr(env, a0);
 				var lty = tc_expr_with_expected(env, a1, TC_TY_U64);
 				if (tc_is_ptr(pty) == 0 || tc_is_ptr_nullable(pty) == 1) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "slice_from_ptr_len expects non-null pointer");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "slice_from_ptr_len expects non-null pointer");
 					return TC_TY_INVALID;
 				}
 				if (lty != TC_TY_U64) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "slice_from_ptr_len expects u64 length");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "slice_from_ptr_len expects u64 length");
 					return TC_TY_INVALID;
 				}
 				var elem = tc_ptr_base(pty);
 				var sty = tc_make_slice(elem);
 				if (sty == TC_TY_INVALID) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "slice_from_ptr_len unsupported element type");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "slice_from_ptr_len unsupported element type");
 					return TC_TY_INVALID;
 				}
 				return sty;
@@ -3969,12 +3914,12 @@ func tc_expr(env, e) {
 		}
 
 		// Phase 5.1 MVP: type simple calls to known functions in the current program.
-		if (callee != 0 && ptr64[callee + 0] == AstExprKind.IDENT && tc_cur_ast_prog != 0) {
-			var fn_name_ptr = ptr64[callee + 40];
-			var fn_name_len = ptr64[callee + 48];
+		if (callee != 0 && *cast(*u64, callee + 0) == AstExprKind.IDENT && tc_cur_ast_prog != 0) {
+			var fn_name_ptr = *cast(*u64, callee + 40);
+			var fn_name_len = *cast(*u64, callee + 48);
 			var fd = tc_find_func_decl_in_prog(tc_cur_ast_prog, fn_name_ptr, fn_name_len);
 			if (fd != 0) {
-				var params = ptr64[fd + 24];
+				var params = *cast(*u64, fd + 24);
 				var pn = 0;
 				var an = 0;
 				if (params != 0) { pn = vec_len(params); }
@@ -3986,7 +3931,7 @@ func tc_expr(env, e) {
 					var a0 = vec_get(args, i2);
 					var ps0 = vec_get(params, i2);
 					var pty = TC_TY_INVALID;
-					if (ps0 != 0 && ptr64[ps0 + 48] != 0) { pty = tc_type_from_asttype(ptr64[ps0 + 48]); }
+					if (ps0 != 0 && *cast(*u64, ps0 + 48) != 0) { pty = tc_type_from_asttype(*cast(*u64, ps0 + 48)); }
 					if (pty != TC_TY_INVALID) { tc_expr_with_expected(env, a0, pty); }
 					else { tc_expr(env, a0); }
 					i2 = i2 + 1;
@@ -3995,7 +3940,7 @@ func tc_expr(env, e) {
 					tc_expr(env, vec_get(args, i2));
 					i2 = i2 + 1;
 				}
-				var ret_ast = ptr64[fd + 32];
+				var ret_ast = *cast(*u64, fd + 32);
 				if (ret_ast != 0) { return tc_type_from_asttype(ret_ast); }
 				return 0;
 			}
@@ -4014,7 +3959,7 @@ func tc_expr(env, e) {
 				if (fptr_params != 0) { pn = vec_len(fptr_params); }
 				if (args_saved != 0) { an = vec_len(args_saved); }
 				if (an != pn) {
-					tc_err_at(ptr64[e_saved + 64], ptr64[e_saved + 72], "func ptr call: argument count mismatch");
+					tc_err_at(*cast(*u64, e_saved + 64), *cast(*u64, e_saved + 72), "func ptr call: argument count mismatch");
 					return TC_TY_INVALID;
 				}
 				var env_saved = env;
@@ -4027,13 +3972,13 @@ func tc_expr(env, e) {
 					i3 = i3 + 1;
 				}
 				// Mark this call expr as indirect call for codegen
-				ptr64[e_saved + 8] = fptr_ty_saved;  // store func ptr type for codegen
+				*cast(*u64, e_saved + 8) = fptr_ty_saved;  // store func ptr type for codegen
 				return tc_func_ptr_ret_type(fptr_ty_saved);
 			}
 		}
 
 		// Default: accept calls, return unknown.
-		if (callee == 0 || ptr64[callee + 0] != AstExprKind.IDENT) {
+		if (callee == 0 || *cast(*u64, callee + 0) != AstExprKind.IDENT) {
 			tc_expr(env, callee);
 		}
 		var i = 0;
@@ -4046,12 +3991,12 @@ func tc_expr(env, e) {
 		return TC_TY_INVALID;
 	}
 	if (k == AstExprKind.INDEX) {
-		var base = ptr64[e + 16];
-		var idx = ptr64[e + 24];
+		var base = *cast(*u64, e + 16);
+		var idx = *cast(*u64, e + 24);
 		var base_ty = tc_expr(env, base);
 		var idx_ty = tc_expr_with_expected(env, idx, TC_TY_U64);
 		if (tc_is_int(idx_ty) == 0) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "index expects integer");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "index expects integer");
 			return TC_TY_INVALID;
 		}
 		if (tc_is_slice(base_ty) == 1) {
@@ -4060,33 +4005,33 @@ func tc_expr(env, e) {
 		if (tc_is_array(base_ty) == 1) {
 			return tc_array_elem(base_ty);
 		}
-		tc_err_at(ptr64[e + 64], ptr64[e + 72], "index expects slice or array");
+		tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "index expects slice or array");
 		return TC_TY_INVALID;
 	}
 	if (k == AstExprKind.BRACE_INIT) {
 		// Phase 3.6: struct literal: Type{...} (a=AstType*), or array literal {..} (a=0).
-		var t_ast = ptr64[e + 16];
+		var t_ast = *cast(*u64, e + 16);
 		if (t_ast == 0) {
 			// Without context, array brace-init cannot be typed.
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "brace-init requires array type context");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "brace-init requires array type context");
 			return TC_TY_INVALID;
 		}
 		var ty = tc_type_from_asttype(t_ast);
 		if (tc_is_struct(ty) == 0) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "struct literal expects struct type");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "struct literal expects struct type");
 			return TC_TY_INVALID;
 		}
-		var elems = ptr64[e + 32];
+		var elems = *cast(*u64, e + 32);
 		var n = 0;
 		if (elems != 0) { n = vec_len(elems); }
 		var fields = tc_struct_fields(ty);
 		var nf = 0;
 		if (fields != 0) { nf = vec_len(fields); }
-		var name_meta = ptr64[e + 8];
+		var name_meta = *cast(*u64, e + 8);
 		if (name_meta != 0) {
 			// Named form: Type{ a: expr, b: expr }
 			if (vec_len(name_meta) != n) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "struct literal: internal name/expr mismatch");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "struct literal: internal name/expr mismatch");
 				return TC_TY_INVALID;
 			}
 			var used = vec_new(4);
@@ -4097,13 +4042,13 @@ func tc_expr(env, e) {
 				var rec = vec_get(name_meta, i);
 				var fn_ptr = 0;
 				var fn_len = 0;
-				var fn_line = ptr64[e + 64];
-				var fn_col = ptr64[e + 72];
+				var fn_line = *cast(*u64, e + 64);
+				var fn_col = *cast(*u64, e + 72);
 				if (rec != 0) {
-					fn_ptr = ptr64[rec + 0];
-					fn_len = ptr64[rec + 8];
-					fn_line = ptr64[rec + 16];
-					fn_col = ptr64[rec + 24];
+					fn_ptr = *cast(*u64, rec + 0);
+					fn_len = *cast(*u64, rec + 8);
+					fn_line = *cast(*u64, rec + 16);
+					fn_col = *cast(*u64, rec + 24);
 				}
 				var f = tc_struct_find_field(ty, fn_ptr, fn_len);
 				if (f == 0) {
@@ -4130,10 +4075,10 @@ func tc_expr(env, e) {
 					j = j + 1;
 				}
 				vec_push(used, f);
-				var fty = ptr64[f + 16];
+				var fty = *cast(*u64, f + 16);
 				var et = tc_expr_with_expected(env, vec_get(elems, i), fty);
 				if (tc_type_eq(et, fty) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "struct literal: field type mismatch");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "struct literal: field type mismatch");
 					return TC_TY_INVALID;
 				}
 				vec_push(metas, f);
@@ -4150,19 +4095,19 @@ func tc_expr(env, e) {
 					j2 = j2 + 1;
 				}
 				if (seen == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "struct literal: missing field");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "struct literal: missing field");
 					return TC_TY_INVALID;
 				}
 				k2 = k2 + 1;
 			}
 			// Annotate for codegen: op=Vec(field_meta*), b=struct ty.
-			ptr64[e + 8] = metas;
-			ptr64[e + 24] = ty;
+			*cast(*u64, e + 8) = metas;
+			*cast(*u64, e + 24) = ty;
 			return ty;
 		}
 		// Positional form: Type{ expr0, expr1, ... }
 		if (n != nf) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "struct literal: field count mismatch");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "struct literal: field count mismatch");
 			return TC_TY_INVALID;
 		}
 		var metas2 = vec_new(4);
@@ -4176,42 +4121,42 @@ func tc_expr(env, e) {
 				var smod2 = tc_struct_mod_id(ty);
 				if (smod2 != tc_cur_mod) {
 					if (tc_struct_field_is_public(f3) == 0) {
-						tc_err_at(ptr64[e + 64], ptr64[e + 72], "struct literal: field is private");
+						tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "struct literal: field is private");
 						return TC_TY_INVALID;
 					}
 				}
 			}
-			var fty2 = ptr64[f3 + 16];
+			var fty2 = *cast(*u64, f3 + 16);
 			var et2 = tc_expr_with_expected(env, vec_get(elems, i2), fty2);
 			if (tc_type_eq(et2, fty2) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "struct literal: field type mismatch");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "struct literal: field type mismatch");
 				return TC_TY_INVALID;
 			}
 			vec_push(metas2, f3);
 			i2 = i2 + 1;
 		}
-		ptr64[e + 8] = metas2;
-		ptr64[e + 24] = ty;
+		*cast(*u64, e + 8) = metas2;
+		*cast(*u64, e + 24) = ty;
 		return ty;
 	}
 	if (k == AstExprKind.CAST) {
-		var to_ty = tc_type_from_asttype(ptr64[e + 16]);
+		var to_ty = tc_type_from_asttype(*cast(*u64, e + 16));
 		// Evaluate inner expression; for INT literals, allow the destination type for range checking.
-		tc_expr_with_expected(env, ptr64[e + 24], to_ty);
+		tc_expr_with_expected(env, *cast(*u64, e + 24), to_ty);
 		return to_ty;
 	}
 	if (k == AstExprKind.OFFSETOF) {
-		var ty_ast = ptr64[e + 16];
+		var ty_ast = *cast(*u64, e + 16);
 		var ty = tc_type_from_asttype(ty_ast);
 		if (tc_is_struct(ty) == 0) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "offsetof expects struct type");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "offsetof expects struct type");
 			return TC_TY_INVALID;
 		}
-		var field_ptr = ptr64[e + 24];
-		var field_len = ptr64[e + 32];
+		var field_ptr = *cast(*u64, e + 24);
+		var field_len = *cast(*u64, e + 32);
 		var f = tc_struct_find_field(ty, field_ptr, field_len);
 		if (f == 0) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "offsetof: unknown field");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "offsetof: unknown field");
 			return TC_TY_INVALID;
 		}
 		// Phase 3.2: cross-module access control.
@@ -4219,15 +4164,15 @@ func tc_expr(env, e) {
 			var smod = tc_struct_mod_id(ty);
 			if (smod != tc_cur_mod) {
 				if (tc_struct_is_public(ty) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "offsetof: struct type is private");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "offsetof: struct type is private");
 				}
 				if (tc_struct_field_is_public(f) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "offsetof: field is private");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "offsetof: field is private");
 				}
 			}
 		}
 		// Store computed offset into `op` for codegen.
-		ptr64[e + 8] = ptr64[f + 24];
+		*cast(*u64, e + 8) = *cast(*u64, f + 24);
 		return TC_TY_U64;
 	}
 	if (k == AstExprKind.FIELD) {
@@ -4238,12 +4183,12 @@ func tc_expr(env, e) {
 		// codegen에서 dot 접근이 arrow처럼 처리되어 런타임 segfault가 날 수 있다.
 		//
 		// 따라서 extra에 size가 이미 들어있는 경우(>0) 빠르게 타입만 반환한다.
-		var extra_fast = ptr64[e + 32];
+		var extra_fast = *cast(*u64, e + 32);
 		var sz_fast = (extra_fast >> 56) & 127;
 		if (sz_fast != 0) {
 			// enum member constant: size=127
 			if (sz_fast == 127) {
-				var en_ty = ptr64[e + 24];
+				var en_ty = *cast(*u64, e + 24);
 				if (en_ty != 0) { return en_ty; }
 				// best-effort fallback: treat as u64-like
 				return TC_TY_U64;
@@ -4251,50 +4196,50 @@ func tc_expr(env, e) {
 			var raw_fast = (extra_fast >> 55) & 1;
 			var hook_fast = (extra_fast >> 54) & 1;
 			if (hook_fast == 1 && raw_fast == 0) {
-				var rec_fast = ptr64[e + 24];
+				var rec_fast = *cast(*u64, e + 24);
 				if (rec_fast != 0) {
-					var fm_fast = ptr64[rec_fast + 8];
-					if (fm_fast != 0) { return ptr64[fm_fast + 16]; }
+					var fm_fast = *cast(*u64, rec_fast + 8);
+					if (fm_fast != 0) { return *cast(*u64, fm_fast + 16); }
 				}
 			}
 			// non-hook: e+24에 field type을 저장해 둔다.
-			var fty_fast = ptr64[e + 24];
+			var fty_fast = *cast(*u64, e + 24);
 			if (fty_fast != 0) { return fty_fast; }
 			return TC_TY_INVALID;
 		}
 
-		var base = ptr64[e + 16];
-		var packed0a = ptr64[e + 32];
+		var base = *cast(*u64, e + 16);
+		var packed0a = *cast(*u64, e + 32);
 		// Pre-typecheck packing from parser: [field_len<<2] | [via_ptr<<1] | raw
 		var via_ptr0 = (packed0a >> 1) & 1;
 		var raw0 = packed0a & 1;
 		var field_len0 = packed0a >> 2;
-		var field_ptr0 = ptr64[e + 24];
+		var field_ptr0 = *cast(*u64, e + 24);
 
 		// Phase 3.2: module-qualified symbol access: mod.sym
 		if (tc_modules != 0 && via_ptr0 == 0) {
-			if (base != 0 && ptr64[base + 0] == AstExprKind.IDENT) {
-				var mod_ptr = ptr64[base + 40];
-				var mod_len = ptr64[base + 48];
+			if (base != 0 && *cast(*u64, base + 0) == AstExprKind.IDENT) {
+				var mod_ptr = *cast(*u64, base + 40);
+				var mod_len = *cast(*u64, base + 48);
 				// NOTE(v2): tc_env_get 호출이 로컬/인자를 클로버할 수 있어 인라인 조회로 대체.
 				var base_ty0 = TC_TY_INVALID;
 				if (env != 0 && mod_ptr != 0) {
-					var bufm = ptr64[env + 0];
-					var nm = ptr64[env + 8];
+					var bufm = *cast(*u64, env + 0);
+					var nm = *cast(*u64, env + 8);
 					while (nm != 0) {
 						nm = nm - 1;
-						var entm = ptr64[bufm + (nm * 8)];
+						var entm = *cast(*u64, bufm + (nm * 8));
 						if (entm != 0) {
-							var enpm = ptr64[entm + 0];
-							var enlm = ptr64[entm + 8];
+							var enpm = *cast(*u64, entm + 0);
+							var enlm = *cast(*u64, entm + 8);
 							if (enlm == mod_len && enpm != 0) {
 								var im = 0;
 								var okm = 1;
 								while (im < mod_len) {
-									if (ptr8[enpm + im] != ptr8[mod_ptr + im]) { okm = 0; break; }
+									if (*cast(*u8, enpm + im) != *cast(*u8, mod_ptr + im)) { okm = 0; break; }
 									im = im + 1;
 								}
-								if (okm == 1) { base_ty0 = ptr64[entm + 16]; break; }
+								if (okm == 1) { base_ty0 = *cast(*u64, entm + 16); break; }
 							}
 						}
 					}
@@ -4306,15 +4251,15 @@ func tc_expr(env, e) {
 						if (mod_id == tc_cur_mod) { ok = 1; }
 						else if (tc_imports_contains(tc_cur_imports, mod_ptr, mod_len) == 1) { ok = 1; }
 						if (ok == 0) {
-							tc_err_at(ptr64[e + 64], ptr64[e + 72], "module not imported");
+							tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "module not imported");
 							return TC_TY_INVALID;
 						}
 
 						var mrec = vec_get(tc_modules, mod_id);
 						var prog = 0;
-						if (mrec != 0) { prog = ptr64[mrec + 16]; }
+						if (mrec != 0) { prog = *cast(*u64, mrec + 16); }
 						var decls = 0;
-						if (prog != 0) { decls = ptr64[prog + 0]; }
+						if (prog != 0) { decls = *cast(*u64, prog + 0); }
 						var found = 0;
 						var dk = 0;
 						var sym_public = 0;
@@ -4325,12 +4270,12 @@ func tc_expr(env, e) {
 							while (j < ndecl) {
 								var d2 = vec_get(decls, j);
 								if (d2 != 0) {
-									var nk = ptr64[d2 + 0];
+									var nk = *cast(*u64, d2 + 0);
 									if (nk != AstDeclKind.IMPORT) {
-										if (slice_eq_parts(ptr64[d2 + 8], ptr64[d2 + 16], field_ptr0, field_len0) == 1) {
+										if (slice_eq_parts(*cast(*u64, d2 + 8), *cast(*u64, d2 + 16), field_ptr0, field_len0) == 1) {
 											found = 1;
 											dk = nk;
-											sym_public = ptr64[d2 + 72];
+											sym_public = *cast(*u64, d2 + 72);
 											// Resolve types where possible.
 											if (dk == AstDeclKind.STRUCT) {
 												sym_ty = tc_struct_lookup_mod(mod_id, field_ptr0, field_len0);
@@ -4339,8 +4284,8 @@ func tc_expr(env, e) {
 											} else if (dk == AstDeclKind.VAR || dk == AstDeclKind.CONST) {
 												var saved_mod = tc_cur_mod;
 												tc_cur_mod = mod_id;
-												if (ptr64[d2 + 24] != 0) {
-													sym_ty = tc_type_from_asttype(ptr64[d2 + 24]);
+												if (*cast(*u64, d2 + 24) != 0) {
+													sym_ty = tc_type_from_asttype(*cast(*u64, d2 + 24));
 												}
 												tc_cur_mod = saved_mod;
 											}
@@ -4353,11 +4298,11 @@ func tc_expr(env, e) {
 						}
 
 						if (found == 0) {
-							tc_err_at(ptr64[e + 64], ptr64[e + 72], "module: unknown symbol");
+							tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "module: unknown symbol");
 							return TC_TY_INVALID;
 						}
 						if (mod_id != tc_cur_mod && sym_public == 0) {
-							tc_err_at(ptr64[e + 64], ptr64[e + 72], "module symbol is private");
+							tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "module symbol is private");
 							return TC_TY_INVALID;
 						}
 						// Functions have no type in this checker yet; accept.
@@ -4369,34 +4314,34 @@ func tc_expr(env, e) {
 		// Phase 3.x: FIELD
 		// NOTE(v2): v2 부트스트랩 환경에서 함수 호출이 로컬/인자를 클로버할 수 있어,
 		// 가능한 한 호출을 피하고(특히 tc_env_get), 필요한 값은 먼저 계산해 둔다.
-		var base2 = ptr64[e + 16];
-		var field_ptr = ptr64[e + 24];
-		var packed0 = ptr64[e + 32];
+		var base2 = *cast(*u64, e + 16);
+		var field_ptr = *cast(*u64, e + 24);
+		var packed0 = *cast(*u64, e + 32);
 		var via_ptr = (packed0 >> 1) & 1;
 		var raw = packed0 & 1;
 		var field_len = packed0 >> 2;
 		var base_ty = TC_TY_INVALID;
 
 		// 1) base_ty 계산(IDENT면 env를 직접 스캔)
-		if (base2 != 0 && ptr64[base2 + 0] == AstExprKind.IDENT && env != 0) {
-			var np2 = ptr64[base2 + 40];
-			var nl2 = ptr64[base2 + 48];
-			var buf2 = ptr64[env + 0];
-			var n2 = ptr64[env + 8];
+		if (base2 != 0 && *cast(*u64, base2 + 0) == AstExprKind.IDENT && env != 0) {
+			var np2 = *cast(*u64, base2 + 40);
+			var nl2 = *cast(*u64, base2 + 48);
+			var buf2 = *cast(*u64, env + 0);
+			var n2 = *cast(*u64, env + 8);
 			while (n2 != 0) {
 				n2 = n2 - 1;
-				var ent2 = ptr64[buf2 + (n2 * 8)];
+				var ent2 = *cast(*u64, buf2 + (n2 * 8));
 				if (ent2 != 0) {
-					var enp2 = ptr64[ent2 + 0];
-					var enl2 = ptr64[ent2 + 8];
+					var enp2 = *cast(*u64, ent2 + 0);
+					var enl2 = *cast(*u64, ent2 + 8);
 					if (enl2 == nl2 && enp2 != 0 && np2 != 0) {
 						var i2 = 0;
 						var ok2 = 1;
 						while (i2 < nl2) {
-							if (ptr8[enp2 + i2] != ptr8[np2 + i2]) { ok2 = 0; break; }
+							if (*cast(*u8, enp2 + i2) != *cast(*u8, np2 + i2)) { ok2 = 0; break; }
 							i2 = i2 + 1;
 						}
-						if (ok2 == 1) { base_ty = ptr64[ent2 + 16]; break; }
+						if (ok2 == 1) { base_ty = *cast(*u64, ent2 + 16); break; }
 					}
 				}
 			}
@@ -4408,13 +4353,13 @@ func tc_expr(env, e) {
 
 		// 2) enum 멤버 특례(Color.Red): base가 env에 바인딩되지 않았을 때만 시도
 		if (base_ty == TC_TY_INVALID) {
-			if (ptr64[e + 8] == 0) {
+			if (*cast(*u64, e + 8) == 0) {
 				if (via_ptr == 0) {
-					if (base2 != 0 && ptr64[base2 + 0] == AstExprKind.IDENT) {
+					if (base2 != 0 && *cast(*u64, base2 + 0) == AstExprKind.IDENT) {
 						// v2 call-clobber 회피: 필요한 값은 전역에 저장
 						tc_tmp_expr = e;
-						tc_tmp_enum_base_ptr = ptr64[base2 + 40];
-						tc_tmp_enum_base_len = ptr64[base2 + 48];
+						tc_tmp_enum_base_ptr = *cast(*u64, base2 + 40);
+						tc_tmp_enum_base_len = *cast(*u64, base2 + 48);
 						tc_tmp_enum_field_ptr = field_ptr;
 						tc_tmp_enum_field_len = field_len;
 
@@ -4422,14 +4367,14 @@ func tc_expr(env, e) {
 						if (en != 0) {
 							var v = tc_enum_find_variant(en, tc_tmp_enum_field_ptr, tc_tmp_enum_field_len);
 							if (v == 0) {
-								tc_err_at(ptr64[tc_tmp_expr + 64], ptr64[tc_tmp_expr + 72], "enum: unknown variant");
+								tc_err_at(*cast(*u64, tc_tmp_expr + 64), *cast(*u64, tc_tmp_expr + 72), "enum: unknown variant");
 								return TC_TY_INVALID;
 							}
 							// Store computed value into op; mark FIELD as immediate via size=127.
-							ptr64[tc_tmp_expr + 8] = ptr64[v + 16];
-							ptr64[tc_tmp_expr + 32] = (127 << 56);
+							*cast(*u64, tc_tmp_expr + 8) = *cast(*u64, v + 16);
+							*cast(*u64, tc_tmp_expr + 32) = (127 << 56);
 							// For idempotent re-visits: store enum type in e+24 (codegen doesn't use it).
-							ptr64[tc_tmp_expr + 24] = en;
+							*cast(*u64, tc_tmp_expr + 24) = en;
 							return en;
 						}
 					}
@@ -4437,7 +4382,7 @@ func tc_expr(env, e) {
 			}
 			// enum lookup도 실패했다면, 이제야 base를 식으로 타입체크해서
 			// "unknown identifier" 같은 정확한 에러를 내도록 한다.
-			if (base2 != 0 && ptr64[base2 + 0] == AstExprKind.IDENT) {
+			if (base2 != 0 && *cast(*u64, base2 + 0) == AstExprKind.IDENT) {
 				base_ty = tc_expr(env, base2);
 			}
 		}
@@ -4445,11 +4390,11 @@ func tc_expr(env, e) {
 		var struct_ty = base_ty;
 		if (via_ptr == 1) {
 			if (tc_is_ptr(base_ty) == 0) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "field access: '->' expects pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "field access: '->' expects pointer");
 				return TC_TY_INVALID;
 			}
 			if (tc_is_ptr_nullable(base_ty) == 1) {
-				tc_err_at(ptr64[e + 64], ptr64[e + 72], "field access: cannot use '->' on nullable pointer");
+				tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "field access: cannot use '->' on nullable pointer");
 				return TC_TY_INVALID;
 			}
 			struct_ty = tc_ptr_base(base_ty);
@@ -4458,7 +4403,7 @@ func tc_expr(env, e) {
 		// 여기서는 함수를 호출하지 않고 인라인으로 판정한다.
 		var is_struct0 = 0;
 		if (struct_ty >= 4096) {
-			if (ptr64[struct_ty + 0] == TC_COMPOUND_STRUCT) { is_struct0 = 1; }
+			if (*cast(*u64, struct_ty + 0) == TC_COMPOUND_STRUCT) { is_struct0 = 1; }
 		}
 		if (is_struct0 == 0) {
 			if (tc_debug_field != 0) {
@@ -4467,44 +4412,44 @@ func tc_expr(env, e) {
 				print_str(" struct_ty=");
 				print_u64(struct_ty);
 				print_str(" base_kind=");
-				if (base2 != 0) { print_u64(ptr64[base2 + 0]); }
+				if (base2 != 0) { print_u64(*cast(*u64, base2 + 0)); }
 				else { print_u64(0); }
 				print_str(" env_len=");
 				print_u64(vec_len(env));
 				var ent0 = vec_get(env, 0);
 				if (ent0 != 0) {
-					var enp = ptr64[ent0 + 0];
-					var enl = ptr64[ent0 + 8];
+					var enp = *cast(*u64, ent0 + 0);
+					var enl = *cast(*u64, ent0 + 8);
 					print_str(" ent0_len=");
 					print_u64(enl);
 					print_str(" ent0_name0=");
-					if (enp != 0 && enl != 0) { print_u64(ptr8[enp]); }
+					if (enp != 0 && enl != 0) { print_u64(*cast(*u8, enp)); }
 					else { print_u64(0); }
 					print_str(" ent0_ty=");
-					var ety = ptr64[ent0 + 16];
+					var ety = *cast(*u64, ent0 + 16);
 					print_u64(ety);
 					if (ety >= 4096) {
 						print_str(" ent0_ty_kind=");
-						print_u64(ptr64[ety + 0]);
+						print_u64(*cast(*u64, ety + 0));
 					}
 				}
-				if (base2 != 0 && ptr64[base2 + 0] == AstExprKind.IDENT) {
-					var np = ptr64[base2 + 40];
-					var nl = ptr64[base2 + 48];
+				if (base2 != 0 && *cast(*u64, base2 + 0) == AstExprKind.IDENT) {
+					var np = *cast(*u64, base2 + 40);
+					var nl = *cast(*u64, base2 + 48);
 					print_str(" name_len=");
 					print_u64(nl);
 					print_str(" name0=");
-					if (np != 0 && nl != 0) { print_u64(ptr8[np]); }
+					if (np != 0 && nl != 0) { print_u64(*cast(*u8, np)); }
 					else { print_u64(0); }
 				}
 				print_str("\n");
 			}
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "field access expects struct type");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "field access expects struct type");
 			return TC_TY_INVALID;
 		}
 		var f = tc_struct_find_field(struct_ty, field_ptr, field_len);
 		if (f == 0) {
-			tc_err_at(ptr64[e + 64], ptr64[e + 72], "field access: unknown field");
+			tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "field access: unknown field");
 			return TC_TY_INVALID;
 		}
 		// Phase 3.2: cross-module access control.
@@ -4512,24 +4457,24 @@ func tc_expr(env, e) {
 			var smod2 = tc_struct_mod_id(struct_ty);
 			if (smod2 != tc_cur_mod) {
 				if (tc_struct_is_public(struct_ty) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "field access: struct type is private");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "field access: struct type is private");
 				}
 				if (tc_struct_field_is_public(f) == 0) {
-					tc_err_at(ptr64[e + 64], ptr64[e + 72], "field access: field is private");
+					tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "field access: field is private");
 				}
 			}
 		}
 		// Store computed field offset for codegen.
-		ptr64[e + 8] = ptr64[f + 24];
-		var fty = ptr64[f + 16];
+		*cast(*u64, e + 8) = *cast(*u64, f + 24);
+		var fty = *cast(*u64, f + 16);
 		// NOTE: codegen은 일반 FIELD에서 e+24를 사용하지 않으므로, 재방문 시를 위해
 		// field type을 저장해 둔다. (hook가 켜지면 아래에서 rec로 덮어쓴다.)
-		ptr64[e + 24] = fty;
+		*cast(*u64, e + 24) = fty;
 		var fsz = tc_sizeof(fty);
 		// Phase 3.5: property hooks.
 		// Pack: [via_ptr:1][field_size:7][raw:1][hook:1][field_len:54]
 		var hook = 0;
-		var fattr2 = ptr64[f + 40];
+		var fattr2 = *cast(*u64, f + 40);
 		if (raw == 0) {
 			var ha = fattr2 & 3;
 			if (ha != 0) { hook = 1; }
@@ -4538,9 +4483,9 @@ func tc_expr(env, e) {
 			// Store a tiny record for codegen: { struct_ty, field_meta }
 			var rec = heap_alloc(16);
 			if (rec != 0) {
-				ptr64[rec + 0] = struct_ty;
-				ptr64[rec + 8] = f;
-				ptr64[e + 24] = rec;
+				*cast(*u64, rec + 0) = struct_ty;
+				*cast(*u64, rec + 8) = f;
+				*cast(*u64, e + 24) = rec;
 			}
 		}
 		var packed = 0;
@@ -4549,20 +4494,20 @@ func tc_expr(env, e) {
 		packed = packed | ((raw & 1) << 55);
 		packed = packed | ((hook & 1) << 54);
 		packed = packed | (field_len & 18014398509481983);
-		ptr64[e + 32] = packed;
+		*cast(*u64, e + 32) = packed;
 		return fty;
 	}
 
-	tc_err_at(ptr64[e + 64], ptr64[e + 72], "expression: unsupported kind");
+	tc_err_at(*cast(*u64, e + 64), *cast(*u64, e + 72), "expression: unsupported kind");
 	return TC_TY_INVALID;
 }
 
 func tc_stmt(env, s) {
 	if (s == 0) { return 0; }
-	var k = ptr64[s + 0];
+	var k = *cast(*u64, s + 0);
 	if (k == AstStmtKind.BLOCK) {
 		var saved = vec_len(env);
-		var stmts = ptr64[s + 8];
+		var stmts = *cast(*u64, s + 8);
 		var i = 0;
 		var n = 0;
 		if (stmts != 0) { n = vec_len(stmts); }
@@ -4570,18 +4515,18 @@ func tc_stmt(env, s) {
 			tc_stmt(env, vec_get(stmts, i));
 			i = i + 1;
 		}
-		ptr64[env + 8] = saved;
+		*cast(*u64, env + 8) = saved;
 		return 0;
 	}
 	if (k == AstStmtKind.VAR) {
-		var flags0 = ptr64[s + 8];
+		var flags0 = *cast(*u64, s + 8);
 		var fns0 = flags0 & TC_STMT_FLAG_NOSPILL;
 		var fs0 = flags0 & TC_STMT_FLAG_SECRET;
 		// Capture name early; calls below may clobber `s`.
-		var name_ptr = ptr64[s + 32];
-		var name_len = ptr64[s + 40];
-		var err_line = ptr64[s + 72];
-		var err_col = ptr64[s + 80];
+		var name_ptr = *cast(*u64, s + 32);
+		var name_len = *cast(*u64, s + 40);
+		var err_line = *cast(*u64, s + 72);
+		var err_col = *cast(*u64, s + 80);
 
 		if (fns0 != 0) {
 			if (tc_nospill_count >= TC_NOSPILL_LIMIT) {
@@ -4596,16 +4541,16 @@ func tc_stmt(env, s) {
 		}
 
 		var decl_ty = TC_TY_INVALID;
-		if (ptr64[s + 48] != 0) {
-			decl_ty = tc_type_from_asttype(ptr64[s + 48]);
+		if (*cast(*u64, s + 48) != 0) {
+			decl_ty = tc_type_from_asttype(*cast(*u64, s + 48));
 		}
 
 		var init_ty = TC_TY_INVALID;
-		if (ptr64[s + 56] != 0) {
+		if (*cast(*u64, s + 56) != 0) {
 			if (decl_ty != TC_TY_INVALID) {
-				init_ty = tc_expr_with_expected(env, ptr64[s + 56], decl_ty);
+				init_ty = tc_expr_with_expected(env, *cast(*u64, s + 56), decl_ty);
 			} else {
-				init_ty = tc_expr(env, ptr64[s + 56]);
+				init_ty = tc_expr(env, *cast(*u64, s + 56));
 			}
 		}
 		if (tc_is_tuple2(init_ty) == 1) {
@@ -4647,19 +4592,19 @@ func tc_stmt(env, s) {
 				print_u64(vec_len(env));
 				var ent0 = vec_get(env, 0);
 				if (ent0 != 0) {
-					var enp = ptr64[ent0 + 0];
-					var enl = ptr64[ent0 + 8];
+					var enp = *cast(*u64, ent0 + 0);
+					var enl = *cast(*u64, ent0 + 8);
 					print_str(" ent0_len=");
 					print_u64(enl);
 					print_str(" ent0_name0=");
-					if (enp != 0 && enl != 0) { print_u64(ptr8[enp]); }
+					if (enp != 0 && enl != 0) { print_u64(*cast(*u8, enp)); }
 					else { print_u64(0); }
 					print_str(" ent0_ty=");
-					var ety = ptr64[ent0 + 16];
+					var ety = *cast(*u64, ent0 + 16);
 					print_u64(ety);
 					if (ety >= 4096) {
 						print_str(" ent0_ty_kind=");
-						print_u64(ptr64[ety + 0]);
+						print_u64(*cast(*u64, ety + 0));
 					}
 				}
 				print_str("\n");
@@ -4668,11 +4613,11 @@ func tc_stmt(env, s) {
 		return 0;
 	}
 	if (k == AstStmtKind.DESTRUCT) {
-		var names = ptr64[s + 8];
-		var is_decl = ptr64[s + 16];
-		var rhs = ptr64[s + 56];
+		var names = *cast(*u64, s + 8);
+		var is_decl = *cast(*u64, s + 16);
+		var rhs = *cast(*u64, s + 56);
 		if (names == 0 || vec_len(names) != 4) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "destruct: internal name vector mismatch");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "destruct: internal name vector mismatch");
 			if (rhs != 0) { tc_expr(env, rhs); }
 			return 0;
 		}
@@ -4682,7 +4627,7 @@ func tc_stmt(env, s) {
 		var name1_len = vec_get(names, 3);
 		var rty = tc_expr(env, rhs);
 		if (tc_is_tuple2(rty) == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "destruct: rhs must be a 2-value return");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "destruct: rhs must be a 2-value return");
 			return 0;
 		}
 		var t0 = tc_tuple2_a(rty);
@@ -4696,33 +4641,33 @@ func tc_stmt(env, s) {
 		if (tc_is_discard_ident(name0_ptr, name0_len) == 0) {
 			var cur0 = tc_env_get(env, name0_ptr, name0_len);
 			if (cur0 == TC_TY_INVALID) {
-				tc_err_at(ptr64[s + 72], ptr64[s + 80], "destruct assign: unknown lhs");
+				tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "destruct assign: unknown lhs");
 			} else if (tc_type_eq(cur0, t0) == 0) {
-				tc_err_at(ptr64[s + 72], ptr64[s + 80], "destruct assign: lhs type mismatch");
+				tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "destruct assign: lhs type mismatch");
 			}
 		}
 		if (tc_is_discard_ident(name1_ptr, name1_len) == 0) {
 			var cur1 = tc_env_get(env, name1_ptr, name1_len);
 			if (cur1 == TC_TY_INVALID) {
-				tc_err_at(ptr64[s + 72], ptr64[s + 80], "destruct assign: unknown rhs lhs");
+				tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "destruct assign: unknown rhs lhs");
 			} else if (tc_type_eq(cur1, t1) == 0) {
-				tc_err_at(ptr64[s + 72], ptr64[s + 80], "destruct assign: lhs type mismatch");
+				tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "destruct assign: lhs type mismatch");
 			}
 		}
 		return 0;
 	}
 	if (k == AstStmtKind.EXPR) {
-		tc_expr(env, ptr64[s + 56]);
+		tc_expr(env, *cast(*u64, s + 56));
 		return 0;
 	}
 	if (k == AstStmtKind.RETURN) {
 		var want = tc_cur_ret_ty;
-		var es = ptr64[s + 8];
+		var es = *cast(*u64, s + 8);
 		if (tc_is_tuple2(want) == 1) {
 			if (es == 0 || vec_len(es) != 2) {
-				tc_err_at(ptr64[s + 72], ptr64[s + 80], "return: expected two values");
+				tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "return: expected two values");
 				// still typecheck single expr for recovery
-				if (ptr64[s + 56] != 0) { tc_expr(env, ptr64[s + 56]); }
+				if (*cast(*u64, s + 56) != 0) { tc_expr(env, *cast(*u64, s + 56)); }
 				return 0;
 			}
 			var a0 = vec_get(es, 0);
@@ -4733,7 +4678,7 @@ func tc_stmt(env, s) {
 		}
 		// non-tuple return
 		if (es != 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "return: unexpected multiple values");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "return: unexpected multiple values");
 			var i0 = 0;
 			var n0 = vec_len(es);
 			while (i0 < n0) { tc_expr(env, vec_get(es, i0)); i0 = i0 + 1; }
@@ -4741,62 +4686,62 @@ func tc_stmt(env, s) {
 		}
 		if (want == 0) {
 			// Unspecified return type: allow return with or without a value.
-			if (ptr64[s + 56] != 0) { tc_expr(env, ptr64[s + 56]); }
+			if (*cast(*u64, s + 56) != 0) { tc_expr(env, *cast(*u64, s + 56)); }
 			return 0;
 		}
-		if (ptr64[s + 56] == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "return: expected value");
+		if (*cast(*u64, s + 56) == 0) {
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "return: expected value");
 			return 0;
 		}
 		// Validate return expression type.
-		tc_expr_with_expected(env, ptr64[s + 56], want);
+		tc_expr_with_expected(env, *cast(*u64, s + 56), want);
 		return 0;
 	}
 	if (k == AstStmtKind.BREAK) {
-		var level = ptr64[s + 8];
+		var level = *cast(*u64, s + 8);
 		if (level == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "break: level must be >= 1");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "break: level must be >= 1");
 			return 0;
 		}
 		if (tc_break_depth == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "break: not inside a loop or switch");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "break: not inside a loop or switch");
 			return 0;
 		}
 		if (level > tc_break_depth) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "break: level exceeds break depth");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "break: level exceeds break depth");
 		}
 		return 0;
 	}
 	if (k == AstStmtKind.CONTINUE) {
-		var level2 = ptr64[s + 8];
+		var level2 = *cast(*u64, s + 8);
 		if (level2 == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "continue: level must be >= 1");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "continue: level must be >= 1");
 			return 0;
 		}
 		if (tc_switch_depth != 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "continue: not allowed inside switch");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "continue: not allowed inside switch");
 			return 0;
 		}
 		if (tc_loop_depth == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "continue: not inside a loop");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "continue: not inside a loop");
 			return 0;
 		}
 		if (level2 > tc_loop_depth) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "continue: level exceeds loop depth");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "continue: level exceeds loop depth");
 		}
 		return 0;
 	}
 	if (k == AstStmtKind.IF) {
-		tc_expr(env, ptr64[s + 8]);
-		tc_stmt(env, ptr64[s + 16]);
-		if (ptr64[s + 24] != 0) { tc_stmt(env, ptr64[s + 24]); }
+		tc_expr(env, *cast(*u64, s + 8));
+		tc_stmt(env, *cast(*u64, s + 16));
+		if (*cast(*u64, s + 24) != 0) { tc_stmt(env, *cast(*u64, s + 24)); }
 		return 0;
 	}
 	if (k == AstStmtKind.WHILE) {
-		tc_expr(env, ptr64[s + 8]);
+		tc_expr(env, *cast(*u64, s + 8));
 		tc_loop_depth = tc_loop_depth + 1;
 		tc_break_depth = tc_break_depth + 1;
-		tc_stmt(env, ptr64[s + 16]);
+		tc_stmt(env, *cast(*u64, s + 16));
 		tc_break_depth = tc_break_depth - 1;
 		tc_loop_depth = tc_loop_depth - 1;
 		return 0;
@@ -4807,10 +4752,10 @@ func tc_stmt(env, s) {
 		//  s->b: cond expr (0 means true)
 		//  s->c: post expr (0 allowed)
 		//  s->expr_ptr: body stmt
-		var init0 = ptr64[s + 8];
-		var cond0 = ptr64[s + 16];
-		var post0 = ptr64[s + 24];
-		var body0 = ptr64[s + 56];
+		var init0 = *cast(*u64, s + 8);
+		var cond0 = *cast(*u64, s + 16);
+		var post0 = *cast(*u64, s + 24);
+		var body0 = *cast(*u64, s + 56);
 		var saved = vec_len(env);
 		if (init0 != 0) { tc_stmt(env, init0); }
 		if (cond0 != 0) { tc_expr(env, cond0); }
@@ -4820,7 +4765,7 @@ func tc_stmt(env, s) {
 		if (post0 != 0) { tc_expr(env, post0); }
 		tc_break_depth = tc_break_depth - 1;
 		tc_loop_depth = tc_loop_depth - 1;
-		ptr64[env + 8] = saved;
+		*cast(*u64, env + 8) = saved;
 		return 0;
 	}
 	if (k == AstStmtKind.FOREACH) {
@@ -4828,11 +4773,11 @@ func tc_stmt(env, s) {
 		//  s->a: AstForeachBind*
 		//  s->b: iter expr
 		//  s->c: body stmt
-		var bind = ptr64[s + 8];
-		var iter_expr = ptr64[s + 16];
-		var body = ptr64[s + 24];
+		var bind = *cast(*u64, s + 8);
+		var iter_expr = *cast(*u64, s + 16);
+		var body = *cast(*u64, s + 24);
 		if (bind == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "foreach: missing binding");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "foreach: missing binding");
 			return 0;
 		}
 
@@ -4843,7 +4788,7 @@ func tc_stmt(env, s) {
 		} else if (tc_is_array(iter_ty) == 1) {
 			elem_ty = tc_array_elem(iter_ty);
 		} else {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "foreach expects slice or array");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "foreach expects slice or array");
 			// Still typecheck body for error recovery.
 			tc_loop_depth = tc_loop_depth + 1;
 			tc_stmt(env, body);
@@ -4853,17 +4798,17 @@ func tc_stmt(env, s) {
 
 		var elem_sz = tc_sizeof(elem_ty);
 		if (elem_sz == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "foreach: unsupported element type");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "foreach: unsupported element type");
 		} else {
 			// Store element size for codegen.
-			ptr64[bind + 40] = elem_sz;
+			*cast(*u64, bind + 40) = elem_sz;
 		}
 
-		var name0_ptr = ptr64[bind + 0];
-		var name0_len = ptr64[bind + 8];
-		var name1_ptr = ptr64[bind + 16];
-		var name1_len = ptr64[bind + 24];
-		var has_two = ptr64[bind + 32];
+		var name0_ptr = *cast(*u64, bind + 0);
+		var name0_len = *cast(*u64, bind + 8);
+		var name1_ptr = *cast(*u64, bind + 16);
+		var name1_len = *cast(*u64, bind + 24);
+		var has_two = *cast(*u64, bind + 32);
 
 		var saved = vec_len(env);
 		if (has_two == 1) {
@@ -4886,7 +4831,7 @@ func tc_stmt(env, s) {
 		tc_stmt(env, body);
 		tc_break_depth = tc_break_depth - 1;
 		tc_loop_depth = tc_loop_depth - 1;
-		ptr64[env + 8] = saved;
+		*cast(*u64, env + 8) = saved;
 		return 0;
 	}
 	if (k == AstStmtKind.SWITCH) {
@@ -4894,24 +4839,24 @@ func tc_stmt(env, s) {
 		//  +8  scrutinee expr
 		// +16  cases Vec(AstSwitchCase*)
 		// +24  default body stmt or 0
-		var scrut = ptr64[s + 8];
+		var scrut = *cast(*u64, s + 8);
 		var scrut_ty = tc_expr(env, scrut);
 		if (tc_is_int(scrut_ty) == 0 && tc_is_enum(scrut_ty) == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "switch: scrutinee must be integer or enum");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "switch: scrutinee must be integer or enum");
 		}
 		var saved_switch = tc_switch_depth;
 		var saved_break = tc_break_depth;
 		tc_switch_depth = tc_switch_depth + 1;
 		tc_break_depth = tc_break_depth + 1;
 
-		var cases = ptr64[s + 16];
+		var cases = *cast(*u64, s + 16);
 		if (cases != 0) {
 			var n = vec_len(cases);
 			var i = 0;
 			while (i < n) {
 				var c = vec_get(cases, i);
 				if (c != 0) {
-					var vexpr = ptr64[c + 0];
+					var vexpr = *cast(*u64, c + 0);
 					var vty = TC_TY_INVALID;
 					if (tc_is_int(scrut_ty) == 1) {
 						vty = tc_expr_with_expected(env, vexpr, scrut_ty);
@@ -4919,18 +4864,18 @@ func tc_stmt(env, s) {
 						vty = tc_expr(env, vexpr);
 					}
 					if (scrut_ty != TC_TY_INVALID && vty != TC_TY_INVALID && tc_type_eq(scrut_ty, vty) == 0) {
-						tc_err_at(ptr64[c + 24], ptr64[c + 32], "switch case: value type mismatch");
+						tc_err_at(*cast(*u64, c + 24), *cast(*u64, c + 32), "switch case: value type mismatch");
 					}
 					if (tc_switch_case_is_const(vexpr) == 0) {
-						tc_err_at(ptr64[c + 24], ptr64[c + 32], "switch case: value must be constant");
+						tc_err_at(*cast(*u64, c + 24), *cast(*u64, c + 32), "switch case: value must be constant");
 					}
-					var body = ptr64[c + 8];
+					var body = *cast(*u64, c + 8);
 					if (body != 0) { tc_stmt(env, body); }
 				}
 				i = i + 1;
 			}
 		}
-		var defb = ptr64[s + 24];
+		var defb = *cast(*u64, s + 24);
 		if (defb != 0) { tc_stmt(env, defb); }
 
 		tc_break_depth = saved_break;
@@ -4939,7 +4884,7 @@ func tc_stmt(env, s) {
 	}
 	if (k == AstStmtKind.DEFER) {
 		// st+8 = inner statement
-		var inner = ptr64[s + 8];
+		var inner = *cast(*u64, s + 8);
 		if (inner != 0) { tc_stmt(env, inner); }
 		return 0;
 	}
@@ -4947,12 +4892,12 @@ func tc_stmt(env, s) {
 		// Layout:
 		//  s->a: expr0 (variable or ptr)
 		//  s->b: expr1 (len) or 0
-		var a0 = ptr64[s + 8];
-		var b0 = ptr64[s + 16];
+		var a0 = *cast(*u64, s + 8);
+		var b0 = *cast(*u64, s + 16);
 		if (b0 == 0) {
 			// wipe variable;
-			if (a0 == 0 || ptr64[a0 + 0] != AstExprKind.IDENT) {
-				tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe variable: expected identifier");
+			if (a0 == 0 || *cast(*u64, a0 + 0) != AstExprKind.IDENT) {
+				tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "wipe variable: expected identifier");
 				// Still typecheck for recovery.
 				if (a0 != 0) { tc_expr(env, a0); }
 				return 0;
@@ -4964,26 +4909,26 @@ func tc_stmt(env, s) {
 		var pty = tc_expr(env, a0);
 		var lty = tc_expr(env, b0);
 		if (tc_is_ptr(pty) == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: ptr must be pointer");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "wipe ptr,len: ptr must be pointer");
 			return 0;
 		}
 		if (tc_is_ptr_nullable(pty) == 1) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: ptr must be non-null pointer");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "wipe ptr,len: ptr must be non-null pointer");
 			return 0;
 		}
 		if (tc_ptr_base(pty) != TC_TY_U8) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: ptr must be *u8");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "wipe ptr,len: ptr must be *u8");
 			return 0;
 		}
 		if (tc_is_int(lty) == 0) {
-			tc_err_at(ptr64[s + 72], ptr64[s + 80], "wipe ptr,len: len must be integer");
+			tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "wipe ptr,len: len must be integer");
 			return 0;
 		}
 		return 0;
 	}
 	if (k == AstStmtKind.PRINT || k == AstStmtKind.PRINTLN) {
 		// a = Vec* of args
-		var args = ptr64[s + 8];
+		var args = *cast(*u64, s + 8);
 		if (args != 0) {
 			var n = vec_len(args);
 			var i = 0;
@@ -4995,24 +4940,8 @@ func tc_stmt(env, s) {
 		}
 		return 0;
 	}
-	if (k == AstStmtKind.ASM) {
-		// asm block: no type checking needed, just pass through
-		return 0;
-	}
-	if (k == AstStmtKind.ALIAS) {
-		// alias reg : name [= init];
-		// Register the name in environment as u64 type
-		var name_ptr = ptr64[s + 32];
-		var name_len = ptr64[s + 40];
-		var init_expr = ptr64[s + 56];
-		if (init_expr != 0) {
-			tc_expr(env, init_expr);
-		}
-		tc_env_push(env, name_ptr, name_len, TC_TY_U64);
-		return 0;
-	}
 
-	tc_err_at(ptr64[s + 72], ptr64[s + 80], "statement: unsupported kind");
+	tc_err_at(*cast(*u64, s + 72), *cast(*u64, s + 80), "statement: unsupported kind");
 	return 0;
 }
 
@@ -5054,20 +4983,20 @@ func typecheck_program(prog) {
 	tc_funcs_map = hashmap_new(16);
 
 	// Pass 0: register enum and struct layouts.
-	var decls0 = ptr64[prog + 0];
+	var decls0 = *cast(*u64, prog + 0);
 	var i0 = 0;
 	var n0 = 0;
 	if (decls0 != 0) { n0 = vec_len(decls0); }
 	while (i0 < n0) {
 		var d0 = vec_get(decls0, i0);
-		if (ptr64[d0 + 0] == AstDeclKind.ENUM) {
-			tc_register_enum_decl(d0, 0, ptr64[d0 + 72]);
+		if (*cast(*u64, d0 + 0) == AstDeclKind.ENUM) {
+			tc_register_enum_decl(d0, 0, *cast(*u64, d0 + 72));
 		}
-		if (ptr64[d0 + 0] == AstDeclKind.STRUCT) {
+		if (*cast(*u64, d0 + 0) == AstDeclKind.STRUCT) {
 			// Phase 5.1: skip generic template structs
-			var generic_params0 = ptr64[d0 + 88];
+			var generic_params0 = *cast(*u64, d0 + 88);
 			if (generic_params0 == 0) {
-				tc_register_struct_decl(d0, 0, ptr64[d0 + 72]);
+				tc_register_struct_decl(d0, 0, *cast(*u64, d0 + 72));
 			}
 		}
 		i0 = i0 + 1;
@@ -5077,8 +5006,8 @@ func typecheck_program(prog) {
 	i0 = 0;
 	while (i0 < n0) {
 		var d1 = vec_get(decls0, i0);
-		if (d1 != 0 && ptr64[d1 + 0] == AstDeclKind.TYPE) {
-			tc_register_type_alias_decl(d1, 0, ptr64[d1 + 72]);
+		if (d1 != 0 && *cast(*u64, d1 + 0) == AstDeclKind.TYPE) {
+			tc_register_type_alias_decl(d1, 0, *cast(*u64, d1 + 72));
 		}
 		i0 = i0 + 1;
 	}
@@ -5094,30 +5023,30 @@ func typecheck_program(prog) {
 	}
 
 	tc_cur_ast_prog = prog;
-	var decls = ptr64[prog + 0];
+	var decls = *cast(*u64, prog + 0);
 	var i = 0;
 	while (decls != 0 && i < vec_len(decls)) {
 		var d = vec_get(decls, i);
-		var k = ptr64[d + 0];
+		var k = *cast(*u64, d + 0);
 		if (k == AstDeclKind.VAR || k == AstDeclKind.CONST) {
 			// In global init expressions, everything in env is global.
 			tc_env_global_len = vec_len(env);
 			// Capture name early; calls below may clobber `d`.
-			var name_ptr = ptr64[d + 8];
-			var name_len = ptr64[d + 16];
-			var err_line = ptr64[d + 56];
-			var err_col = ptr64[d + 64];
+			var name_ptr = *cast(*u64, d + 8);
+			var name_len = *cast(*u64, d + 16);
+			var err_line = *cast(*u64, d + 56);
+			var err_col = *cast(*u64, d + 64);
 
 			var decl_ty = TC_TY_INVALID;
-			if (ptr64[d + 24] != 0) {
-				decl_ty = tc_type_from_asttype(ptr64[d + 24]);
+			if (*cast(*u64, d + 24) != 0) {
+				decl_ty = tc_type_from_asttype(*cast(*u64, d + 24));
 			}
 			var init_ty = TC_TY_INVALID;
-			if (ptr64[d + 32] != 0) {
+			if (*cast(*u64, d + 32) != 0) {
 				if (decl_ty != TC_TY_INVALID) {
-					init_ty = tc_expr_with_expected(env, ptr64[d + 32], decl_ty);
+					init_ty = tc_expr_with_expected(env, *cast(*u64, d + 32), decl_ty);
 				} else {
-					init_ty = tc_expr(env, ptr64[d + 32]);
+					init_ty = tc_expr(env, *cast(*u64, d + 32));
 				}
 			}
 			if (decl_ty != TC_TY_INVALID && init_ty != TC_TY_INVALID && decl_ty != init_ty) {
@@ -5128,7 +5057,7 @@ func typecheck_program(prog) {
 			tc_env_push(env, name_ptr, name_len, bind_ty);
 		} else if (k == AstDeclKind.FUNC) {
 			// Phase 5.1: skip generic templates; they are instantiated at call sites.
-			var generic_params2 = ptr64[d + 88];
+			var generic_params2 = *cast(*u64, d + 88);
 			if (generic_params2 != 0) { i = i + 1; continue; }
 			// Phase 4.5: validate @reg annotations (extern-only).
 			tc_validate_reg_anno_in_func(d);
@@ -5140,7 +5069,7 @@ func typecheck_program(prog) {
 			// Phase 4.4: reset nospill tracking per function.
 			tc_nospill_reset();
 			// Bind params into the environment.
-			var params = ptr64[d + 24];
+			var params = *cast(*u64, d + 24);
 			if (params != 0) {
 				var pn = vec_len(params);
 				var pi = 0;
@@ -5148,11 +5077,11 @@ func typecheck_program(prog) {
 					var ps = vec_get(params, pi);
 					if (ps != 0) {
 						// Params are AstStmt(VAR)
-						var pname_ptr = ptr64[ps + 32];
-						var pname_len = ptr64[ps + 40];
+						var pname_ptr = *cast(*u64, ps + 32);
+						var pname_len = *cast(*u64, ps + 40);
 						var pty = TC_TY_INVALID;
-						if (ptr64[ps + 48] != 0) {
-							pty = tc_type_from_asttype(ptr64[ps + 48]);
+						if (*cast(*u64, ps + 48) != 0) {
+							pty = tc_type_from_asttype(*cast(*u64, ps + 48));
 						}
 						tc_env_push(env, pname_ptr, pname_len, pty);
 					}
@@ -5160,21 +5089,20 @@ func typecheck_program(prog) {
 				}
 			}
 			// Set expected return type for this function.
-			var ret_ast = ptr64[d + 32];
+			var ret_ast = *cast(*u64, d + 32);
 			if (ret_ast != 0) { tc_cur_ret_ty = tc_type_from_asttype(ret_ast); }
 			else { tc_cur_ret_ty = 0; }
-			var body = ptr64[d + 40];
+			var body = *cast(*u64, d + 40);
 			if (body != 0) {
 				var saved_loop = tc_loop_depth;
 				tc_loop_depth = 0;
 				tc_stmt(env, body);
 				tc_loop_depth = saved_loop;
 			}
-			// NOTE: nospill checking disabled in v3 simplification (moved to v4)
-			// if (tc_nospill_overflowed != 0) {
-			// 	tc_err_at(tc_nospill_overflow_line, tc_nospill_overflow_col, "nospill: register pressure exceeded");
-			// }
-			ptr64[env + 8] = saved;
+			if (tc_nospill_overflowed != 0) {
+				tc_err_at(tc_nospill_overflow_line, tc_nospill_overflow_col, "nospill: register pressure exceeded");
+			}
+			*cast(*u64, env + 8) = saved;
 			tc_env_global_len = saved;
 			tc_cur_ret_ty = saved_ret;
 		}
@@ -5188,17 +5116,17 @@ func tc_collect_imports_from_prog(prog) {
 	var imports = vec_new(4);
 	if (imports == 0) { return 0; }
 	if (prog == 0) { return imports; }
-	var decls = ptr64[prog + 0];
+	var decls = *cast(*u64, prog + 0);
 	if (decls == 0) { return imports; }
 	var n = vec_len(decls);
 	var i = 0;
 	while (i < n) {
 		var d = vec_get(decls, i);
-		if (d != 0 && ptr64[d + 0] == AstDeclKind.IMPORT) {
+		if (d != 0 && *cast(*u64, d + 0) == AstDeclKind.IMPORT) {
 			var ent = heap_alloc(16);
 			if (ent != 0) {
-				ptr64[ent + 0] = ptr64[d + 8];
-				ptr64[ent + 8] = ptr64[d + 16];
+				*cast(*u64, ent + 0) = *cast(*u64, d + 8);
+				*cast(*u64, ent + 8) = *cast(*u64, d + 16);
 				vec_push(imports, ent);
 			}
 		}
@@ -5235,26 +5163,26 @@ func tc_typecheck_all_modules() {
 	while (mi < mcount) {
 		var m = vec_get(tc_modules, mi);
 		var prog = 0;
-		if (m != 0) { prog = ptr64[m + 16]; }
+		if (m != 0) { prog = *cast(*u64, m + 16); }
 		tc_cur_mod = mi;
 		tc_cur_imports = 0;
-		if (m != 0) { tc_cur_imports = ptr64[m + 24]; }
+		if (m != 0) { tc_cur_imports = *cast(*u64, m + 24); }
 		var decls0 = 0;
-		if (prog != 0) { decls0 = ptr64[prog + 0]; }
+		if (prog != 0) { decls0 = *cast(*u64, prog + 0); }
 		var i0 = 0;
 		var n0 = 0;
 		if (decls0 != 0) { n0 = vec_len(decls0); }
 		while (i0 < n0) {
 			var d0 = vec_get(decls0, i0);
 			if (d0 != 0) {
-				if (ptr64[d0 + 0] == AstDeclKind.ENUM) {
-					tc_register_enum_decl(d0, mi, ptr64[d0 + 72]);
+				if (*cast(*u64, d0 + 0) == AstDeclKind.ENUM) {
+					tc_register_enum_decl(d0, mi, *cast(*u64, d0 + 72));
 				}
-				if (ptr64[d0 + 0] == AstDeclKind.STRUCT) {
-					var tflag0 = ptr64[d0 + 80] & TC_DECL_FLAG_GENERIC_TEMPLATE;
-					var tparams0 = ptr64[d0 + 96];
+				if (*cast(*u64, d0 + 0) == AstDeclKind.STRUCT) {
+					var tflag0 = *cast(*u64, d0 + 80) & TC_DECL_FLAG_GENERIC_TEMPLATE;
+					var tparams0 = *cast(*u64, d0 + 96);
 					if (tflag0 == 0 && tparams0 == 0) {
-						tc_register_struct_decl(d0, mi, ptr64[d0 + 72]);
+						tc_register_struct_decl(d0, mi, *cast(*u64, d0 + 72));
 					}
 				}
 			}
@@ -5268,19 +5196,19 @@ func tc_typecheck_all_modules() {
 	while (mi < mcount) {
 		var m0 = vec_get(tc_modules, mi);
 		var prog0 = 0;
-		if (m0 != 0) { prog0 = ptr64[m0 + 16]; }
+		if (m0 != 0) { prog0 = *cast(*u64, m0 + 16); }
 		tc_cur_mod = mi;
 		tc_cur_imports = 0;
-		if (m0 != 0) { tc_cur_imports = ptr64[m0 + 24]; }
+		if (m0 != 0) { tc_cur_imports = *cast(*u64, m0 + 24); }
 		var decls_t = 0;
-		if (prog0 != 0) { decls_t = ptr64[prog0 + 0]; }
+		if (prog0 != 0) { decls_t = *cast(*u64, prog0 + 0); }
 		var tn = 0;
 		if (decls_t != 0) { tn = vec_len(decls_t); }
 		var ti = 0;
 		while (ti < tn) {
 			var d_t = vec_get(decls_t, ti);
-			if (d_t != 0 && ptr64[d_t + 0] == AstDeclKind.TYPE) {
-				tc_register_type_alias_decl(d_t, mi, ptr64[d_t + 72]);
+			if (d_t != 0 && *cast(*u64, d_t + 0) == AstDeclKind.TYPE) {
+				tc_register_type_alias_decl(d_t, mi, *cast(*u64, d_t + 72));
 			}
 			ti = ti + 1;
 		}
@@ -5294,7 +5222,7 @@ func tc_typecheck_all_modules() {
 	while (mi < mcount) {
 		var m05 = vec_get(tc_modules, mi);
 		var prog05 = 0;
-		if (m05 != 0) { prog05 = ptr64[m05 + 16]; }
+		if (m05 != 0) { prog05 = *cast(*u64, m05 + 16); }
 		tc_collect_func_sigs_from_prog(prog05, mi);
 		mi = mi + 1;
 	}
@@ -5303,7 +5231,7 @@ func tc_typecheck_all_modules() {
 		tc_cur_mod = mi;
 		var m05b = vec_get(tc_modules, mi);
 		tc_cur_imports = 0;
-		if (m05b != 0) { tc_cur_imports = ptr64[m05b + 24]; }
+		if (m05b != 0) { tc_cur_imports = *cast(*u64, m05b + 24); }
 		tc_validate_property_hooks_mod(mi);
 		mi = mi + 1;
 	}
@@ -5313,41 +5241,41 @@ func tc_typecheck_all_modules() {
 	while (mi < mcount) {
 		var m2 = vec_get(tc_modules, mi);
 		var prog2 = 0;
-		if (m2 != 0) { prog2 = ptr64[m2 + 16]; }
+		if (m2 != 0) { prog2 = *cast(*u64, m2 + 16); }
 		tc_cur_ast_prog = prog2;
 		tc_cur_mod = mi;
 		tc_cur_imports = 0;
-		if (m2 != 0) { tc_cur_imports = ptr64[m2 + 24]; }
+		if (m2 != 0) { tc_cur_imports = *cast(*u64, m2 + 24); }
 
 		var env = tc_env_new();
 		if (env == 0) { return 1; }
 
 		var decls = 0;
-		if (prog2 != 0) { decls = ptr64[prog2 + 0]; }
+		if (prog2 != 0) { decls = *cast(*u64, prog2 + 0); }
 		var i = 0;
 		while (decls != 0 && i < vec_len(decls)) {
 			var d = vec_get(decls, i);
 			if (d == 0) { i = i + 1; continue; }
-			var k = ptr64[d + 0];
+			var k = *cast(*u64, d + 0);
 			if (k == AstDeclKind.VAR || k == AstDeclKind.CONST) {
 				// In global init expressions, everything in env is global.
 				tc_env_global_len = vec_len(env);
 				// Capture name early; calls below may clobber `d`.
-				var name_ptr = ptr64[d + 8];
-				var name_len = ptr64[d + 16];
-				var err_line = ptr64[d + 56];
-				var err_col = ptr64[d + 64];
+				var name_ptr = *cast(*u64, d + 8);
+				var name_len = *cast(*u64, d + 16);
+				var err_line = *cast(*u64, d + 56);
+				var err_col = *cast(*u64, d + 64);
 
 				var decl_ty = TC_TY_INVALID;
-				if (ptr64[d + 24] != 0) {
-					decl_ty = tc_type_from_asttype(ptr64[d + 24]);
+				if (*cast(*u64, d + 24) != 0) {
+					decl_ty = tc_type_from_asttype(*cast(*u64, d + 24));
 				}
 				var init_ty = TC_TY_INVALID;
-				if (ptr64[d + 32] != 0) {
+				if (*cast(*u64, d + 32) != 0) {
 					if (decl_ty != TC_TY_INVALID) {
-						init_ty = tc_expr_with_expected(env, ptr64[d + 32], decl_ty);
+						init_ty = tc_expr_with_expected(env, *cast(*u64, d + 32), decl_ty);
 					} else {
-						init_ty = tc_expr(env, ptr64[d + 32]);
+						init_ty = tc_expr(env, *cast(*u64, d + 32));
 					}
 				}
 				if (decl_ty != TC_TY_INVALID && init_ty != TC_TY_INVALID && decl_ty != init_ty) {
@@ -5358,8 +5286,8 @@ func tc_typecheck_all_modules() {
 				tc_env_push(env, name_ptr, name_len, bind_ty);
 			} else if (k == AstDeclKind.FUNC) {
 				// Phase 5.1: skip generic templates; they are instantiated at call sites.
-				var tflag3 = ptr64[d + 80] & TC_DECL_FLAG_GENERIC_TEMPLATE;
-				var tparams3 = ptr64[d + 96];
+				var tflag3 = *cast(*u64, d + 80) & TC_DECL_FLAG_GENERIC_TEMPLATE;
+				var tparams3 = *cast(*u64, d + 96);
 				if (tflag3 != 0 || tparams3 != 0) { i = i + 1; continue; }
 				// Phase 4.5: validate @reg annotations (extern-only).
 				tc_validate_reg_anno_in_func(d);
@@ -5371,7 +5299,7 @@ func tc_typecheck_all_modules() {
 				// Phase 4.4: reset nospill tracking per function.
 				tc_nospill_reset();
 				// Bind params into the environment.
-				var params = ptr64[d + 24];
+				var params = *cast(*u64, d + 24);
 				if (params != 0) {
 					var pn = vec_len(params);
 					var pi = 0;
@@ -5379,11 +5307,11 @@ func tc_typecheck_all_modules() {
 						var ps = vec_get(params, pi);
 						if (ps != 0) {
 							// Params are AstStmt(VAR)
-							var pname_ptr = ptr64[ps + 32];
-							var pname_len = ptr64[ps + 40];
+							var pname_ptr = *cast(*u64, ps + 32);
+							var pname_len = *cast(*u64, ps + 40);
 							var pty = TC_TY_INVALID;
-							if (ptr64[ps + 48] != 0) {
-								pty = tc_type_from_asttype(ptr64[ps + 48]);
+							if (*cast(*u64, ps + 48) != 0) {
+								pty = tc_type_from_asttype(*cast(*u64, ps + 48));
 							}
 							tc_env_push(env, pname_ptr, pname_len, pty);
 						}
@@ -5391,18 +5319,17 @@ func tc_typecheck_all_modules() {
 					}
 				}
 				// Set expected return type for this function.
-				var ret_ast = ptr64[d + 32];
+				var ret_ast = *cast(*u64, d + 32);
 				if (ret_ast != 0) { tc_cur_ret_ty = tc_type_from_asttype(ret_ast); }
 				else { tc_cur_ret_ty = 0; }
-				var body = ptr64[d + 40];
+				var body = *cast(*u64, d + 40);
 				if (body != 0) {
 					tc_stmt(env, body);
 				}
-				// NOTE: nospill checking disabled in v3 simplification (moved to v4)
-				// if (tc_nospill_overflowed != 0) {
-				// 	tc_err_at(tc_nospill_overflow_line, tc_nospill_overflow_col, "nospill: register pressure exceeded");
-				// }
-				ptr64[env + 8] = saved;
+				if (tc_nospill_overflowed != 0) {
+					tc_err_at(tc_nospill_overflow_line, tc_nospill_overflow_col, "nospill: register pressure exceeded");
+				}
+				*cast(*u64, env + 8) = saved;
 				tc_env_global_len = saved;
 				tc_cur_ret_ty = saved_ret;
 			}
@@ -5433,7 +5360,6 @@ func typecheck_entry_file(path) {
 	while (i < nmods) {
 		var mpath = vec_get(order, i);
 		var src = read_file(mpath);
-		alias rdx : n_reg;
 		var n = n_reg;
 		if (src == 0) {
 			print_str("error: failed to read file\n");
@@ -5448,7 +5374,7 @@ func typecheck_entry_file(path) {
 		lexer_init(lex, src, n);
 		parser_init(prs, lex, tok);
 		parse_program(prs, prog);
-		var parse_errors = ptr64[prog + 8];
+		var parse_errors = *cast(*u64, prog + 8);
 		if (parse_errors != 0) {
 			print_str("parse_errors=");
 			print_u64(parse_errors);
@@ -5459,16 +5385,15 @@ func typecheck_entry_file(path) {
 		lower_program(prog);
 
 		var bp = v3h_path_basename_no_ext(mpath);
-		alias rdx : bl_reg;
 		var bl = bl_reg;
 
 		var mrec = heap_alloc(32);
 		if (mrec == 0) { return 1; }
-		ptr64[mrec + 0] = bp;
-		ptr64[mrec + 8] = bl;
-		ptr64[mrec + 16] = prog;
+		*cast(*u64, mrec + 0) = bp;
+		*cast(*u64, mrec + 8) = bl;
+		*cast(*u64, mrec + 16) = prog;
 		var imports = tc_collect_imports_from_prog(prog);
-		ptr64[mrec + 24] = imports;
+		*cast(*u64, mrec + 24) = imports;
 		vec_push(tc_modules, mrec);
 		i = i + 1;
 	}
