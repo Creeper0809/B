@@ -396,7 +396,17 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
 
 **의존성**: v3 Self-Hosting 완료 필수
 
-#### Phase 4.0.1: 제어 흐름 (2-3개월)
+#### Phase 4.0.1: 제어 흐름 및 OOP 기초 (2-3개월)
+
+- [ ] **impl 블록 완전 구현** (v3에서 파싱만 지원, 실제 동작 안 함)
+  - [ ] 파서: 이미 구현됨 (v3)
+  - [ ] 타입 체크: impl 블록 함수 등록, self 파라미터 검증
+  - [ ] Symbol Table: impl 블록 함수를 타입에 바인딩
+  - [ ] Codegen: 메서드 호출 설탕 (obj.method(args) → method(&obj, args))
+  - [ ] 테스트: struct + impl + 메서드 호출 전체 검증
+  - DoD: `obj.method()` 형태로 메서드 호출 가능, 컴파일러 개발에 필수
+  - **배경**: v3에서 파싱만 구현, 실제 메서드 호출 시 링크 에러 발생
+  - **우선순위**: [CRITICAL] 컴파일러 개발에서 OOP 패턴 필수
 
 - [ ] **match 표현식** (v3의 switch 대체)
   - [ ] 파서: match 키워드, 패턴 매칭 문법
@@ -463,6 +473,14 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
   - [ ] enum 기반 구현
   - [ ] unwrap, is_some, is_none
   - DoD: Nullable 대체
+
+- [ ] **Tuple + 다중 리턴** (v3에서 제거된 기능 복원)
+  - [ ] (T, U, ...) 타입 문법
+  - [ ] 구조 분해: var (a, b) = func()
+  - [ ] 다중 리턴: func f() -> (T, U)
+  - DoD: 타입 시스템과 통합된 다중 값 반환
+  - **배경**: v3에서 복잡한 호출 규약으로 인해 제거됨
+  - 참조: v4_roadmap.md 섹션 0.0
 
 - [ ] **String 타입**
   - [ ] Vec<u8> 래퍼
@@ -618,6 +636,8 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
 
 #### Phase 4.1.1: 제네릭 개선 (3-4개월)
 
+**Note**: v3에서 제네릭은 복잡한 타입 시스템으로 인해 제거됨. v4에서는 타입 추론과 통합하여 재설계.
+
 - [ ] **타입 추론**
   - [ ] 함수 호출 시 타입 파라미터 추론
   - [ ] id(10) → id<u64>(10) 자동 변환
@@ -631,6 +651,8 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
   - 참조: v4_roadmap.md 섹션 0.17
 
 #### Phase 4.1.2: 기본 Comptime (3-4개월)
+
+**Note**: v3에서 comptime은 컴파일 타임 평가 복잡도로 인해 제거됨. v4에서는 CTFE 인터프리터와 통합하여 재설계.
 
 - [ ] **comptime 블록**
   - [ ] comptime { ... } 문법
@@ -905,6 +927,14 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
 
 #### Phase 4.4.1: SSA IR 전환 (6-8개월)
 
+- [ ] **packed struct 복원** (v3에서 제거된 기능)
+  - [ ] packed 키워드 파서 재구현
+  - [ ] 비트필드 DSL 설계
+  - [ ] 비트 단위 메모리 접근 codegen
+  - DoD: 하드웨어 레지스터 매핑, 네트워크 프로토콜 구조체
+  - 참조: v4_roadmap.md 비트필드 섹션
+  - **배경**: v3에서 비트필드 복잡도로 제거, v4에서 재설계
+
 - [ ] **SSA 변환**
   - [ ] SSAValue, Phi Node 정의
   - [ ] Dominance Tree 계산
@@ -971,6 +1001,26 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
 **상태**: [IDEATION]
 
 다음 기능들은 **아직 확정되지 않았으며**, 실제 필요성이 검증된 후에만 진행합니다:
+
+- [ ] **보안 기능 복원** (v3에서 제거된 기능들)
+  - [ ] **nospill**: 레지스터 할당기와 통합하여 재설계
+    - [ ] 레지스터 할당기에서 nospill 변수 우선순위 처리
+    - [ ] 스필이 불가피한 경우 컴파일 에러
+    - DoD: 민감한 데이터의 메모리 노출 방지
+  - [ ] **secret/wipe**: 보안 모듈로 분리
+    - [ ] secret 변수 타입 시스템 통합
+    - [ ] wipe 명령어 volatile 보장
+    - [ ] 최적화 단계에서 wipe 코드 보존
+    - DoD: 암호 키, 비밀번호 등 민감 데이터 안전 처리
+  - **배경**: v3에서 레지스터 할당 복잡도로 제거, v4.5+에서 재설계
+  - 참조: v4_roadmap.md 보안 섹션
+
+- [ ] **프로퍼티 훅** (v3에서 제거된 기능)
+  - [ ] @[getter], @[setter] 속성
+  - [ ] 필드 접근 시 자동 함수 호출
+  - [ ] lazy evaluation, validation 지원
+  - DoD: C# 스타일 프로퍼티 구현
+  - **배경**: v3에서 복잡도로 제거, v4.5+에서 재평가
 
 - [ ] **고급 암호/알고리즘 Intrinsics (v4.5+)**
   - [ ] Multi-precision 연산 (mpadd_u256, mpmul_u256)

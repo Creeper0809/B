@@ -1392,38 +1392,40 @@ func tc_ptr_base(ty) {
 }
 
 func tc_make_ptr(base_ty, nullable) {
-	// Disallow pointers-to-pointers in Phase 2.2 MVP.
-	if (tc_is_ptr(base_ty) == 1) { return TC_TY_INVALID; }
+	// Allow pointers-to-pointers (double pointers).
+	// Create compound pointer type for any base type.
+	
 	// For builtin scalar base types, keep encoded pointer types.
 	if (base_ty > 0 && base_ty <= 255) {
-		if (nullable == 1) { return TC_TY_PTR_NULLABLE_BASE + base_ty; }
-		return TC_TY_PTR_BASE + base_ty;
-	}
-	// Allow pointers to structs (compound types).
-	if (tc_is_struct(base_ty) == 1) {
-		// Intern: reuse if already created.
-		if (tc_ptr_types != 0) {
-			var n = vec_len(tc_ptr_types);
-			var i = 0;
-			while (i < n) {
-				var pt = vec_get(tc_ptr_types, i);
-				if (ptr64[pt + 0] == TC_COMPOUND_PTR) {
-					if (ptr64[pt + 8] == base_ty) {
-						if (ptr64[pt + 16] == nullable) { return pt; }
-					}
-				}
-				i = i + 1;
-			}
+		// But don't use encoded form if it's already a pointer (needs compound)
+		if (tc_is_ptr(base_ty) == 0) {
+			if (nullable == 1) { return TC_TY_PTR_NULLABLE_BASE + base_ty; }
+			return TC_TY_PTR_BASE + base_ty;
 		}
-		var t = heap_alloc(24);
-		if (t == 0) { return TC_TY_INVALID; }
-		ptr64[t + 0] = TC_COMPOUND_PTR;
-		ptr64[t + 8] = base_ty;
-		ptr64[t + 16] = nullable;
-		vec_push(tc_ptr_types, t);
-		return t;
 	}
-	return TC_TY_INVALID;
+	
+	// Allow pointers to any type (structs, pointers, etc).
+	// Intern: reuse if already created.
+	if (tc_ptr_types != 0) {
+		var n = vec_len(tc_ptr_types);
+		var i = 0;
+		while (i < n) {
+			var pt = vec_get(tc_ptr_types, i);
+			if (ptr64[pt + 0] == TC_COMPOUND_PTR) {
+				if (ptr64[pt + 8] == base_ty) {
+					if (ptr64[pt + 16] == nullable) { return pt; }
+				}
+			}
+			i = i + 1;
+		}
+	}
+	var t = heap_alloc(24);
+	if (t == 0) { return TC_TY_INVALID; }
+	ptr64[t + 0] = TC_COMPOUND_PTR;
+	ptr64[t + 8] = base_ty;
+	ptr64[t + 16] = nullable;
+	vec_push(tc_ptr_types, t);
+	return t;
 }
 
 func tc_is_slice(ty) {
@@ -1787,7 +1789,8 @@ func tc_expr_with_expected(env, e, expected) {
 				return TC_TY_INVALID;
 			}
 			var rk2 = ptr64[rhs2 + 0];
-			if (rk2 != AstExprKind.IDENT && rk2 != AstExprKind.FIELD) {
+			// Allow &identifier, &field, &array[index]
+			if (rk2 != AstExprKind.IDENT && rk2 != AstExprKind.FIELD && rk2 != AstExprKind.INDEX) {
 				tc_err_at(ptr64[e + 64], ptr64[e + 72], "'&' expects lvalue");
 				return TC_TY_INVALID;
 			}
@@ -3622,7 +3625,10 @@ func tc_expr(env, e) {
 				tc_err_at(ptr64[e + 64], ptr64[e + 72], "cannot deref nullable pointer");
 				return TC_TY_INVALID;
 			}
-			return tc_ptr_base(rhs_ty);
+			var base_ty = tc_ptr_base(rhs_ty);
+			var sz_star = tc_sizeof(base_ty);
+			ptr64[e + 32] = sz_star; // for codegen: store size for *ptr = val
+			return base_ty;
 		}
 		if (op == TokKind.BANG) {
 			if (rhs_ty != TC_TY_BOOL) {
@@ -3679,7 +3685,7 @@ func tc_expr(env, e) {
 	if (k == AstExprKind.BINARY) {
 		var op = ptr64[e + 8];
 
-		// Assignment: lhs must be an identifier and rhs must match lhs type.
+		// Assignment: lhs must be an identifier, field, array index, or $ptr.
 		if (op == TokKind.EQ) {
 			var lhs = ptr64[e + 16];
 			var rhs = ptr64[e + 24];
@@ -3690,10 +3696,13 @@ func tc_expr(env, e) {
 			var lk = ptr64[lhs + 0];
 			if (lk != AstExprKind.IDENT) {
 				if (lk != AstExprKind.FIELD) {
-					// Phase 4.1: allow $ptr = v stores.
-					if (lk != AstExprKind.UNARY || ptr64[lhs + 8] != TokKind.DOLLAR) {
-						tc_err_at(ptr64[e + 64], ptr64[e + 72], "assignment lhs must be identifier, field, or $ptr");
-						return TC_TY_INVALID;
+					// Allow array indexing: arr[i] = val
+					if (lk != AstExprKind.INDEX) {
+						// Phase 4.1: allow $ptr = v and *ptr = v stores.
+						if (lk != AstExprKind.UNARY || (ptr64[lhs + 8] != TokKind.DOLLAR && ptr64[lhs + 8] != TokKind.STAR)) {
+							tc_err_at(ptr64[e + 64], ptr64[e + 72], "assignment lhs must be identifier, field, index, $ptr, or *ptr");
+							return TC_TY_INVALID;
+						}
 					}
 				}
 			}
@@ -4054,14 +4063,19 @@ func tc_expr(env, e) {
 			tc_err_at(ptr64[e + 64], ptr64[e + 72], "index expects integer");
 			return TC_TY_INVALID;
 		}
+		var elem_ty = 0;
 		if (tc_is_slice(base_ty) == 1) {
-			return tc_slice_elem(base_ty);
+			elem_ty = tc_slice_elem(base_ty);
+		} else if (tc_is_array(base_ty) == 1) {
+			elem_ty = tc_array_elem(base_ty);
+		} else {
+			tc_err_at(ptr64[e + 64], ptr64[e + 72], "index expects slice or array");
+			return TC_TY_INVALID;
 		}
-		if (tc_is_array(base_ty) == 1) {
-			return tc_array_elem(base_ty);
-		}
-		tc_err_at(ptr64[e + 64], ptr64[e + 72], "index expects slice or array");
-		return TC_TY_INVALID;
+		// Store elem_sz in extra field (bits 0-7)
+		var elem_sz = tc_sizeof(elem_ty);
+		ptr64[e + 32] = elem_sz & 255;
+		return elem_ty;
 	}
 	if (k == AstExprKind.BRACE_INIT) {
 		// Phase 3.6: struct literal: Type{...} (a=AstType*), or array literal {..} (a=0).

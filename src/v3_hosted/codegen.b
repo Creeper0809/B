@@ -676,6 +676,29 @@ func cg_lower_lvalue_addr(ctx, e) {
 		ir_emit(f, IrInstrKind.BINOP, TokKind.PLUS, 0, 0);
 		return 1;
 	}
+	if (ek == AstExprKind.INDEX) {
+		// INDEX: base[idx] -> addr = base_ptr + (idx * elem_sz)
+		var base = ptr64[e + 16];
+		var idx_expr = ptr64[e + 24];
+		var extra = ptr64[e + 32];
+		var elem_sz = extra & 255;
+		
+		// For now, only support IDENT base (arrays), not slices
+		var base_kind = ptr64[base + 0];
+		if (base_kind != AstExprKind.IDENT) { return 0; }
+		
+		// Get array base address
+		if (cg_lower_lvalue_addr(ctx, base) == 0) { return 0; }
+		
+		// Push index * elem_sz
+		cg_lower_expr(ctx, idx_expr);
+		ir_emit(f, IrInstrKind.PUSH_IMM, elem_sz, 0, 0);
+		ir_emit(f, IrInstrKind.BINOP, TokKind.STAR, 0, 0);
+		
+		// Add base + offset
+		ir_emit(f, IrInstrKind.BINOP, TokKind.PLUS, 0, 0);
+		return 1;
+	}
 	return 0;
 }
 
@@ -881,11 +904,46 @@ func cg_lower_expr(ctx, e) {
 		var rhs = ptr64[e + 24];
 		if (op == TokKind.EQ) {
 			// assignment
-			if (ptr64[lhs + 0] == AstExprKind.UNARY && ptr64[lhs + 8] == TokKind.DOLLAR) {
-				// $ptr = rhs
-				var szp = ptr64[lhs + 32];
-				if (szp != 1 && szp != 8) {
-					// Unsupported store size; evaluate rhs and push 0.
+			if (ptr64[lhs + 0] == AstExprKind.UNARY) {
+				var unary_op = ptr64[lhs + 8];
+				// $ptr = rhs or *ptr = rhs
+				if (unary_op == TokKind.DOLLAR || unary_op == TokKind.STAR) {
+					var szp = ptr64[lhs + 32];
+					if (szp != 1 && szp != 8) {
+						// Unsupported store size; evaluate rhs and push 0.
+						cg_lower_expr(ctx, rhs);
+						if (cg_expr_is_slice(ctx, rhs) == 1) {
+							ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+							ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+						}
+						else { ir_emit(f, IrInstrKind.POP, 0, 0, 0); }
+						ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+						return 0;
+					}
+					// push addr then value (STORE_MEM* pops value then addr)
+					cg_lower_expr(ctx, ptr64[lhs + 16]);
+					cg_lower_expr(ctx, rhs);
+					if (cg_expr_is_slice(ctx, rhs) == 1) {
+						// best-effort discard
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+						ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+						return 0;
+					}
+					if (szp == 1) { ir_emit(f, IrInstrKind.STORE_MEM8, 0, 0, 0); }
+					else { ir_emit(f, IrInstrKind.STORE_MEM64, 0, 0, 0); }
+					// Return assigned value by re-loading.
+					cg_lower_expr(ctx, lhs);
+					return 0;
+				}
+			}
+			if (ptr64[lhs + 0] == AstExprKind.INDEX) {
+				// array/slice index assignment: arr[i] = rhs
+				var extra = ptr64[lhs + 32];
+				var elem_sz = extra & 255;
+				if (elem_sz != 1 && elem_sz != 8) {
+					// Unsupported element size; evaluate rhs and push 0.
 					cg_lower_expr(ctx, rhs);
 					if (cg_expr_is_slice(ctx, rhs) == 1) {
 						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
@@ -895,20 +953,32 @@ func cg_lower_expr(ctx, e) {
 					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
 					return 0;
 				}
-				// push addr then value (STORE_MEM* pops value then addr)
-				cg_lower_expr(ctx, ptr64[lhs + 16]);
+				if (cg_lower_lvalue_addr(ctx, lhs) == 0) {
+					// cannot address: evaluate rhs and discard
+					cg_lower_expr(ctx, rhs);
+					if (cg_expr_is_slice(ctx, rhs) == 1) {
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+						ir_emit(f, IrInstrKind.POP, 0, 0, 0);
+					}
+					else { ir_emit(f, IrInstrKind.POP, 0, 0, 0); }
+					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
+					return 0;
+				}
 				cg_lower_expr(ctx, rhs);
 				if (cg_expr_is_slice(ctx, rhs) == 1) {
 					// best-effort discard
 					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
 					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
-					ir_emit(f, IrInstrKind.POP, 0, 0, 0);
 					ir_emit(f, IrInstrKind.PUSH_IMM, 0, 0, 0);
 					return 0;
 				}
-				if (szp == 1) { ir_emit(f, IrInstrKind.STORE_MEM8, 0, 0, 0); }
-				else { ir_emit(f, IrInstrKind.STORE_MEM64, 0, 0, 0); }
-				// Return assigned value by re-loading.
+				if (elem_sz == 1) {
+					ir_emit(f, IrInstrKind.STORE_MEM8, 0, 0, 0);
+				}
+				else {
+					ir_emit(f, IrInstrKind.STORE_MEM64, 0, 0, 0);
+				}
+				// Return assigned value by re-loading lhs.
 				cg_lower_expr(ctx, lhs);
 				return 0;
 			}
@@ -1124,10 +1194,29 @@ func cg_lower_expr(ctx, e) {
 	}
 
 	if (ek == AstExprKind.INDEX) {
-		// base[idx] where base is []u8
+		// base[idx] where base is []u8 or [N]T array
 		var unsafe = ptr64[e + 8];
 		var base = ptr64[e + 16];
 		var idx = ptr64[e + 24];
+		var extra = ptr64[e + 32];
+		var elem_sz = extra & 255;
+		
+		// Check if base is an array (IDENT) or slice
+		var base_kind = ptr64[base + 0];
+		if (base_kind == AstExprKind.IDENT) {
+			// Array: compute addr and load
+			if (cg_lower_lvalue_addr(ctx, e) != 0) {
+				// Successfully got address, now load
+				if (elem_sz == 1) {
+					ir_emit(f, IrInstrKind.LOAD_MEM8, 0, 0, 0);
+				} else {
+					ir_emit(f, IrInstrKind.LOAD_MEM64, 0, 0, 0);
+				}
+				return 0;
+			}
+		}
+		
+		// Slice fallback (old code)
 		cg_lower_expr(ctx, base);
 		cg_lower_expr(ctx, idx);
 		var do_check = 1;
