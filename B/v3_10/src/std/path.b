@@ -6,8 +6,7 @@ import std.str;
 func path_dirname(path, path_len) {
     var last_slash;
     last_slash = 0 - 1;
-    var i;
-    i = 0;
+    var i = 0;
     while (i < path_len) {
         if (*(*u8)(path + i) == 47) {
             last_slash = i;
@@ -23,8 +22,7 @@ func path_dirname(path, path_len) {
         return result;
     }
 
-    var result;
-    result = heap_alloc(last_slash + 2);
+    var result = heap_alloc(last_slash + 2);
     str_copy(result, path, last_slash);
     *(*u8)(result + last_slash) = 0;
     return result;

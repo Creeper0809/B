@@ -38,8 +38,7 @@ func warn(msg, len) {
 // ============================================
 
 func emit_char(c) {
-    var buf;
-    buf = heap_alloc(1);
+    var buf = heap_alloc(1);
     *(*u8)buf = c;
     sys_write(1, buf, 1);
 }
@@ -49,10 +48,8 @@ func emit_u64(n) {
         emit("0", 1);
         return;
     }
-    var buf;
-    buf = heap_alloc(32);
-    var i;
-    i = 0;
+    var buf = heap_alloc(32);
+    var i = 0;
     var t;
     t = n;
     while (t > 0) {

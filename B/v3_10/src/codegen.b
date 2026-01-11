@@ -75,8 +75,7 @@ func check_type_compat(from_base, from_depth, to_base, to_depth) {
 // ============================================
 
 func symtab_new() {
-    var s;
-    s = heap_alloc(40);
+    var s = heap_alloc(40);
     *(s) = vec_new(64);
     *(s + 8) = vec_new(64);
     *(s + 16) = vec_new(64);
@@ -88,36 +87,26 @@ func symtab_new() {
 func symtab_clear(s) {
     *(s + 24) = 0;
     *(s + 32) = 0;
-    var names;
-    names = *(s);
+    var names = *(s);
     *(names + 8) = 0;
-    var offsets;
-    offsets = *(s + 8);
+    var offsets = *(s + 8);
     *(offsets + 8) = 0;
-    var types;
-    types = *(s + 16);
+    var types = *(s + 16);
     *(types + 8) = 0;
 }
 
 func symtab_add(s, name_ptr, name_len, type_kind, ptr_depth) {
-    var names;
-    names = *(s);
-    var offsets;
-    offsets = *(s + 8);
-    var types;
-    types = *(s + 16);
-    var count;
-    count = *(s + 24);
+    var names = *(s);
+    var offsets = *(s + 8);
+    var types = *(s + 16);
+    var count = *(s + 24);
     
-    var size;
-    size = 8;
+    var size = 8;
     
-    var offset;
-    offset = *(s + 32) - size;
+    var offset = *(s + 32) - size;
     *(s + 32) = offset;
     
-    var name_info;
-    name_info = heap_alloc(16);
+    var name_info = heap_alloc(16);
     *(name_info) = name_ptr;
     *(name_info + 8) = name_len;
     vec_push(names, name_info);
@@ -136,15 +125,11 @@ func symtab_add(s, name_ptr, name_len, type_kind, ptr_depth) {
 }
 
 func symtab_find(s, name_ptr, name_len) {
-    var names;
-    names = *(s);
-    var offsets;
-    offsets = *(s + 8);
-    var count;
-    count = *(s + 24);
+    var names = *(s);
+    var offsets = *(s + 8);
+    var count = *(s + 24);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
         var name_info;
         name_info = vec_get(names, i);
@@ -163,15 +148,11 @@ func symtab_find(s, name_ptr, name_len) {
 }
 
 func symtab_get_type(s, name_ptr, name_len) {
-    var names;
-    names = *(s);
-    var types;
-    types = *(s + 16);
-    var count;
-    count = *(s + 24);
+    var names = *(s);
+    var types = *(s + 16);
+    var count = *(s + 24);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
         var name_info;
         name_info = vec_get(names, i);
@@ -190,15 +171,11 @@ func symtab_get_type(s, name_ptr, name_len) {
 }
 
 func symtab_update_type(s, name_ptr, name_len, type_kind, ptr_depth) {
-    var names;
-    names = *(s);
-    var types;
-    types = *(s + 16);
-    var count;
-    count = *(s + 24);
+    var names = *(s);
+    var types = *(s + 16);
+    var count = *(s + 24);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
         var name_info;
         name_info = vec_get(names, i);
@@ -223,10 +200,8 @@ func symtab_update_type(s, name_ptr, name_len, type_kind, ptr_depth) {
 // ============================================
 
 func is_global_var(name_ptr, name_len) {
-    var len;
-    len = vec_len(g_globals);
-    var i;
-    i = 0;
+    var len = vec_len(g_globals);
+    var i = 0;
     while (i < len) {
         var ginfo;
         ginfo = vec_get(g_globals, i);
@@ -251,10 +226,8 @@ func string_table_init() {
 }
 
 func string_get_label(str_ptr, str_len) {
-    var i;
-    i = 0;
-    var count;
-    count = vec_len(g_strings);
+    var i = 0;
+    var count = vec_len(g_strings);
     
     while (i < count) {
         var entry;
@@ -285,15 +258,13 @@ func string_get_label(str_ptr, str_len) {
 }
 
 func string_emit_data() {
-    var count;
-    count = vec_len(g_strings);
+    var count = vec_len(g_strings);
     
     if (count == 0) { return; }
     
     emit("\nsection .data\n", 15);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
         var entry;
         entry = vec_get(g_strings, i);
@@ -340,15 +311,13 @@ func string_emit_data() {
 }
 
 func globals_emit_bss() {
-    var count;
-    count = vec_len(g_globals);
+    var count = vec_len(g_globals);
     
     if (count == 0) { return; }
     
     emit("\nsection .bss\n", 14);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
         var ginfo;
         ginfo = vec_get(g_globals, i);
@@ -370,10 +339,8 @@ func globals_emit_bss() {
 // ============================================
 
 func const_find(name_ptr, name_len) {
-    var len;
-    len = vec_len(g_consts);
-    var i;
-    i = 0;
+    var len = vec_len(g_consts);
+    var i = 0;
     while (i < len) {
         var c;
         c = vec_get(g_consts, i);
@@ -1008,12 +975,9 @@ func cg_lvalue(node) {
 // ============================================
 
 func cg_block(node) {
-    var stmts;
-    stmts = *(node + 8);
-    var len;
-    len = vec_len(stmts);
-    var i;
-    i = 0;
+    var stmts = *(node + 8);
+    var len = vec_len(stmts);
+    var i = 0;
     while (i < len) {
         cg_stmt(vec_get(stmts, i));
         i = i + 1;
@@ -1434,14 +1398,11 @@ func cg_stmt(node) {
 // ============================================
 
 func cg_func(node) {
-    var name_ptr;
-    name_ptr = *(node + 8);
-    var name_len;
-    name_len = *(node + 16);
+    var name_ptr = *(node + 8);
+    var name_len = *(node + 16);
     var params;
     params = *(node + 24);
-    var body;
-    body = *(node + 40);
+    var body = *(node + 40);
     
     symtab_clear(g_symtab);
     
@@ -1454,8 +1415,7 @@ func cg_func(node) {
     
     var nparams;
     nparams = vec_len(params);
-    var i;
-    i = 0;
+    var i = 0;
     while (i < nparams) {
         var param;
         param = vec_get(params, i);
@@ -1556,10 +1516,8 @@ func cg_program(prog) {
     emit("    mov rax, 60\n", 16);
     emit("    syscall\n", 12);
     
-    var len;
-    len = vec_len(funcs);
-    var i;
-    i = 0;
+    var len = vec_len(funcs);
+    var i = 0;
     while (i < len) {
         cg_func(vec_get(funcs, i));
         i = i + 1;

@@ -5,10 +5,8 @@ import std.io;
 // Vec structure: [buf_ptr, len, cap]
 
 func vec_new(cap) {
-    var v;
-    v = heap_alloc(24);
-    var buf;
-    buf = heap_alloc(cap * 8);
+    var v = heap_alloc(24);
+    var buf = heap_alloc(cap * 8);
     *(v) = buf;
     *(v + 8) = 0;
     *(v + 16) = cap;
@@ -24,10 +22,8 @@ func vec_cap(v) {
 }
 
 func vec_push(v, item) {
-    var len;
-    len = *(v + 8);
-    var cap;
-    cap = *(v + 16);
+    var len = *(v + 8);
+    var cap = *(v + 16);
     
     // Grow if needed
     if (len >= cap) {
@@ -48,20 +44,17 @@ func vec_push(v, item) {
         *(v + 16) = new_cap;
     }
     
-    var buf;
-    buf = *(v);
+    var buf = *(v);
     *(buf + len * 8) = item;
     *(v + 8) = len + 1;
 }
 
 func vec_get(v, i) {
-    var buf;
-    buf = *(v);
+    var buf = *(v);
     return *(buf + i * 8);
 }
 
 func vec_set(v, i, val) {
-    var buf;
-    buf = *(v);
+    var buf = *(v);
     *(buf + i * 8) = val;
 }

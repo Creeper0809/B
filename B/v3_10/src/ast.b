@@ -9,8 +9,7 @@ import types;
 
 // AST_LITERAL: [kind, value]
 func ast_literal(val) {
-    var n;
-    n = heap_alloc(16);
+    var n = heap_alloc(16);
     *(n) = AST_LITERAL;
     *(n + 8) = val;
     return n;
@@ -18,8 +17,7 @@ func ast_literal(val) {
 
 // AST_IDENT: [kind, name_ptr, name_len]
 func ast_ident(name_ptr, name_len) {
-    var n;
-    n = heap_alloc(24);
+    var n = heap_alloc(24);
     *(n) = AST_IDENT;
     *(n + 8) = name_ptr;
     *(n + 16) = name_len;
@@ -28,8 +26,7 @@ func ast_ident(name_ptr, name_len) {
 
 // AST_STRING: [kind, str_ptr, str_len]
 func ast_string(str_ptr, str_len) {
-    var n;
-    n = heap_alloc(24);
+    var n = heap_alloc(24);
     *(n) = AST_STRING;
     *(n + 8) = str_ptr;
     *(n + 16) = str_len;
@@ -38,8 +35,7 @@ func ast_string(str_ptr, str_len) {
 
 // AST_BINARY: [kind, op, left, right]
 func ast_binary(op, left, right) {
-    var n;
-    n = heap_alloc(32);
+    var n = heap_alloc(32);
     *(n) = AST_BINARY;
     *(n + 8) = op;
     *(n + 16) = left;
@@ -49,8 +45,7 @@ func ast_binary(op, left, right) {
 
 // AST_UNARY: [kind, op, operand]
 func ast_unary(op, operand) {
-    var n;
-    n = heap_alloc(24);
+    var n = heap_alloc(24);
     *(n) = AST_UNARY;
     *(n + 8) = op;
     *(n + 16) = operand;
@@ -59,8 +54,7 @@ func ast_unary(op, operand) {
 
 // AST_CALL: [kind, name_ptr, name_len, args_vec]
 func ast_call(name_ptr, name_len, args) {
-    var n;
-    n = heap_alloc(32);
+    var n = heap_alloc(32);
     *(n) = AST_CALL;
     *(n + 8) = name_ptr;
     *(n + 16) = name_len;
@@ -70,8 +64,7 @@ func ast_call(name_ptr, name_len, args) {
 
 // AST_ADDR_OF: [kind, operand]
 func ast_addr_of(operand) {
-    var n;
-    n = heap_alloc(16);
+    var n = heap_alloc(16);
     *(n) = AST_ADDR_OF;
     *(n + 8) = operand;
     return n;
@@ -79,8 +72,7 @@ func ast_addr_of(operand) {
 
 // AST_DEREF: [kind, operand]
 func ast_deref(operand) {
-    var n;
-    n = heap_alloc(16);
+    var n = heap_alloc(16);
     *(n) = AST_DEREF;
     *(n + 8) = operand;
     return n;
@@ -88,8 +80,7 @@ func ast_deref(operand) {
 
 // AST_DEREF8: [kind, operand] - byte dereference
 func ast_deref8(operand) {
-    var n;
-    n = heap_alloc(16);
+    var n = heap_alloc(16);
     *(n) = AST_DEREF8;
     *(n + 8) = operand;
     return n;
@@ -97,8 +88,7 @@ func ast_deref8(operand) {
 
 // AST_CAST: [kind, expr, target_type, target_ptr_depth]
 func ast_cast(expr, target_type, ptr_depth) {
-    var n;
-    n = heap_alloc(32);
+    var n = heap_alloc(32);
     *(n) = AST_CAST;
     *(n + 8) = expr;
     *(n + 16) = target_type;
@@ -112,8 +102,7 @@ func ast_cast(expr, target_type, ptr_depth) {
 
 // AST_RETURN: [kind, expr]
 func ast_return(expr) {
-    var n;
-    n = heap_alloc(16);
+    var n = heap_alloc(16);
     *(n) = AST_RETURN;
     *(n + 8) = expr;
     return n;
@@ -121,8 +110,7 @@ func ast_return(expr) {
 
 // AST_VAR_DECL: [kind, name_ptr, name_len, type_kind, ptr_depth, init_expr]
 func ast_var_decl(name_ptr, name_len, type_kind, ptr_depth, init) {
-    var n;
-    n = heap_alloc(48);
+    var n = heap_alloc(48);
     *(n) = AST_VAR_DECL;
     *(n + 8) = name_ptr;
     *(n + 16) = name_len;
@@ -134,8 +122,7 @@ func ast_var_decl(name_ptr, name_len, type_kind, ptr_depth, init) {
 
 // AST_CONST_DECL: [kind, name_ptr, name_len, value]
 func ast_const_decl(name_ptr, name_len, value) {
-    var n;
-    n = heap_alloc(32);
+    var n = heap_alloc(32);
     *(n) = AST_CONST_DECL;
     *(n + 8) = name_ptr;
     *(n + 16) = name_len;
@@ -145,8 +132,7 @@ func ast_const_decl(name_ptr, name_len, value) {
 
 // AST_ASSIGN: [kind, target, value]
 func ast_assign(target, value) {
-    var n;
-    n = heap_alloc(24);
+    var n = heap_alloc(24);
     *(n) = AST_ASSIGN;
     *(n + 8) = target;
     *(n + 16) = value;
@@ -155,8 +141,7 @@ func ast_assign(target, value) {
 
 // AST_EXPR_STMT: [kind, expr]
 func ast_expr_stmt(expr) {
-    var n;
-    n = heap_alloc(16);
+    var n = heap_alloc(16);
     *(n) = AST_EXPR_STMT;
     *(n + 8) = expr;
     return n;
@@ -164,8 +149,7 @@ func ast_expr_stmt(expr) {
 
 // AST_IF: [kind, cond, then_block, else_block]
 func ast_if(cond, then_blk, else_blk) {
-    var n;
-    n = heap_alloc(32);
+    var n = heap_alloc(32);
     *(n) = AST_IF;
     *(n + 8) = cond;
     *(n + 16) = then_blk;
@@ -175,8 +159,7 @@ func ast_if(cond, then_blk, else_blk) {
 
 // AST_WHILE: [kind, cond, body]
 func ast_while(cond, body) {
-    var n;
-    n = heap_alloc(24);
+    var n = heap_alloc(24);
     *(n) = AST_WHILE;
     *(n + 8) = cond;
     *(n + 16) = body;
@@ -185,8 +168,7 @@ func ast_while(cond, body) {
 
 // AST_FOR: [kind, init, cond, update, body]
 func ast_for(init, cond, update, body) {
-    var n;
-    n = heap_alloc(40);
+    var n = heap_alloc(40);
     *(n) = AST_FOR;
     *(n + 8) = init;
     *(n + 16) = cond;
@@ -197,8 +179,7 @@ func ast_for(init, cond, update, body) {
 
 // AST_SWITCH: [kind, expr, cases_vec]
 func ast_switch(expr, cases) {
-    var n;
-    n = heap_alloc(24);
+    var n = heap_alloc(24);
     *(n) = AST_SWITCH;
     *(n + 8) = expr;
     *(n + 16) = cases;
@@ -207,8 +188,7 @@ func ast_switch(expr, cases) {
 
 // AST_CASE: [kind, value, body, is_default]
 func ast_case(value, body, is_default) {
-    var n;
-    n = heap_alloc(32);
+    var n = heap_alloc(32);
     *(n) = AST_CASE;
     *(n + 8) = value;
     *(n + 16) = body;
@@ -218,22 +198,19 @@ func ast_case(value, body, is_default) {
 
 // AST_BREAK: [kind]
 func ast_break() {
-    var n;
-    n = heap_alloc(8);
+    var n = heap_alloc(8);
     *(n) = AST_BREAK;
     return n;
 }
 // AST_CONTINUE: [kind]
 func ast_continue() {
-    var n;
-    n = heap_alloc(8);
+    var n = heap_alloc(8);
     *(n) = AST_CONTINUE;
     return n;
 }
 // AST_ASM: [kind, text_vec]
 func ast_asm(text_vec) {
-    var n;
-    n = heap_alloc(16);
+    var n = heap_alloc(16);
     *(n) = AST_ASM;
     *(n + 8) = text_vec;
     return n;
@@ -241,8 +218,7 @@ func ast_asm(text_vec) {
 
 // AST_BLOCK: [kind, stmts_vec]
 func ast_block(stmts) {
-    var n;
-    n = heap_alloc(16);
+    var n = heap_alloc(16);
     *(n) = AST_BLOCK;
     *(n + 8) = stmts;
     return n;
@@ -254,8 +230,7 @@ func ast_block(stmts) {
 
 // AST_FUNC: [kind, name_ptr, name_len, params_vec, ret_type, body]
 func ast_func(name_ptr, name_len, params, ret_type, body) {
-    var n;
-    n = heap_alloc(48);
+    var n = heap_alloc(48);
     *(n) = AST_FUNC;
     *(n + 8) = name_ptr;
     *(n + 16) = name_len;
@@ -267,8 +242,7 @@ func ast_func(name_ptr, name_len, params, ret_type, body) {
 
 // AST_PROGRAM: [kind, funcs_vec, consts_vec, imports_vec, globals_vec]
 func ast_program(funcs, consts, imports) {
-    var n;
-    n = heap_alloc(40);
+    var n = heap_alloc(40);
     *(n) = AST_PROGRAM;
     *(n + 8) = funcs;
     *(n + 16) = consts;
@@ -279,8 +253,7 @@ func ast_program(funcs, consts, imports) {
 
 // AST_IMPORT: [kind, path_ptr, path_len]
 func ast_import(path_ptr, path_len) {
-    var n;
-    n = heap_alloc(24);
+    var n = heap_alloc(24);
     *(n) = AST_IMPORT;
     *(n + 8) = path_ptr;
     *(n + 16) = path_len;

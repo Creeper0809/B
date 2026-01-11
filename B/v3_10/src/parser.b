@@ -10,25 +10,21 @@ import ast;
 // Parser structure: [tokens_vec, cur]
 
 func parse_new(tokens) {
-    var p;
-    p = heap_alloc(16);
+    var p = heap_alloc(16);
     *(p) = tokens;
     *(p + 8) = 0;
     return p;
 }
 
 func parse_peek(p) {
-    var vec;
-    vec = *(p);
-    var cur;
-    cur = *(p + 8);
+    var vec = *(p);
+    var cur = *(p + 8);
     if (cur >= vec_len(vec)) { return 0; }
     return vec_get(vec, cur);
 }
 
 func parse_peek_kind(p) {
-    var tok;
-    tok = parse_peek(p);
+    var tok = parse_peek(p);
     if (tok == 0) { return TOKEN_EOF; }
     return tok_kind(tok);
 }
@@ -38,10 +34,8 @@ func parse_adv(p) {
 }
 
 func parse_prev(p) {
-    var vec;
-    vec = *(p);
-    var cur;
-    cur = *(p + 8);
+    var vec = *(p);
+    var cur = *(p + 8);
     if (cur == 0) { return 0; }
     return vec_get(vec, cur - 1);
 }
@@ -87,8 +81,7 @@ func parse_consume(p, kind) {
 // ============================================
 
 func parse_base_type(p) {
-    var k;
-    k = parse_peek_kind(p);
+    var k = parse_peek_kind(p);
     if (k == TOKEN_U8) { parse_adv(p); return TYPE_U8; }
     if (k == TOKEN_U16) { parse_adv(p); return TYPE_U16; }
     if (k == TOKEN_U32) { parse_adv(p); return TYPE_U32; }
@@ -98,15 +91,12 @@ func parse_base_type(p) {
 }
 
 func parse_type(p) {
-    var depth;
-    depth = 0;
+    var depth = 0;
     while (parse_match(p, TOKEN_STAR)) {
         depth = depth + 1;
     }
-    var base;
-    base = parse_base_type(p);
-    var result;
-    result = heap_alloc(16);
+    var base = parse_base_type(p);
+    var result = heap_alloc(16);
     *(result) = base;
     *(result + 8) = depth;
     return result;
@@ -117,14 +107,10 @@ func parse_type(p) {
 // ============================================
 
 func parse_num_val(tok) {
-    var ptr;
-    ptr = tok_ptr(tok);
-    var len;
-    len = tok_len(tok);
-    var val;
-    val = 0;
-    var i;
-    i = 0;
+    var ptr = tok_ptr(tok);
+    var len = tok_len(tok);
+    var val = 0;
+    var i = 0;
 
     // i64 max = 9223372036854775807
     var max_div10;
@@ -196,10 +182,8 @@ func is_ptr_keyword(ptr, len) {
 }
 
 func parse_ptr_access(p) {
-    var tok;
-    tok = parse_peek(p);
-    var ptr_kind;
-    ptr_kind = is_ptr_keyword(tok_ptr(tok), tok_len(tok));
+    var tok = parse_peek(p);
+    var ptr_kind = is_ptr_keyword(tok_ptr(tok), tok_len(tok));
     
     if (ptr_kind > 0) {
         parse_adv(p);
@@ -221,8 +205,7 @@ func parse_ptr_access(p) {
 }
 
 func parse_primary(p) {
-    var k;
-    k = parse_peek_kind(p);
+    var k = parse_peek_kind(p);
     
     if (k == TOKEN_NUMBER) {
         var tok;
@@ -384,8 +367,7 @@ func parse_postfix(p) {
 }
 
 func parse_unary(p) {
-    var k;
-    k = parse_peek_kind(p);
+    var k = parse_peek_kind(p);
     
     if (k == TOKEN_STAR) {
         parse_adv(p);
@@ -732,8 +714,7 @@ func parse_assign_or_expr(p) {
 }
 
 func is_assignable_expr(expr) {
-    var k;
-    k = ast_kind(expr);
+    var k = ast_kind(expr);
     if (k == AST_IDENT) { return 1; }
     if (k == AST_DEREF) { return 1; }
     if (k == AST_DEREF8) { return 1; }
@@ -750,8 +731,7 @@ func make_incdec_rhs(incdec_kind, target) {
 }
 
 func parse_prefix_incdec_assign(p) {
-    var k;
-    k = parse_peek_kind(p);
+    var k = parse_peek_kind(p);
     parse_consume(p, k);
     var target;
     target = parse_unary(p);
@@ -765,8 +745,7 @@ func parse_prefix_incdec_assign(p) {
 }
 
 func parse_postfix_incdec_after_expr(p, expr) {
-    var k;
-    k = parse_peek_kind(p);
+    var k = parse_peek_kind(p);
     if (k != TOKEN_PLUSPLUS) {
         if (k != TOKEN_MINUSMINUS) {
             return expr;
@@ -1071,8 +1050,7 @@ func parse_import_decl(p) {
 }
 
 func parse_stmt(p) {
-    var k;
-    k = parse_peek_kind(p);
+    var k = parse_peek_kind(p);
 
     if (k == TOKEN_PLUSPLUS) {
         var stmt;

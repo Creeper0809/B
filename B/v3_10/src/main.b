@@ -30,18 +30,15 @@ var g_file_len;
 // ============================================
 
 func read_entire_file(path) {
-    var fd;
-    fd = sys_open(path, 0, 0);
+    var fd = sys_open(path, 0, 0);
     if (fd < 0) { return 0; }
     
     var statbuf;
     statbuf = heap_alloc(144);
     sys_fstat(fd, statbuf);
-    var size;
-    size = *(statbuf + 48);
+    var size = *(statbuf + 48);
     
-    var buf;
-    buf = heap_alloc(size + 1);
+    var buf = heap_alloc(size + 1);
     
     var total;
     total = 0;
@@ -67,8 +64,7 @@ func read_entire_file(path) {
 // ============================================
 
 func file_exists(path) {
-    var fd;
-    fd = sys_open(path, 0, 0);
+    var fd = sys_open(path, 0, 0);
     if (fd < 0) { return 0; }
     sys_close(fd);
     return 1;

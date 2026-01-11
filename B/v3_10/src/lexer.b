@@ -19,10 +19,8 @@ func lex_new(src, len) {
 }
 
 func lex_at_end(l) {
-    var pos;
-    pos = *(l + 16);
-    var len;
-    len = *(l + 8);
+    var pos = *(l + 16);
+    var len = *(l + 8);
     if (pos >= len) { return 1; }
     return 0;
 }
@@ -31,16 +29,13 @@ func lex_peek(l) {
     if (lex_at_end(l)) { return 0; }
     var src;
     src = *(l);
-    var pos;
-    pos = *(l + 16);
+    var pos = *(l + 16);
     return *(*u8)(src + pos);
 }
 
 func lex_peek_next(l) {
-    var pos;
-    pos = *(l + 16);
-    var len;
-    len = *(l + 8);
+    var pos = *(l + 16);
+    var len = *(l + 8);
     if (pos + 1 >= len) { return 0; }
     var src;
     src = *(l);
@@ -48,8 +43,7 @@ func lex_peek_next(l) {
 }
 
 func lex_advance(l) {
-    var c;
-    c = lex_peek(l);
+    var c = lex_peek(l);
     *(l + 16) = *(l + 16) + 1;
     if (c == 10) {
         *(l + 24) = *(l + 24) + 1;
@@ -161,10 +155,8 @@ func lex_next(l) {
         return tok_new(TOKEN_EOF, 0, 0, line, col);
     }
     
-    var start;
-    start = *(l + 16);
-    var c;
-    c = lex_advance(l);
+    var start = *(l + 16);
+    var c = lex_advance(l);
     var src;
     src = *(l);
     
