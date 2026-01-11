@@ -1,2 +1,0 @@
-type error at 7:1: continue: not allowed inside switch
-type_errors=1

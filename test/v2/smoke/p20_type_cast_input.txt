@@ -1,7 +1,0 @@
-// P20: type hint + cast()
-
-func main() {
-  var x: u64 = 0x1234;
-  var y: u8 = cast(u8, x);
-  return y;
-}

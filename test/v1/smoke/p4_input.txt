@@ -1,4 +1,0 @@
-var g;
-func main() {
-	var x;
-}

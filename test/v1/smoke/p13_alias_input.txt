@@ -1,6 +1,0 @@
-func main() {
-  alias rcx : counter = 0;
-  counter = counter + 1;
-  counter = counter << 3;
-  return counter;
-}

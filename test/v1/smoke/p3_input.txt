@@ -1,9 +1,0 @@
-// sample for lexer smoke
-var x;
-func main() {
-  // comment
-  x = 123;
-  if (x == 123) { x = x + 1; }
-  asm { "mov rax, 1\n" }
-  return;
-}

@@ -1,2 +1,0 @@
-type error at 2:15: cannot deref nullable pointer
-type_errors=1

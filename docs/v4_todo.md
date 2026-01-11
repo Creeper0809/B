@@ -32,9 +32,12 @@ v4_roadmap.md의 실행 계획. 기능을 의존성과 우선순위에 따라 �
   - [ ] 하위 호환: `.b`와 `.bpp` 모두 컴파일 가능
   - [ ] `bpp/` 폴더 경로 인식
 
-- [ ] **v4 코드베이스 개발**
+- [x] **v4 코드베이스 개발** (bpp/src/std/ v3 타입 문법 변환 완료: 2026-01-10)
+  - [x] `bpp/src/std/io.bpp`: ptr8→*cast, syscall wrappers 타입 명시
+  - [x] `bpp/src/std/mem.bpp`: ptr8→*cast, u64→u8 명시적 cast
+  - [x] `bpp/src/std/vec.bpp`: ptr64→*cast, 함수 시그니처 타입 명시
+  - [x] `bpp/src/std/hashmap.bpp`: ptr64→*cast (런타임 로직 버그는 별도)
   - [ ] `bpp/src/`에서 v4 컴파일러 개발 시작
-  - [ ] `bpp/std/`에서 v4 표준 라이브러리 개발
   - [ ] `bpp/examples/`에 v4 기능 예제 작성
   - [ ] `bpp/test/`에 v4 테스트 작성
   - [ ] **주의**: 상위 폴더의 v3 코드는 그대로 유지
