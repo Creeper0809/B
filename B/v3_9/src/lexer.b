@@ -8,8 +8,7 @@ import std.vec;
 // Lexer structure: [src_ptr, src_len, pos, line, col]
 
 func lex_new(src, len) {
-    var l;
-    l = heap_alloc(40);
+    var l = heap_alloc(40);
     *(l) = src;
     *(l + 8) = len;
     *(l + 16) = 0;
@@ -19,37 +18,29 @@ func lex_new(src, len) {
 }
 
 func lex_at_end(l) {
-    var pos;
-    pos = *(l + 16);
-    var len;
-    len = *(l + 8);
+    var pos = *(l + 16);
+    var len = *(l + 8);
     if (pos >= len) { return 1; }
     return 0;
 }
 
 func lex_peek(l) {
     if (lex_at_end(l)) { return 0; }
-    var src;
-    src = *(l);
-    var pos;
-    pos = *(l + 16);
+    var src = *(l);
+    var pos = *(l + 16);
     return *(*u8)(src + pos);
 }
 
 func lex_peek_next(l) {
-    var pos;
-    pos = *(l + 16);
-    var len;
-    len = *(l + 8);
+    var pos = *(l + 16);
+    var len = *(l + 8);
     if (pos + 1 >= len) { return 0; }
-    var src;
-    src = *(l);
+    var src = *(l);
     return *(*u8)(src + pos + 1);
 }
 
 func lex_advance(l) {
-    var c;
-    c = lex_peek(l);
+    var c = lex_peek(l);
     *(l + 16) = *(l + 16) + 1;
     if (c == 10) {
         *(l + 24) = *(l + 24) + 1;
@@ -62,8 +53,7 @@ func lex_advance(l) {
 
 func lex_skip_ws(l) {
     while (!lex_at_end(l)) {
-        var c;
-        c = lex_peek(l);
+        var c = lex_peek(l);
         if (!is_whitespace(c)) { break; }
         lex_advance(l);
     }
@@ -75,8 +65,7 @@ func lex_skip_comment(l) {
             lex_advance(l);
             lex_advance(l);
             while (!lex_at_end(l)) {
-                var c;
-                c = lex_peek(l);
+                var c = lex_peek(l);
                 if (c == 10) {
                     lex_advance(l);
                     break;
@@ -90,8 +79,7 @@ func lex_skip_comment(l) {
 func lex_skip_ws_and_comments(l) {
     while (!lex_at_end(l)) {
         lex_skip_ws(l);
-        var c;
-        c = lex_peek(l);
+        var c = lex_peek(l);
         if (c == 47) {
             if (lex_peek_next(l) == 47) {
                 lex_skip_comment(l);
@@ -133,8 +121,7 @@ func lex_check_keyword(ptr, len) {
 // Token structure: [kind, ptr, len, line, col]
 
 func tok_new(kind, ptr, len, line, col) {
-    var t;
-    t = heap_alloc(40);
+    var t = heap_alloc(40);
     *(t) = kind;
     *(t + 8) = ptr;
     *(t + 16) = len;
@@ -152,21 +139,16 @@ func tok_col(t) { return *(t + 32); }
 func lex_next(l) {
     lex_skip_ws_and_comments(l);
     
-    var line;
-    line = *(l + 24);
-    var col;
-    col = *(l + 32);
+    var line = *(l + 24);
+    var col = *(l + 32);
     
     if (lex_at_end(l)) {
         return tok_new(TOKEN_EOF, 0, 0, line, col);
     }
     
-    var start;
-    start = *(l + 16);
-    var c;
-    c = lex_advance(l);
-    var src;
-    src = *(l);
+    var start = *(l + 16);
+    var c = lex_advance(l);
+    var src = *(l);
     
     // Identifier or keyword
     if (is_alpha(c)) {
@@ -177,10 +159,8 @@ func lex_next(l) {
                 break;
             }
         }
-        var len;
-        len = *(l + 16) - start;
-        var kind;
-        kind = lex_check_keyword(src + start, len);
+        var len = *(l + 16) - start;
+        var kind = lex_check_keyword(src + start, len);
         return tok_new(kind, src + start, len, line, col);
     }
     
@@ -193,16 +173,14 @@ func lex_next(l) {
                 break;
             }
         }
-        var len;
-        len = *(l + 16) - start;
+        var len = *(l + 16) - start;
         return tok_new(TOKEN_NUMBER, src + start, len, line, col);
     }
     
     // String literal
     if (c == 34) {
         while (!lex_at_end(l)) {
-            var ch;
-            ch = lex_peek(l);
+            var ch = lex_peek(l);
             if (ch == 34) {
                 lex_advance(l);
                 break;
@@ -216,8 +194,7 @@ func lex_next(l) {
                 lex_advance(l);
             }
         }
-        var len;
-        len = *(l + 16) - start;
+        var len = *(l + 16) - start;
         return tok_new(TOKEN_STRING, src + start, len, line, col);
     }
     
@@ -314,13 +291,10 @@ func lex_next(l) {
 }
 
 func lex_all(src, len) {
-    var l;
-    l = lex_new(src, len);
-    var tokens;
-    tokens = vec_new(256);
+    var l = lex_new(src, len);
+    var tokens = vec_new(256);
     while (1) {
-        var tok;
-        tok = lex_next(l);
+        var tok = lex_next(l);
         vec_push(tokens, tok);
         if (tok_kind(tok) == TOKEN_EOF) { break; }
     }

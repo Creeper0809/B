@@ -87,12 +87,9 @@ func heap_alloc(size) {
         heap_inited = 1;
     }
     
-    var p;
-    p = heap_brk;
-    var new_brk;
-    new_brk = p + size;
-    var res;
-    res = sys_brk(new_brk);
+    var p = heap_brk;
+    var new_brk = p + size;
+    var res = sys_brk(new_brk);
     if (res < new_brk) {
         return 0;
     }

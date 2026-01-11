@@ -53,10 +53,8 @@ func check_type_compat(from_base, from_depth, to_base, to_depth) {
     }
     if (from_depth == 0) {
         if (to_depth == 0) {
-            var from_size;
-            from_size = get_type_size(from_base, 0);
-            var to_size;
-            to_size = get_type_size(to_base, 0);
+            var from_size = get_type_size(from_base, 0);
+            var to_size = get_type_size(to_base, 0);
             if (from_size == to_size) { return 0; }
             return 1;
         }
@@ -75,8 +73,7 @@ func check_type_compat(from_base, from_depth, to_base, to_depth) {
 // ============================================
 
 func symtab_new() {
-    var s;
-    s = heap_alloc(40);
+    var s = heap_alloc(40);
     *(s) = vec_new(64);
     *(s + 8) = vec_new(64);
     *(s + 16) = vec_new(64);
@@ -88,44 +85,39 @@ func symtab_new() {
 func symtab_clear(s) {
     *(s + 24) = 0;
     *(s + 32) = 0;
-    var names;
-    names = *(s);
+    var names = *(s);
     *(names + 8) = 0;
-    var offsets;
-    offsets = *(s + 8);
+    var offsets = *(s + 8);
     *(offsets + 8) = 0;
-    var types;
-    types = *(s + 16);
+    var types = *(s + 16);
     *(types + 8) = 0;
 }
 
 func symtab_add(s, name_ptr, name_len, type_kind, ptr_depth) {
-    var names;
-    names = *(s);
-    var offsets;
-    offsets = *(s + 8);
-    var types;
-    types = *(s + 16);
-    var count;
-    count = *(s + 24);
+    // 중복 체크: 이미 같은 이름이 있으면 기존 offset 반환
+    var existing = symtab_find(s, name_ptr, name_len);
+    if (existing != 0) {
+        return existing;
+    }
     
-    var size;
-    size = 8;
+    var names = *(s);
+    var offsets = *(s + 8);
+    var types = *(s + 16);
+    var count = *(s + 24);
     
-    var offset;
-    offset = *(s + 32) - size;
+    var size = 8;
+    
+    var offset = *(s + 32) - size;
     *(s + 32) = offset;
     
-    var name_info;
-    name_info = heap_alloc(16);
+    var name_info = heap_alloc(16);
     *(name_info) = name_ptr;
     *(name_info + 8) = name_len;
     vec_push(names, name_info);
     
     vec_push(offsets, offset);
     
-    var type_info;
-    type_info = heap_alloc(16);
+    var type_info = heap_alloc(16);
     *(type_info) = type_kind;
     *(type_info + 8) = ptr_depth;
     vec_push(types, type_info);
@@ -136,22 +128,15 @@ func symtab_add(s, name_ptr, name_len, type_kind, ptr_depth) {
 }
 
 func symtab_find(s, name_ptr, name_len) {
-    var names;
-    names = *(s);
-    var offsets;
-    offsets = *(s + 8);
-    var count;
-    count = *(s + 24);
+    var names = *(s);
+    var offsets = *(s + 8);
+    var count = *(s + 24);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
-        var name_info;
-        name_info = vec_get(names, i);
-        var n_ptr;
-        n_ptr = *(name_info);
-        var n_len;
-        n_len = *(name_info + 8);
+        var name_info = vec_get(names, i);
+        var n_ptr = *(name_info);
+        var n_len = *(name_info + 8);
         
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
             return vec_get(offsets, i);
@@ -163,22 +148,15 @@ func symtab_find(s, name_ptr, name_len) {
 }
 
 func symtab_get_type(s, name_ptr, name_len) {
-    var names;
-    names = *(s);
-    var types;
-    types = *(s + 16);
-    var count;
-    count = *(s + 24);
+    var names = *(s);
+    var types = *(s + 16);
+    var count = *(s + 24);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
-        var name_info;
-        name_info = vec_get(names, i);
-        var n_ptr;
-        n_ptr = *(name_info);
-        var n_len;
-        n_len = *(name_info + 8);
+        var name_info = vec_get(names, i);
+        var n_ptr = *(name_info);
+        var n_len = *(name_info + 8);
         
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
             return vec_get(types, i);
@@ -190,26 +168,18 @@ func symtab_get_type(s, name_ptr, name_len) {
 }
 
 func symtab_update_type(s, name_ptr, name_len, type_kind, ptr_depth) {
-    var names;
-    names = *(s);
-    var types;
-    types = *(s + 16);
-    var count;
-    count = *(s + 24);
+    var names = *(s);
+    var types = *(s + 16);
+    var count = *(s + 24);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
-        var name_info;
-        name_info = vec_get(names, i);
-        var n_ptr;
-        n_ptr = *(name_info);
-        var n_len;
-        n_len = *(name_info + 8);
+        var name_info = vec_get(names, i);
+        var n_ptr = *(name_info);
+        var n_len = *(name_info + 8);
         
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
-            var type_info;
-            type_info = vec_get(types, i);
+            var type_info = vec_get(types, i);
             *(type_info) = type_kind;
             *(type_info + 8) = ptr_depth;
             return;
@@ -223,17 +193,12 @@ func symtab_update_type(s, name_ptr, name_len, type_kind, ptr_depth) {
 // ============================================
 
 func is_global_var(name_ptr, name_len) {
-    var len;
-    len = vec_len(g_globals);
-    var i;
-    i = 0;
+    var len = vec_len(g_globals);
+    var i = 0;
     while (i < len) {
-        var ginfo;
-        ginfo = vec_get(g_globals, i);
-        var g_ptr;
-        g_ptr = *(ginfo);
-        var g_len;
-        g_len = *(ginfo + 8);
+        var ginfo = vec_get(g_globals, i);
+        var g_ptr = *(ginfo);
+        var g_len = *(ginfo + 8);
         if (str_eq(g_ptr, g_len, name_ptr, name_len)) {
             return 1;
         }
@@ -251,18 +216,13 @@ func string_table_init() {
 }
 
 func string_get_label(str_ptr, str_len) {
-    var i;
-    i = 0;
-    var count;
-    count = vec_len(g_strings);
+    var i = 0;
+    var count = vec_len(g_strings);
     
     while (i < count) {
-        var entry;
-        entry = vec_get(g_strings, i);
-        var e_ptr;
-        e_ptr = *(entry);
-        var e_len;
-        e_len = *(entry + 8);
+        var entry = vec_get(g_strings, i);
+        var e_ptr = *(entry);
+        var e_len = *(entry + 8);
         
         if (str_eq(e_ptr, e_len, str_ptr, str_len)) {
             return *(entry + 16);
@@ -270,12 +230,10 @@ func string_get_label(str_ptr, str_len) {
         i = i + 1;
     }
     
-    var label_id;
-    label_id = g_label_counter;
+    var label_id = g_label_counter;
     g_label_counter = g_label_counter + 1;
     
-    var entry;
-    entry = heap_alloc(24);
+    var entry = heap_alloc(24);
     *(entry) = str_ptr;
     *(entry + 8) = str_len;
     *(entry + 16) = label_id;
@@ -285,40 +243,31 @@ func string_get_label(str_ptr, str_len) {
 }
 
 func string_emit_data() {
-    var count;
-    count = vec_len(g_strings);
+    var count = vec_len(g_strings);
     
     if (count == 0) { return; }
     
     emit("\nsection .data\n", 15);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
-        var entry;
-        entry = vec_get(g_strings, i);
-        var str_ptr;
-        str_ptr = *(entry);
-        var str_len;
-        str_len = *(entry + 8);
-        var label_id;
-        label_id = *(entry + 16);
+        var entry = vec_get(g_strings, i);
+        var str_ptr = *(entry);
+        var str_len = *(entry + 8);
+        var label_id = *(entry + 16);
         
         emit("_str", 4);
         emit_u64(label_id);
         emit(": db ", 5);
         
-        var j;
-        j = 1;
+        var j = 1;
         while (j < str_len - 1) {
-            var c;
-            c = *(*u8)(str_ptr + j);
+            var c = *(*u8)(str_ptr + j);
             
             if (c == 92) {
                 j = j + 1;
                 if (j < str_len - 1) {
-                    var ec;
-                    ec = *(*u8)(str_ptr + j);
+                    var ec = *(*u8)(str_ptr + j);
                     if (ec == 110) { emit("10", 2); }
                     else if (ec == 116) { emit("9", 1); }
                     else if (ec == 48) { emit("0", 1); }
@@ -340,22 +289,17 @@ func string_emit_data() {
 }
 
 func globals_emit_bss() {
-    var count;
-    count = vec_len(g_globals);
+    var count = vec_len(g_globals);
     
     if (count == 0) { return; }
     
     emit("\nsection .bss\n", 14);
     
-    var i;
-    i = 0;
+    var i = 0;
     while (i < count) {
-        var ginfo;
-        ginfo = vec_get(g_globals, i);
-        var name_ptr;
-        name_ptr = *(ginfo);
-        var name_len;
-        name_len = *(ginfo + 8);
+        var ginfo = vec_get(g_globals, i);
+        var name_ptr = *(ginfo);
+        var name_len = *(ginfo + 8);
         
         emit("_gvar_", 6);
         emit(name_ptr, name_len);
@@ -370,28 +314,21 @@ func globals_emit_bss() {
 // ============================================
 
 func const_find(name_ptr, name_len) {
-    var len;
-    len = vec_len(g_consts);
-    var i;
-    i = 0;
+    var len = vec_len(g_consts);
+    var i = 0;
     while (i < len) {
-        var c;
-        c = vec_get(g_consts, i);
-        var c_ptr;
-        c_ptr = *(c);
-        var c_len;
-        c_len = *(c + 8);
+        var c = vec_get(g_consts, i);
+        var c_ptr = *(c);
+        var c_len = *(c + 8);
         if (str_eq(c_ptr, c_len, name_ptr, name_len)) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = 1;
             *(result + 8) = *(c + 16);
             return result;
         }
         i = i + 1;
     }
-    var result;
-    result = heap_alloc(16);
+    var result = heap_alloc(16);
     *(result) = 0;
     return result;
 }
@@ -401,8 +338,7 @@ func const_find(name_ptr, name_len) {
 // ============================================
 
 func new_label() {
-    var l;
-    l = g_label_counter;
+    var l = g_label_counter;
     g_label_counter = g_label_counter + 1;
     return l;
 }
@@ -423,19 +359,14 @@ func emit_label_def(n) {
 // ============================================
 
 func get_expr_type(node) {
-    var kind;
-    kind = ast_kind(node);
+    var kind = ast_kind(node);
     
     if (kind == AST_IDENT) {
-        var name_ptr;
-        name_ptr = *(node + 8);
-        var name_len;
-        name_len = *(node + 16);
-        var type_info;
-        type_info = symtab_get_type(g_symtab, name_ptr, name_len);
+        var name_ptr = *(node + 8);
+        var name_len = *(node + 16);
+        var type_info = symtab_get_type(g_symtab, name_ptr, name_len);
         if (type_info == 0) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
@@ -444,29 +375,24 @@ func get_expr_type(node) {
     }
     
     if (kind == AST_STRING) {
-        var result;
-        result = heap_alloc(16);
+        var result = heap_alloc(16);
         *(result) = TYPE_U8;
         *(result + 8) = 1;
         return result;
     }
     
     if (kind == AST_CAST) {
-        var result;
-        result = heap_alloc(16);
+        var result = heap_alloc(16);
         *(result) = *(node + 16);
         *(result + 8) = *(node + 24);
         return result;
     }
     
     if (kind == AST_ADDR_OF) {
-        var operand;
-        operand = *(node + 8);
-        var op_type;
-        op_type = get_expr_type(operand);
+        var operand = *(node + 8);
+        var op_type = get_expr_type(operand);
         if (op_type != 0) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = *(op_type);
             *(result + 8) = *(op_type + 8) + 1;
             return result;
@@ -474,16 +400,12 @@ func get_expr_type(node) {
     }
     
     if (kind == AST_DEREF) {
-        var operand;
-        operand = *(node + 8);
-        var op_type;
-        op_type = get_expr_type(operand);
+        var operand = *(node + 8);
+        var op_type = get_expr_type(operand);
         if (op_type != 0) {
-            var depth;
-            depth = *(op_type + 8);
+            var depth = *(op_type + 8);
             if (depth > 0) {
-                var result;
-                result = heap_alloc(16);
+                var result = heap_alloc(16);
                 *(result) = *(op_type);
                 *(result + 8) = depth - 1;
                 return result;
@@ -492,90 +414,75 @@ func get_expr_type(node) {
     }
     
     if (kind == AST_DEREF8) {
-        var result;
-        result = heap_alloc(16);
+        var result = heap_alloc(16);
         *(result) = TYPE_U8;
         *(result + 8) = 0;
         return result;
     }
     
     if (kind == AST_BINARY) {
-        var op;
-        op = *(node + 8);
+        var op = *(node + 8);
 
         if (op == TOKEN_ANDAND) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
         }
 
         if (op == TOKEN_OROR) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
         }
 
         if (op == TOKEN_LT) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
         }
         if (op == TOKEN_GT) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
         }
         if (op == TOKEN_LTEQ) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
         }
         if (op == TOKEN_GTEQ) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
         }
         if (op == TOKEN_EQEQ) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
         }
         if (op == TOKEN_BANGEQ) {
-            var result;
-            result = heap_alloc(16);
+            var result = heap_alloc(16);
             *(result) = TYPE_I64;
             *(result + 8) = 0;
             return result;
         }
 
-        var left;
-        left = *(node + 16);
-        var right;
-        right = *(node + 24);
+        var left = *(node + 16);
+        var right = *(node + 24);
         
         if (op == TOKEN_PLUS) {
-            var left_type;
-            left_type = get_expr_type(left);
+            var left_type = get_expr_type(left);
             if (left_type != 0) {
-                var l_depth;
-                l_depth = *(left_type + 8);
+                var l_depth = *(left_type + 8);
                 if (l_depth > 0) {
-                    var result;
-                    result = heap_alloc(16);
+                    var result = heap_alloc(16);
                     *(result) = *(left_type);
                     *(result + 8) = l_depth;
                     return result;
@@ -596,14 +503,11 @@ func get_expr_type(node) {
                 }
             }
         } else if (op == TOKEN_MINUS) {
-            var left_type;
-            left_type = get_expr_type(left);
+            var left_type = get_expr_type(left);
             if (left_type != 0) {
-                var l_depth;
-                l_depth = *(left_type + 8);
+                var l_depth = *(left_type + 8);
                 if (l_depth > 0) {
-                    var result;
-                    result = heap_alloc(16);
+                    var result = heap_alloc(16);
                     *(result) = *(left_type);
                     *(result + 8) = l_depth;
                     return result;
@@ -627,15 +531,13 @@ func get_expr_type(node) {
     }
     
     if (kind == AST_LITERAL) {
-        var result;
-        result = heap_alloc(16);
+        var result = heap_alloc(16);
         *(result) = TYPE_I64;
         *(result + 8) = 0;
         return result;
     }
     
-    var result;
-    result = heap_alloc(16);
+    var result = heap_alloc(16);
     *(result) = TYPE_I64;
     *(result + 8) = 0;
     return result;
@@ -646,8 +548,7 @@ func get_expr_type(node) {
 // ============================================
 
 func cg_expr(node) {
-    var kind;
-    kind = ast_kind(node);
+    var kind = ast_kind(node);
     
     if (kind == AST_LITERAL) {
         emit("    mov rax, ", 13);
@@ -657,12 +558,9 @@ func cg_expr(node) {
     }
     
     if (kind == AST_STRING) {
-        var str_ptr;
-        str_ptr = *(node + 8);
-        var str_len;
-        str_len = *(node + 16);
-        var label_id;
-        label_id = string_get_label(str_ptr, str_len);
+        var str_ptr = *(node + 8);
+        var str_len = *(node + 16);
+        var label_id = string_get_label(str_ptr, str_len);
         emit("    lea rax, [rel _str", 22);
         emit_u64(label_id);
         emit("]\n", 2);
@@ -670,13 +568,10 @@ func cg_expr(node) {
     }
     
     if (kind == AST_IDENT) {
-        var name_ptr;
-        name_ptr = *(node + 8);
-        var name_len;
-        name_len = *(node + 16);
+        var name_ptr = *(node + 8);
+        var name_len = *(node + 16);
         
-        var c_result;
-        c_result = const_find(name_ptr, name_len);
+        var c_result = const_find(name_ptr, name_len);
         if (*(c_result) == 1) {
             emit("    mov rax, ", 13);
             emit_u64(*(c_result + 8));
@@ -702,18 +597,13 @@ func cg_expr(node) {
     }
     
     if (kind == AST_BINARY) {
-        var op;
-        op = *(node + 8);
-        var left;
-        left = *(node + 16);
-        var right;
-        right = *(node + 24);
+        var op = *(node + 8);
+        var left = *(node + 16);
+        var right = *(node + 24);
 
         if (op == TOKEN_ANDAND) {
-            var l_false;
-            l_false = new_label();
-            var l_end;
-            l_end = new_label();
+            var l_false = new_label();
+            var l_end = new_label();
 
             cg_expr(left);
             emit("    test rax, rax\n", 18);
@@ -736,10 +626,8 @@ func cg_expr(node) {
         }
 
         if (op == TOKEN_OROR) {
-            var l_true;
-            l_true = new_label();
-            var l_end;
-            l_end = new_label();
+            var l_true = new_label();
+            var l_end = new_label();
 
             cg_expr(left);
             emit("    test rax, rax\n", 18);
@@ -767,23 +655,19 @@ func cg_expr(node) {
         emit("    mov rbx, rax\n", 17);
         emit("    pop rax\n", 12);
         
-        var left_type;
-        left_type = get_expr_type(left);
-        var ptr_depth;
-        ptr_depth = *(left_type + 8);
+        var left_type = get_expr_type(left);
+        var ptr_depth = *(left_type + 8);
         
         if (ptr_depth > 0) {
             if (op == TOKEN_PLUS) {
-                var psize;
-                psize = get_pointee_size(*(left_type), ptr_depth);
+                var psize = get_pointee_size(*(left_type), ptr_depth);
                 if (psize > 1) {
                     emit("    imul rbx, ", 14);
                     emit_u64(psize);
                     emit_nl();
                 }
             } else if (op == TOKEN_MINUS) {
-                var psize;
-                psize = get_pointee_size(*(left_type), ptr_depth);
+                var psize = get_pointee_size(*(left_type), ptr_depth);
                 if (psize > 1) {
                     emit("    imul rbx, ", 14);
                     emit_u64(psize);
@@ -849,10 +733,8 @@ func cg_expr(node) {
     }
     
     if (kind == AST_UNARY) {
-        var op;
-        op = *(node + 8);
-        var operand;
-        operand = *(node + 16);
+        var op = *(node + 8);
+        var operand = *(node + 16);
         
         cg_expr(operand);
         if (op == TOKEN_MINUS) { emit("    neg rax\n", 12); }
@@ -865,14 +747,10 @@ func cg_expr(node) {
     }
     
     if (kind == AST_ADDR_OF) {
-        var operand;
-        operand = *(node + 8);
-        var name_ptr;
-        name_ptr = *(operand + 8);
-        var name_len;
-        name_len = *(operand + 16);
-        var offset;
-        offset = symtab_find(g_symtab, name_ptr, name_len);
+        var operand = *(node + 8);
+        var name_ptr = *(operand + 8);
+        var name_len = *(operand + 16);
+        var offset = symtab_find(g_symtab, name_ptr, name_len);
         
         emit("    lea rax, [rbp", 17);
         if (offset < 0) { emit_i64(offset); }
@@ -882,16 +760,12 @@ func cg_expr(node) {
     }
     
     if (kind == AST_DEREF) {
-        var operand;
-        operand = *(node + 8);
+        var operand = *(node + 8);
         cg_expr(operand);
         
-        var op_type;
-        op_type = get_expr_type(operand);
-        var base_type;
-        base_type = *(op_type);
-        var ptr_depth;
-        ptr_depth = *(op_type + 8);
+        var op_type = get_expr_type(operand);
+        var base_type = *(op_type);
+        var ptr_depth = *(op_type + 8);
         
         if (ptr_depth == 1) {
             if (base_type == TYPE_U8) {
@@ -920,24 +794,18 @@ func cg_expr(node) {
     }
     
     if (kind == AST_CAST) {
-        var expr;
-        expr = *(node + 8);
+        var expr = *(node + 8);
         cg_expr(expr);
         return;
     }
     
     if (kind == AST_CALL) {
-        var name_ptr;
-        name_ptr = *(node + 8);
-        var name_len;
-        name_len = *(node + 16);
-        var args;
-        args = *(node + 24);
-        var nargs;
-        nargs = vec_len(args);
+        var name_ptr = *(node + 8);
+        var name_len = *(node + 16);
+        var args = *(node + 24);
+        var nargs = vec_len(args);
         
-        var i;
-        i = nargs - 1;
+        var i = nargs - 1;
         while (i >= 0) {
             cg_expr(vec_get(args, i));
             emit("    push rax\n", 13);
@@ -962,14 +830,11 @@ func cg_expr(node) {
 // ============================================
 
 func cg_lvalue(node) {
-    var kind;
-    kind = ast_kind(node);
+    var kind = ast_kind(node);
     
     if (kind == AST_IDENT) {
-        var name_ptr;
-        name_ptr = *(node + 8);
-        var name_len;
-        name_len = *(node + 16);
+        var name_ptr = *(node + 8);
+        var name_len = *(node + 16);
         
         if (is_global_var(name_ptr, name_len)) {
             emit("    lea rax, [rel _gvar_", 24);
@@ -978,8 +843,7 @@ func cg_lvalue(node) {
             return;
         }
         
-        var offset;
-        offset = symtab_find(g_symtab, name_ptr, name_len);
+        var offset = symtab_find(g_symtab, name_ptr, name_len);
         
         emit("    lea rax, [rbp", 17);
         if (offset < 0) { emit_i64(offset); }
@@ -989,8 +853,7 @@ func cg_lvalue(node) {
     }
     
     if (kind == AST_DEREF) {
-        var operand;
-        operand = *(node + 8);
+        var operand = *(node + 8);
         cg_expr(operand);
         return;
     }
@@ -1008,12 +871,9 @@ func cg_lvalue(node) {
 // ============================================
 
 func cg_block(node) {
-    var stmts;
-    stmts = *(node + 8);
-    var len;
-    len = vec_len(stmts);
-    var i;
-    i = 0;
+    var stmts = *(node + 8);
+    var len = vec_len(stmts);
+    var i = 0;
     while (i < len) {
         cg_stmt(vec_get(stmts, i));
         i = i + 1;
@@ -1021,12 +881,10 @@ func cg_block(node) {
 }
 
 func cg_stmt(node) {
-    var kind;
-    kind = ast_kind(node);
+    var kind = ast_kind(node);
     
     if (kind == AST_RETURN) {
-        var expr;
-        expr = *(node + 8);
+        var expr = *(node + 8);
         if (expr != 0) { cg_expr(expr); }
         else { emit("    xor eax, eax\n", 17); }
         emit("    mov rsp, rbp\n", 17);
@@ -1036,32 +894,22 @@ func cg_stmt(node) {
     }
     
     if (kind == AST_VAR_DECL) {
-        var name_ptr;
-        name_ptr = *(node + 8);
-        var name_len;
-        name_len = *(node + 16);
-        var type_kind;
-        type_kind = *(node + 24);
-        var ptr_depth;
-        ptr_depth = *(node + 32);
-        var init;
-        init = *(node + 40);
+        var name_ptr = *(node + 8);
+        var name_len = *(node + 16);
+        var type_kind = *(node + 24);
+        var ptr_depth = *(node + 32);
+        var init = *(node + 40);
         
-        var offset;
-        offset = symtab_add(g_symtab, name_ptr, name_len, type_kind, ptr_depth);
+        var offset = symtab_add(g_symtab, name_ptr, name_len, type_kind, ptr_depth);
         
         if (init != 0) {
             if (type_kind != 0) {
-                var init_type;
-                init_type = get_expr_type(init);
+                var init_type = get_expr_type(init);
                 if (init_type != 0) {
-                    var it_base;
-                    it_base = *(init_type);
-                    var it_depth;
-                    it_depth = *(init_type + 8);
+                    var it_base = *(init_type);
+                    var it_depth = *(init_type + 8);
                     
-                    var compat;
-                    compat = check_type_compat(it_base, it_depth, type_kind, ptr_depth);
+                    var compat = check_type_compat(it_base, it_depth, type_kind, ptr_depth);
                     if (compat == 1) {
                         warn("implicit type conversion in initialization", 43);
                     }
@@ -1078,37 +926,25 @@ func cg_stmt(node) {
     }
     
     if (kind == AST_ASSIGN) {
-        var target;
-        target = *(node + 8);
-        var value;
-        value = *(node + 16);
+        var target = *(node + 8);
+        var value = *(node + 16);
         
-        var target_kind;
-        target_kind = ast_kind(target);
+        var target_kind = ast_kind(target);
         if (target_kind == AST_IDENT) {
-            var name_ptr;
-            name_ptr = *(target + 8);
-            var name_len;
-            name_len = *(target + 16);
+            var name_ptr = *(target + 8);
+            var name_len = *(target + 16);
             
-            var target_type;
-            target_type = symtab_get_type(g_symtab, name_ptr, name_len);
-            var value_type;
-            value_type = get_expr_type(value);
+            var target_type = symtab_get_type(g_symtab, name_ptr, name_len);
+            var value_type = get_expr_type(value);
             
             if (target_type != 0) {
                 if (value_type != 0) {
-                    var tt_base;
-                    tt_base = *(target_type);
-                    var tt_depth;
-                    tt_depth = *(target_type + 8);
-                    var vt_base;
-                    vt_base = *(value_type);
-                    var vt_depth;
-                    vt_depth = *(value_type + 8);
+                    var tt_base = *(target_type);
+                    var tt_depth = *(target_type + 8);
+                    var vt_base = *(value_type);
+                    var vt_depth = *(value_type + 8);
                     
-                    var compat;
-                    compat = check_type_compat(vt_base, vt_depth, tt_base, tt_depth);
+                    var compat = check_type_compat(vt_base, vt_depth, tt_base, tt_depth);
                     if (compat == 1) {
                         warn("implicit type conversion in assignment", 39);
                     }
@@ -1119,11 +955,9 @@ func cg_stmt(node) {
                 }
             } else {
                 if (value_type != 0) {
-                    var vt_depth;
-                    vt_depth = *(value_type + 8);
+                    var vt_depth = *(value_type + 8);
                     if (vt_depth > 0) {
-                        var vt_base;
-                        vt_base = *(value_type);
+                        var vt_base = *(value_type);
                         symtab_update_type(g_symtab, name_ptr, name_len, vt_base, vt_depth);
                     }
                 }
@@ -1136,14 +970,10 @@ func cg_stmt(node) {
         emit("    pop rbx\n", 12);
         
         if (target_kind == AST_DEREF) {
-            var deref_operand;
-            deref_operand = *(target + 8);
-            var op_type;
-            op_type = get_expr_type(deref_operand);
-            var base_type;
-            base_type = *(op_type);
-            var ptr_depth;
-            ptr_depth = *(op_type + 8);
+            var deref_operand = *(target + 8);
+            var op_type = get_expr_type(deref_operand);
+            var base_type = *(op_type);
+            var ptr_depth = *(op_type + 8);
             
             if (ptr_depth == 1) {
                 if (base_type == TYPE_U8) {
@@ -1178,17 +1008,12 @@ func cg_stmt(node) {
     }
     
     if (kind == AST_IF) {
-        var cond;
-        cond = *(node + 8);
-        var then_blk;
-        then_blk = *(node + 16);
-        var else_blk;
-        else_blk = *(node + 24);
+        var cond = *(node + 8);
+        var then_blk = *(node + 16);
+        var else_blk = *(node + 24);
         
-        var else_label;
-        else_label = new_label();
-        var end_label;
-        end_label = new_label();
+        var else_label = new_label();
+        var end_label = new_label();
         
         cg_expr(cond);
         emit("    test rax, rax\n", 18);
@@ -1214,15 +1039,11 @@ func cg_stmt(node) {
     }
     
     if (kind == AST_WHILE) {
-        var cond;
-        cond = *(node + 8);
-        var body;
-        body = *(node + 16);
+        var cond = *(node + 8);
+        var body = *(node + 16);
         
-        var start_label;
-        start_label = new_label();
-        var end_label;
-        end_label = new_label();
+        var start_label = new_label();
+        var end_label = new_label();
         
         emit_label_def(start_label);
         
@@ -1237,8 +1058,7 @@ func cg_stmt(node) {
         
         cg_block(body);
         
-        var len;
-        len = vec_len(g_loop_labels);
+        var len = vec_len(g_loop_labels);
         *(g_loop_labels + 8) = len - 1;
         len = vec_len(g_loop_continue_labels);
         *(g_loop_continue_labels + 8) = len - 1;
@@ -1252,23 +1072,16 @@ func cg_stmt(node) {
     }
     
     if (kind == AST_FOR) {
-        var init;
-        init = *(node + 8);
-        var cond;
-        cond = *(node + 16);
-        var update;
-        update = *(node + 24);
-        var body;
-        body = *(node + 32);
+        var init = *(node + 8);
+        var cond = *(node + 16);
+        var update = *(node + 24);
+        var body = *(node + 32);
         
         if (init != 0) { cg_stmt(init); }
         
-        var start_label;
-        start_label = new_label();
-        var update_label;
-        update_label = new_label();
-        var end_label;
-        end_label = new_label();
+        var start_label = new_label();
+        var update_label = new_label();
+        var end_label = new_label();
         
         emit_label_def(start_label);
         
@@ -1285,8 +1098,7 @@ func cg_stmt(node) {
         
         cg_block(body);
         
-        var labels_len;
-        labels_len = vec_len(g_loop_labels);
+        var labels_len = vec_len(g_loop_labels);
         *(g_loop_labels + 8) = labels_len - 1;
         labels_len = vec_len(g_loop_continue_labels);
         *(g_loop_continue_labels + 8) = labels_len - 1;
@@ -1304,32 +1116,23 @@ func cg_stmt(node) {
     }
     
     if (kind == AST_SWITCH) {
-        var expr;
-        expr = *(node + 8);
-        var cases;
-        cases = *(node + 16);
+        var expr = *(node + 8);
+        var cases = *(node + 16);
         
         cg_expr(expr);
         emit("    push rax\n", 13);
         
-        var end_label;
-        end_label = new_label();
+        var end_label = new_label();
         
-        var num_cases;
-        num_cases = vec_len(cases);
-        var i;
-        i = 0;
+        var num_cases = vec_len(cases);
+        var i = 0;
         while (i < num_cases) {
-            var case_node;
-            case_node = vec_get(cases, i);
-            var is_default;
-            is_default = *(case_node + 24);
+            var case_node = vec_get(cases, i);
+            var is_default = *(case_node + 24);
             
             if (is_default == 0) {
-                var value;
-                value = *(case_node + 8);
-                var next_label;
-                next_label = new_label();
+                var value = *(case_node + 8);
+                var next_label = new_label();
                 
                 emit("    mov rax, [rsp]\n", 19);
                 emit("    push rax\n", 13);
@@ -1341,8 +1144,7 @@ func cg_stmt(node) {
                 emit_label(next_label);
                 emit_nl();
                 
-                var body;
-                body = *(case_node + 16);
+                var body = *(case_node + 16);
                 cg_block(body);
                 
                 emit("    jmp ", 8);
@@ -1351,8 +1153,7 @@ func cg_stmt(node) {
                 
                 emit_label_def(next_label);
             } else {
-                var body;
-                body = *(case_node + 16);
+                var body = *(case_node + 16);
                 cg_block(body);
             }
             
@@ -1365,14 +1166,12 @@ func cg_stmt(node) {
     }
     
     if (kind == AST_BREAK) {
-        var len;
-        len = vec_len(g_loop_labels);
+        var len = vec_len(g_loop_labels);
         if (len == 0) {
             emit_stderr("[ERROR] break outside loop\n", 29);
             panic();
         }
-        var label;
-        label = vec_get(g_loop_labels, len - 1);
+        var label = vec_get(g_loop_labels, len - 1);
         emit("    jmp ", 8);
         emit_label(label);
         emit_nl();
@@ -1380,14 +1179,12 @@ func cg_stmt(node) {
     }
 
     if (kind == AST_CONTINUE) {
-        var len;
-        len = vec_len(g_loop_continue_labels);
+        var len = vec_len(g_loop_continue_labels);
         if (len == 0) {
             emit_stderr("[ERROR] continue outside loop\n", 32);
             panic();
         }
-        var label;
-        label = vec_get(g_loop_continue_labels, len - 1);
+        var label = vec_get(g_loop_continue_labels, len - 1);
         emit("    jmp ", 8);
         emit_label(label);
         emit_nl();
@@ -1395,18 +1192,13 @@ func cg_stmt(node) {
     }
     
     if (kind == AST_ASM) {
-        var text_vec;
-        text_vec = *(node + 8);
-        var asm_len;
-        asm_len = vec_len(text_vec);
+        var text_vec = *(node + 8);
+        var asm_len = vec_len(text_vec);
         
-        var i;
-        i = 0;
-        var at_line_start;
-        at_line_start = 1;
+        var i = 0;
+        var at_line_start = 1;
         while (i < asm_len) {
-            var ch;
-            ch = vec_get(text_vec, i);
+            var ch = vec_get(text_vec, i);
             if (ch == 10) {
                 emit_nl();
                 at_line_start = 1;
@@ -1434,14 +1226,10 @@ func cg_stmt(node) {
 // ============================================
 
 func cg_func(node) {
-    var name_ptr;
-    name_ptr = *(node + 8);
-    var name_len;
-    name_len = *(node + 16);
-    var params;
-    params = *(node + 24);
-    var body;
-    body = *(node + 40);
+    var name_ptr = *(node + 8);
+    var name_len = *(node + 16);
+    var params = *(node + 24);
+    var body = *(node + 40);
     
     symtab_clear(g_symtab);
     
@@ -1452,39 +1240,27 @@ func cg_func(node) {
     emit("    mov rbp, rsp\n", 17);
     emit("    sub rsp, 1024\n", 18);
     
-    var nparams;
-    nparams = vec_len(params);
-    var i;
-    i = 0;
+    var nparams = vec_len(params);
+    var i = 0;
     while (i < nparams) {
-        var param;
-        param = vec_get(params, i);
-        var pname;
-        pname = *(param);
-        var plen;
-        plen = *(param + 8);
-        var ptype;
-        ptype = *(param + 16);
-        var pdepth;
-        pdepth = *(param + 24);
+        var param = vec_get(params, i);
+        var pname = *(param);
+        var plen = *(param + 8);
+        var ptype = *(param + 16);
+        var pdepth = *(param + 24);
         
-        var names;
-        names = *(g_symtab);
-        var offsets;
-        offsets = *(g_symtab + 8);
-        var types;
-        types = *(g_symtab + 16);
+        var names = *(g_symtab);
+        var offsets = *(g_symtab + 8);
+        var types = *(g_symtab + 16);
         
-        var name_info;
-        name_info = heap_alloc(16);
+        var name_info = heap_alloc(16);
         *(name_info) = pname;
         *(name_info + 8) = plen;
         vec_push(names, name_info);
         
         vec_push(offsets, 16 + i * 8);
         
-        var type_info;
-        type_info = heap_alloc(16);
+        var type_info = heap_alloc(16);
         *(type_info) = ptype;
         *(type_info + 8) = pdepth;
         vec_push(types, type_info);
@@ -1507,12 +1283,9 @@ func cg_func(node) {
 // ============================================
 
 func cg_program(prog) {
-    var funcs;
-    funcs = *(prog + 8);
-    var consts;
-    consts = *(prog + 16);
-    var globals;
-    globals = *(prog + 32);
+    var funcs = *(prog + 8);
+    var consts = *(prog + 16);
+    var globals = *(prog + 32);
     
     g_symtab = symtab_new();
     g_label_counter = 0;
@@ -1527,15 +1300,11 @@ func cg_program(prog) {
     }
     
     g_consts = vec_new(64);
-    var clen;
-    clen = vec_len(consts);
-    var ci;
-    ci = 0;
+    var clen = vec_len(consts);
+    var ci = 0;
     while (ci < clen) {
-        var c;
-        c = vec_get(consts, ci);
-        var cinfo;
-        cinfo = heap_alloc(24);
+        var c = vec_get(consts, ci);
+        var cinfo = heap_alloc(24);
         *(cinfo) = *(c + 8);
         *(cinfo + 8) = *(c + 16);
         *(cinfo + 16) = *(c + 24);
@@ -1556,10 +1325,8 @@ func cg_program(prog) {
     emit("    mov rax, 60\n", 16);
     emit("    syscall\n", 12);
     
-    var len;
-    len = vec_len(funcs);
-    var i;
-    i = 0;
+    var len = vec_len(funcs);
+    var i = 0;
     while (i < len) {
         cg_func(vec_get(funcs, i));
         i = i + 1;

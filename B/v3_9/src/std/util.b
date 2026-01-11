@@ -12,8 +12,7 @@ import std.char;
 func panic() {
     emit("[PANIC] Compiler error - exiting", 32);
     emit_nl();
-    var x;
-    x = *(0);
+    var x = *(0);
 }
 
 func emit_stderr(s, len) {
@@ -21,8 +20,7 @@ func emit_stderr(s, len) {
 }
 
 func emit_stderr_nl() {
-    var nl;
-    nl = heap_alloc(1);
+    var nl = heap_alloc(1);
     *(*u8)nl = 10;
     sys_write(2, nl, 1);
 }
@@ -38,8 +36,7 @@ func warn(msg, len) {
 // ============================================
 
 func emit_char(c) {
-    var buf;
-    buf = heap_alloc(1);
+    var buf = heap_alloc(1);
     *(*u8)buf = c;
     sys_write(1, buf, 1);
 }
@@ -49,19 +46,15 @@ func emit_u64(n) {
         emit("0", 1);
         return;
     }
-    var buf;
-    buf = heap_alloc(32);
-    var i;
-    i = 0;
-    var t;
-    t = n;
+    var buf = heap_alloc(32);
+    var i = 0;
+    var t = n;
     while (t > 0) {
         *(*u8)(buf + i) = 48 + (t % 10);
         t = t / 10;
         i = i + 1;
     }
-    var j;
-    j = i - 1;
+    var j = i - 1;
     while (j >= 0) {
         sys_write(1, buf + j, 1);
         j = j - 1;
@@ -78,8 +71,7 @@ func emit_i64(n) {
 }
 
 func emit_nl() {
-    var nl;
-    nl = heap_alloc(1);
+    var nl = heap_alloc(1);
     *(*u8)nl = 10;
     sys_write(1, nl, 1);
 }

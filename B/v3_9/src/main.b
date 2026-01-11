@@ -30,24 +30,18 @@ var g_file_len;
 // ============================================
 
 func read_entire_file(path) {
-    var fd;
-    fd = sys_open(path, 0, 0);
+    var fd = sys_open(path, 0, 0);
     if (fd < 0) { return 0; }
     
-    var statbuf;
-    statbuf = heap_alloc(144);
+    var statbuf = heap_alloc(144);
     sys_fstat(fd, statbuf);
-    var size;
-    size = *(statbuf + 48);
+    var size = *(statbuf + 48);
     
-    var buf;
-    buf = heap_alloc(size + 1);
+    var buf = heap_alloc(size + 1);
     
-    var total;
-    total = 0;
+    var total = 0;
     while (total < size) {
-        var n;
-        n = sys_read(fd, buf + total, size - total);
+        var n = sys_read(fd, buf + total, size - total);
         if (n <= 0) { break; }
         total = total + n;
     }
@@ -67,8 +61,7 @@ func read_entire_file(path) {
 // ============================================
 
 func file_exists(path) {
-    var fd;
-    fd = sys_open(path, 0, 0);
+    var fd = sys_open(path, 0, 0);
     if (fd < 0) { return 0; }
     sys_close(fd);
     return 1;
@@ -100,13 +93,10 @@ func is_std_path(module_path, module_len) {
 }
 
 func resolve_module_path(module_path, module_len) {
-    var eff_path;
-    var eff_len;
-    eff_path = module_path;
-    eff_len = module_len;
+    var eff_path = module_path;
+    var eff_len = module_len;
 
-    var prefer_lib;
-    prefer_lib = 0;
+    var prefer_lib = 0;
 
     if (is_std_alias(module_path, module_len)) {
         eff_path = std_alias_to_module_path(module_path, module_len);
@@ -118,19 +108,15 @@ func resolve_module_path(module_path, module_len) {
         prefer_lib = 1;
     }
 
-    var ext;
-    ext = heap_alloc(3);
+    var ext = heap_alloc(3);
     *(*u8)ext = 46;
     *(*u8)(ext + 1) = 98;
     *(*u8)(ext + 2) = 0;
     
-    var with_ext;
-    with_ext = str_concat(eff_path, eff_len, ext, 2);
-    var with_ext_len;
-    with_ext_len = eff_len + 2;
+    var with_ext = str_concat(eff_path, eff_len, ext, 2);
+    var with_ext_len = eff_len + 2;
     
-    var slash;
-    slash = heap_alloc(1);
+    var slash = heap_alloc(1);
     *(*u8)slash = 47;
 
     var full1;
@@ -149,10 +135,8 @@ func resolve_module_path(module_path, module_len) {
 }
 
 func load_module_by_name(module_path, module_len) {
-    var resolved;
-    resolved = resolve_module_path(module_path, module_len);
-    var resolved_len;
-    resolved_len = str_len(resolved);
+    var resolved = resolve_module_path(module_path, module_len);
+    var resolved_len = str_len(resolved);
     return load_module(resolved, resolved_len);
 }
 
@@ -171,12 +155,10 @@ func load_module(file_path, file_path_len) {
     
     hashmap_put(g_loaded_modules, file_path, file_path_len, 1);
     
-    var content;
-    content = read_entire_file(file_path);
+    var content = read_entire_file(file_path);
     if (content == 0) {
         emit_stderr("[ERROR] Cannot open module: ", 29);
-        var i;
-        i = 0;
+        var i = 0;
         while (i < file_path_len) {
             emit_char(*(*u8)(file_path + i));
             i = i + 1;
@@ -185,38 +167,25 @@ func load_module(file_path, file_path_len) {
         return 0;
     }
     
-    var src;
-    src = g_file_ptr;
-    var slen;
-    slen = g_file_len;
+    var src = g_file_ptr;
+    var slen = g_file_len;
     
-    var tokens;
-    tokens = lex_all(src, slen);
+    var tokens = lex_all(src, slen);
     
-    var p;
-    p = parse_new(tokens);
-    var prog;
-    prog = parse_program(p);
+    var p = parse_new(tokens);
+    var prog = parse_program(p);
     
     // Process imports recursively
-    var imports;
-    imports = *(prog + 24);
-    var num_imports;
-    num_imports = vec_len(imports);
-    var ii;
-    ii = 0;
+    var imports = *(prog + 24);
+    var num_imports = vec_len(imports);
+    var ii = 0;
     while (ii < num_imports) {
-        var imp;
-        imp = vec_get(imports, ii);
-        var imp_path;
-        imp_path = *(imp + 8);
-        var imp_len;
-        imp_len = *(imp + 16);
+        var imp = vec_get(imports, ii);
+        var imp_path = *(imp + 8);
+        var imp_len = *(imp + 16);
         
-        var resolved;
-        resolved = resolve_module_path(imp_path, imp_len);
-        var resolved_len;
-        resolved_len = str_len(resolved);
+        var resolved = resolve_module_path(imp_path, imp_len);
+        var resolved_len = str_len(resolved);
         
         if (!load_module(resolved, resolved_len)) {
             return 0;
@@ -226,37 +195,28 @@ func load_module(file_path, file_path_len) {
     }
     
     // Add consts
-    var consts;
-    consts = *(prog + 16);
-    var num_consts;
-    num_consts = vec_len(consts);
-    var ci;
-    ci = 0;
+    var consts = *(prog + 16);
+    var num_consts = vec_len(consts);
+    var ci = 0;
     while (ci < num_consts) {
         vec_push(g_all_consts, vec_get(consts, ci));
         ci = ci + 1;
     }
     
     // Add funcs
-    var funcs;
-    funcs = *(prog + 8);
-    var num_funcs;
-    num_funcs = vec_len(funcs);
-    var fi;
-    fi = 0;
+    var funcs = *(prog + 8);
+    var num_funcs = vec_len(funcs);
+    var fi = 0;
     while (fi < num_funcs) {
         vec_push(g_all_funcs, vec_get(funcs, fi));
         fi = fi + 1;
     }
     
     // Add globals
-    var globals;
-    globals = *(prog + 32);
+    var globals = *(prog + 32);
     if (globals != 0) {
-        var num_globals;
-        num_globals = vec_len(globals);
-        var gi;
-        gi = 0;
+        var num_globals = vec_len(globals);
+        var gi = 0;
         while (gi < num_globals) {
             vec_push(g_all_globals, vec_get(globals, gi));
             gi = gi + 1;
@@ -276,10 +236,8 @@ func main(argc, argv) {
         return 1;
     }
     
-    var filename;
-    filename = *(argv + 8);
-    var filename_len;
-    filename_len = str_len(filename);
+    var filename = *(argv + 8);
+    var filename_len = str_len(filename);
     
     g_base_dir = path_dirname(filename, filename_len);
     g_base_dir_len = str_len(g_base_dir);
@@ -302,10 +260,8 @@ func main(argc, argv) {
         return 1;
     }
     
-    var dummy_imports;
-    dummy_imports = vec_new(1);
-    var merged_prog;
-    merged_prog = ast_program(g_all_funcs, g_all_consts, dummy_imports);
+    var dummy_imports = vec_new(1);
+    var merged_prog = ast_program(g_all_funcs, g_all_consts, dummy_imports);
     *(merged_prog + 32) = g_all_globals;
     
     cg_program(merged_prog);
