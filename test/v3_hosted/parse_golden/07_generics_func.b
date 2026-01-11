@@ -1,3 +1,0 @@
-func id<T>(x: T) -> T {
-	return x;
-}

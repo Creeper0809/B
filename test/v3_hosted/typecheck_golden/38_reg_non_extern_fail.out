@@ -1,2 +1,0 @@
-type error at 5:1: @reg is only allowed on extern functions
-type_errors=1
