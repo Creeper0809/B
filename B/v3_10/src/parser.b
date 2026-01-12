@@ -53,12 +53,10 @@ func parse_consume(p, kind) {
         emit_stderr("[ERROR] Expected token kind ", 29);
         emit_u64(kind);
         emit(" but got ", 9);
-        var got;
-        got = parse_peek_kind(p);
+        var got = parse_peek_kind(p);
         emit_u64(got);
 
-        var tok;
-        tok = parse_peek(p);
+        var tok = parse_peek(p);
         if (tok != 0) {
             emit(" at ", 4);
             emit_u64(tok_line(tok));
@@ -110,19 +108,14 @@ func parse_num_val(tok) {
     var ptr = tok_ptr(tok);
     var len = tok_len(tok);
     var val = 0;
-    var i = 0;
 
     // i64 max = 9223372036854775807
-    var max_div10;
-    max_div10 = 922337203685477580;
-    var max_mod10;
-    max_mod10 = 7;
+    var max_div10 = 922337203685477580;
+    var max_mod10 = 7;
 
-    while (i < len) {
-        var c;
-        c = *(*u8)(ptr + i);
-        var digit;
-        digit = c - 48;
+    for(var i = 0; i<len;i++){
+         var c = *(*u8)(ptr + i);
+        var digit = c - 48;
 
         if (val > max_div10) {
             emit_stderr("[ERROR] Integer literal overflow at ", 38);
@@ -148,7 +141,6 @@ func parse_num_val(tok) {
         }
 
         val = val * 10 + digit;
-        i = i + 1;
     }
     return val;
 }
@@ -189,8 +181,7 @@ func parse_ptr_access(p) {
         parse_adv(p);
         if (parse_peek_kind(p) == TOKEN_LBRACKET) {
             parse_adv(p);
-            var idx;
-            idx = parse_expr(p);
+            var idx = parse_expr(p);
             parse_consume(p, TOKEN_RBRACKET);
             if (ptr_kind == 64) {
                 return ast_deref(idx);
@@ -208,8 +199,7 @@ func parse_primary(p) {
     var k = parse_peek_kind(p);
     
     if (k == TOKEN_NUMBER) {
-        var tok;
-        tok = parse_peek(p);
+        var tok = parse_peek(p);
         parse_adv(p);
         return ast_literal(parse_num_val(tok));
     }
@@ -225,101 +215,80 @@ func parse_primary(p) {
     }
     
     if (k == TOKEN_STRING) {
-        var tok;
-        tok = parse_peek(p);
+        var tok = parse_peek(p);
         parse_adv(p);
         return ast_string(tok_ptr(tok), tok_len(tok));
     }
     
     if (k == TOKEN_AMPERSAND) {
         parse_adv(p);
-        var tok;
-        tok = parse_peek(p);
+        var tok = parse_peek(p);
         if (parse_peek_kind(p) != TOKEN_IDENTIFIER) {
             emit_stderr("[ERROR] Expected identifier after &\n", 37);
             return 0;
         }
         parse_adv(p);
-        var ident;
-        ident = ast_ident(tok_ptr(tok), tok_len(tok));
+        var ident = ast_ident(tok_ptr(tok), tok_len(tok));
         return ast_addr_of(ident);
     }
     
     if (k == TOKEN_STAR) {
         parse_adv(p);
-        var operand;
-        operand = parse_unary(p);
+        var operand = parse_unary(p);
         return ast_deref(operand);
     }
     
     if (k == TOKEN_LPAREN) {
         parse_adv(p);
         
-        var next_k;
-        next_k = parse_peek_kind(p);
+        var next_k = parse_peek_kind(p);
         if (next_k == TOKEN_STAR) {
-            var ty;
-            ty = parse_type(p);
+            var ty = parse_type(p);
             parse_consume(p, TOKEN_RPAREN);
-            var operand;
-            operand = parse_unary(p);
+            var operand = parse_unary(p);
             return ast_cast(operand, *(ty), *(ty + 8));
         }
         if (next_k == TOKEN_U8) {
-            var ty;
-            ty = parse_type(p);
+            var ty = parse_type(p);
             parse_consume(p, TOKEN_RPAREN);
-            var operand;
-            operand = parse_unary(p);
+            var operand = parse_unary(p);
             return ast_cast(operand, *(ty), *(ty + 8));
         }
         if (next_k == TOKEN_U16) {
-            var ty;
-            ty = parse_type(p);
+            var ty = parse_type(p);
             parse_consume(p, TOKEN_RPAREN);
-            var operand;
-            operand = parse_unary(p);
+            var operand = parse_unary(p);
             return ast_cast(operand, *(ty), *(ty + 8));
         }
         if (next_k == TOKEN_U32) {
-            var ty;
-            ty = parse_type(p);
+            var ty = parse_type(p);
             parse_consume(p, TOKEN_RPAREN);
-            var operand;
-            operand = parse_unary(p);
+            var operand = parse_unary(p);
             return ast_cast(operand, *(ty), *(ty + 8));
         }
         if (next_k == TOKEN_U64) {
-            var ty;
-            ty = parse_type(p);
+            var ty = parse_type(p);
             parse_consume(p, TOKEN_RPAREN);
-            var operand;
-            operand = parse_unary(p);
+            var operand = parse_unary(p);
             return ast_cast(operand, *(ty), *(ty + 8));
         }
         if (next_k == TOKEN_I64) {
-            var ty;
-            ty = parse_type(p);
+            var ty = parse_type(p);
             parse_consume(p, TOKEN_RPAREN);
-            var operand;
-            operand = parse_unary(p);
+            var operand = parse_unary(p);
             return ast_cast(operand, *(ty), *(ty + 8));
         }
         
-        var expr;
-        expr = parse_expr(p);
+        var expr = parse_expr(p);
         parse_consume(p, TOKEN_RPAREN);
         return expr;
     }
     
     if (k == TOKEN_IDENTIFIER) {
-        var tok;
-        tok = parse_peek(p);
-        var ptr_kind;
-        ptr_kind = is_ptr_keyword(tok_ptr(tok), tok_len(tok));
+        var tok= parse_peek(p);
+        var ptr_kind = is_ptr_keyword(tok_ptr(tok), tok_len(tok));
         if (ptr_kind > 0) {
-            var result;
-            result = parse_ptr_access(p);
+            var result = parse_ptr_access(p);
             if (result != 0) {
                 return result;
             }
@@ -327,14 +296,12 @@ func parse_primary(p) {
     }
     
     if (k == TOKEN_IDENTIFIER) {
-        var tok;
-        tok = parse_peek(p);
+        var tok = parse_peek(p);
         parse_adv(p);
         
         if (parse_peek_kind(p) == TOKEN_LPAREN) {
             parse_adv(p);
-            var args;
-            args = vec_new(8);
+            var args = vec_new(8);
             if (parse_peek_kind(p) != TOKEN_RPAREN) {
                 vec_push(args, parse_expr(p));
                 while (parse_match(p, TOKEN_COMMA)) {
@@ -352,13 +319,11 @@ func parse_primary(p) {
 }
 
 func parse_postfix(p) {
-    var left;
-    left = parse_primary(p);
+    var left = parse_primary(p);
     
     while (parse_peek_kind(p) == TOKEN_LBRACKET) {
         parse_adv(p);
-        var idx;
-        idx = parse_expr(p);
+        var idx = parse_expr(p);
         parse_consume(p, TOKEN_RBRACKET);
         left = ast_deref(ast_binary(TOKEN_PLUS, left, idx));
     }
@@ -371,22 +336,19 @@ func parse_unary(p) {
     
     if (k == TOKEN_STAR) {
         parse_adv(p);
-        var operand;
-        operand = parse_unary(p);
+        var operand= parse_unary(p);
         return ast_deref(operand);
     }
     
     if (k == TOKEN_MINUS) {
         parse_adv(p);
-        var operand;
-        operand = parse_unary(p);
+        var operand = parse_unary(p);
         return ast_unary(TOKEN_MINUS, operand);
     }
     
     if (k == TOKEN_BANG) {
         parse_adv(p);
-        var operand;
-        operand = parse_unary(p);
+        var operand = parse_unary(p);
         return ast_unary(TOKEN_BANG, operand);
     }
     
@@ -394,26 +356,21 @@ func parse_unary(p) {
 }
 
 func parse_mul(p) {
-    var left;
-    left = parse_unary(p);
+    var left = parse_unary(p);
     
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_STAR) {
             parse_adv(p);
-            var right;
-            right = parse_unary(p);
+            var right = parse_unary(p);
             left = ast_binary(TOKEN_STAR, left, right);
         } else if (k == TOKEN_SLASH) {
             parse_adv(p);
-            var right;
-            right = parse_unary(p);
+            var right = parse_unary(p);
             left = ast_binary(TOKEN_SLASH, left, right);
         } else if (k == TOKEN_PERCENT) {
             parse_adv(p);
-            var right;
-            right = parse_unary(p);
+            var right = parse_unary(p);
             left = ast_binary(TOKEN_PERCENT, left, right);
         } else {
             break;
@@ -424,21 +381,17 @@ func parse_mul(p) {
 }
 
 func parse_add(p) {
-    var left;
-    left = parse_mul(p);
+    var left = parse_mul(p);
     
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k= parse_peek_kind(p);
         if (k == TOKEN_PLUS) {
             parse_adv(p);
-            var right;
-            right = parse_mul(p);
+            var right = parse_mul(p);
             left = ast_binary(TOKEN_PLUS, left, right);
         } else if (k == TOKEN_MINUS) {
             parse_adv(p);
-            var right;
-            right = parse_mul(p);
+            var right = parse_mul(p);
             left = ast_binary(TOKEN_MINUS, left, right);
         } else {
             break;
@@ -449,21 +402,17 @@ func parse_add(p) {
 }
 
 func parse_shift(p) {
-    var left;
-    left = parse_add(p);
+    var left = parse_add(p);
     
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_LSHIFT) {
             parse_adv(p);
-            var right;
-            right = parse_add(p);
+            var right = parse_add(p);
             left = ast_binary(TOKEN_LSHIFT, left, right);
         } else if (k == TOKEN_RSHIFT) {
             parse_adv(p);
-            var right;
-            right = parse_add(p);
+            var right = parse_add(p);
             left = ast_binary(TOKEN_RSHIFT, left, right);
         } else {
             break;
@@ -474,31 +423,25 @@ func parse_shift(p) {
 }
 
 func parse_rel(p) {
-    var left;
-    left = parse_shift(p);
+    var left = parse_shift(p);
     
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_LT) {
             parse_adv(p);
-            var right;
-            right = parse_shift(p);
+            var right = parse_shift(p);
             left = ast_binary(TOKEN_LT, left, right);
         } else if (k == TOKEN_GT) {
             parse_adv(p);
-            var right;
-            right = parse_shift(p);
+            var right = parse_shift(p);
             left = ast_binary(TOKEN_GT, left, right);
         } else if (k == TOKEN_LTEQ) {
             parse_adv(p);
-            var right;
-            right = parse_shift(p);
+            var right = parse_shift(p);
             left = ast_binary(TOKEN_LTEQ, left, right);
         } else if (k == TOKEN_GTEQ) {
             parse_adv(p);
-            var right;
-            right = parse_shift(p);
+            var right = parse_shift(p);
             left = ast_binary(TOKEN_GTEQ, left, right);
         } else {
             break;
@@ -509,21 +452,17 @@ func parse_rel(p) {
 }
 
 func parse_eq(p) {
-    var left;
-    left = parse_rel(p);
+    var left = parse_rel(p);
     
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_EQEQ) {
             parse_adv(p);
-            var right;
-            right = parse_rel(p);
+            var right = parse_rel(p);
             left = ast_binary(TOKEN_EQEQ, left, right);
         } else if (k == TOKEN_BANGEQ) {
             parse_adv(p);
-            var right;
-            right = parse_rel(p);
+            var right = parse_rel(p);
             left = ast_binary(TOKEN_BANGEQ, left, right);
         } else {
             break;
@@ -534,16 +473,13 @@ func parse_eq(p) {
 }
 
 func parse_bitand(p) {
-    var left;
-    left = parse_eq(p);
+    var left = parse_eq(p);
     
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_AMPERSAND) {
             parse_adv(p);
-            var right;
-            right = parse_eq(p);
+            var right  = parse_eq(p);
             left = ast_binary(TOKEN_AMPERSAND, left, right);
         } else {
             break;
@@ -554,16 +490,13 @@ func parse_bitand(p) {
 }
 
 func parse_bitxor(p) {
-    var left;
-    left = parse_bitand(p);
+    var left = parse_bitand(p);
     
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_CARET) {
             parse_adv(p);
-            var right;
-            right = parse_bitand(p);
+            var right = parse_bitand(p);
             left = ast_binary(TOKEN_CARET, left, right);
         } else {
             break;
@@ -574,16 +507,13 @@ func parse_bitxor(p) {
 }
 
 func parse_bitor(p) {
-    var left;
-    left = parse_bitxor(p);
+    var left = parse_bitxor(p);
     
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_PIPE) {
             parse_adv(p);
-            var right;
-            right = parse_bitxor(p);
+            var right = parse_bitxor(p);
             left = ast_binary(TOKEN_PIPE, left, right);
         } else {
             break;
@@ -594,16 +524,13 @@ func parse_bitor(p) {
 }
 
 func parse_logand(p) {
-    var left;
-    left = parse_bitor(p);
+    var left = parse_bitor(p);
 
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_ANDAND) {
             parse_adv(p);
-            var right;
-            right = parse_bitor(p);
+            var right = parse_bitor(p);
             left = ast_binary(TOKEN_ANDAND, left, right);
         } else {
             break;
@@ -614,16 +541,13 @@ func parse_logand(p) {
 }
 
 func parse_logor(p) {
-    var left;
-    left = parse_logand(p);
+    var left = parse_logand(p);
 
     while (1) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_OROR) {
             parse_adv(p);
-            var right;
-            right = parse_logand(p);
+            var right = parse_logand(p);
             left = ast_binary(TOKEN_OROR, left, right);
         } else {
             break;
@@ -644,24 +568,19 @@ func parse_expr(p) {
 func parse_var_decl(p) {
     parse_consume(p, TOKEN_VAR);
     
-    var name_tok;
-    name_tok = parse_peek(p);
+    var name_tok = parse_peek(p);
     parse_consume(p, TOKEN_IDENTIFIER);
     
-    var type_kind;
-    type_kind = TYPE_I64;
-    var ptr_depth;
-    ptr_depth = 0;
+    var type_kind = TYPE_I64;
+    var ptr_depth = 0;
     
     if (parse_match(p, TOKEN_COLON)) {
-        var ty;
-        ty = parse_type(p);
+        var ty = parse_type(p);
         type_kind = *(ty);
         ptr_depth = *(ty + 8);
     }
     
-    var init;
-    init = 0;
+    var init = 0;
     
     if (parse_match(p, TOKEN_EQ)) {
         init = parse_expr(p);
@@ -673,27 +592,23 @@ func parse_var_decl(p) {
 }
 
 func parse_assign_or_expr(p) {
-    var expr;
-    expr = parse_expr(p);
+    var expr = parse_expr(p);
     
     if (parse_match(p, TOKEN_EQ)) {
-        var val;
-        val = parse_expr(p);
+        var val = parse_expr(p);
         parse_consume(p, TOKEN_SEMICOLON);
         return ast_assign(expr, val);
     }
 
     // Postfix ++/-- statement sugar: x++; x--;  =>  x = x +/- 1;
-    var post_k;
-    post_k = parse_peek_kind(p);
+    var post_k = parse_peek_kind(p);
     if (post_k == TOKEN_PLUSPLUS) {
         parse_consume(p, post_k);
         if (!is_assignable_expr(expr)) {
             emit_stderr("[ERROR] ++/-- requires assignable expression\n", 45);
             panic("Parse error");
         }
-        var rhs;
-        rhs = make_incdec_rhs(post_k, expr);
+        var rhs = make_incdec_rhs(post_k, expr);
         parse_consume(p, TOKEN_SEMICOLON);
         return ast_assign(expr, rhs);
     }
@@ -703,8 +618,7 @@ func parse_assign_or_expr(p) {
             emit_stderr("[ERROR] ++/-- requires assignable expression\n", 45);
             panic("Parse error");
         }
-        var rhs;
-        rhs = make_incdec_rhs(post_k, expr);
+        var rhs = make_incdec_rhs(post_k, expr);
         parse_consume(p, TOKEN_SEMICOLON);
         return ast_assign(expr, rhs);
     }
@@ -722,8 +636,7 @@ func is_assignable_expr(expr) {
 }
 
 func make_incdec_rhs(incdec_kind, target) {
-    var one;
-    one = ast_literal(1);
+    var one = ast_literal(1);
     if (incdec_kind == TOKEN_PLUSPLUS) {
         return ast_binary(TOKEN_PLUS, target, one);
     }
@@ -733,14 +646,12 @@ func make_incdec_rhs(incdec_kind, target) {
 func parse_prefix_incdec_assign(p) {
     var k = parse_peek_kind(p);
     parse_consume(p, k);
-    var target;
-    target = parse_unary(p);
+    var target = parse_unary(p);
     if (!is_assignable_expr(target)) {
         emit_stderr("[ERROR] ++/-- requires assignable expression\n", 45);
         panic("Parse error");
     }
-    var rhs;
-    rhs = make_incdec_rhs(k, target);
+    var rhs = make_incdec_rhs(k, target);
     return ast_assign(target, rhs);
 }
 
@@ -756,29 +667,23 @@ func parse_postfix_incdec_after_expr(p, expr) {
         emit_stderr("[ERROR] ++/-- requires assignable expression\n", 45);
         panic("Parse error");
     }
-    var rhs;
-    rhs = make_incdec_rhs(k, expr);
+    var rhs = make_incdec_rhs(k, expr);
     return ast_assign(expr, rhs);
 }
 
 func parse_if_stmt(p) {
     parse_consume(p, TOKEN_IF);
     parse_consume(p, TOKEN_LPAREN);
-    var cond;
-    cond = parse_expr(p);
+    var cond = parse_expr(p);
     parse_consume(p, TOKEN_RPAREN);
     
-    var then_blk;
-    then_blk = parse_block(p);
+    var then_blk = parse_block(p);
     
-    var else_blk;
-    else_blk = 0;
+    var else_blk = 0;
     if (parse_match(p, TOKEN_ELSE)) {
         if (parse_peek_kind(p) == TOKEN_IF) {
-            var else_stmt;
-            else_stmt = parse_if_stmt(p);
-            var stmts;
-            stmts = vec_new(1);
+            var else_stmt = parse_if_stmt(p);
+            var stmts = vec_new(1);
             vec_push(stmts, else_stmt);
             else_blk = ast_block(stmts);
         } else {
@@ -792,12 +697,10 @@ func parse_if_stmt(p) {
 func parse_while_stmt(p) {
     parse_consume(p, TOKEN_WHILE);
     parse_consume(p, TOKEN_LPAREN);
-    var cond;
-    cond = parse_expr(p);
+    var cond = parse_expr(p);
     parse_consume(p, TOKEN_RPAREN);
     
-    var body;
-    body = parse_block(p);
+    var body = parse_block(p);
     
     return ast_while(cond, body);
 }
@@ -806,8 +709,7 @@ func parse_for_stmt(p) {
     parse_consume(p, TOKEN_FOR);
     parse_consume(p, TOKEN_LPAREN);
     
-    var init;
-    init = 0;
+    var init = 0;
     if (parse_peek_kind(p) != TOKEN_SEMICOLON) {
         if (parse_peek_kind(p) == TOKEN_VAR) {
             init = parse_var_decl(p);
@@ -818,11 +720,9 @@ func parse_for_stmt(p) {
                 if (parse_peek_kind(p) == TOKEN_MINUSMINUS) {
                     init = parse_prefix_incdec_assign(p);
                 } else {
-                var lhs;
-                lhs = parse_expr(p);
+                var lhs = parse_expr(p);
                 if (parse_match(p, TOKEN_EQ)) {
-                    var rhs;
-                    rhs = parse_expr(p);
+                    var rhs = parse_expr(p);
                     init = ast_assign(lhs, rhs);
                 } else {
                     init = parse_postfix_incdec_after_expr(p, lhs);
@@ -835,15 +735,13 @@ func parse_for_stmt(p) {
         parse_consume(p, TOKEN_SEMICOLON);
     }
     
-    var cond;
-    cond = 0;
+    var cond = 0;
     if (parse_peek_kind(p) != TOKEN_SEMICOLON) {
         cond = parse_expr(p);
     }
     parse_consume(p, TOKEN_SEMICOLON);
     
-    var update;
-    update = 0;
+    var update = 0;
     if (parse_peek_kind(p) != TOKEN_RPAREN) {
         if (parse_peek_kind(p) == TOKEN_PLUSPLUS) {
             update = parse_prefix_incdec_assign(p);
@@ -851,11 +749,9 @@ func parse_for_stmt(p) {
             if (parse_peek_kind(p) == TOKEN_MINUSMINUS) {
                 update = parse_prefix_incdec_assign(p);
             } else {
-            var upd_lhs;
-            upd_lhs = parse_expr(p);
+            var upd_lhs = parse_expr(p);
             if (parse_match(p, TOKEN_EQ)) {
-                var upd_rhs;
-                upd_rhs = parse_expr(p);
+                var upd_rhs = parse_expr(p);
                 update = ast_assign(upd_lhs, upd_rhs);
             } else {
                 update = parse_postfix_incdec_after_expr(p, upd_lhs);
@@ -865,8 +761,7 @@ func parse_for_stmt(p) {
     }
     parse_consume(p, TOKEN_RPAREN);
     
-    var body;
-    body = parse_block(p);
+    var body  = parse_block(p);
     
     return ast_for(init, cond, update, body);
 }
@@ -874,21 +769,17 @@ func parse_for_stmt(p) {
 func parse_switch_stmt(p) {
     parse_consume(p, TOKEN_SWITCH);
     parse_consume(p, TOKEN_LPAREN);
-    var expr;
-    expr = parse_expr(p);
+    var expr = parse_expr(p);
     parse_consume(p, TOKEN_RPAREN);
     parse_consume(p, TOKEN_LBRACE);
     
-    var cases;
-    cases = vec_new(16);
+    var cases = vec_new(16);
     
     while (parse_peek_kind(p) != TOKEN_RBRACE) {
         if (parse_peek_kind(p) == TOKEN_EOF) { break; }
         
-        var is_default;
-        is_default = 0;
-        var value;
-        value = 0;
+        var is_default = 0;
+        var value = 0;
         
         if (parse_peek_kind(p) == TOKEN_CASE) {
             parse_consume(p, TOKEN_CASE);
@@ -904,8 +795,7 @@ func parse_switch_stmt(p) {
         
         parse_consume(p, TOKEN_COLON);
         
-        var stmts;
-        stmts = vec_new(8);
+        var stmts = vec_new(8);
         while (parse_peek_kind(p) != TOKEN_CASE) {
             if (parse_peek_kind(p) == TOKEN_DEFAULT) { break; }
             if (parse_peek_kind(p) == TOKEN_RBRACE) { break; }
@@ -913,8 +803,7 @@ func parse_switch_stmt(p) {
             vec_push(stmts, parse_stmt(p));
         }
         
-        var case_body;
-        case_body = ast_block(stmts);
+        var case_body = ast_block(stmts);
         vec_push(cases, ast_case(value, case_body, is_default));
     }
     
@@ -938,11 +827,9 @@ func parse_asm_stmt(p) {
     parse_consume(p, TOKEN_ASM);
     parse_consume(p, TOKEN_LBRACE);
     
-    var asm_text;
-    asm_text = vec_new(256);
+    var asm_text = vec_new(256);
     
-    var prev_line;
-    prev_line = 0 - 1;
+    var prev_line = 0 - 1;
     
     while (parse_peek_kind(p) != TOKEN_RBRACE) {
         if (parse_peek_kind(p) == TOKEN_EOF) {
@@ -950,10 +837,8 @@ func parse_asm_stmt(p) {
             panic();
         }
         
-        var tok;
-        tok = parse_peek(p);
-        var cur_line;
-        cur_line = tok_line(tok);
+        var tok = parse_peek(p);
+        var cur_line  = tok_line(tok);
         
         if (prev_line >= 0) {
             if (cur_line > prev_line) {
@@ -964,17 +849,12 @@ func parse_asm_stmt(p) {
         }
         prev_line = cur_line;
         
-        var ptr;
-        ptr = tok_ptr(tok);
-        var len;
-        len = tok_len(tok);
-        var i;
-        i = 0;
-        while (i < len) {
+        var ptr = tok_ptr(tok);
+        var len = tok_len(tok);
+
+        for(var i = 0; i<len ;i++){
             vec_push(asm_text, *(*u8)(ptr + i));
-            i = i + 1;
         }
-        
         parse_adv(p);
     }
     
@@ -986,8 +866,7 @@ func parse_asm_stmt(p) {
 func parse_return_stmt(p) {
     parse_consume(p, TOKEN_RETURN);
     
-    var expr;
-    expr = 0;
+    var expr = 0;
     if (parse_peek_kind(p) != TOKEN_SEMICOLON) {
         expr = parse_expr(p);
     }
@@ -999,18 +878,15 @@ func parse_return_stmt(p) {
 func parse_const_decl(p) {
     parse_consume(p, TOKEN_CONST);
     
-    var name_tok;
-    name_tok = parse_peek(p);
+    var name_tok = parse_peek(p);
     parse_consume(p, TOKEN_IDENTIFIER);
     
     parse_consume(p, TOKEN_EQ);
     
-    var val_tok;
-    val_tok = parse_peek(p);
+    var val_tok = parse_peek(p);
     parse_consume(p, TOKEN_NUMBER);
     
-    var value;
-    value = parse_num_val(val_tok);
+    var value = parse_num_val(val_tok);
     
     parse_consume(p, TOKEN_SEMICOLON);
     
@@ -1020,26 +896,20 @@ func parse_const_decl(p) {
 func parse_import_decl(p) {
     parse_consume(p, TOKEN_IMPORT);
     
-    var first_tok;
-    first_tok = parse_peek(p);
+    var first_tok = parse_peek(p);
     parse_consume(p, TOKEN_IDENTIFIER);
     
-    var path_ptr;
-    path_ptr = tok_ptr(first_tok);
-    var path_len;
-    path_len = tok_len(first_tok);
+    var path_ptr  = tok_ptr(first_tok);
+    var path_len = tok_len(first_tok);
     
     while (parse_match(p, TOKEN_DOT)) {
-        var next_tok;
-        next_tok = parse_peek(p);
+        var next_tok = parse_peek(p);
         parse_consume(p, TOKEN_IDENTIFIER);
         
-        var slash;
-        slash = heap_alloc(1);
+        var slash = heap_alloc(1);
         *(*u8)slash = 47;
         
-        var tmp;
-        tmp = str_concat(path_ptr, path_len, slash, 1);
+        var tmp = str_concat(path_ptr, path_len, slash, 1);
         path_ptr = str_concat(tmp, path_len + 1, tok_ptr(next_tok), tok_len(next_tok));
         path_len = path_len + 1 + tok_len(next_tok);
     }
@@ -1053,14 +923,12 @@ func parse_stmt(p) {
     var k = parse_peek_kind(p);
 
     if (k == TOKEN_PLUSPLUS) {
-        var stmt;
-        stmt = parse_prefix_incdec_assign(p);
+        var stmt = parse_prefix_incdec_assign(p);
         parse_consume(p, TOKEN_SEMICOLON);
         return stmt;
     }
     if (k == TOKEN_MINUSMINUS) {
-        var stmt;
-        stmt = parse_prefix_incdec_assign(p);
+        var stmt = parse_prefix_incdec_assign(p);
         parse_consume(p, TOKEN_SEMICOLON);
         return stmt;
     }
@@ -1081,8 +949,7 @@ func parse_stmt(p) {
 func parse_block(p) {
     parse_consume(p, TOKEN_LBRACE);
     
-    var stmts;
-    stmts = vec_new(16);
+    var stmts = vec_new(16);
     
     while (parse_peek_kind(p) != TOKEN_RBRACE) {
         if (parse_peek_kind(p) == TOKEN_EOF) { break; }
@@ -1098,24 +965,19 @@ func parse_block(p) {
 // ============================================
 
 func parse_param(p) {
-    var name_tok;
-    name_tok = parse_peek(p);
+    var name_tok = parse_peek(p);
     parse_consume(p, TOKEN_IDENTIFIER);
     
-    var type_kind;
-    var ptr_depth;
-    type_kind = 0;
-    ptr_depth = 0;
+    var type_kind = 0;
+    var ptr_depth = 0;
     
     if (parse_match(p, TOKEN_COLON)) {
-        var ty;
-        ty = parse_type(p);
+        var ty = parse_type(p);
         type_kind = *(ty);
         ptr_depth = *(ty + 8);
     }
     
-    var param;
-    param = heap_alloc(32);
+    var param = heap_alloc(32);
     *(param) = tok_ptr(name_tok);
     *(param + 8) = tok_len(name_tok);
     *(param + 16) = type_kind;
@@ -1126,14 +988,12 @@ func parse_param(p) {
 func parse_func_decl(p) {
     parse_consume(p, TOKEN_FUNC);
     
-    var name_tok;
-    name_tok = parse_peek(p);
+    var name_tok = parse_peek(p);
     parse_consume(p, TOKEN_IDENTIFIER);
     
     parse_consume(p, TOKEN_LPAREN);
     
-    var params;
-    params = vec_new(8);
+    var params = vec_new(8);
     
     if (parse_peek_kind(p) != TOKEN_RPAREN) {
         vec_push(params, parse_param(p));
@@ -1144,20 +1004,16 @@ func parse_func_decl(p) {
     
     parse_consume(p, TOKEN_RPAREN);
     
-    var ret_type;
-    var ret_ptr_depth;
-    ret_type = TYPE_VOID;
-    ret_ptr_depth = 0;
+    var ret_type = TYPE_VOID;
+    var ret_ptr_depth = 0;
     
     if (parse_match(p, TOKEN_ARROW)) {
-        var ty;
-        ty = parse_type(p);
+        var ty = parse_type(p);
         ret_type = *(ty);
         ret_ptr_depth = *(ty + 8);
     }
     
-    var body;
-    body = parse_block(p);
+    var body = parse_block(p);
     
     return ast_func(tok_ptr(name_tok), tok_len(name_tok), params, ret_type, body);
 }
@@ -1167,34 +1023,25 @@ func parse_func_decl(p) {
 // ============================================
 
 func parse_program(p) {
-    var funcs;
-    funcs = vec_new(16);
-    var consts;
-    consts = vec_new(64);
-    var imports;
-    imports = vec_new(16);
-    var globals;
-    globals = vec_new(32);
+    var funcs = vec_new(16);
+    var consts = vec_new(64);
+    var imports = vec_new(16);
+    var globals = vec_new(32);
     
     while (parse_peek_kind(p) != TOKEN_EOF) {
-        var k;
-        k = parse_peek_kind(p);
+        var k = parse_peek_kind(p);
         if (k == TOKEN_FUNC) {
             vec_push(funcs, parse_func_decl(p));
         } else if (k == TOKEN_CONST) {
             vec_push(consts, parse_const_decl(p));
         } else if (k == TOKEN_VAR) {
             parse_consume(p, TOKEN_VAR);
-            var tok;
-            tok = parse_peek(p);
-            var name_ptr;
-            name_ptr = tok_ptr(tok);
-            var name_len;
-            name_len = tok_len(tok);
+            var tok = parse_peek(p);
+            var name_ptr = tok_ptr(tok);
+            var name_len = tok_len(tok);
             parse_consume(p, TOKEN_IDENTIFIER);
             parse_consume(p, TOKEN_SEMICOLON);
-            var ginfo;
-            ginfo = heap_alloc(16);
+            var ginfo = heap_alloc(16);
             *(ginfo) = name_ptr;
             *(ginfo + 8) = name_len;
             vec_push(globals, ginfo);
@@ -1206,8 +1053,7 @@ func parse_program(p) {
         }
     }
     
-    var prog;
-    prog = ast_program(funcs, consts, imports);
+    var prog  = ast_program(funcs, consts, imports);
     *(prog + 32) = globals;
     return prog;
 }

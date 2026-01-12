@@ -1,19 +1,19 @@
 // char.b - Character classification utilities for v3.8
 
 func is_alpha(c) {
-    if (c >= 65) {
-        if (c <= 90) { return 1; }
+    if (c >= 65 && c <= 90) {
+        return 1;
     }
-    if (c >= 97) {
-        if (c <= 122) { return 1; }
+    if (c >= 97 && c <= 122) {
+        return 1; 
     }
     if (c == 95) { return 1; }
     return 0;
 }
 
 func is_digit(c) {
-    if (c >= 48) {
-        if (c <= 57) { return 1; }
+    if (c >= 48 && c <= 57) {
+        return 1;
     }
     return 0;
 }

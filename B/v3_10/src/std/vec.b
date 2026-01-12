@@ -27,15 +27,11 @@ func vec_push(v, item) {
     
     // Grow if needed
     if (len >= cap) {
-        var new_cap;
-        new_cap = cap * 2;
-        var new_buf;
-        new_buf = heap_alloc(new_cap * 8);
-        var old_buf;
-        old_buf = *(v);
+        var new_cap = cap * 2;
+        var new_buf = heap_alloc(new_cap * 8);
+        var old_buf = *(v);
         // Copy old data
-        var i;
-        i = 0;
+        var i = 0;
         while (i < len) {
             *(new_buf + i * 8) = *(old_buf + i * 8);
             i = i + 1;
