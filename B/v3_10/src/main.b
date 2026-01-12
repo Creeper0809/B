@@ -231,8 +231,8 @@ func main(argc, argv) {
     g_base_dir = path_dirname(filename, filename_len);
     g_base_dir_len = str_len(g_base_dir);
 
-    // Repo layout convention: compiler/runtime modules live under B/v3_9/src
-    g_lib_dir = "B/v3_9/src";
+    // Repo layout convention: compiler/runtime modules live under B/v3_10/src
+    g_lib_dir = "B/v3_10/src";
     g_lib_dir_len = str_len(g_lib_dir);
     
     g_loaded_modules = hashmap_new(64);

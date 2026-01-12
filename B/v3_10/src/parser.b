@@ -324,6 +324,13 @@ func parse_unary(p) {
     
     if (k == TOKEN_MINUS) {
         parse_adv(p);
+        var next_k = parse_peek_kind(p);
+        if (next_k == TOKEN_NUMBER) {
+            var tok = parse_peek(p);
+            parse_adv(p);
+            var val = parse_num_val(tok);
+            return ast_literal(0 - val);
+        }
         var operand = parse_unary(p);
         return ast_unary(TOKEN_MINUS, operand);
     }

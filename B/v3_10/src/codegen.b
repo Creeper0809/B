@@ -541,8 +541,13 @@ func cg_expr(node) {
     var kind = ast_kind(node);
     
     if (kind == AST_LITERAL) {
+        var val = *(node + 8);
         emit("    mov rax, ", 13);
-        emit_u64(*(node + 8));
+        if (val < 0) {
+            emit_i64(val);
+        } else {
+            emit_u64(val);
+        }
         emit_nl();
         return;
     }

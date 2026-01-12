@@ -100,3 +100,46 @@ func heap_alloc(size) {
 func emit(s, len) {
     sys_write(1, s, len);
 }
+
+func print(s, len) {
+    sys_write(1, s, len);
+}
+
+func print_nl() {
+    sys_write(1, "\n", 1);
+}
+
+func println(s, len) {
+    sys_write(1, s, len);
+    sys_write(1, "\n", 1);
+}
+
+func print_u64(n) {
+    if (n == 0) {
+        sys_write(1, "0", 1);
+        return;
+    }
+    var buf = heap_alloc(32);
+    var i = 0;
+    var tmp = n;
+    while (tmp > 0) {
+        var digit = tmp % 10;
+        *(*u8)(buf + i) = digit + 48;
+        tmp = tmp / 10;
+        i = i + 1;
+    }
+    var j = i - 1;
+    while (j >= 0) {
+        sys_write(1, buf + j, 1);
+        j = j - 1;
+    }
+}
+
+func print_i64(n) {
+    if (n < 0) {
+        sys_write(1, "-", 1);
+        print_u64(0 - n);
+    } else {
+        print_u64(n);
+    }
+}
