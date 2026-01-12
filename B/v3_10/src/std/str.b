@@ -4,19 +4,15 @@ import std.io;
 
 func str_eq(s1, len1, s2, len2) {
     if (len1 != len2) { return 0; }
-    var i = 0;
-    while (i < len1) {
-        if (*(*u8)(s1 + i) != *(*u8)(s2 + i)) { return 0; }
-        i = i + 1;
+    for(var i = 0; i<len1;i++){
+         if (*(*u8)(s1 + i) != *(*u8)(s2 + i)) { return 0; }
     }
     return 1;
 }
 
 func str_copy(dst, src, len) {
-    var i = 0;
-    while (i < len) {
+    for(var i = 0; i < len; i++){
         *(*u8)(dst + i) = *(*u8)(src + i);
-        i = i + 1;
     }
 }
 

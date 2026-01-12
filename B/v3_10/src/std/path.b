@@ -5,12 +5,10 @@ import std.str;
 
 func path_dirname(path, path_len) {
     var last_slash = 0 - 1;
-    var i = 0;
-    while (i < path_len) {
+    for(var i = 0; i < path_len; i++){
         if (*(*u8)(path + i) == 47) {
             last_slash = i;
         }
-        i = i + 1;
     }
 
     if (last_slash < 0) {

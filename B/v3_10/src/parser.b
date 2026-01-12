@@ -146,29 +146,11 @@ func parse_num_val(tok) {
 }
 
 func is_ptr_keyword(ptr, len) {
-    if (len == 5) {
-        if (*(*u8)ptr == 112) {
-            if (*(*u8)(ptr+1) == 116) {
-                if (*(*u8)(ptr+2) == 114) {
-                    if (*(*u8)(ptr+3) == 54) {
-                        if (*(*u8)(ptr+4) == 52) {
-                            return 64;
-                        }
-                    }
-                }
-            }
-        }
+    if (len == 5 && *(*u8)ptr == 112 && *(*u8)(ptr+1) == 116 && *(*u8)(ptr+2) == 114 && *(*u8)(ptr+3) == 54 &&*(*u8)(ptr+4) == 52) {
+        return 64;
     }
-    if (len == 4) {
-        if (*(*u8)ptr == 112) {
-            if (*(*u8)(ptr+1) == 116) {
-                if (*(*u8)(ptr+2) == 114) {
-                    if (*(*u8)(ptr+3) == 56) {
-                        return 8;
-                    }
-                }
-            }
-        }
+    if (len == 4&&*(*u8)ptr == 112&&*(*u8)(ptr+1) == 116&&*(*u8)(ptr+2) == 114&&*(*u8)(ptr+3) == 56) {
+        return 8;
     }
     return 0;
 }
