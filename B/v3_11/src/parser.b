@@ -85,6 +85,20 @@ func parse_base_type(p) {
     if (k == TOKEN_U32) { parse_adv(p); return TYPE_U32; }
     if (k == TOKEN_U64) { parse_adv(p); return TYPE_U64; }
     if (k == TOKEN_I64) { parse_adv(p); return TYPE_I64; }
+    
+    // Check for struct type name
+    if (k == TOKEN_IDENTIFIER) {
+        var tok = parse_peek(p);
+        var name_ptr = tok_ptr(tok);
+        var name_len = tok_len(tok);
+        
+        // Call is_struct_type (defined in main.b)
+        if (is_struct_type(name_ptr, name_len) != 0) {
+            parse_adv(p);
+            return TYPE_STRUCT;
+        }
+    }
+    
     return TYPE_VOID;
 }
 
@@ -303,11 +317,22 @@ func parse_primary(p) {
 func parse_postfix(p) {
     var left = parse_primary(p);
     
-    while (parse_peek_kind(p) == TOKEN_LBRACKET) {
-        parse_adv(p);
-        var idx = parse_expr(p);
-        parse_consume(p, TOKEN_RBRACKET);
-        left = ast_deref(ast_binary(TOKEN_PLUS, left, idx));
+    while (1) {
+        var k = parse_peek_kind(p);
+        
+        if (k == TOKEN_LBRACKET) {
+            parse_adv(p);
+            var idx = parse_expr(p);
+            parse_consume(p, TOKEN_RBRACKET);
+            left = ast_deref(ast_binary(TOKEN_PLUS, left, idx));
+        } else if (k == TOKEN_DOT) {
+            parse_adv(p);
+            var field_tok = parse_peek(p);
+            parse_consume(p, TOKEN_IDENTIFIER);
+            left = ast_member_access(left, tok_ptr(field_tok), tok_len(field_tok));
+        } else {
+            break;
+        }
     }
     
     return left;
@@ -562,11 +587,30 @@ func parse_var_decl(p) {
     
     var type_kind = TYPE_I64;
     var ptr_depth = 0;
+    var struct_name_ptr = 0;
+    var struct_name_len = 0;
     
     if (parse_match(p, TOKEN_COLON)) {
+        var before_type_idx = *(p + 8);  // Save position
+        
         var ty = parse_type(p);
         type_kind = *(ty);
         ptr_depth = *(ty + 8);
+        
+        // If TYPE_STRUCT and no pointer, get the struct name from previous token
+        if (type_kind == TYPE_STRUCT) {
+            if (ptr_depth == 0) {
+                var tok_vec = *(p);
+                var prev_idx = *(p + 8) - 1;
+                if (prev_idx >= 0) {
+                    if (prev_idx < vec_len(tok_vec)) {
+                        var prev_tok = vec_get(tok_vec, prev_idx);
+                        struct_name_ptr = tok_ptr(prev_tok);
+                        struct_name_len = tok_len(prev_tok);
+                    }
+                }
+            }
+        }
     }
     
     var init = 0;
@@ -577,7 +621,10 @@ func parse_var_decl(p) {
     
     parse_consume(p, TOKEN_SEMICOLON);
     
-    return ast_var_decl(tok_ptr(name_tok), tok_len(name_tok), type_kind, ptr_depth, init);
+    var decl = ast_var_decl(tok_ptr(name_tok), tok_len(name_tok), type_kind, ptr_depth, init);
+    *(decl + 48) = struct_name_ptr;
+    *(decl + 56) = struct_name_len;
+    return decl;
 }
 
 func parse_assign_or_expr(p) {
@@ -1016,6 +1063,7 @@ func parse_program(p) {
     var consts = vec_new(64);
     var imports = vec_new(16);
     var globals = vec_new(32);
+    var structs = vec_new(16);
     
     while (parse_peek_kind(p) != TOKEN_EOF) {
         var k = parse_peek_kind(p);
@@ -1023,6 +1071,10 @@ func parse_program(p) {
             vec_push(funcs, parse_func_decl(p));
         } else if (k == TOKEN_CONST) {
             vec_push(consts, parse_const_decl(p));
+        } else if (k == TOKEN_STRUCT) {
+            var struct_def = parse_struct_def(p);
+            vec_push(structs, struct_def);
+            register_struct_type(struct_def);  // Register immediately for type checking
         } else if (k == TOKEN_VAR) {
             parse_consume(p, TOKEN_VAR);
             var tok = parse_peek(p);
@@ -1044,5 +1096,49 @@ func parse_program(p) {
     
     var prog  = ast_program(funcs, consts, imports);
     *(prog + 32) = globals;
+    *(prog + 40) = structs;  // structs 추가
     return prog;
+}
+
+// ============================================
+// Struct Parsing
+// ============================================
+
+func parse_struct_def(p) {
+    parse_consume(p, TOKEN_STRUCT);
+    
+    var name_tok = parse_peek(p);
+    var name_ptr = tok_ptr(name_tok);
+    var name_len = tok_len(name_tok);
+    parse_consume(p, TOKEN_IDENTIFIER);
+    
+    parse_consume(p, TOKEN_LBRACE);
+    
+    var fields = vec_new(8);
+    
+    // Parse fields: field_name : type ;
+    while (parse_peek_kind(p) != TOKEN_RBRACE) {
+        var field_name_tok = parse_peek(p);
+        var field_name_ptr = tok_ptr(field_name_tok);
+        var field_name_len = tok_len(field_name_tok);
+        parse_consume(p, TOKEN_IDENTIFIER);
+        
+        parse_consume(p, TOKEN_COLON);
+        
+        var field_type = parse_type(p);
+        
+        parse_consume(p, TOKEN_SEMICOLON);
+        
+        // field_desc = [name_ptr:8][name_len:8][type:8]
+        var field_desc = heap_alloc(24);
+        *(field_desc) = field_name_ptr;
+        *(field_desc + 8) = field_name_len;
+        *(field_desc + 16) = field_type;
+        
+        vec_push(fields, field_desc);
+    }
+    
+    parse_consume(p, TOKEN_RBRACE);
+    
+    return ast_struct_def(name_ptr, name_len, fields);
 }

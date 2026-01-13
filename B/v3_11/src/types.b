@@ -26,6 +26,7 @@ const TOKEN_CONTINUE = 33;
 const TOKEN_ASM = 34;
 const TOKEN_TRUE = 35;
 const TOKEN_FALSE = 36;
+const TOKEN_STRUCT = 37;
 
 // Type keywords
 const TOKEN_U8 = 40;
@@ -86,6 +87,7 @@ const AST_DEREF = 106;
 const AST_DEREF8 = 107;
 const AST_CAST = 108;
 const AST_STRING = 109;
+const AST_MEMBER_ACCESS = 110;
 
 // Statements
 const AST_RETURN = 200;
@@ -107,6 +109,7 @@ const AST_ASM = 213;
 const AST_FUNC = 300;
 const AST_PROGRAM = 301;
 const AST_IMPORT = 302;
+const AST_STRUCT_DEF = 303;
 
 // ============================================
 // Type Constants
@@ -118,3 +121,4 @@ const TYPE_U32 = 3;
 const TYPE_U64 = 4;
 const TYPE_I64 = 5;
 const TYPE_PTR = 10;
+const TYPE_STRUCT = 20;

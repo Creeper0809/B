@@ -110,13 +110,15 @@ func ast_return(expr) {
 
 // AST_VAR_DECL: [kind, name_ptr, name_len, type_kind, ptr_depth, init_expr]
 func ast_var_decl(name_ptr, name_len, type_kind, ptr_depth, init) {
-    var n = heap_alloc(48);
+    var n = heap_alloc(64);
     *(n) = AST_VAR_DECL;
     *(n + 8) = name_ptr;
     *(n + 16) = name_len;
     *(n + 24) = type_kind;
     *(n + 32) = ptr_depth;
     *(n + 40) = init;
+    *(n + 48) = 0;  // struct_name_ptr (will be set if TYPE_STRUCT)
+    *(n + 56) = 0;  // struct_name_len
     return n;
 }
 
@@ -242,12 +244,13 @@ func ast_func(name_ptr, name_len, params, ret_type, body) {
 
 // AST_PROGRAM: [kind, funcs_vec, consts_vec, imports_vec, globals_vec]
 func ast_program(funcs, consts, imports) {
-    var n = heap_alloc(40);
+    var n = heap_alloc(48);
     *(n) = AST_PROGRAM;
     *(n + 8) = funcs;
     *(n + 16) = consts;
     *(n + 24) = imports;
-    *(n + 32) = 0;
+    *(n + 32) = 0;    // globals (will be set by parse_program)
+    *(n + 40) = 0;    // structs (will be set by parse_program)
     return n;
 }
 
@@ -257,6 +260,26 @@ func ast_import(path_ptr, path_len) {
     *(n) = AST_IMPORT;
     *(n + 8) = path_ptr;
     *(n + 16) = path_len;
+    return n;
+}
+
+// AST_STRUCT_DEF: [kind, name_ptr, name_len, fields_vec]
+func ast_struct_def(name_ptr, name_len, fields) {
+    var n = heap_alloc(32);
+    *(n) = AST_STRUCT_DEF;
+    *(n + 8) = name_ptr;
+    *(n + 16) = name_len;
+    *(n + 24) = fields;
+    return n;
+}
+
+// AST_MEMBER_ACCESS: [kind, object, member_ptr, member_len]
+func ast_member_access(object, member_ptr, member_len) {
+    var n = heap_alloc(32);
+    *(n) = AST_MEMBER_ACCESS;
+    *(n + 8) = object;
+    *(n + 16) = member_ptr;
+    *(n + 24) = member_len;
     return n;
 }
 

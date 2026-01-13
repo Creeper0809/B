@@ -18,6 +18,8 @@ var g_loop_labels;    // Stack of loop end labels for break
 var g_loop_continue_labels;  // Stack of loop continue labels
 var g_globals;        // Global variables list
 
+// Struct information (populated from prog+40 in cg_program)
+var g_structs;        // HashMap: struct_name -> struct_def (built in cg_program)
 // ============================================
 // Type Helpers
 // ============================================
@@ -95,13 +97,50 @@ func symtab_clear(s) {
     *(types + 8) = 0;
 }
 
-func symtab_add(s, name_ptr, name_len, type_kind, ptr_depth) {
+// Calculate size of a type
+// Returns size in bytes for allocating on stack
+func sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len) {
+    // Pointers are always 8 bytes
+    if (ptr_depth > 0) { return 8; }
+    
+    // Primitive types
+    if (type_kind == TYPE_U8) { return 1; }
+    if (type_kind == TYPE_U16) { return 2; }
+    if (type_kind == TYPE_U32) { return 4; }
+    if (type_kind == TYPE_U64) { return 8; }
+    if (type_kind == TYPE_I64) { return 8; }
+    
+    // Struct type: sum of field sizes
+    if (type_kind == TYPE_STRUCT) {
+        if (g_structs == 0) { return 8; }
+        
+        var struct_def = hashmap_get(g_structs, struct_name_ptr, struct_name_len);
+        if (struct_def == 0) { return 8; }
+        
+        var fields = *(struct_def + 24);
+        var num_fields = vec_len(fields);
+        var total_size = 0;
+        
+        for(var i = 0; i < num_fields; i++){
+            var field = vec_get(fields, i);
+            var field_type = *(field + 16);
+            // For now, assume all fields are u64 (8 bytes)
+            // TODO: recursive sizeof_type for field types
+            total_size = total_size + 8;
+        }
+        
+        return total_size;
+    }
+    
+    // Default: 8 bytes
+    return 8;
+}
+
+func symtab_add(s, name_ptr, name_len, type_kind, ptr_depth, size) {
     var names = *(s);
     var offsets = *(s + 8);
     var types = *(s + 16);
     var count = *(s + 24);
-    
-    var size = 8;
     
     var offset = *(s + 32) - size;
     *(s + 32) = offset;
@@ -891,8 +930,13 @@ func cg_stmt(node) {
         var type_kind = *(node + 24);
         var ptr_depth = *(node + 32);
         var init = *(node + 40);
+        var struct_name_ptr = *(node + 48);
+        var struct_name_len = *(node + 56);
         
-        var offset = symtab_add(g_symtab, name_ptr, name_len, type_kind, ptr_depth);
+        // Calculate size based on type
+        var size = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+        
+        var offset = symtab_add(g_symtab, name_ptr, name_len, type_kind, ptr_depth, size);
         
         if (init != 0) {
             if (type_kind != 0) {
@@ -1278,12 +1322,25 @@ func cg_program(prog) {
     var funcs = *(prog + 8);
     var consts = *(prog + 16);
     var globals  = *(prog + 32);
+    var structs = *(prog + 40);
     
     g_symtab = symtab_new();
     g_label_counter = 0;
     string_table_init();
     g_loop_labels = vec_new(16);
     g_loop_continue_labels = vec_new(16);
+    
+    // Build struct lookup table
+    g_structs = hashmap_new(64);
+    if (structs != 0) {
+        var num_structs = vec_len(structs);
+        for(var si = 0; si < num_structs; si++){
+            var struct_def = vec_get(structs, si);
+            var struct_name_ptr = *(struct_def + 8);
+            var struct_name_len = *(struct_def + 16);
+            hashmap_put(g_structs, struct_name_ptr, struct_name_len, struct_def);
+        }
+    }
     
     if (globals == 0) {
         g_globals = vec_new(32);

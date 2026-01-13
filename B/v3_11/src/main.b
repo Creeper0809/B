@@ -17,6 +17,7 @@ var g_loaded_modules;    // HashMap: path -> 1 (tracks loaded files)
 var g_all_funcs;         // Vec of all function ASTs
 var g_all_consts;        // Vec of all const ASTs
 var g_all_globals;       // Vec of all global var info
+var g_all_structs;       // HashMap: struct_name -> struct_def
 var g_base_dir;          // Base directory for imports
 var g_base_dir_len;
 var g_lib_dir;           // Library root directory for compiler/runtime modules
@@ -212,7 +213,41 @@ func load_module(file_path, file_path_len) {
         }
     }
     
+    // Register structs
+    var structs = *(prog + 40);
+    if (structs != 0) {
+        var num_structs = vec_len(structs);
+        for(var si = 0; si < num_structs; si++){
+            var struct_def = vec_get(structs, si);
+            var struct_name_ptr = *(struct_def + 8);
+            var struct_name_len = *(struct_def + 16);
+            hashmap_put(g_all_structs, struct_name_ptr, struct_name_len, struct_def);
+        }
+    }
+    
     return 1;
+}
+
+// ============================================
+// Helper functions for parser
+// ============================================
+
+// Check if a name is a registered struct type
+func is_struct_type(name_ptr, name_len) {
+    if (g_all_structs == 0) { return 0; }
+    var struct_def = hashmap_get(g_all_structs, name_ptr, name_len);
+    if (struct_def == 0) { return 0; }
+    return 1;
+}
+
+// Register a struct type during parsing
+func register_struct_type(struct_def) {
+    if (g_all_structs == 0) {
+        g_all_structs = hashmap_new(64);
+    }
+    var struct_name_ptr = *(struct_def + 8);
+    var struct_name_len = *(struct_def + 16);
+    hashmap_put(g_all_structs, struct_name_ptr, struct_name_len, struct_def);
 }
 
 // ============================================
@@ -239,6 +274,7 @@ func main(argc, argv) {
     g_all_funcs = vec_new(64);
     g_all_consts = vec_new(128);
     g_all_globals = vec_new(64);
+    g_all_structs = hashmap_new(64);
 
     // Implicit standard library prelude (std/* available without explicit import)
     if (!load_std_prelude()) {
