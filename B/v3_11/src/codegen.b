@@ -140,9 +140,10 @@ func sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len) {
             var field_type = *(field + 16);
             var field_struct_name_ptr = *(field + 24);
             var field_struct_name_len = *(field + 32);
+            var field_ptr_depth = *(field + 40);
             
             // Recursively calculate field size
-            var field_size = sizeof_type(field_type, 0, field_struct_name_ptr, field_struct_name_len);
+            var field_size = sizeof_type(field_type, field_ptr_depth, field_struct_name_ptr, field_struct_name_len);
             total_size = total_size + field_size;
         }
         
@@ -510,11 +511,12 @@ func get_expr_type(node) {
                 var field_type = *(field + 16);
                 var field_struct_name_ptr = *(field + 24);
                 var field_struct_name_len = *(field + 32);
+                var field_ptr_depth = *(field + 40);
                 
                 // Return the field's type
                 var result = heap_alloc(24);
                 *(result) = field_type;
-                *(result + 8) = 0;  // Fields are not pointers (for now)
+                *(result + 8) = field_ptr_depth;  // Use stored ptr_depth
                 
                 // If field is a struct, find its struct_def
                 if (field_type == TYPE_STRUCT) {
@@ -691,8 +693,9 @@ func get_field_offset(struct_def, field_name_ptr, field_name_len) {
         var field_type = *(field + 16);
         var field_struct_name_ptr = *(field + 24);
         var field_struct_name_len = *(field + 32);
+        var field_ptr_depth = *(field + 40);
         
-        var field_size = sizeof_type(field_type, 0, field_struct_name_ptr, field_struct_name_len);
+        var field_size = sizeof_type(field_type, field_ptr_depth, field_struct_name_ptr, field_struct_name_len);
         offset = offset + field_size;
     }
     
@@ -1360,7 +1363,8 @@ func cg_stmt(node) {
                         var field_type = *(field + 16);
                         var field_struct_name_ptr = *(field + 24);
                         var field_struct_name_len = *(field + 32);
-                        var field_size = sizeof_type(field_type, 0, field_struct_name_ptr, field_struct_name_len);
+                        var field_ptr_depth = *(field + 40);
+                        var field_size = sizeof_type(field_type, field_ptr_depth, field_struct_name_ptr, field_struct_name_len);
                         
                         // Evaluate field value
                         cg_expr(vec_get(values, i));

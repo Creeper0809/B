@@ -1218,13 +1218,14 @@ func parse_struct_def(p) {
         
         parse_consume(p, TOKEN_SEMICOLON);
         
-        // field_desc = [name_ptr:8][name_len:8][type:8][struct_name_ptr:8][struct_name_len:8]
-        var field_desc = heap_alloc(40);
+        // field_desc = [name_ptr:8][name_len:8][type:8][struct_name_ptr:8][struct_name_len:8][ptr_depth:8]
+        var field_desc = heap_alloc(48);
         *(field_desc) = field_name_ptr;
         *(field_desc + 8) = field_name_len;
         *(field_desc + 16) = field_type_kind;
         *(field_desc + 24) = field_struct_name_ptr;
         *(field_desc + 32) = field_struct_name_len;
+        *(field_desc + 40) = field_ptr_depth;
         
         vec_push(fields, field_desc);
     }
