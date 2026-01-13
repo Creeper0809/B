@@ -1145,6 +1145,13 @@ func parse_program(p) {
             vec_push(funcs, parse_func_decl(p));
         } else if (k == TOKEN_CONST) {
             vec_push(consts, parse_const_decl(p));
+        } else if (k == TOKEN_ENUM) {
+            // Enum을 여러 const로 변환
+            var enum_consts = parse_enum_def(p);
+            var num_enum_consts = vec_len(enum_consts);
+            for (var i = 0; i < num_enum_consts; i++) {
+                vec_push(consts, vec_get(enum_consts, i));
+            }
         } else if (k == TOKEN_STRUCT) {
             var struct_def = parse_struct_def(p);
             vec_push(structs, struct_def);
@@ -1228,6 +1235,80 @@ func parse_struct_def(p) {
         *(field_desc + 40) = field_ptr_depth;
         
         vec_push(fields, field_desc);
+    }
+    
+    parse_consume(p, TOKEN_RBRACE);
+    
+    var struct_def = ast_struct_def(name_ptr, name_len, fields);
+    return struct_def;
+}
+
+// ============================================
+// Enum Parsing
+// ============================================
+
+func parse_enum_def(p) {
+    parse_consume(p, TOKEN_ENUM);
+    
+    var enum_name_tok = parse_peek(p);
+    var enum_name_ptr = tok_ptr(enum_name_tok);
+    var enum_name_len = tok_len(enum_name_tok);
+    parse_consume(p, TOKEN_IDENTIFIER);
+    
+    parse_consume(p, TOKEN_LBRACE);
+    
+    var consts = vec_new(16);
+    var current_value = 0;
+    
+    while (parse_peek_kind(p) != TOKEN_RBRACE) {
+        if (parse_peek_kind(p) == TOKEN_EOF) { break; }
+        
+        var member_tok = parse_peek(p);
+        var member_ptr = tok_ptr(member_tok);
+        var member_len = tok_len(member_tok);
+        parse_consume(p, TOKEN_IDENTIFIER);
+        
+        // Check for explicit value
+        if (parse_match(p, TOKEN_EQ)) {
+            var val_tok = parse_peek(p);
+            parse_consume(p, TOKEN_NUMBER);
+            current_value = parse_num_val(val_tok);
+        }
+        
+        // Create EnumName_MemberName
+        var full_name = vec_new(64);
+        for (var i = 0; i < enum_name_len; i++) {
+            vec_push(full_name, *(*u8)(enum_name_ptr + i));
+        }
+        vec_push(full_name, 95);  // '_'
+        for (var i = 0; i < member_len; i++) {
+            vec_push(full_name, *(*u8)(member_ptr + i));
+        }
+        
+        // Copy to permanent heap storage
+        var full_name_len = vec_len(full_name);
+        var full_name_ptr = heap_alloc(full_name_len);
+        var full_name_buf = *(full_name);  // vec buf_ptr (array of i64)
+        for (var i = 0; i < full_name_len; i++) {
+            var ch = vec_get(full_name, i);  // Get i64 value
+            *(*u8)(full_name_ptr + i) = ch;  // Store as u8
+        }
+        
+        var const_node = ast_const_decl(full_name_ptr, full_name_len, current_value);
+        vec_push(consts, const_node);
+        
+        current_value = current_value + 1;
+        
+        // Optional comma
+        if (parse_peek_kind(p) == TOKEN_COMMA) {
+            parse_consume(p, TOKEN_COMMA);
+        }
+    }
+    
+    parse_consume(p, TOKEN_RBRACE);
+    
+    return consts;
+}
     }
     
     parse_consume(p, TOKEN_RBRACE);

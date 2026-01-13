@@ -1653,6 +1653,9 @@ func cg_stmt(node) {
         var end_label;
         end_label = new_label();
         
+        // Push end_label to g_loop_labels so that break works
+        vec_push(g_loop_labels, end_label);
+        
         var num_cases = vec_len(cases);
         var i = 0;
         while (i < num_cases) {
@@ -1688,6 +1691,10 @@ func cg_stmt(node) {
             
             i = i + 1;
         }
+        
+        // Pop end_label from g_loop_labels
+        var len = vec_len(g_loop_labels);
+        *(g_loop_labels + 8) = len - 1;
         
         emit("    add rsp, 8\n", 15);
         emit_label_def(end_label);

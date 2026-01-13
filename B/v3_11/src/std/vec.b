@@ -54,3 +54,7 @@ func vec_set(v, i, val) {
     var buf = *(v);
     *(buf + i * 8) = val;
 }
+
+func vec_data(v) {
+    return *(v);
+}
