@@ -18,6 +18,7 @@ var g_all_funcs;         // Vec of all function ASTs
 var g_all_consts;        // Vec of all const ASTs
 var g_all_globals;       // Vec of all global var info
 var g_all_structs;       // HashMap: struct_name -> struct_def
+var g_all_structs_vec;   // Vec of all struct_defs (for codegen)
 var g_base_dir;          // Base directory for imports
 var g_base_dir_len;
 var g_lib_dir;           // Library root directory for compiler/runtime modules
@@ -245,9 +246,13 @@ func register_struct_type(struct_def) {
     if (g_all_structs == 0) {
         g_all_structs = hashmap_new(64);
     }
+    if (g_all_structs_vec == 0) {
+        g_all_structs_vec = vec_new(16);
+    }
     var struct_name_ptr = *(struct_def + 8);
     var struct_name_len = *(struct_def + 16);
     hashmap_put(g_all_structs, struct_name_ptr, struct_name_len, struct_def);
+    vec_push(g_all_structs_vec, struct_def);
 }
 
 // ============================================
@@ -275,6 +280,7 @@ func main(argc, argv) {
     g_all_consts = vec_new(128);
     g_all_globals = vec_new(64);
     g_all_structs = hashmap_new(64);
+    g_all_structs_vec = vec_new(16);
 
     // Implicit standard library prelude (std/* available without explicit import)
     if (!load_std_prelude()) {
@@ -288,6 +294,7 @@ func main(argc, argv) {
     var dummy_imports = vec_new(1);
     var merged_prog = ast_program(g_all_funcs, g_all_consts, dummy_imports);
     *(merged_prog + 32) = g_all_globals;
+    *(merged_prog + 40) = g_all_structs_vec;
     
     cg_program(merged_prog);
     

@@ -19,7 +19,7 @@ var g_loop_continue_labels;  // Stack of loop continue labels
 var g_globals;        // Global variables list
 
 // Struct information (populated from prog+40 in cg_program)
-var g_structs;        // HashMap: struct_name -> struct_def (built in cg_program)
+var g_structs_vec;    // Vector of struct definitions (simpler than hashmap)
 // ============================================
 // Type Helpers
 // ============================================
@@ -112,9 +112,23 @@ func sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len) {
     
     // Struct type: sum of field sizes
     if (type_kind == TYPE_STRUCT) {
-        if (g_structs == 0) { return 8; }
+        if (g_structs_vec == 0) { return 8; }
         
-        var struct_def = hashmap_get(g_structs, struct_name_ptr, struct_name_len);
+        // Find struct by name
+        var num_structs = vec_len(g_structs_vec);
+        var struct_def = 0;
+        
+        for(var si = 0; si < num_structs; si++){
+            var candidate = vec_get(g_structs_vec, si);
+            var candidate_name_ptr = *(candidate + 8);
+            var candidate_name_len = *(candidate + 16);
+            
+            if (str_eq(candidate_name_ptr, candidate_name_len, struct_name_ptr, struct_name_len)) {
+                struct_def = candidate;
+                break;
+            }
+        }
+        
         if (struct_def == 0) { return 8; }
         
         var fields = *(struct_def + 24);
@@ -152,9 +166,10 @@ func symtab_add(s, name_ptr, name_len, type_kind, ptr_depth, size) {
     
     vec_push(offsets, offset);
     
-    var type_info = heap_alloc(16);
+    var type_info = heap_alloc(24);
     *(type_info) = type_kind;
     *(type_info + 8) = ptr_depth;
+    *(type_info + 16) = 0;  // struct_def pointer (filled later for TYPE_STRUCT)
     vec_push(types, type_info);
     
     *(s + 24) = count + 1;
@@ -573,6 +588,34 @@ func get_expr_type(node) {
 }
 
 // ============================================
+// Struct Helper Functions
+// ============================================
+
+// Get field offset in bytes from struct definition
+// Returns -1 if field not found
+func get_field_offset(struct_def, field_name_ptr, field_name_len) {
+    var fields = *(struct_def + 24);
+    var num_fields = vec_len(fields);
+    var offset = 0;
+    
+    for(var i = 0; i < num_fields; i++){
+        var field = vec_get(fields, i);
+        var fname_ptr = *(field);
+        var fname_len = *(field + 8);
+        
+        if (str_eq(fname_ptr, fname_len, field_name_ptr, field_name_len)) {
+            return offset;
+        }
+        
+        // For now, all fields are u64 (8 bytes)
+        // TODO: use field type to calculate proper size
+        offset = offset + 8;
+    }
+    
+    return 0;
+}
+
+// ============================================
 // Expression Codegen
 // ============================================
 
@@ -626,6 +669,54 @@ func cg_expr(node) {
         if (offset < 0) { emit_i64(offset); }
         else { emit("+", 1); emit_u64(offset); }
         emit("]\n", 2);
+        return;
+    }
+    
+    if (kind == AST_MEMBER_ACCESS) {
+        var object = *(node + 8);
+        var member_ptr = *(node + 16);
+        var member_len = *(node + 24);
+        
+        // Get object address (should be a struct variable)
+        var obj_kind = ast_kind(object);
+        if (obj_kind != AST_IDENT) {
+            emit_stderr("[ERROR] Member access on non-identifier\n", 41);
+            return;
+        }
+        
+        var obj_name_ptr = *(object + 8);
+        var obj_name_len = *(object + 16);
+        
+        // Get variable info from symtab
+        var var_offset = symtab_find(g_symtab, obj_name_ptr, obj_name_len);
+        var var_type = symtab_get_type(g_symtab, obj_name_ptr, obj_name_len);
+        var type_kind = *(var_type);
+        
+        if (type_kind != TYPE_STRUCT) {
+            emit_stderr("[ERROR] Member access on non-struct type\n", 42);
+            return;
+        }
+        
+        // Get struct_def directly from type_info
+        var struct_def = *(var_type + 16);
+        
+        if (struct_def == 0) {
+            emit_stderr("[ERROR] Struct definition not found in type_info\n", 52);
+            return;
+        }
+        
+        var field_offset = get_field_offset(struct_def, member_ptr, member_len);
+        
+        // Calculate address: lea rax, [rbp + var_offset - field_offset]
+        // Stack grows down, so higher field offsets mean lower addresses
+        emit("    lea rax, [rbp", 17);
+        var total_offset = var_offset - field_offset;
+        if (total_offset < 0) { emit_i64(total_offset); }
+        else { emit("+", 1); emit_u64(total_offset); }
+        emit("]\n", 2);
+        
+        // Load value from address
+        emit("    mov rax, [rax]\n", 19);
         return;
     }
     
@@ -895,6 +986,48 @@ func cg_lvalue(node) {
         cg_expr(operand);
         return;
     }
+    
+    if (kind == AST_MEMBER_ACCESS) {
+        var object = *(node + 8);
+        var member_ptr = *(node + 16);
+        var member_len = *(node + 24);
+        
+        // Get object address (should be a struct variable)
+        var obj_kind = ast_kind(object);
+        if (obj_kind != AST_IDENT) {
+            emit_stderr("[ERROR] Member access on non-identifier in lvalue\n", 51);
+            return;
+        }
+        
+        var obj_name_ptr = *(object + 8);
+        var obj_name_len = *(object + 16);
+        
+        // Get variable info from symtab
+        var var_offset = symtab_find(g_symtab, obj_name_ptr, obj_name_len);
+        var var_type = symtab_get_type(g_symtab, obj_name_ptr, obj_name_len);
+        
+        // Get struct_def directly from type_info
+        var struct_def = 0;
+        if (var_type != 0) {
+            struct_def = *(var_type + 16);
+        }
+        
+        if (struct_def == 0) {
+            emit_stderr("[ERROR] Struct definition not found in lvalue\n", 47);
+            return;
+        }
+        
+        var field_offset = get_field_offset(struct_def, member_ptr, member_len);
+        
+        // Calculate address: lea rax, [rbp + var_offset - field_offset]
+        // Stack grows down, so higher field offsets mean lower addresses
+        emit("    lea rax, [rbp", 17);
+        var total_offset = var_offset - field_offset;
+        if (total_offset < 0) { emit_i64(total_offset); }
+        else { emit("+", 1); emit_u64(total_offset); }
+        emit("]\n", 2);
+        return;
+    }
 }
 
 // ============================================
@@ -937,6 +1070,25 @@ func cg_stmt(node) {
         var size = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
         
         var offset = symtab_add(g_symtab, name_ptr, name_len, type_kind, ptr_depth, size);
+        
+        // If it's a struct type, find struct_def and store pointer in type_info
+        if (type_kind == TYPE_STRUCT) {
+            var struct_def = 0;
+            if (g_structs_vec != 0) {
+                var num_structs = vec_len(g_structs_vec);
+                for (var i = 0; i < num_structs; i++) {
+                    var sd = vec_get(g_structs_vec, i);
+                    var sname_ptr = *(sd + 8);
+                    var sname_len = *(sd + 16);
+                    if (str_eq(sname_ptr, sname_len, struct_name_ptr, struct_name_len)) {
+                        struct_def = sd;
+                        break;
+                    }
+                }
+            }
+            var type_info = symtab_get_type(g_symtab, name_ptr, name_len);
+            *(type_info + 16) = struct_def;
+        }
         
         if (init != 0) {
             if (type_kind != 0) {
@@ -1330,17 +1482,16 @@ func cg_program(prog) {
     g_loop_labels = vec_new(16);
     g_loop_continue_labels = vec_new(16);
     
-    // Build struct lookup table
-    g_structs = hashmap_new(64);
-    if (structs != 0) {
-        var num_structs = vec_len(structs);
-        for(var si = 0; si < num_structs; si++){
-            var struct_def = vec_get(structs, si);
-            var struct_name_ptr = *(struct_def + 8);
-            var struct_name_len = *(struct_def + 16);
-            hashmap_put(g_structs, struct_name_ptr, struct_name_len, struct_def);
-        }
-    }
+    // Store structs vector for lookup during codegen
+    g_structs_vec = structs;
+    
+    // emit_stderr("[DEBUG] cg_program: structs=", 29);
+    // emit_u64(structs);
+    // if (structs != 0) {
+    //     emit_stderr(", len=", 6);
+    //     emit_u64(vec_len(structs));
+    // }
+    // emit_nl();
     
     if (globals == 0) {
         g_globals = vec_new(32);
