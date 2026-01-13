@@ -100,17 +100,18 @@ func symtab_clear(s) {
 }
 
 func symtab_add(s, name_ptr, name_len, type_kind, ptr_depth) {
-    var names;
-    names = *(s);
-    var offsets;
-    offsets = *(s + 8);
-    var types;
-    types = *(s + 16);
-    var count;
-    count = *(s + 24);
+    // 중복 체크: 이미 같은 이름이 있으면 기존 offset 반환
+    var existing = symtab_find(s, name_ptr, name_len);
+    if (existing != 0) {
+        return existing;
+    }
     
-    var size;
-    size = 8;
+    var names = *(s);
+    var offsets = *(s + 8);
+    var types = *(s + 16);
+    var count = *(s + 24);
+    
+    var size = 8;
     
     var offset;
     offset = *(s + 32) - size;

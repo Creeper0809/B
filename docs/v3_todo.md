@@ -63,6 +63,20 @@
 - ✅ 테스트 38 (panic): `panic("msg")` 내장 함수 (stderr 출력 + exit(1))
 - ✅ 전역 심볼 테이블 HashMap 전환 (O(1) lookup)
 
+### v3_11 구조체 스위트 현황 (2026-01-13, 로컬)
+
+- [x] `.` 멤버 접근: 34_struct_member
+- [x] `->` 포인터 멤버 접근: 35_struct_arrow
+- [x] 중첩 멤버 접근: 36_struct_nested
+- [x] 다중 구조체 타입 선택: 37_struct_multiple
+- [x] 다중 변수/루프/스트레스: 39~42
+- [x] **함수 인자/호출 경계: 38_struct_function (Exit 42)**
+- [x] **struct literal: 43~49 (모두 Exit 42)**
+- [x] struct copy: 50~53, 55~58
+- [x] linkedlist 계열: 59~67
+
+**최신 테스트 결과 (2026-01-13)**: 69/69 PASS
+
 ---
 
 ## 부트스트랩 핫픽스 (v3.6 컴파일러)
@@ -125,6 +139,8 @@
 
 - [ ] v3.9 작업 목록: [docs/v3_9_todo.md](v3_9_todo.md)
 - [ ] `++/--` 표현식 컨텍스트 지원(값 반환): `i = j++`, `x = ++j`, `f(j++)`
+- [x] 선언+초기화 통합 리팩터링 기반 작업(보수적): var-init 타입 전파 수정 + self-host 검증 + 회귀 테스트 추가
+- [ ] 선언+초기화 통합 리팩터링(본작업): 파일 단위로 `var x; x = expr;` → `var x = expr;` 전환 지속 (std/hashmap.b 완료, parser.b 진행 중)
 
 ---
 ## 전제(Freeze 요약)
