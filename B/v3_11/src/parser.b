@@ -333,6 +333,29 @@ func parse_primary(p) {
         var tok = parse_peek(p);
         parse_adv(p);
         
+        // Check for struct literal: StructName { expr, expr, ... }
+        if (parse_peek_kind(p) == TOKEN_LBRACE) {
+            var name_ptr = tok_ptr(tok);
+            var name_len = tok_len(tok);
+            
+            // Look up struct type
+            if (is_struct_type(name_ptr, name_len) != 0) {
+                var struct_def = get_struct_def(name_ptr, name_len);
+                parse_adv(p);  // consume '{'
+                
+                var values = vec_new(8);
+                if (parse_peek_kind(p) != TOKEN_RBRACE) {
+                    vec_push(values, parse_expr(p));
+                    while (parse_match(p, TOKEN_COMMA)) {
+                        vec_push(values, parse_expr(p));
+                    }
+                }
+                parse_consume(p, TOKEN_RBRACE);
+                
+                return ast_struct_literal(struct_def, values);
+            }
+        }
+        
         if (parse_peek_kind(p) == TOKEN_LPAREN) {
             parse_adv(p);
             var args = vec_new(8);

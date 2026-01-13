@@ -541,6 +541,15 @@ func get_expr_type(node) {
         return 0;
     }
     
+    if (kind == AST_STRUCT_LITERAL) {
+        var struct_def = *(node + 8);
+        var result = heap_alloc(24);
+        *(result) = TYPE_STRUCT;
+        *(result + 8) = 0;  // ptr_depth = 0
+        *(result + 16) = struct_def;
+        return result;
+    }
+    
     if (kind == AST_BINARY) {
         var op = *(node + 8);
 
@@ -1102,6 +1111,12 @@ func cg_expr(node) {
         }
         return;
     }
+    
+    if (kind == AST_STRUCT_LITERAL) {
+        // Struct literals should only appear in var initializers (handled in cg_stmt)
+        emit("    xor eax, eax\n", 17);
+        return;
+    }
 }
 
 // ============================================
@@ -1327,6 +1342,42 @@ func cg_stmt(node) {
         }
         
         if (init != 0) {
+            var init_kind = ast_kind(init);
+            
+            // Handle struct literal initialization specially
+            if (init_kind == AST_STRUCT_LITERAL) {
+                var struct_def = *(init + 8);
+                var values = *(init + 16);
+                var num_values = vec_len(values);
+                var fields = *(struct_def + 24);
+                var num_fields = vec_len(fields);
+                
+                // Initialize each field
+                var field_offset = 0;
+                for (var i = 0; i < num_values; i++) {
+                    if (i < num_fields) {
+                        var field = vec_get(fields, i);
+                        var field_type = *(field + 16);
+                        var field_struct_name_ptr = *(field + 24);
+                        var field_struct_name_len = *(field + 32);
+                        var field_size = sizeof_type(field_type, 0, field_struct_name_ptr, field_struct_name_len);
+                        
+                        // Evaluate field value
+                        cg_expr(vec_get(values, i));
+                        
+                        // Store at variable offset + field offset
+                        emit("    mov [rbp", 12);
+                        var total_offset = offset + field_offset;
+                        if (total_offset < 0) { emit_i64(total_offset); }
+                        else { emit("+", 1); emit_u64(total_offset); }
+                        emit("], rax\n", 7);
+                        
+                        field_offset = field_offset + field_size;
+                    }
+                }
+                return;
+            }
+            
             if (type_kind != 0) {
                 var init_type = get_expr_type(init);
                 if (init_type != 0) {

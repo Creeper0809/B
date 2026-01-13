@@ -241,6 +241,12 @@ func is_struct_type(name_ptr, name_len) {
     return 1;
 }
 
+// Get struct definition by name
+func get_struct_def(name_ptr, name_len) {
+    if (g_all_structs == 0) { return 0; }
+    return hashmap_get(g_all_structs, name_ptr, name_len);
+}
+
 // Register a struct type during parsing
 func register_struct_type(struct_def) {
     if (g_all_structs == 0) {

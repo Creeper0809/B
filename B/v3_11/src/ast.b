@@ -283,6 +283,16 @@ func ast_member_access(object, member_ptr, member_len) {
     return n;
 }
 
+// AST_STRUCT_LITERAL: struct_def_ptr, values (vec of exprs)
+// Layout: [kind:8][struct_def:8][values:8]
+func ast_struct_literal(struct_def, values) {
+    var n = heap_alloc(24);
+    *(n) = AST_STRUCT_LITERAL;
+    *(n + 8) = struct_def;
+    *(n + 16) = values;
+    return n;
+}
+
 // ============================================
 // AST Accessors
 // ============================================

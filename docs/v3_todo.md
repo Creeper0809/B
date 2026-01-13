@@ -70,8 +70,12 @@
 - [x] 중첩 멤버 접근: 36_struct_nested
 - [x] 다중 구조체 타입 선택: 37_struct_multiple
 - [x] 다중 변수/루프/스트레스: 39~42
-- [ ] 함수 인자/호출 경계: 38_struct_function (컴파일러 세그폴트)
-- [ ] struct literal/copy/linkedlist 계열: 43~53, 55~57, 59~66 (컴파일러 세그폴트/컴파일 실패)
+- [x] **함수 인자/호출 경계: 38_struct_function (Exit 42)**
+- [x] **struct literal: 43~49 (모두 Exit 42)**
+- [ ] struct copy: 50~53, 55, 58 (일부 exit code 불일치, 56/57 컴파일 세그폴트)
+- [ ] linkedlist 계열: 59~67 (대부분 컴파일 세그폴트/컴파일 실패)
+
+**최신 테스트 결과 (2026-01-13 저녁)**: 55/69 PASS, 14 FAIL
 
 ---
 
