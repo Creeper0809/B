@@ -1472,71 +1472,50 @@ func cg_stmt(node) {
         }
         
         // Check if this is a struct-to-struct copy
-        if (target_kind == AST_IDENT) {
-            var name_ptr = *(target + 8);
-            var name_len = *(target + 16);
-            var target_type = symtab_get_type(g_symtab, name_ptr, name_len);
+        // Get target type to determine if struct copy is needed
+        var target_type = get_expr_type(target);
+        if (target_type != 0) {
+            var tt_base = *(target_type);
+            var tt_depth = *(target_type + 8);
             
-            if (target_type != 0) {
-                var tt_base = *(target_type);
-                var tt_depth = *(target_type + 8);
-                
-                // If it's a direct struct (not pointer), copy all fields
-                if (tt_base == TYPE_STRUCT) {
-                    if (tt_depth == 0) {
-                        var struct_def = *(target_type + 16);
-                        if (struct_def != 0) {
-                            // Get struct name to calculate size
-                            var struct_name_ptr = *(struct_def + 8);
-                            var struct_name_len = *(struct_def + 16);
-                            var struct_size = sizeof_type(TYPE_STRUCT, 0, struct_name_ptr, struct_name_len);
-                            
-                            // Multi-qword copy for structs
-                            // rax = dest address, rbx = src first qword (in value slot)
-                            // But we need source address! Value was evaluated as rvalue
-                            // Need to get source address instead
-                            
-                            // Pop the value back and get source address
-                            emit("    mov rbx, rax  ; dest addr\n", 30);
-                            
-                            // Re-evaluate value as lvalue to get source address
-                            var value_kind = ast_kind(value);
-                            if (value_kind == AST_IDENT) {
-                                var val_name_ptr = *(value + 8);
-                                var val_name_len = *(value + 16);
-                                
-                                if (is_global_var(val_name_ptr, val_name_len)) {
-                                    emit("    lea rax, [rel _gvar_", 24);
-                                    emit(val_name_ptr, val_name_len);
-                                    emit("]\n", 2);
-                                } else {
-                                    var val_offset = symtab_find(g_symtab, val_name_ptr, val_name_len);
-                                    emit("    lea rax, [rbp", 17);
-                                    if (val_offset < 0) { emit_i64(val_offset); }
-                                    else { emit("+", 1); emit_u64(val_offset); }
-                                    emit("]\n", 2);
-                                }
-                                
-                                // Copy struct_size bytes (8 bytes at a time)
-                                var offset = 0;
-                                while (offset < struct_size) {
-                                    emit("    mov rcx, [rax", 17);
-                                    if (offset > 0) {
-                                        emit("+", 1);
-                                        emit_u64(offset);
-                                    }
-                                    emit("]\n", 2);
-                                    emit("    mov [rbx", 12);
-                                    if (offset > 0) {
-                                        emit("+", 1);
-                                        emit_u64(offset);
-                                    }
-                                    emit("], rcx\n", 7);
-                                    offset = offset + 8;
-                                }
-                                return;
+            // If it's a direct struct (not pointer), do multi-qword copy
+            if (tt_base == TYPE_STRUCT) {
+                if (tt_depth == 0) {
+                    var struct_def = *(target_type + 16);
+                    if (struct_def != 0) {
+                        // Get struct name to calculate size
+                        var struct_name_ptr = *(struct_def + 8);
+                        var struct_name_len = *(struct_def + 16);
+                        var struct_size = sizeof_type(TYPE_STRUCT, 0, struct_name_ptr, struct_name_len);
+                        
+                        // rax = dest address (already computed by cg_lvalue)
+                        // rbx = value (popped from stack, but we need lvalue!)
+                        // Save dest address
+                        emit("    mov r8, rax  ; save dest addr\n", 34);
+                        
+                        // Get source address by evaluating value as lvalue
+                        emit("    pop rbx  ; discard rvalue\n", 30);
+                        cg_lvalue(value);
+                        
+                        // Now: rax = source address, r8 = dest address
+                        // Copy struct_size bytes (8 bytes at a time)
+                        var offset = 0;
+                        while (offset < struct_size) {
+                            emit("    mov rcx, [rax", 17);
+                            if (offset > 0) {
+                                emit("+", 1);
+                                emit_u64(offset);
                             }
+                            emit("]\n", 2);
+                            emit("    mov [r8", 11);
+                            if (offset > 0) {
+                                emit("+", 1);
+                                emit_u64(offset);
+                            }
+                            emit("], rcx\n", 7);
+                            offset = offset + 8;
                         }
+                        return;
                     }
                 }
             }
