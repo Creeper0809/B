@@ -442,9 +442,10 @@ func get_expr_type(node) {
         var operand  = *(node + 8);
         var op_type = get_expr_type(operand);
         if (op_type != 0) {
-            var result = heap_alloc(16);
+            var result = heap_alloc(24);
             *(result) = *(op_type);
             *(result + 8) = *(op_type + 8) + 1;
+            *(result + 16) = *(op_type + 16);  // Copy struct_def
             return result;
         }
     }
@@ -455,9 +456,10 @@ func get_expr_type(node) {
         if (op_type != 0) {
             var depth = *(op_type + 8);
             if (depth > 0) {
-                var result = heap_alloc(16);
+                var result = heap_alloc(24);
                 *(result) = *(op_type);
                 *(result + 8) = depth - 1;
+                *(result + 16) = *(op_type + 16);  // Copy struct_def
                 return result;
             }
         }
@@ -677,8 +679,52 @@ func cg_expr(node) {
         var member_ptr = *(node + 16);
         var member_len = *(node + 24);
         
-        // Get object address (should be a struct variable)
         var obj_kind = ast_kind(object);
+        
+        // Handle ptr->field (object is AST_DEREF)
+        if (obj_kind == AST_DEREF) {
+            var ptr_expr = *(object + 8);
+            
+            // Evaluate pointer expression to get pointer value
+            cg_expr(ptr_expr);
+            emit("    push rax\n", 13);
+            
+            // Get pointer type to find struct_def
+            var ptr_type = get_expr_type(ptr_expr);
+            if (ptr_type == 0) {
+                emit_stderr("[ERROR] Cannot determine pointer type in arrow operator\n", 57);
+                return;
+            }
+            
+            var base_type = *(ptr_type);
+            var ptr_depth = *(ptr_type + 8);
+            
+            if (ptr_depth == 0 || base_type != TYPE_STRUCT) {
+                emit_stderr("[ERROR] Arrow operator requires pointer to struct\n", 51);
+                return;
+            }
+            
+            // Get struct_def from pointer's base type
+            var struct_def = *(ptr_type + 16);
+            if (struct_def == 0) {
+                emit_stderr("[ERROR] Struct definition not found for pointer type\n", 54);
+                return;
+            }
+            
+            var field_offset = get_field_offset(struct_def, member_ptr, member_len);
+            
+            // Pop pointer value, add field offset, and load value
+            emit("    pop rax\n", 12);
+            if (field_offset > 0) {
+                emit("    add rax, ", 13);
+                emit_u64(field_offset);
+                emit("\n", 1);
+            }
+            emit("    mov rax, [rax]\n", 19);
+            return;
+        }
+        
+        // Handle obj.field (object is AST_IDENT)
         if (obj_kind != AST_IDENT) {
             emit_stderr("[ERROR] Member access on non-identifier\n", 41);
             return;
@@ -707,10 +753,9 @@ func cg_expr(node) {
         
         var field_offset = get_field_offset(struct_def, member_ptr, member_len);
         
-        // Calculate address: lea rax, [rbp + var_offset - field_offset]
-        // Stack grows down, so higher field offsets mean lower addresses
+        // Calculate address: lea rax, [rbp + var_offset + field_offset]
         emit("    lea rax, [rbp", 17);
-        var total_offset = var_offset - field_offset;
+        var total_offset = var_offset + field_offset;
         if (total_offset < 0) { emit_i64(total_offset); }
         else { emit("+", 1); emit_u64(total_offset); }
         emit("]\n", 2);
@@ -992,8 +1037,51 @@ func cg_lvalue(node) {
         var member_ptr = *(node + 16);
         var member_len = *(node + 24);
         
-        // Get object address (should be a struct variable)
         var obj_kind = ast_kind(object);
+        
+        // Handle ptr->field (object is AST_DEREF)
+        if (obj_kind == AST_DEREF) {
+            var ptr_expr = *(object + 8);
+            
+            // Evaluate pointer expression to get pointer value
+            cg_expr(ptr_expr);
+            emit("    push rax\n", 13);
+            
+            // Get pointer type to find struct_def
+            var ptr_type = get_expr_type(ptr_expr);
+            if (ptr_type == 0) {
+                emit_stderr("[ERROR] Cannot determine pointer type in arrow operator\n", 57);
+                return;
+            }
+            
+            var base_type = *(ptr_type);
+            var ptr_depth = *(ptr_type + 8);
+            
+            if (ptr_depth == 0 || base_type != TYPE_STRUCT) {
+                emit_stderr("[ERROR] Arrow operator requires pointer to struct\n", 51);
+                return;
+            }
+            
+            // Get struct_def from pointer's base type
+            var struct_def = *(ptr_type + 16);
+            if (struct_def == 0) {
+                emit_stderr("[ERROR] Struct definition not found for pointer type\n", 54);
+                return;
+            }
+            
+            var field_offset = get_field_offset(struct_def, member_ptr, member_len);
+            
+            // Pop pointer value and add field offset
+            emit("    pop rax\n", 12);
+            if (field_offset > 0) {
+                emit("    add rax, ", 13);
+                emit_u64(field_offset);
+                emit("\n", 1);
+            }
+            return;
+        }
+        
+        // Handle obj.field (object is AST_IDENT)
         if (obj_kind != AST_IDENT) {
             emit_stderr("[ERROR] Member access on non-identifier in lvalue\n", 51);
             return;
@@ -1019,10 +1107,9 @@ func cg_lvalue(node) {
         
         var field_offset = get_field_offset(struct_def, member_ptr, member_len);
         
-        // Calculate address: lea rax, [rbp + var_offset - field_offset]
-        // Stack grows down, so higher field offsets mean lower addresses
+        // Calculate address: lea rax, [rbp + var_offset + field_offset]
         emit("    lea rax, [rbp", 17);
-        var total_offset = var_offset - field_offset;
+        var total_offset = var_offset + field_offset;
         if (total_offset < 0) { emit_i64(total_offset); }
         else { emit("+", 1); emit_u64(total_offset); }
         emit("]\n", 2);
@@ -1071,7 +1158,8 @@ func cg_stmt(node) {
         
         var offset = symtab_add(g_symtab, name_ptr, name_len, type_kind, ptr_depth, size);
         
-        // If it's a struct type, find struct_def and store pointer in type_info
+        // If base type is struct, find struct_def and store pointer in type_info
+        // This applies to both direct structs and pointers to structs
         if (type_kind == TYPE_STRUCT) {
             var struct_def = 0;
             if (g_structs_vec != 0) {

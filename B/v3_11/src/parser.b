@@ -330,6 +330,13 @@ func parse_postfix(p) {
             var field_tok = parse_peek(p);
             parse_consume(p, TOKEN_IDENTIFIER);
             left = ast_member_access(left, tok_ptr(field_tok), tok_len(field_tok));
+        } else if (k == TOKEN_ARROW) {
+            parse_adv(p);
+            var field_tok = parse_peek(p);
+            parse_consume(p, TOKEN_IDENTIFIER);
+            // ptr->field = (*ptr).field
+            var deref = ast_deref(left);
+            left = ast_member_access(deref, tok_ptr(field_tok), tok_len(field_tok));
         } else {
             break;
         }
@@ -597,17 +604,16 @@ func parse_var_decl(p) {
         type_kind = *(ty);
         ptr_depth = *(ty + 8);
         
-        // If TYPE_STRUCT and no pointer, get the struct name from previous token
+        // If TYPE_STRUCT, get the struct name from previous token
+        // This applies to both direct structs and pointers to structs
         if (type_kind == TYPE_STRUCT) {
-            if (ptr_depth == 0) {
-                var tok_vec = *(p);
-                var prev_idx = *(p + 8) - 1;
-                if (prev_idx >= 0) {
-                    if (prev_idx < vec_len(tok_vec)) {
-                        var prev_tok = vec_get(tok_vec, prev_idx);
-                        struct_name_ptr = tok_ptr(prev_tok);
-                        struct_name_len = tok_len(prev_tok);
-                    }
+            var tok_vec = *(p);
+            var prev_idx = *(p + 8) - 1;
+            if (prev_idx >= 0) {
+                if (prev_idx < vec_len(tok_vec)) {
+                    var prev_tok = vec_get(tok_vec, prev_idx);
+                    struct_name_ptr = tok_ptr(prev_tok);
+                    struct_name_len = tok_len(prev_tok);
                 }
             }
         }
