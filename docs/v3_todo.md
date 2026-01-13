@@ -63,6 +63,16 @@
 - ✅ 테스트 38 (panic): `panic("msg")` 내장 함수 (stderr 출력 + exit(1))
 - ✅ 전역 심볼 테이블 HashMap 전환 (O(1) lookup)
 
+### v3_11 구조체 스위트 현황 (2026-01-13, 로컬)
+
+- [x] `.` 멤버 접근: 34_struct_member
+- [x] `->` 포인터 멤버 접근: 35_struct_arrow
+- [x] 중첩 멤버 접근: 36_struct_nested
+- [x] 다중 구조체 타입 선택: 37_struct_multiple
+- [x] 다중 변수/루프/스트레스: 39~42
+- [ ] 함수 인자/호출 경계: 38_struct_function (컴파일러 세그폴트)
+- [ ] struct literal/copy/linkedlist 계열: 43~53, 55~57, 59~66 (컴파일러 세그폴트/컴파일 실패)
+
 ---
 
 ## 부트스트랩 핫픽스 (v3.6 컴파일러)

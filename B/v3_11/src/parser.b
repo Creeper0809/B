@@ -1132,14 +1132,31 @@ func parse_struct_def(p) {
         parse_consume(p, TOKEN_COLON);
         
         var field_type = parse_type(p);
+        var field_type_kind = *(field_type);
+        var field_ptr_depth = *(field_type + 8);
+        
+        // If the field is a struct type, capture the struct name
+        var field_struct_name_ptr = 0;
+        var field_struct_name_len = 0;
+        if (field_type_kind == TYPE_STRUCT) {
+            var tok_vec = *(p);
+            var prev_idx = *(p + 8) - 1;
+            if (prev_idx >= 0 && prev_idx < vec_len(tok_vec)) {
+                var prev_tok = vec_get(tok_vec, prev_idx);
+                field_struct_name_ptr = tok_ptr(prev_tok);
+                field_struct_name_len = tok_len(prev_tok);
+            }
+        }
         
         parse_consume(p, TOKEN_SEMICOLON);
         
-        // field_desc = [name_ptr:8][name_len:8][type:8]
-        var field_desc = heap_alloc(24);
+        // field_desc = [name_ptr:8][name_len:8][type:8][struct_name_ptr:8][struct_name_len:8]
+        var field_desc = heap_alloc(40);
         *(field_desc) = field_name_ptr;
         *(field_desc + 8) = field_name_len;
-        *(field_desc + 16) = field_type;
+        *(field_desc + 16) = field_type_kind;
+        *(field_desc + 24) = field_struct_name_ptr;
+        *(field_desc + 32) = field_struct_name_len;
         
         vec_push(fields, field_desc);
     }

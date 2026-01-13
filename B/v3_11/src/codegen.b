@@ -138,9 +138,12 @@ func sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len) {
         for(var i = 0; i < num_fields; i++){
             var field = vec_get(fields, i);
             var field_type = *(field + 16);
-            // For now, assume all fields are u64 (8 bytes)
-            // TODO: recursive sizeof_type for field types
-            total_size = total_size + 8;
+            var field_struct_name_ptr = *(field + 24);
+            var field_struct_name_len = *(field + 32);
+            
+            // Recursively calculate field size
+            var field_size = sizeof_type(field_type, 0, field_struct_name_ptr, field_struct_name_len);
+            total_size = total_size + field_size;
         }
         
         return total_size;
@@ -472,6 +475,72 @@ func get_expr_type(node) {
         return result;
     }
     
+    if (kind == AST_MEMBER_ACCESS) {
+        var object = *(node + 8);
+        var member_ptr = *(node + 16);
+        var member_len = *(node + 24);
+        
+        // Get the type of the object
+        var obj_type = get_expr_type(object);
+        if (obj_type == 0) { return 0; }
+        
+        var base_type = *(obj_type);
+        var ptr_depth = *(obj_type + 8);
+        
+        // Handle ptr->field (dereference pointer first)
+        if (ptr_depth > 0) {
+            ptr_depth = ptr_depth - 1;
+        }
+        
+        if (base_type != TYPE_STRUCT) { return 0; }
+        
+        var struct_def = *(obj_type + 16);
+        if (struct_def == 0) { return 0; }
+        
+        // Find the field in the struct
+        var fields = *(struct_def + 24);
+        var num_fields = vec_len(fields);
+        
+        for (var i = 0; i < num_fields; i++) {
+            var field = vec_get(fields, i);
+            var fname_ptr = *(field);
+            var fname_len = *(field + 8);
+            
+            if (str_eq(fname_ptr, fname_len, member_ptr, member_len)) {
+                var field_type = *(field + 16);
+                var field_struct_name_ptr = *(field + 24);
+                var field_struct_name_len = *(field + 32);
+                
+                // Return the field's type
+                var result = heap_alloc(24);
+                *(result) = field_type;
+                *(result + 8) = 0;  // Fields are not pointers (for now)
+                
+                // If field is a struct, find its struct_def
+                if (field_type == TYPE_STRUCT) {
+                    var field_struct_def = 0;
+                    if (g_structs_vec != 0) {
+                        var num_structs = vec_len(g_structs_vec);
+                        for (var j = 0; j < num_structs; j++) {
+                            var sd = vec_get(g_structs_vec, j);
+                            var sname_ptr = *(sd + 8);
+                            var sname_len = *(sd + 16);
+                            if (str_eq(sname_ptr, sname_len, field_struct_name_ptr, field_struct_name_len)) {
+                                field_struct_def = sd;
+                                break;
+                            }
+                        }
+                    }
+                    *(result + 16) = field_struct_def;
+                }
+                
+                return result;
+            }
+        }
+        
+        return 0;
+    }
+    
     if (kind == AST_BINARY) {
         var op = *(node + 8);
 
@@ -609,9 +678,13 @@ func get_field_offset(struct_def, field_name_ptr, field_name_len) {
             return offset;
         }
         
-        // For now, all fields are u64 (8 bytes)
-        // TODO: use field type to calculate proper size
-        offset = offset + 8;
+        // Calculate field size based on type
+        var field_type = *(field + 16);
+        var field_struct_name_ptr = *(field + 24);
+        var field_struct_name_len = *(field + 32);
+        
+        var field_size = sizeof_type(field_type, 0, field_struct_name_ptr, field_struct_name_len);
+        offset = offset + field_size;
     }
     
     return 0;
@@ -714,6 +787,44 @@ func cg_expr(node) {
             var field_offset = get_field_offset(struct_def, member_ptr, member_len);
             
             // Pop pointer value, add field offset, and load value
+            emit("    pop rax\n", 12);
+            if (field_offset > 0) {
+                emit("    add rax, ", 13);
+                emit_u64(field_offset);
+                emit("\n", 1);
+            }
+            emit("    mov rax, [rax]\n", 19);
+            return;
+        }
+        
+        // Handle nested member access: outer.inner.field
+        if (obj_kind == AST_MEMBER_ACCESS) {
+            // Recursively get the address of the nested object
+            cg_lvalue(object);
+            emit("    push rax\n", 13);
+            
+            // Get the type of the nested object
+            var obj_type = get_expr_type(object);
+            if (obj_type == 0) {
+                emit_stderr("[ERROR] Cannot determine type of nested member access\n", 55);
+                return;
+            }
+            
+            var base_type = *(obj_type);
+            if (base_type != TYPE_STRUCT) {
+                emit_stderr("[ERROR] Nested member access on non-struct\n", 44);
+                return;
+            }
+            
+            var struct_def = *(obj_type + 16);
+            if (struct_def == 0) {
+                emit_stderr("[ERROR] Struct definition not found for nested access\n", 55);
+                return;
+            }
+            
+            var field_offset = get_field_offset(struct_def, member_ptr, member_len);
+            
+            // Pop base address and add field offset
             emit("    pop rax\n", 12);
             if (field_offset > 0) {
                 emit("    add rax, ", 13);
@@ -1072,6 +1183,43 @@ func cg_lvalue(node) {
             var field_offset = get_field_offset(struct_def, member_ptr, member_len);
             
             // Pop pointer value and add field offset
+            emit("    pop rax\n", 12);
+            if (field_offset > 0) {
+                emit("    add rax, ", 13);
+                emit_u64(field_offset);
+                emit("\n", 1);
+            }
+            return;
+        }
+        
+        // Handle nested member access: outer.inner.field (lvalue)
+        if (obj_kind == AST_MEMBER_ACCESS) {
+            // Recursively get the address of the nested object
+            cg_lvalue(object);
+            emit("    push rax\n", 13);
+            
+            // Get the type of the nested object
+            var obj_type = get_expr_type(object);
+            if (obj_type == 0) {
+                emit_stderr("[ERROR] Cannot determine type of nested member in lvalue\n", 58);
+                return;
+            }
+            
+            var base_type = *(obj_type);
+            if (base_type != TYPE_STRUCT) {
+                emit_stderr("[ERROR] Nested member access on non-struct in lvalue\n", 54);
+                return;
+            }
+            
+            var struct_def = *(obj_type + 16);
+            if (struct_def == 0) {
+                emit_stderr("[ERROR] Struct definition not found for nested lvalue\n", 55);
+                return;
+            }
+            
+            var field_offset = get_field_offset(struct_def, member_ptr, member_len);
+            
+            // Pop base address and add field offset
             emit("    pop rax\n", 12);
             if (field_offset > 0) {
                 emit("    add rax, ", 13);
