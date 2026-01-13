@@ -8,6 +8,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/../config.ini"
 
+# 프로젝트 루트로 이동 (B/v3_11/test -> B 루트)
+ROOT_DIR="$SCRIPT_DIR/../../.."
+cd "$ROOT_DIR"
+
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: config.ini not found at $CONFIG_FILE"
     exit 1
