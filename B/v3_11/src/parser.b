@@ -114,6 +114,44 @@ func parse_type(p) {
     return result;
 }
 
+// Extended type parsing that also captures struct type name.
+// Layout: [base:8][ptr_depth:8][struct_name_ptr:8][struct_name_len:8]
+func parse_type_ex(p) {
+    var depth = 0;
+    while (parse_match(p, TOKEN_STAR)) {
+        depth = depth + 1;
+    }
+
+    var base = 0;
+    var struct_name_ptr = 0;
+    var struct_name_len = 0;
+
+    var k = parse_peek_kind(p);
+    if (k == TOKEN_U8) { parse_adv(p); base = TYPE_U8; }
+    else if (k == TOKEN_U16) { parse_adv(p); base = TYPE_U16; }
+    else if (k == TOKEN_U32) { parse_adv(p); base = TYPE_U32; }
+    else if (k == TOKEN_U64) { parse_adv(p); base = TYPE_U64; }
+    else if (k == TOKEN_I64) { parse_adv(p); base = TYPE_I64; }
+    else if (k == TOKEN_IDENTIFIER) {
+        var tok = parse_peek(p);
+        var name_ptr = tok_ptr(tok);
+        var name_len = tok_len(tok);
+        if (is_struct_type(name_ptr, name_len) != 0) {
+            parse_adv(p);
+            base = TYPE_STRUCT;
+            struct_name_ptr = name_ptr;
+            struct_name_len = name_len;
+        }
+    }
+
+    var result = heap_alloc(32);
+    *(result) = base;
+    *(result + 8) = depth;
+    *(result + 16) = struct_name_ptr;
+    *(result + 24) = struct_name_len;
+    return result;
+}
+
 // ============================================
 // Expression Parsing
 // ============================================
@@ -1012,18 +1050,25 @@ func parse_param(p) {
     
     var type_kind = 0;
     var ptr_depth = 0;
+    var struct_name_ptr = 0;
+    var struct_name_len = 0;
     
     if (parse_match(p, TOKEN_COLON)) {
-        var ty = parse_type(p);
+        var ty = parse_type_ex(p);
         type_kind = *(ty);
         ptr_depth = *(ty + 8);
+        struct_name_ptr = *(ty + 16);
+        struct_name_len = *(ty + 24);
     }
     
-    var param = heap_alloc(32);
+    // Layout: [name_ptr:8][name_len:8][type_kind:8][ptr_depth:8][struct_name_ptr:8][struct_name_len:8]
+    var param = heap_alloc(48);
     *(param) = tok_ptr(name_tok);
     *(param + 8) = tok_len(name_tok);
     *(param + 16) = type_kind;
     *(param + 24) = ptr_depth;
+    *(param + 32) = struct_name_ptr;
+    *(param + 40) = struct_name_len;
     return param;
 }
 

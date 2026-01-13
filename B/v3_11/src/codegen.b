@@ -1335,7 +1335,7 @@ func cg_stmt(node) {
                     
                     var compat = check_type_compat(it_base, it_depth, type_kind, ptr_depth);
                     if (compat == 1) {
-                        warn("implicit type conversion in initialization", 43);
+                        // warn("implicit type conversion in initialization", 43);
                     }
                 }
             }
@@ -1370,7 +1370,7 @@ func cg_stmt(node) {
                     
                     var compat = check_type_compat(vt_base, vt_depth, tt_base, tt_depth);
                     if (compat == 1) {
-                        warn("implicit type conversion in assignment", 39);
+                        // warn("implicit type conversion in assignment", 39);
                     }
                     
                     if (vt_depth > 0) {
@@ -1672,6 +1672,8 @@ func cg_func(node) {
         var plen = *(param + 8);
         var ptype = *(param + 16);
         var pdepth  = *(param + 24);
+        var pstruct_name_ptr = *(param + 32);
+        var pstruct_name_len = *(param + 40);
         
         var names  = *(g_symtab);
         var offsets = *(g_symtab + 8);
@@ -1684,9 +1686,32 @@ func cg_func(node) {
         
         vec_push(offsets, 16 + i * 8);
         
-        var type_info = heap_alloc(16);
+        var type_info = heap_alloc(24);
         *(type_info) = ptype;
         *(type_info + 8) = pdepth;
+        *(type_info + 16) = 0;
+
+        // If this is a struct (including *Struct), resolve its struct_def now.
+        if (ptype == TYPE_STRUCT) {
+            if (g_structs_vec != 0) {
+                if (pstruct_name_ptr != 0) {
+                    var num_structs = vec_len(g_structs_vec);
+                    var si = 0;
+                    while (si < num_structs) {
+                        var sd = vec_get(g_structs_vec, si);
+                        var sname_ptr = *(sd + 8);
+                        var sname_len = *(sd + 16);
+                        if (sname_len == pstruct_name_len) {
+                            if (str_eq(sname_ptr, sname_len, pstruct_name_ptr, pstruct_name_len) != 0) {
+                                *(type_info + 16) = sd;
+                                break;
+                            }
+                        }
+                        si = si + 1;
+                    }
+                }
+            }
+        }
         vec_push(types, type_info);
         
         *(g_symtab + 24) = *(g_symtab + 24) + 1;
