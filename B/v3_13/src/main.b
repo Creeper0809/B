@@ -63,6 +63,63 @@ func read_entire_file(path: u64) -> u64 {
 }
 
 // ============================================
+// Config File Parsing
+// ============================================
+
+// Simple line-by-line config parser
+func find_line_starting_with(content: u64, content_len: u64, prefix: u64, prefix_len: u64) -> u64 {
+    var i: u64 = 0;
+    
+    while (i < content_len) {
+        // Find start of current line
+        var line_start: u64 = i;
+        
+        // Find end of line
+        var line_end: u64 = i;
+        while (line_end < content_len) {
+            if (*(*u8)(content + line_end) == 10) { break; }
+            line_end = line_end + 1;
+        }
+        
+        var line_len: u64 = line_end - line_start;
+        
+        // Check if line starts with prefix
+        if (line_len >= prefix_len) {
+            if (str_eq(content + line_start, prefix_len, prefix, prefix_len)) {
+                // Found matching line, return pointer to start of value (after prefix)
+                var value_start: u64 = line_start + prefix_len;
+                var value_len: u64 = line_len - prefix_len;
+                
+                // Allocate and copy value
+                var value: u64 = heap_alloc(value_len + 1);
+                var j: u64 = 0;
+                while (j < value_len) {
+                    *(*u8)(value + j) = *(*u8)(content + value_start + j);
+                    j = j + 1;
+                }
+                *(*u8)(value + value_len) = 0;
+                return value;
+            }
+        }
+        
+        // Move to next line
+        i = line_end + 1;
+    }
+    
+    return 0;
+}
+
+// Read config.ini and extract VERSION value
+func read_version_from_config(config_path: u64) -> u64 {
+    var content: u64 = read_entire_file(config_path);
+    if (content == 0) {
+        return 0;
+    }
+    
+    return find_line_starting_with(content, g_file_len, "VERSION=", 8);
+}
+
+// ============================================
 // Module Loading
 // ============================================
 
@@ -281,8 +338,16 @@ func main(argc: u64, argv: u64) -> u64 {
     g_base_dir = path_dirname(filename, filename_len);
     g_base_dir_len = str_len(g_base_dir);
 
-    // Repo layout convention: compiler/runtime modules live under B/v3_10/src
-    g_lib_dir = "B/v3_13/src";
+    // Read version from config.ini
+    var version: u64 = read_version_from_config("B/v3_13/config.ini");
+    if (version == 0) {
+        version = "v3_13";  // Fallback to hardcoded default
+    }
+    
+    // Build lib_dir path: "B/{version}/src"
+    var b_prefix: u64 = "B/";
+    var src_suffix: u64 = "/src";
+    g_lib_dir = str_concat3(b_prefix, 2, version, str_len(version), src_suffix, 4);
     g_lib_dir_len = str_len(g_lib_dir);
     
     g_loaded_modules = hashmap_new(64);
