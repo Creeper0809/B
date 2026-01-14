@@ -20,6 +20,12 @@ var g_globals;        // Global variables list
 
 // Struct information (populated from prog+40 in cg_program)
 var g_structs_vec;    // Vector of struct definitions (simpler than hashmap)
+
+// Current function return type information (for struct return)
+var g_current_func_ret_type;
+var g_current_func_ret_ptr_depth;
+var g_current_func_ret_struct_name_ptr;
+var g_current_func_ret_struct_name_len;
 // ============================================
 // Type Helpers
 // ============================================
@@ -1302,8 +1308,49 @@ func cg_stmt(node) {
     
     if (kind == AST_RETURN) {
         var expr = *(node + 8);
-        if (expr != 0) { cg_expr(expr); }
-        else { emit("    xor eax, eax\n", 17); }
+        if (expr != 0) {
+            // Check if return type is struct (value, not pointer)
+            if (g_current_func_ret_type == TYPE_STRUCT) {
+                if (g_current_func_ret_ptr_depth == 0) {
+                    // Returning struct by value
+                    var expr_kind = ast_kind(expr);
+                    
+                    // Find struct size
+                    var struct_size = sizeof_type(g_current_func_ret_type, 0, g_current_func_ret_struct_name_ptr, g_current_func_ret_struct_name_len);
+                    
+                    // For simplicity, support up to 16 bytes (rax + rdx)
+                    if (struct_size > 16) {
+                        println("[ERROR] Struct return size > 16 bytes not supported");
+                        panic("Struct return too large");
+                    }
+                    
+                    // If expression is a function call, it already returns struct in rax/rdx
+                    if (expr_kind == AST_CALL) {
+                        cg_expr(expr);
+                        // rax and rdx already contain the struct value
+                    } else {
+                        // For other expressions (AST_IDENT, etc), get address and load
+                        cg_lvalue(expr);
+                        
+                        // rax now contains address of struct
+                        // Load struct content into rax (and rdx if needed)
+                        emit("    mov r10, rax\n", 17);   // Save struct address in r10
+                        emit("    mov rax, [r10]\n", 19); // Load first 8 bytes into rax
+                        if (struct_size > 8) {
+                            emit("    mov rdx, [r10+8]\n", 21); // Load next 8 bytes into rdx
+                        }
+                    }
+                } else {
+                    // Returning pointer to struct - normal case
+                    cg_expr(expr);
+                }
+            } else {
+                // Normal return (non-struct)
+                cg_expr(expr);
+            }
+        } else {
+            emit("    xor eax, eax\n", 17);
+        }
         emit("    mov rsp, rbp\n", 17);
         emit("    pop rbp\n", 12);
         emit("    ret\n", 8);
@@ -1396,10 +1443,32 @@ func cg_stmt(node) {
             }
             
             cg_expr(init);
-            emit("    mov [rbp", 12);
-            if (offset < 0) { emit_i64(offset); }
-            else { emit("+", 1); emit_u64(offset); }
-            emit("], rax\n", 7);
+            
+            // Check if initializing struct by value (e.g., var p: Point = Point_new(...))
+            if (type_kind == TYPE_STRUCT && ptr_depth == 0) {
+                // Struct returned in rax/rdx registers
+                // Store rax at offset, rdx at offset+8
+                emit("    mov [rbp", 12);
+                if (offset < 0) { emit_i64(offset); }
+                else { emit("+", 1); emit_u64(offset); }
+                emit("], rax\n", 7);
+                
+                // Check if struct is larger than 8 bytes
+                var struct_size = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+                if (struct_size > 8) {
+                    emit("    mov [rbp", 12);
+                    var offset2 = offset + 8;
+                    if (offset2 < 0) { emit_i64(offset2); }
+                    else { emit("+", 1); emit_u64(offset2); }
+                    emit("], rdx\n", 7);
+                }
+            } else {
+                // Normal case: single value in rax
+                emit("    mov [rbp", 12);
+                if (offset < 0) { emit_i64(offset); }
+                else { emit("+", 1); emit_u64(offset); }
+                emit("], rax\n", 7);
+            }
         }
         return;
     }
@@ -1765,7 +1834,20 @@ func cg_func(node) {
     var name_ptr = *(node + 8);
     var name_len = *(node + 16);
     var params = *(node + 24);
+    var ret_type = *(node + 32);
     var body = *(node + 40);
+    
+    // Check if this is an extended AST_FUNC node (72 bytes)
+    // If ret_ptr_depth field exists, read return type information
+    var ret_ptr_depth = *(node + 48);
+    var ret_struct_name_ptr = *(node + 56);
+    var ret_struct_name_len = *(node + 64);
+    
+    // Store return type information in global state for AST_RETURN to use
+    g_current_func_ret_type = ret_type;
+    g_current_func_ret_ptr_depth = ret_ptr_depth;
+    g_current_func_ret_struct_name_ptr = ret_struct_name_ptr;
+    g_current_func_ret_struct_name_len = ret_struct_name_len;
     
     symtab_clear(g_symtab);
     

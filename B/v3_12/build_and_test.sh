@@ -37,11 +37,14 @@ if [ -f "./bin/${BASE_COMPILER}" ]; then
     echo "   (${BASE_COMPILER} 사용)"
     ./bin/${BASE_COMPILER} ${SRC_FILE} > build/${VERSION}_stage0.asm
 elif [ -f "./bin/${PREV_VERSION}_stage1" ]; then
-    echo "   (${PREV_VERSION} 사용)"
+    echo "   (${PREV_VERSION}_stage1 사용)"
     ./bin/${PREV_VERSION}_stage1 ${SRC_FILE} > build/${VERSION}_stage0.asm
+elif [ -f "./bin/${PREV_VERSION}" ]; then
+    echo "   (${PREV_VERSION} 사용)"
+    ./bin/${PREV_VERSION} ${SRC_FILE} > build/${VERSION}_stage0.asm
 else
     echo "❌ 에러: 베이스 컴파일러를 찾을 수 없습니다."
-    echo "   ${BASE_COMPILER} 또는 ${PREV_VERSION}이 필요합니다."
+    echo "   ${BASE_COMPILER}, ${PREV_VERSION}_stage1 또는 ${PREV_VERSION}이 필요합니다."
     exit 1
 fi
 nasm -felf64 build/${VERSION}_stage0.asm -o build/${VERSION}_stage0.o

@@ -28,6 +28,7 @@ const TOKEN_TRUE = 35;
 const TOKEN_FALSE = 36;
 const TOKEN_STRUCT = 37;
 const TOKEN_ENUM = 38;
+const TOKEN_IMPL = 39;
 
 // Type keywords
 const TOKEN_U8 = 40;

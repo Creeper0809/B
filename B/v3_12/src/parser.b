@@ -1116,16 +1116,20 @@ func parse_func_decl(p) {
     
     var ret_type = TYPE_VOID;
     var ret_ptr_depth = 0;
+    var ret_struct_name_ptr = 0;
+    var ret_struct_name_len = 0;
     
     if (parse_match(p, TOKEN_ARROW)) {
-        var ty = parse_type(p);
+        var ty = parse_type_ex(p);
         ret_type = *(ty);
         ret_ptr_depth = *(ty + 8);
+        ret_struct_name_ptr = *(ty + 16);
+        ret_struct_name_len = *(ty + 24);
     }
     
     var body = parse_block(p);
     
-    return ast_func(tok_ptr(name_tok), tok_len(name_tok), params, ret_type, body);
+    return ast_func_ex(tok_ptr(name_tok), tok_len(name_tok), params, ret_type, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len, body);
 }
 
 // ============================================
@@ -1156,6 +1160,13 @@ func parse_program(p) {
             var struct_def = parse_struct_def(p);
             vec_push(structs, struct_def);
             register_struct_type(struct_def);  // Register immediately for type checking
+        } else if (k == TOKEN_IMPL) {
+            // impl 블록: 내부 함수들을 StructName_methodName으로 변환
+            var impl_funcs = parse_impl_block(p);
+            var num_impl_funcs = vec_len(impl_funcs);
+            for (var i = 0; i < num_impl_funcs; i++) {
+                vec_push(funcs, vec_get(impl_funcs, i));
+            }
         } else if (k == TOKEN_VAR) {
             parse_consume(p, TOKEN_VAR);
             var tok = parse_peek(p);
@@ -1308,6 +1319,68 @@ func parse_enum_def(p) {
     parse_consume(p, TOKEN_RBRACE);
     
     return consts;
+}
+
+// ============================================
+// Impl Block Parsing
+// ============================================
+
+func parse_impl_block(p) {
+    parse_consume(p, TOKEN_IMPL);
+    
+    // Get struct name
+    var struct_name_tok = parse_peek(p);
+    var struct_name_ptr = tok_ptr(struct_name_tok);
+    var struct_name_len = tok_len(struct_name_tok);
+    parse_consume(p, TOKEN_IDENTIFIER);
+    
+    parse_consume(p, TOKEN_LBRACE);
+    
+    var funcs = vec_new(8);
+    
+    // Parse all functions in impl block
+    while (parse_peek_kind(p) != TOKEN_RBRACE) {
+        if (parse_peek_kind(p) == TOKEN_EOF) { break; }
+        
+        if (parse_peek_kind(p) == TOKEN_FUNC) {
+            var func_node = parse_func_decl(p);
+            
+            // Rename function: methodName -> StructName_methodName
+            var original_name_ptr = *(func_node + 8);
+            var original_name_len = *(func_node + 16);
+            
+            // Create new name: StructName_methodName
+            var new_name = vec_new(64);
+            for (var i = 0; i < struct_name_len; i++) {
+                vec_push(new_name, *(*u8)(struct_name_ptr + i));
+            }
+            vec_push(new_name, 95);  // '_'
+            for (var i = 0; i < original_name_len; i++) {
+                vec_push(new_name, *(*u8)(original_name_ptr + i));
+            }
+            
+            // Copy to permanent heap storage
+            var new_name_len = vec_len(new_name);
+            var new_name_ptr = heap_alloc(new_name_len);
+            for (var i = 0; i < new_name_len; i++) {
+                var ch = vec_get(new_name, i);
+                *(*u8)(new_name_ptr + i) = ch;
+            }
+            
+            // Update function name
+            *(func_node + 8) = new_name_ptr;
+            *(func_node + 16) = new_name_len;
+            
+            vec_push(funcs, func_node);
+        } else {
+            emit_stderr("[ERROR] impl block can only contain functions\n", 48);
+            break;
+        }
+    }
+    
+    parse_consume(p, TOKEN_RBRACE);
+    
+    return funcs;
 }
     }
     
