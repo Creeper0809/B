@@ -257,10 +257,22 @@ func is_global_var(name_ptr, name_len) {
     var i = 0;
     while (i < len) {
         var ginfo = vec_get(g_globals, i);
-        var g_ptr = *(ginfo);
-        var g_len = *(ginfo + 8);
-        if (str_eq(g_ptr, g_len, name_ptr, name_len)) {
-            return 1;
+        var kind = *(ginfo);
+        
+        // Check for AST_STATIC_VAR_DECL
+        if (kind == AST_STATIC_VAR_DECL) {
+            var g_ptr = *(ginfo + 8);
+            var g_len = *(ginfo + 16);
+            if (str_eq(g_ptr, g_len, name_ptr, name_len)) {
+                return 2;  // Return 2 for static variables
+            }
+        } else {
+            // Regular global (old format: [name_ptr, name_len])
+            var g_ptr = *(ginfo);
+            var g_len = *(ginfo + 8);
+            if (str_eq(g_ptr, g_len, name_ptr, name_len)) {
+                return 1;
+            }
         }
         i = i + 1;
     }
@@ -358,12 +370,28 @@ func globals_emit_bss() {
     var i = 0;
     while (i < count) {
         var ginfo = vec_get(g_globals, i);
-        var name_ptr = *(ginfo);
-        var name_len  = *(ginfo + 8);
+        var kind = *(ginfo);
         
-        emit("_gvar_", 6);
-        emit(name_ptr, name_len);
-        emit(": resq 1\n", 9);
+        // Check if it's AST_STATIC_VAR_DECL
+        if (kind == AST_STATIC_VAR_DECL) {
+            // Static variable: emit as _static_StructName_varname
+            var name_ptr = *(ginfo + 8);
+            var name_len = *(ginfo + 16);
+            var type_kind = *(ginfo + 24);
+            var ptr_depth = *(ginfo + 32);
+            
+            emit("_static_", 8);
+            emit(name_ptr, name_len);
+            emit(": resq 1\n", 9);
+        } else {
+            // Regular global variable (old format): [name_ptr, name_len]
+            var name_ptr = *(ginfo);
+            var name_len  = *(ginfo + 8);
+            
+            emit("_gvar_", 6);
+            emit(name_ptr, name_len);
+            emit(": resq 1\n", 9);
+        }
         
         i = i + 1;
     }
@@ -749,7 +777,16 @@ func cg_expr(node) {
             return;
         }
         
-        if (is_global_var(name_ptr, name_len)) {
+        var gvar_kind = is_global_var(name_ptr, name_len);
+        if (gvar_kind == 2) {
+            // Static variable: use _static_ prefix
+            emit("    mov rax, [rel _static_", 26);
+            emit(name_ptr, name_len);
+            emit("]\n", 2);
+            return;
+        }
+        if (gvar_kind == 1) {
+            // Regular global variable: use _gvar_ prefix
             emit("    mov rax, [rel _gvar_", 24);
             emit(name_ptr, name_len);
             emit("]\n", 2);
@@ -1139,7 +1176,16 @@ func cg_lvalue(node) {
         var name_ptr = *(node + 8);
         var name_len = *(node + 16);
         
-        if (is_global_var(name_ptr, name_len)) {
+        var gvar_kind = is_global_var(name_ptr, name_len);
+        if (gvar_kind == 2) {
+            // Static variable
+            emit("    lea rax, [rel _static_", 26);
+            emit(name_ptr, name_len);
+            emit("]\n", 2);
+            return;
+        }
+        if (gvar_kind == 1) {
+            // Regular global variable
             emit("    lea rax, [rel _gvar_", 24);
             emit(name_ptr, name_len);
             emit("]\n", 2);

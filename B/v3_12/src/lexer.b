@@ -104,6 +104,7 @@ func lex_check_keyword(ptr, len) {
     if (str_eq(ptr, len, "struct", 6)) { return TOKEN_STRUCT; }
     if (str_eq(ptr, len, "enum", 4)) { return TOKEN_ENUM; }
     if (str_eq(ptr, len, "impl", 4)) { return TOKEN_IMPL; }
+    if (str_eq(ptr, len, "static", 6)) { return TOKEN_STATIC; }
     if (str_eq(ptr, len, "while", 5)) { return TOKEN_WHILE; }
     if (str_eq(ptr, len, "for", 3)) { return TOKEN_FOR; }
     if (str_eq(ptr, len, "switch", 6)) { return TOKEN_SWITCH; }

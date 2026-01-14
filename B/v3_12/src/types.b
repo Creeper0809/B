@@ -29,13 +29,14 @@ const TOKEN_FALSE = 36;
 const TOKEN_STRUCT = 37;
 const TOKEN_ENUM = 38;
 const TOKEN_IMPL = 39;
+const TOKEN_STATIC = 40;
 
 // Type keywords
-const TOKEN_U8 = 40;
-const TOKEN_U16 = 41;
-const TOKEN_U32 = 42;
-const TOKEN_U64 = 43;
-const TOKEN_I64 = 44;
+const TOKEN_U8 = 45;
+const TOKEN_U16 = 46;
+const TOKEN_U32 = 47;
+const TOKEN_U64 = 48;
+const TOKEN_I64 = 49;
 
 // Delimiters
 const TOKEN_LPAREN = 100;
@@ -96,6 +97,7 @@ const AST_STRUCT_LITERAL = 111;
 const AST_RETURN = 200;
 const AST_VAR_DECL = 201;
 const AST_CONST_DECL = 206;
+const AST_STATIC_VAR_DECL = 214;
 const AST_ASSIGN = 202;
 const AST_EXPR_STMT = 203;
 const AST_IF = 204;

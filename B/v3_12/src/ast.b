@@ -132,6 +132,21 @@ func ast_const_decl(name_ptr, name_len, value) {
     return n;
 }
 
+// AST_STATIC_VAR_DECL: [kind, name_ptr, name_len, type_kind, ptr_depth, init_expr, struct_name_ptr, struct_name_len]
+// Static variables go to .data/.bss section
+func ast_static_var_decl(name_ptr, name_len, type_kind, ptr_depth, init) {
+    var n = heap_alloc(64);
+    *(n) = AST_STATIC_VAR_DECL;
+    *(n + 8) = name_ptr;
+    *(n + 16) = name_len;
+    *(n + 24) = type_kind;
+    *(n + 32) = ptr_depth;
+    *(n + 40) = init;
+    *(n + 48) = 0;  // struct_name_ptr (will be set if TYPE_STRUCT)
+    *(n + 56) = 0;  // struct_name_len
+    return n;
+}
+
 // AST_ASSIGN: [kind, target, value]
 func ast_assign(target, value) {
     var n = heap_alloc(24);

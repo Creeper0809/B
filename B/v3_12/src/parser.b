@@ -390,7 +390,79 @@ func parse_postfix(p) {
             parse_adv(p);
             var field_tok = parse_peek(p);
             parse_consume(p, TOKEN_IDENTIFIER);
-            left = ast_member_access(left, tok_ptr(field_tok), tok_len(field_tok));
+            
+            var left_kind = ast_kind(left);
+            
+            // Check if left is AST_IDENT and is a struct type name
+            if (left_kind == AST_IDENT) {
+                var type_name_ptr = *(left + 8);
+                var type_name_len = *(left + 16);
+                
+                // Only treat as static access if it's actually a struct type
+                if (is_struct_type(type_name_ptr, type_name_len) != 0) {
+                    var member_name_ptr = tok_ptr(field_tok);
+                    var member_name_len = tok_len(field_tok);
+                    
+                    // Check if this is a static method call: Type.method()
+                    if (parse_peek_kind(p) == TOKEN_LPAREN) {
+                        // Create combined name: TypeName_methodName
+                        var combined_name = vec_new(64);
+                        for (var i = 0; i < type_name_len; i++) {
+                            vec_push(combined_name, *(*u8)(type_name_ptr + i));
+                        }
+                        vec_push(combined_name, 95);  // '_'
+                        for (var i = 0; i < member_name_len; i++) {
+                            vec_push(combined_name, *(*u8)(member_name_ptr + i));
+                        }
+                        
+                        // Copy to heap
+                        var combined_len = vec_len(combined_name);
+                        var combined_ptr = heap_alloc(combined_len);
+                        for (var i = 0; i < combined_len; i++) {
+                            *(*u8)(combined_ptr + i) = vec_get(combined_name, i);
+                        }
+                        
+                        // Parse function call
+                        parse_adv(p);  // consume '('
+                        var args = vec_new(8);
+                        if (parse_peek_kind(p) != TOKEN_RPAREN) {
+                            vec_push(args, parse_expr(p));
+                            while (parse_match(p, TOKEN_COMMA)) {
+                                vec_push(args, parse_expr(p));
+                            }
+                        }
+                        parse_consume(p, TOKEN_RPAREN);
+                        return ast_call(combined_ptr, combined_len, args);
+                    } else {
+                        // Type.field - static variable access
+                        // Convert Type.field to Type_field identifier
+                        var combined_name = vec_new(64);
+                        for (var i = 0; i < type_name_len; i++) {
+                            vec_push(combined_name, *(*u8)(type_name_ptr + i));
+                        }
+                        vec_push(combined_name, 95);  // '_'
+                        for (var i = 0; i < member_name_len; i++) {
+                            vec_push(combined_name, *(*u8)(member_name_ptr + i));
+                        }
+                        
+                        // Copy to heap
+                        var combined_len = vec_len(combined_name);
+                        var combined_ptr = heap_alloc(combined_len);
+                        for (var i = 0; i < combined_len; i++) {
+                            *(*u8)(combined_ptr + i) = vec_get(combined_name, i);
+                        }
+                        
+                        // Return as identifier (static variable)
+                        left = ast_ident(combined_ptr, combined_len);
+                    }
+                } else {
+                    // Not a struct type, treat as regular member access
+                    left = ast_member_access(left, tok_ptr(field_tok), tok_len(field_tok));
+                }
+            } else {
+                // left is not an identifier, treat as instance member access
+                left = ast_member_access(left, tok_ptr(field_tok), tok_len(field_tok));
+            }
         } else if (k == TOKEN_ARROW) {
             parse_adv(p);
             var field_tok = parse_peek(p);
@@ -691,6 +763,72 @@ func parse_var_decl(p) {
     var decl = ast_var_decl(tok_ptr(name_tok), tok_len(name_tok), type_kind, ptr_depth, init);
     *(decl + 48) = struct_name_ptr;
     *(decl + 56) = struct_name_len;
+    return decl;
+}
+
+// parse_static_var_decl: Parse static variable declaration in impl blocks
+// static variables are prefixed with StructName_
+// Note: 'static' token is already consumed by caller
+func parse_static_var_decl(p, struct_name_ptr, struct_name_len) {
+    parse_consume(p, TOKEN_VAR);
+    
+    var name_tok = parse_peek(p);
+    var original_name_ptr = tok_ptr(name_tok);
+    var original_name_len = tok_len(name_tok);
+    parse_consume(p, TOKEN_IDENTIFIER);
+    
+    var type_kind = TYPE_I64;
+    var ptr_depth = 0;
+    var decl_struct_name_ptr = 0;
+    var decl_struct_name_len = 0;
+    
+    if (parse_match(p, TOKEN_COLON)) {
+        var ty = parse_type(p);
+        type_kind = *(ty);
+        ptr_depth = *(ty + 8);
+        
+        // If TYPE_STRUCT, get the struct name
+        if (type_kind == TYPE_STRUCT) {
+            var tok_vec = *(p);
+            var prev_idx = *(p + 8) - 1;
+            if (prev_idx >= 0) {
+                if (prev_idx < vec_len(tok_vec)) {
+                    var prev_tok = vec_get(tok_vec, prev_idx);
+                    decl_struct_name_ptr = tok_ptr(prev_tok);
+                    decl_struct_name_len = tok_len(prev_tok);
+                }
+            }
+        }
+    }
+    
+    var init = 0;
+    if (parse_match(p, TOKEN_EQ)) {
+        init = parse_expr(p);
+    }
+    
+    parse_consume(p, TOKEN_SEMICOLON);
+    
+    // Create prefixed name: StructName_varname
+    var new_name = vec_new(64);
+    for (var i = 0; i < struct_name_len; i++) {
+        vec_push(new_name, *(*u8)(struct_name_ptr + i));
+    }
+    vec_push(new_name, 95);  // '_'
+    for (var i = 0; i < original_name_len; i++) {
+        vec_push(new_name, *(*u8)(original_name_ptr + i));
+    }
+    
+    // Copy to permanent heap storage
+    var new_name_len = vec_len(new_name);
+    var new_name_ptr = heap_alloc(new_name_len);
+    for (var i = 0; i < new_name_len; i++) {
+        var ch = vec_get(new_name, i);
+        *(*u8)(new_name_ptr + i) = ch;
+    }
+    
+    var decl = ast_static_var_decl(new_name_ptr, new_name_len, type_kind, ptr_depth, init);
+    *(decl + 48) = decl_struct_name_ptr;
+    *(decl + 56) = decl_struct_name_len;
     return decl;
 }
 
@@ -1161,11 +1299,21 @@ func parse_program(p) {
             vec_push(structs, struct_def);
             register_struct_type(struct_def);  // Register immediately for type checking
         } else if (k == TOKEN_IMPL) {
-            // impl 블록: 내부 함수들을 StructName_methodName으로 변환
-            var impl_funcs = parse_impl_block(p);
+            // impl 블록: 내부 함수들과 static 변수들을 처리
+            var impl_result = parse_impl_block(p);
+            var impl_funcs = vec_get(impl_result, 0);
+            var impl_statics = vec_get(impl_result, 1);
+            
+            // Add impl functions to program functions
             var num_impl_funcs = vec_len(impl_funcs);
             for (var i = 0; i < num_impl_funcs; i++) {
                 vec_push(funcs, vec_get(impl_funcs, i));
+            }
+            
+            // Add static variables to globals
+            var num_statics = vec_len(impl_statics);
+            for (var i = 0; i < num_statics; i++) {
+                vec_push(globals, vec_get(impl_statics, i));
             }
         } else if (k == TOKEN_VAR) {
             parse_consume(p, TOKEN_VAR);
@@ -1337,12 +1485,23 @@ func parse_impl_block(p) {
     parse_consume(p, TOKEN_LBRACE);
     
     var funcs = vec_new(8);
+    var statics = vec_new(4);  // Static variables
     
-    // Parse all functions in impl block
+    // Parse all functions and static variables in impl block
     while (parse_peek_kind(p) != TOKEN_RBRACE) {
         if (parse_peek_kind(p) == TOKEN_EOF) { break; }
         
-        if (parse_peek_kind(p) == TOKEN_FUNC) {
+        var is_static = 0;
+        if (parse_peek_kind(p) == TOKEN_STATIC) {
+            is_static = 1;
+            parse_consume(p, TOKEN_STATIC);
+        }
+        
+        if (parse_peek_kind(p) == TOKEN_VAR) {
+            // static var declaration
+            var static_node = parse_static_var_decl(p, struct_name_ptr, struct_name_len);
+            vec_push(statics, static_node);
+        } else if (parse_peek_kind(p) == TOKEN_FUNC) {
             var func_node = parse_func_decl(p);
             
             // Rename function: methodName -> StructName_methodName
@@ -1373,18 +1532,19 @@ func parse_impl_block(p) {
             
             vec_push(funcs, func_node);
         } else {
-            emit_stderr("[ERROR] impl block can only contain functions\n", 48);
+            emit_stderr("[ERROR] impl block can only contain functions and static variables\n", 69);
             break;
         }
     }
     
     parse_consume(p, TOKEN_RBRACE);
     
-    return funcs;
+    // Return both funcs and statics
+    var result = vec_new(2);
+    vec_push(result, funcs);
+    vec_push(result, statics);
+    return result;
 }
-    }
-    
-    parse_consume(p, TOKEN_RBRACE);
     
     return ast_struct_def(name_ptr, name_len, fields);
 }
