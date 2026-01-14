@@ -7,12 +7,19 @@ import types;
 // Expression Nodes
 // ============================================
 
+// AST Literal node layout (16 bytes)
+// NOTE: 기존 포인터 산술 레이아웃([kind, value])과 동일하게 유지한다.
+struct AstLiteral {
+    kind: u64;
+    value: u64;
+}
+
 // AST_LITERAL: [kind, value]
 func ast_literal(val: u64) -> u64 {
-    var n: u64 = heap_alloc(16);
-    *(n) = AST_LITERAL;
-    *(n + 8) = val;
-    return n;
+    var n: *AstLiteral = (*AstLiteral)(heap_alloc(16));
+    n->kind = AST_LITERAL;
+    n->value = val;
+    return (u64)n;
 }
 
 // AST_IDENT: [kind, name_ptr, name_len]

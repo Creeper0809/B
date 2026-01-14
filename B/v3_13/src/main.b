@@ -7,7 +7,11 @@ import std.vec;
 import std.hashmap;
 import lexer;
 import ast;
-import parser;
+import parser.util;
+import parser.type;
+import parser.expr;
+import parser.stmt;
+import parser.decl;
 import codegen;
 
 // ============================================

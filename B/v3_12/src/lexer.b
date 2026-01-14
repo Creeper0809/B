@@ -18,16 +18,16 @@ func lex_new(src, len) {
 }
 
 func lex_at_end(l) {
-    var pos = *(l + 16);
-    var len = *(l + 8);
-    if (pos >= len) { return 1; }
+    var pos= *(l + 16);
+    var len= *(l + 8);
+    if (pos >= len) { return true; }
     return 0;
 }
 
 func lex_peek(l) {
     if (lex_at_end(l)) { return 0; }
     var src = *(l);
-    var pos = *(l + 16);
+    var pos= *(l + 16);
     return *(*u8)(src + pos);
 }
 
