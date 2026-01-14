@@ -231,14 +231,34 @@ func ast_block(stmts) {
 // ============================================
 
 // AST_FUNC: [kind, name_ptr, name_len, params_vec, ret_type, body]
+// AST_FUNC: [kind, name_ptr, name_len, params, ret_type, body, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len]
+// Legacy ast_func() now creates 72-byte nodes with extra fields zeroed for compatibility
 func ast_func(name_ptr, name_len, params, ret_type, body) {
-    var n = heap_alloc(48);
+    var n = heap_alloc(72);
     *(n) = AST_FUNC;
     *(n + 8) = name_ptr;
     *(n + 16) = name_len;
     *(n + 24) = params;
     *(n + 32) = ret_type;
     *(n + 40) = body;
+    *(n + 48) = 0;  // ret_ptr_depth = 0
+    *(n + 56) = 0;  // ret_struct_name_ptr = 0
+    *(n + 64) = 0;  // ret_struct_name_len = 0
+    return n;
+}
+
+// AST_FUNC (extended): [kind, name_ptr, name_len, params, ret_type, body, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len]
+func ast_func_ex(name_ptr, name_len, params, ret_type, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len, body) {
+    var n = heap_alloc(72);
+    *(n) = AST_FUNC;
+    *(n + 8) = name_ptr;
+    *(n + 16) = name_len;
+    *(n + 24) = params;
+    *(n + 32) = ret_type;
+    *(n + 40) = body;
+    *(n + 48) = ret_ptr_depth;
+    *(n + 56) = ret_struct_name_ptr;
+    *(n + 64) = ret_struct_name_len;
     return n;
 }
 
