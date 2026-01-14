@@ -7,8 +7,8 @@ import std.vec;
 
 // Lexer structure: [src_ptr, src_len, pos, line, col]
 
-func lex_new(src, len) {
-    var l = heap_alloc(40);
+func lex_new(src: u64, len: u64) -> u64 {
+    var l: u64 = heap_alloc(40);
     *(l) = src;
     *(l + 8) = len;
     *(l + 16) = 0;
@@ -17,30 +17,30 @@ func lex_new(src, len) {
     return l;
 }
 
-func lex_at_end(l) {
-    var pos = *(l + 16);
-    var len = *(l + 8);
+func lex_at_end(l: u64) -> u64 {
+    var pos: u64 = *(l + 16);
+    var len: u64 = *(l + 8);
     if (pos >= len) { return 1; }
     return 0;
 }
 
-func lex_peek(l) {
+func lex_peek(l: u64) -> u64 {
     if (lex_at_end(l)) { return 0; }
-    var src = *(l);
-    var pos = *(l + 16);
+    var src: u64 = *(l);
+    var pos: u64 = *(l + 16);
     return *(*u8)(src + pos);
 }
 
-func lex_peek_next(l) {
-    var pos = *(l + 16);
-    var len = *(l + 8);
+func lex_peek_next(l: u64) -> u64 {
+    var pos: u64 = *(l + 16);
+    var len: u64 = *(l + 8);
     if (pos + 1 >= len) { return 0; }
-    var src = *(l);
+    var src: u64 = *(l);
     return *(*u8)(src + pos + 1);
 }
 
-func lex_advance(l) {
-    var c = lex_peek(l);
+func lex_advance(l: u64) -> u64 {
+    var c: u64 = lex_peek(l);
     *(l + 16) = *(l + 16) + 1;
     if (c == 10) {
         *(l + 24) = *(l + 24) + 1;
@@ -51,21 +51,21 @@ func lex_advance(l) {
     return c;
 }
 
-func lex_skip_ws(l) {
+func lex_skip_ws(l: u64) -> u64 {
     while (!lex_at_end(l)) {
-        var c = lex_peek(l);
+        var c: u64 = lex_peek(l);
         if (!is_whitespace(c)) { break; }
         lex_advance(l);
     }
 }
 
-func lex_skip_comment(l) {
+func lex_skip_comment(l: u64) -> u64 {
     if (lex_peek(l) == 47) {
         if (lex_peek_next(l) == 47) {
             lex_advance(l);
             lex_advance(l);
             while (!lex_at_end(l)) {
-                var c = lex_peek(l);
+                var c: u64 = lex_peek(l);
                 if (c == 10) {
                     lex_advance(l);
                     break;
@@ -76,10 +76,10 @@ func lex_skip_comment(l) {
     }
 }
 
-func lex_skip_ws_and_comments(l) {
+func lex_skip_ws_and_comments(l: u64) -> u64 {
     while (!lex_at_end(l)) {
         lex_skip_ws(l);
-        var c = lex_peek(l);
+        var c: u64 = lex_peek(l);
         if (c == 47) {
             if (lex_peek_next(l) == 47) {
                 lex_skip_comment(l);
@@ -92,7 +92,7 @@ func lex_skip_ws_and_comments(l) {
     }
 }
 
-func lex_check_keyword(ptr, len) {
+func lex_check_keyword(ptr: u64, len: u64) -> u64 {
     if (str_eq(ptr, len, "func", 4)) { return TOKEN_FUNC; }
     if (str_eq(ptr, len, "var", 3)) { return TOKEN_VAR; }
     if (str_eq(ptr, len, "const", 5)) { return TOKEN_CONST; }
@@ -123,8 +123,8 @@ func lex_check_keyword(ptr, len) {
 
 // Token structure: [kind, ptr, len, line, col]
 
-func tok_new(kind, ptr, len, line, col) {
-    var t = heap_alloc(40);
+func tok_new(kind: u64, ptr: u64, len: u64, line: u64, col: u64) -> u64 {
+    var t: u64 = heap_alloc(40);
     *(t) = kind;
     *(t + 8) = ptr;
     *(t + 16) = len;
@@ -133,25 +133,25 @@ func tok_new(kind, ptr, len, line, col) {
     return t;
 }
 
-func tok_kind(t) { return *(t); }
-func tok_ptr(t) { return *(t + 8); }
-func tok_len(t) { return *(t + 16); }
-func tok_line(t) { return *(t + 24); }
-func tok_col(t) { return *(t + 32); }
+func tok_kind(t: u64) -> u64 { return *(t); }
+func tok_ptr(t: u64) -> u64 { return *(t + 8); }
+func tok_len(t: u64) -> u64 { return *(t + 16); }
+func tok_line(t: u64) -> u64 { return *(t + 24); }
+func tok_col(t: u64) -> u64 { return *(t + 32); }
 
-func lex_next(l) {
+func lex_next(l: u64) -> u64 {
     lex_skip_ws_and_comments(l);
     
-    var line = *(l + 24);
-    var col = *(l + 32);
+    var line: u64 = *(l + 24);
+    var col: u64 = *(l + 32);
     
     if (lex_at_end(l)) {
         return tok_new(TOKEN_EOF, 0, 0, line, col);
     }
     
-    var start = *(l + 16);
-    var c = lex_advance(l);
-    var src = *(l);
+    var start: u64 = *(l + 16);
+    var c: u64 = lex_advance(l);
+    var src: u64 = *(l);
     
     // Identifier or keyword
     if (is_alpha(c)) {
@@ -162,8 +162,8 @@ func lex_next(l) {
                 break;
             }
         }
-        var len  = *(l + 16) - start;
-        var kind = lex_check_keyword(src + start, len);
+        var len: u64  = *(l + 16) - start;
+        var kind: u64 = lex_check_keyword(src + start, len);
         return tok_new(kind, src + start, len, line, col);
     }
     
@@ -176,14 +176,14 @@ func lex_next(l) {
                 break;
             }
         }
-        var len = *(l + 16) - start;
+        var len: u64 = *(l + 16) - start;
         return tok_new(TOKEN_NUMBER, src + start, len, line, col);
     }
     
     // String literal
     if (c == 34) {
         while (!lex_at_end(l)) {
-            var ch = lex_peek(l);
+            var ch: u64 = lex_peek(l);
             if (ch == 34) {
                 lex_advance(l);
                 break;
@@ -197,7 +197,7 @@ func lex_next(l) {
                 lex_advance(l);
             }
         }
-        var len = *(l + 16) - start;
+        var len: u64 = *(l + 16) - start;
         return tok_new(TOKEN_STRING, src + start, len, line, col);
     }
     
@@ -293,11 +293,11 @@ func lex_next(l) {
     return tok_new(TOKEN_EOF, 0, 0, line, col);
 }
 
-func lex_all(src, len) {
-    var l = lex_new(src, len);
-    var tokens = vec_new(256);
+func lex_all(src: u64, len: u64) -> u64 {
+    var l: u64 = lex_new(src, len);
+    var tokens: u64 = vec_new(256);
     while (1) {
-        var tok = lex_next(l);
+        var tok: u64 = lex_next(l);
         vec_push(tokens, tok);
         if (tok_kind(tok) == TOKEN_EOF) { break; }
     }

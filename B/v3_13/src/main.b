@@ -31,19 +31,19 @@ var g_file_len;
 // File Reading
 // ============================================
 
-func read_entire_file(path) {
-    var fd = sys_open(path, 0, 0);
+func read_entire_file(path: u64) -> u64 {
+    var fd: u64 = sys_open(path, 0, 0);
     if (fd < 0) { return 0; }
     
-    var statbuf = heap_alloc(144);
+    var statbuf: u64 = heap_alloc(144);
     sys_fstat(fd, statbuf);
-    var size = *(statbuf + 48);
+    var size: u64 = *(statbuf + 48);
     
-    var buf = heap_alloc(size + 1);
+    var buf: u64 = heap_alloc(size + 1);
     
-    var total = 0;
+    var total: u64 = 0;
     while (total < size) {
-        var n = sys_read(fd, buf + total, size - total);
+        var n: u64 = sys_read(fd, buf + total, size - total);
         if (n <= 0) { break; }
         total = total + n;
     }
@@ -62,14 +62,14 @@ func read_entire_file(path) {
 // Module Loading
 // ============================================
 
-func file_exists(path) {
-    var fd = sys_open(path, 0, 0);
+func file_exists(path: u64) -> u64 {
+    var fd: u64 = sys_open(path, 0, 0);
     if (fd < 0) { return 0; }
     sys_close(fd);
     return 1;
 }
 
-func is_std_alias(module_path, module_len) {
+func is_std_alias(module_path: u64, module_len: u64) -> u64 {
     if (str_eq(module_path, module_len, "io", 2)) { return 1; }
     if (str_eq(module_path, module_len, "util", 4)) { return 1; }
     if (str_eq(module_path, module_len, "vec", 3)) { return 1; }
@@ -77,7 +77,7 @@ func is_std_alias(module_path, module_len) {
     return 0;
 }
 
-func std_alias_to_module_path(module_path, module_len) {
+func std_alias_to_module_path(module_path: u64, module_len: u64) -> u64 {
     if (str_eq(module_path, module_len, "io", 2)) { return "std/io"; }
     if (str_eq(module_path, module_len, "util", 4)) { return "std/util"; }
     if (str_eq(module_path, module_len, "vec", 3)) { return "std/vec"; }
@@ -85,7 +85,7 @@ func std_alias_to_module_path(module_path, module_len) {
     return 0;
 }
 
-func is_std_path(module_path, module_len) {
+func is_std_path(module_path: u64, module_len: u64) -> u64 {
     if (module_len < 4) { return 0; }
     if (*(*u8)module_path != 115) { return 0; }      // s
     if (*(*u8)(module_path + 1) != 116) { return 0; } // t
@@ -94,11 +94,11 @@ func is_std_path(module_path, module_len) {
     return 1;
 }
 
-func resolve_module_path(module_path, module_len) {
-    var eff_path = module_path;
-    var eff_len = module_len;
+func resolve_module_path(module_path: u64, module_len: u64) -> u64 {
+    var eff_path: u64 = module_path;
+    var eff_len: u64 = module_len;
 
-    var prefer_lib = 0;
+    var prefer_lib: u64 = 0;
 
     if (is_std_alias(module_path, module_len)) {
         eff_path = std_alias_to_module_path(module_path, module_len);
@@ -110,19 +110,19 @@ func resolve_module_path(module_path, module_len) {
         prefer_lib = 1;
     }
 
-    var ext = heap_alloc(3);
+    var ext: u64 = heap_alloc(3);
     *(*u8)ext = 46;
     *(*u8)(ext + 1) = 98;
     *(*u8)(ext + 2) = 0;
     
-    var with_ext = str_concat(eff_path, eff_len, ext, 2);
-    var with_ext_len = eff_len + 2;
+    var with_ext: u64 = str_concat(eff_path, eff_len, ext, 2);
+    var with_ext_len: u64 = eff_len + 2;
     
-    var slash = heap_alloc(1);
+    var slash: u64 = heap_alloc(1);
     *(*u8)slash = 47;
 
-    var full1;
-    var full2;
+    var full1: u64;
+    var full2: u64;
     if (prefer_lib) {
         full1 = str_concat3(g_lib_dir, g_lib_dir_len, slash, 1, with_ext, with_ext_len);
         if (file_exists(full1)) { return full1; }
@@ -136,13 +136,13 @@ func resolve_module_path(module_path, module_len) {
     return full2;
 }
 
-func load_module_by_name(module_path, module_len) {
-    var resolved = resolve_module_path(module_path, module_len);
-    var resolved_len = str_len(resolved);
+func load_module_by_name(module_path: u64, module_len: u64) -> u64 {
+    var resolved: u64 = resolve_module_path(module_path, module_len);
+    var resolved_len: u64 = str_len(resolved);
     return load_module(resolved, resolved_len);
 }
 
-func load_std_prelude() {
+func load_std_prelude() -> u64 {
     if (!load_module_by_name("std/io", 6)) { return 0; }
     if (!load_module_by_name("std/util", 8)) { return 0; }
     if (!load_module_by_name("std/vec", 7)) { return 0; }
@@ -150,41 +150,41 @@ func load_std_prelude() {
     return 1;
 }
 
-func load_module(file_path, file_path_len) {
+func load_module(file_path: u64, file_path_len: u64) -> u64 {
     if (hashmap_has(g_loaded_modules, file_path, file_path_len)) {
         return 1;
     }
     
     hashmap_put(g_loaded_modules, file_path, file_path_len, 1);
     
-    var content = read_entire_file(file_path);
+    var content: u64 = read_entire_file(file_path);
     if (content == 0) {
         emit_stderr("[ERROR] Cannot open module: ", 29);
-        for(var i = 0; i< file_path_len;i++){
+        for (var i: u64 = 0; i< file_path_len;i++){
             emit_char(*(*u8)(file_path + i));
         }
         emit_nl();
         return 0;
     }
     
-    var src = g_file_ptr;
-    var slen  = g_file_len;
+    var src: u64 = g_file_ptr;
+    var slen: u64  = g_file_len;
     
-    var tokens = lex_all(src, slen);
+    var tokens: u64 = lex_all(src, slen);
     
-    var p = parse_new(tokens);
-    var prog = parse_program(p);
+    var p: u64 = parse_new(tokens);
+    var prog: u64 = parse_program(p);
     
     // Process imports recursively
-    var imports  = *(prog + 24);
-    var num_imports = vec_len(imports);
-    for(var ii = 0; ii<num_imports;ii++){
-        var imp = vec_get(imports, ii);
-        var imp_path = *(imp + 8);
-        var imp_len = *(imp + 16);
+    var imports: u64  = *(prog + 24);
+    var num_imports: u64 = vec_len(imports);
+    for (var ii: u64 = 0; ii<num_imports;ii++){
+        var imp: u64 = vec_get(imports, ii);
+        var imp_path: u64 = *(imp + 8);
+        var imp_len: u64 = *(imp + 16);
         
-        var resolved = resolve_module_path(imp_path, imp_len);
-        var resolved_len = str_len(resolved);
+        var resolved: u64 = resolve_module_path(imp_path, imp_len);
+        var resolved_len: u64 = str_len(resolved);
         
         if (!load_module(resolved, resolved_len)) {
             return 0;
@@ -192,36 +192,36 @@ func load_module(file_path, file_path_len) {
     }
     
     // Add consts
-    var consts = *(prog + 16);
-    var num_consts  = vec_len(consts);
-    for(var ci = 0; ci < num_consts; ci++){
+    var consts: u64 = *(prog + 16);
+    var num_consts: u64  = vec_len(consts);
+    for (var ci: u64 = 0; ci < num_consts; ci++){
         vec_push(g_all_consts, vec_get(consts, ci));
     }
     
     // Add funcs
-    var funcs = *(prog + 8);
-    var num_funcs = vec_len(funcs);
-    for(var fi = 0;fi < num_funcs; fi++){
+    var funcs: u64 = *(prog + 8);
+    var num_funcs: u64 = vec_len(funcs);
+    for (var fi: u64 = 0;fi < num_funcs; fi++){
          vec_push(g_all_funcs, vec_get(funcs, fi));
     }
     
     // Add globals
-    var globals  = *(prog + 32);
+    var globals: u64  = *(prog + 32);
     if (globals != 0) {
-        var num_globals  = vec_len(globals);
-        for(var gi = 0; gi < num_globals; gi++){
+        var num_globals: u64  = vec_len(globals);
+        for (var gi: u64 = 0; gi < num_globals; gi++){
             vec_push(g_all_globals, vec_get(globals, gi));
         }
     }
     
     // Register structs
-    var structs = *(prog + 40);
+    var structs: u64 = *(prog + 40);
     if (structs != 0) {
-        var num_structs = vec_len(structs);
-        for(var si = 0; si < num_structs; si++){
-            var struct_def = vec_get(structs, si);
-            var struct_name_ptr = *(struct_def + 8);
-            var struct_name_len = *(struct_def + 16);
+        var num_structs: u64 = vec_len(structs);
+        for (var si: u64 = 0; si < num_structs; si++){
+            var struct_def: u64 = vec_get(structs, si);
+            var struct_name_ptr: u64 = *(struct_def + 8);
+            var struct_name_len: u64 = *(struct_def + 16);
             hashmap_put(g_all_structs, struct_name_ptr, struct_name_len, struct_def);
         }
     }
@@ -234,29 +234,29 @@ func load_module(file_path, file_path_len) {
 // ============================================
 
 // Check if a name is a registered struct type
-func is_struct_type(name_ptr, name_len) {
+func is_struct_type(name_ptr: u64, name_len: u64) -> u64 {
     if (g_all_structs == 0) { return 0; }
-    var struct_def = hashmap_get(g_all_structs, name_ptr, name_len);
+    var struct_def: u64 = hashmap_get(g_all_structs, name_ptr, name_len);
     if (struct_def == 0) { return 0; }
     return 1;
 }
 
 // Get struct definition by name
-func get_struct_def(name_ptr, name_len) {
+func get_struct_def(name_ptr: u64, name_len: u64) -> u64 {
     if (g_all_structs == 0) { return 0; }
     return hashmap_get(g_all_structs, name_ptr, name_len);
 }
 
 // Register a struct type during parsing
-func register_struct_type(struct_def) {
+func register_struct_type(struct_def: u64) -> u64 {
     if (g_all_structs == 0) {
         g_all_structs = hashmap_new(64);
     }
     if (g_all_structs_vec == 0) {
         g_all_structs_vec = vec_new(16);
     }
-    var struct_name_ptr = *(struct_def + 8);
-    var struct_name_len = *(struct_def + 16);
+    var struct_name_ptr: u64 = *(struct_def + 8);
+    var struct_name_len: u64 = *(struct_def + 16);
     hashmap_put(g_all_structs, struct_name_ptr, struct_name_len, struct_def);
     vec_push(g_all_structs_vec, struct_def);
 }
@@ -265,14 +265,14 @@ func register_struct_type(struct_def) {
 // Main Entry Point
 // ============================================
 
-func main(argc, argv) {
+func main(argc: u64, argv: u64) -> u64 {
     if (argc < 2) {
         emit("Usage: v3_9 <source.b>\n", 23);
         return 1;
     }
     
-    var filename = *(argv + 8);
-    var filename_len = str_len(filename);
+    var filename: u64 = *(argv + 8);
+    var filename_len: u64 = str_len(filename);
     
     g_base_dir = path_dirname(filename, filename_len);
     g_base_dir_len = str_len(g_base_dir);
@@ -297,8 +297,8 @@ func main(argc, argv) {
         return 1;
     }
     
-    var dummy_imports = vec_new(1);
-    var merged_prog = ast_program(g_all_funcs, g_all_consts, dummy_imports);
+    var dummy_imports: u64 = vec_new(1);
+    var merged_prog: u64 = ast_program(g_all_funcs, g_all_consts, dummy_imports);
     *(merged_prog + 32) = g_all_globals;
     *(merged_prog + 40) = g_all_structs_vec;
     

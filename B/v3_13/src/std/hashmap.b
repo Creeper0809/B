@@ -6,25 +6,25 @@ import std.util;
 // HashMap structure: [entries_ptr, capacity, count]
 // Entry: [key_ptr, key_len, value, hash, used] = 40 bytes
 
-func fnv1a_hash(ptr, len) {
-    var hash = 0;
-    for(var i = 0;i < len; i++){
+func fnv1a_hash(ptr: u64, len: u64) -> u64 {
+    var hash: u64 = 0;
+    for (var i: u64 = 0;i < len; i++){
         hash = hash ^ *(*u8)(ptr + i);
         hash = hash * 31;
     }
     return hash;
 }
 
-func hashmap_new(capacity) {
-    var cap = 16;
+func hashmap_new(capacity: u64) -> u64 {
+    var cap: u64 = 16;
     while (cap < capacity) {
         cap = cap * 2;
     }
-    var map = heap_alloc(24);
-    var bytes = cap * 40;
-    var entries = heap_alloc(bytes);
+    var map: u64 = heap_alloc(24);
+    var bytes: u64 = cap * 40;
+    var entries: u64 = heap_alloc(bytes);
     
-    for(var i = 0; i < bytes;i++){
+    for (var i: u64 = 0; i < bytes;i++){
         *(*u8)(entries + i) = 0;
     }
     
@@ -34,19 +34,19 @@ func hashmap_new(capacity) {
     return map;
 }
 
-func hashmap_entry_ptr(entries, idx) {
+func hashmap_entry_ptr(entries: u64, idx: u64) -> u64 {
     return entries + idx * 40;
 }
 
-func hashmap_put_internal(map, key_ptr, key_len, value) {
-    var entries = *(map);
-    var cap = *(map + 8);
-    var hash = fnv1a_hash(key_ptr, key_len);
-    var idx = hash % cap;
+func hashmap_put_internal(map: u64, key_ptr: u64, key_len: u64, value: u64) -> u64 {
+    var entries: u64 = *(map);
+    var cap: u64 = *(map + 8);
+    var hash: u64 = fnv1a_hash(key_ptr, key_len);
+    var idx: u64 = hash % cap;
     
-    for(var i = 0; i < cap ; i++){
-        var e = hashmap_entry_ptr(entries, idx);
-        var used = *(e + 32);
+    for (var i: u64 = 0; i < cap ; i++){
+        var e: u64 = hashmap_entry_ptr(entries, idx);
+        var used: u64 = *(e + 32);
         
         if (used == 0) {
             *(e) = key_ptr;
@@ -62,15 +62,15 @@ func hashmap_put_internal(map, key_ptr, key_len, value) {
     }
 }
 
-func hashmap_grow(map) {
-    var old_entries = *(map);
-    var old_cap = *(map + 8);
+func hashmap_grow(map: u64) -> u64 {
+    var old_entries: u64 = *(map);
+    var old_cap: u64 = *(map + 8);
     
-    var new_cap = old_cap * 2;
-    var new_bytes = new_cap * 40;
-    var new_entries = heap_alloc(new_bytes);
+    var new_cap: u64 = old_cap * 2;
+    var new_bytes: u64 = new_cap * 40;
+    var new_entries: u64 = heap_alloc(new_bytes);
     
-    for(var i = 0; i < new_bytes;i++){
+    for (var i: u64 = 0; i < new_bytes;i++){
         *(*u8)(new_entries + i) = 0;
     }
 
@@ -78,22 +78,22 @@ func hashmap_grow(map) {
     *(map + 8) = new_cap;
     *(map + 16) = 0;
     
-    for(var i = 0; i<old_cap;i++){
-        var e = old_entries + i * 40;
-        var used = *(e + 32);
+    for (var i: u64 = 0; i<old_cap;i++){
+        var e: u64 = old_entries + i * 40;
+        var used: u64 = *(e + 32);
         if (used != 0) {
-            var kp = *(e);
-            var kl = *(e + 8);
-            var val = *(e + 16);
+            var kp: u64 = *(e);
+            var kl: u64 = *(e + 8);
+            var val: u64 = *(e + 16);
             hashmap_put_internal(map, kp, kl, val);
         }
     }
 }
 
-func hashmap_put(map, key_ptr, key_len, value) {
-    var entries  = *(map);
-    var cap = *(map + 8);
-    var count = *(map + 16);
+func hashmap_put(map: u64, key_ptr: u64, key_len: u64, value: u64) -> u64 {
+    var entries: u64  = *(map);
+    var cap: u64 = *(map + 8);
+    var count: u64 = *(map + 16);
     
     if (count * 10 >= cap * 7) {
         hashmap_grow(map);
@@ -101,12 +101,12 @@ func hashmap_put(map, key_ptr, key_len, value) {
         cap = *(map + 8);
     }
     
-    var hash = fnv1a_hash(key_ptr, key_len);
-    var idx = hash % cap;
+    var hash: u64 = fnv1a_hash(key_ptr, key_len);
+    var idx: u64 = hash % cap;
     
-    for(var i = 0; i < cap ;i++){
-        var e= hashmap_entry_ptr(entries, idx);
-        var used = *(e + 32);
+    for (var i: u64 = 0; i < cap ;i++){
+        var e: u64= hashmap_entry_ptr(entries, idx);
+        var used: u64 = *(e + 32);
         
         if (used == 0) {
             *(e) = key_ptr;
@@ -118,8 +118,8 @@ func hashmap_put(map, key_ptr, key_len, value) {
             return;
         }
         
-        var kp = *(e);
-        var kl = *(e + 8);
+        var kp: u64 = *(e);
+        var kl: u64 = *(e + 8);
         if (str_eq(kp, kl, key_ptr, key_len)) {
             *(e + 16) = value;
             return;
@@ -129,22 +129,22 @@ func hashmap_put(map, key_ptr, key_len, value) {
     }
 }
 
-func hashmap_get(map, key_ptr, key_len) {
-    var entries = *(map);
-    var cap = *(map + 8);
-    var hash = fnv1a_hash(key_ptr, key_len);
-    var idx = hash % cap;
+func hashmap_get(map: u64, key_ptr: u64, key_len: u64) -> u64 {
+    var entries: u64 = *(map);
+    var cap: u64 = *(map + 8);
+    var hash: u64 = fnv1a_hash(key_ptr, key_len);
+    var idx: u64 = hash % cap;
     
-    for(var i = 0; i <cap ; i++){
-        var e = hashmap_entry_ptr(entries, idx);
-        var used = *(e + 32);
+    for (var i: u64 = 0; i <cap ; i++){
+        var e: u64 = hashmap_entry_ptr(entries, idx);
+        var used: u64 = *(e + 32);
         
         if (used == 0) {
             return 0;
         }
         
-        var kp = *(e);
-        var kl  = *(e + 8);
+        var kp: u64 = *(e);
+        var kl: u64  = *(e + 8);
         if (str_eq(kp, kl, key_ptr, key_len)) {
             return *(e + 16);
         }
@@ -153,22 +153,22 @@ func hashmap_get(map, key_ptr, key_len) {
     }
 }
 
-func hashmap_has(map, key_ptr, key_len) {
-    var entries = *(map);
-    var cap = *(map + 8);
-    var hash = fnv1a_hash(key_ptr, key_len);
-    var idx = hash % cap;
+func hashmap_has(map: u64, key_ptr: u64, key_len: u64) -> u64 {
+    var entries: u64 = *(map);
+    var cap: u64 = *(map + 8);
+    var hash: u64 = fnv1a_hash(key_ptr, key_len);
+    var idx: u64 = hash % cap;
     
-    for(var i = 0; i < cap ; i++){
-        var e = hashmap_entry_ptr(entries, idx);
-        var used = *(e + 32);
+    for (var i: u64 = 0; i < cap ; i++){
+        var e: u64 = hashmap_entry_ptr(entries, idx);
+        var used: u64 = *(e + 32);
         
         if (used == 0) {
             return 0;
         }
         
-        var kp = *(e);
-        var kl = *(e + 8);
+        var kp: u64 = *(e);
+        var kl: u64 = *(e + 8);
         if (str_eq(kp, kl, key_ptr, key_len)) {
             return 1;
         }
