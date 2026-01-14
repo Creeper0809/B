@@ -1,0 +1,41 @@
+// 81_struct_return_loop.b - Struct return in loop
+// Expect exit code: 42
+
+struct Counter {
+    value: i64;
+    step: i64;
+}
+
+func Counter_new(initial: i64, step: i64) -> Counter {
+    var c: Counter;
+    c.value = initial;
+    c.step = step;
+    return c;
+}
+
+func Counter_next(c: *Counter) -> Counter {
+    var next: Counter;
+    next.value = c->value + c->step;
+    next.step = c->step;
+    return next;
+}
+
+func main() -> i64 {
+    var c: Counter = Counter_new(0, 5);
+    var sum = c.value;  // 0
+    
+    // Loop 5 times: accumulate 5, 10, 15, 20, 25
+    var i = 0;
+    while (i < 5) {
+        c = Counter_next(&c);
+        sum = sum + c.value;
+        i = i + 1;
+    }
+    
+    // sum = 0 + 5 + 10 + 15 + 20 + 25 = 75
+    
+    if (sum == 75) {
+        return 42;
+    }
+    return 1;
+}
