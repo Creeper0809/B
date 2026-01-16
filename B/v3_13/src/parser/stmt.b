@@ -52,10 +52,10 @@ func parse_var_decl(p: u64) -> u64 {
     
     parse_consume(p, TOKEN_SEMICOLON);
     
-    var decl: u64 = ast_var_decl(tok_ptr(name_tok), tok_len(name_tok), type_kind, ptr_depth, init);
-    *(decl + 48) = struct_name_ptr;
-    *(decl + 56) = struct_name_len;
-    return decl;
+    var decl: *AstVarDecl = (*AstVarDecl)ast_var_decl(tok_ptr(name_tok), tok_len(name_tok), type_kind, ptr_depth, init);
+    decl->struct_name_ptr = struct_name_ptr;
+    decl->struct_name_len = struct_name_len;
+    return (u64)decl;
 }
 
 // ============================================
