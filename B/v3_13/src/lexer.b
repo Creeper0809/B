@@ -8,45 +8,42 @@ import std.vec;
 // Lexer structure: [src_ptr, src_len, pos, line, col]
 
 func lex_new(src: u64, len: u64) -> u64 {
-    var l: u64 = heap_alloc(40);
-    *(l) = src;
-    *(l + 8) = len;
-    *(l + 16) = 0;
-    *(l + 24) = 1;
-    *(l + 32) = 1;
-    return l;
+    var l: *Lexer = (*Lexer)heap_alloc(40);
+    l->src_ptr = src;
+    l->src_len = len;
+    l->pos = 0;
+    l->line = 1;
+    l->col = 1;
+    return (u64)l;
 }
 
 func lex_at_end(l: u64) -> u64 {
-    var pos: u64 = *(l + 16);
-    var len: u64 = *(l + 8);
-    if (pos >= len) { return 1; }
+    var lex: *Lexer = (*Lexer)l;
+    if (lex->pos >= lex->src_len) { return 1; }
     return 0;
 }
 
 func lex_peek(l: u64) -> u64 {
     if (lex_at_end(l)) { return 0; }
-    var src: u64 = *(l);
-    var pos: u64 = *(l + 16);
-    return *(*u8)(src + pos);
+    var lex: *Lexer = (*Lexer)l;
+    return *(*u8)(lex->src_ptr + lex->pos);
 }
 
 func lex_peek_next(l: u64) -> u64 {
-    var pos: u64 = *(l + 16);
-    var len: u64 = *(l + 8);
-    if (pos + 1 >= len) { return 0; }
-    var src: u64 = *(l);
-    return *(*u8)(src + pos + 1);
+    var lex: *Lexer = (*Lexer)l;
+    if (lex->pos + 1 >= lex->src_len) { return 0; }
+    return *(*u8)(lex->src_ptr + lex->pos + 1);
 }
 
 func lex_advance(l: u64) -> u64 {
     var c: u64 = lex_peek(l);
-    *(l + 16) = *(l + 16) + 1;
+    var lex: *Lexer = (*Lexer)l;
+    lex->pos = lex->pos + 1;
     if (c == 10) {
-        *(l + 24) = *(l + 24) + 1;
-        *(l + 32) = 1;
+        lex->line = lex->line + 1;
+        lex->col = 1;
     } else {
-        *(l + 32) = *(l + 32) + 1;
+        lex->col = lex->col + 1;
     }
     return c;
 }
@@ -124,34 +121,50 @@ func lex_check_keyword(ptr: u64, len: u64) -> u64 {
 // Token structure: [kind, ptr, len, line, col]
 
 func tok_new(kind: u64, ptr: u64, len: u64, line: u64, col: u64) -> u64 {
-    var t: u64 = heap_alloc(40);
-    *(t) = kind;
-    *(t + 8) = ptr;
-    *(t + 16) = len;
-    *(t + 24) = line;
-    *(t + 32) = col;
-    return t;
+    var t: *Token = (*Token)heap_alloc(40);
+    t->kind = kind;
+    t->ptr = ptr;
+    t->len = len;
+    t->line = line;
+    t->col = col;
+    return (u64)t;
 }
 
-func tok_kind(t: u64) -> u64 { return *(t); }
-func tok_ptr(t: u64) -> u64 { return *(t + 8); }
-func tok_len(t: u64) -> u64 { return *(t + 16); }
-func tok_line(t: u64) -> u64 { return *(t + 24); }
-func tok_col(t: u64) -> u64 { return *(t + 32); }
+func tok_kind(t: u64) -> u64 { 
+    var tok: *Token = (*Token)t;
+    return tok->kind; 
+}
+func tok_ptr(t: u64) -> u64 { 
+    var tok: *Token = (*Token)t;
+    return tok->ptr; 
+}
+func tok_len(t: u64) -> u64 { 
+    var tok: *Token = (*Token)t;
+    return tok->len; 
+}
+func tok_line(t: u64) -> u64 { 
+    var tok: *Token = (*Token)t;
+    return tok->line; 
+}
+func tok_col(t: u64) -> u64 { 
+    var tok: *Token = (*Token)t;
+    return tok->col; 
+}
 
 func lex_next(l: u64) -> u64 {
     lex_skip_ws_and_comments(l);
     
-    var line: u64 = *(l + 24);
-    var col: u64 = *(l + 32);
+    var lex: *Lexer = (*Lexer)l;
+    var line: u64 = lex->line;
+    var col: u64 = lex->col;
     
     if (lex_at_end(l)) {
         return tok_new(TOKEN_EOF, 0, 0, line, col);
     }
     
-    var start: u64 = *(l + 16);
+    var start: u64 = lex->pos;
     var c: u64 = lex_advance(l);
-    var src: u64 = *(l);
+    var src: u64 = lex->src_ptr;
     
     // Identifier or keyword
     if (is_alpha(c)) {
@@ -162,7 +175,8 @@ func lex_next(l: u64) -> u64 {
                 break;
             }
         }
-        var len: u64  = *(l + 16) - start;
+        lex = (*Lexer)l;
+        var len: u64  = lex->pos - start;
         var kind: u64 = lex_check_keyword(src + start, len);
         return tok_new(kind, src + start, len, line, col);
     }
@@ -176,7 +190,8 @@ func lex_next(l: u64) -> u64 {
                 break;
             }
         }
-        var len: u64 = *(l + 16) - start;
+        lex = (*Lexer)l;
+        var len: u64 = lex->pos - start;
         return tok_new(TOKEN_NUMBER, src + start, len, line, col);
     }
     
@@ -197,7 +212,8 @@ func lex_next(l: u64) -> u64 {
                 lex_advance(l);
             }
         }
-        var len: u64 = *(l + 16) - start;
+        lex = (*Lexer)l;
+        var len: u64 = lex->pos - start;
         return tok_new(TOKEN_STRING, src + start, len, line, col);
     }
     

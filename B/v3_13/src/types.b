@@ -161,6 +161,28 @@ struct GlobalInfo {
 }
 
 // ============================================
+// Lexer Data Structures
+// ============================================
+
+// Token structure (40 bytes)
+struct Token {
+    kind: u64;
+    ptr: u64;
+    len: u64;
+    line: u64;
+    col: u64;
+}
+
+// Lexer structure (40 bytes)
+struct Lexer {
+    src_ptr: u64;
+    src_len: u64;
+    pos: u64;
+    line: u64;
+    col: u64;
+}
+
+// ============================================
 // Parser Data Structures
 // ============================================
 
@@ -172,20 +194,4 @@ struct Param {
     ptr_depth: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
-}
-
-// Struct field descriptor (48 bytes)
-struct FieldDesc {
-    name_ptr: u64;
-    name_len: u64;
-    type_kind: u64;
-    struct_name_ptr: u64;
-    struct_name_len: u64;
-    ptr_depth: u64;
-}
-
-// Global variable info (16 bytes)
-struct GlobalInfo {
-    name_ptr: u64;
-    name_len: u64;
 }
