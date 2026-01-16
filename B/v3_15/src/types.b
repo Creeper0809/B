@@ -160,6 +160,13 @@ struct GlobalInfo {
     name_len: u64;
 }
 
+// Constant info (24 bytes)
+struct ConstInfo {
+    name_ptr: u64;
+    name_len: u64;
+    value: u64;
+}
+
 // Symbol table structure (40 bytes)
 struct Symtab {
     names_vec: u64;      // vector of [name_ptr, name_len] pairs

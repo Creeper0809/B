@@ -92,12 +92,12 @@ func emitter_load_consts(consts: u64) -> u64 {
     var clen: u64 = vec_len(consts);
     var ci: u64 = 0;
     while (ci < clen) {
-        var c: u64 = vec_get(consts, ci);
-        var cinfo: u64 = heap_alloc(24);
-        *(cinfo) = *(c + 8);      // name_ptr
-        *(cinfo + 8) = *(c + 16); // name_len
-        *(cinfo + 16) = *(c + 24); // value
-        vec_push(g_consts, cinfo);
+        var c_node: *AstConstDecl = (*AstConstDecl)vec_get(consts, ci);
+        var cinfo: *ConstInfo = (*ConstInfo)heap_alloc(24);
+        cinfo->name_ptr = c_node->name_ptr;
+        cinfo->name_len = c_node->name_len;
+        cinfo->value = c_node->value;
+        vec_push(g_consts, (u64)cinfo);
         ci = ci + 1;
     }
 }
@@ -127,13 +127,11 @@ func const_find(name_ptr: u64, name_len: u64) -> u64 {
     var len: u64 = vec_len(g_consts);
     var i: u64 = 0;
     while (i < len) {
-        var c: u64 = vec_get(g_consts, i);
-        var c_ptr: u64 = *(c);
-        var c_len: u64 = *(c + 8);
-        if (str_eq(c_ptr, c_len, name_ptr, name_len)) {
+        var c: *ConstInfo = (*ConstInfo)vec_get(g_consts, i);
+        if (str_eq(c->name_ptr, c->name_len, name_ptr, name_len)) {
             var result: u64 = heap_alloc(16);
             *(result) = 1;           // found
-            *(result + 8) = *(c + 16); // value
+            *(result + 8) = c->value; // value
             return result;
         }
         i = i + 1;
