@@ -185,28 +185,24 @@ func parse_for_stmt(p: u64) -> u64 {
     parse_consume(p, TOKEN_LPAREN);
     
     var init: u64 = 0;
-    if (parse_peek_kind(p) != TOKEN_SEMICOLON) {
-        if (parse_peek_kind(p) == TOKEN_VAR) {
-            init = parse_var_decl(p);
-        } else {
-            if (parse_peek_kind(p) == TOKEN_PLUSPLUS) {
-                init = parse_prefix_incdec_assign(p);
-            } else {
-                if (parse_peek_kind(p) == TOKEN_MINUSMINUS) {
-                    init = parse_prefix_incdec_assign(p);
-                } else {
-                    var lhs: u64 = parse_expr(p);
-                    if (parse_match(p, TOKEN_EQ)) {
-                        var rhs: u64 = parse_expr(p);
-                        init = ast_assign(lhs, rhs);
-                    } else {
-                        init = parse_postfix_incdec_after_expr(p, lhs);
-                    }
-                }
-            }
-            parse_consume(p, TOKEN_SEMICOLON);
-        }
+    var k: u64 = parse_peek_kind(p);
+    
+    // Parse init clause
+    if (k == TOKEN_SEMICOLON) {
+        parse_consume(p, TOKEN_SEMICOLON);
+    } else if (k == TOKEN_VAR) {
+        init = parse_var_decl(p);
+    } else if (k == TOKEN_PLUSPLUS || k == TOKEN_MINUSMINUS) {
+        init = parse_prefix_incdec_assign(p);
+        parse_consume(p, TOKEN_SEMICOLON);
     } else {
+        var lhs: u64 = parse_expr(p);
+        if (parse_match(p, TOKEN_EQ)) {
+            var rhs: u64 = parse_expr(p);
+            init = ast_assign(lhs, rhs);
+        } else {
+            init = parse_postfix_incdec_after_expr(p, lhs);
+        }
         parse_consume(p, TOKEN_SEMICOLON);
     }
     
@@ -217,23 +213,23 @@ func parse_for_stmt(p: u64) -> u64 {
     parse_consume(p, TOKEN_SEMICOLON);
     
     var update: u64 = 0;
-    if (parse_peek_kind(p) != TOKEN_RPAREN) {
-        if (parse_peek_kind(p) == TOKEN_PLUSPLUS) {
-            update = parse_prefix_incdec_assign(p);
+    k = parse_peek_kind(p);
+    
+    // Parse update clause
+    if (k == TOKEN_RPAREN) {
+        // No update clause
+    } else if (k == TOKEN_PLUSPLUS || k == TOKEN_MINUSMINUS) {
+        update = parse_prefix_incdec_assign(p);
+    } else {
+        var upd_lhs: u64 = parse_expr(p);
+        if (parse_match(p, TOKEN_EQ)) {
+            var upd_rhs: u64 = parse_expr(p);
+            update = ast_assign(upd_lhs, upd_rhs);
         } else {
-            if (parse_peek_kind(p) == TOKEN_MINUSMINUS) {
-                update = parse_prefix_incdec_assign(p);
-            } else {
-                var upd_lhs: u64 = parse_expr(p);
-                if (parse_match(p, TOKEN_EQ)) {
-                    var upd_rhs: u64 = parse_expr(p);
-                    update = ast_assign(upd_lhs, upd_rhs);
-                } else {
-                    update = parse_postfix_incdec_after_expr(p, upd_lhs);
-                }
-            }
+            update = parse_postfix_incdec_after_expr(p, upd_lhs);
         }
     }
+    
     parse_consume(p, TOKEN_RPAREN);
     
     var body: u64 = parse_block(p);
@@ -324,7 +320,7 @@ func parse_asm_stmt(p: u64) -> u64 {
     
     var asm_text: u64 = vec_new(256);
     
-    var prev_line: u64 = 0 - 1;
+    var prev_line: u64 = -1;
     
     while (parse_peek_kind(p) != TOKEN_RBRACE) {
         if (parse_peek_kind(p) == TOKEN_EOF) {
