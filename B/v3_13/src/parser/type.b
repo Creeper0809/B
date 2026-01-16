@@ -46,10 +46,12 @@ func parse_type(p: u64) -> u64 {
         depth = depth + 1;
     }
     var base: u64 = parse_base_type(p);
-    var result: u64 = heap_alloc(16);
-    *(result) = base;
-    *(result + 8) = depth;
-    return result;
+    var result: *TypeInfo = (*TypeInfo)heap_alloc(32);
+    result->type_kind = base;
+    result->ptr_depth = depth;
+    result->struct_name_ptr = 0;
+    result->struct_name_len = 0;
+    return (u64)result;
 }
 
 // Extended type parsing that also captures struct type name.
@@ -82,10 +84,10 @@ func parse_type_ex(p: u64) -> u64 {
         }
     }
 
-    var result: u64 = heap_alloc(32);
-    *(result) = base;
-    *(result + 8) = depth;
-    *(result + 16) = struct_name_ptr;
-    *(result + 24) = struct_name_len;
-    return result;
+    var result: *TypeInfo = (*TypeInfo)heap_alloc(32);
+    result->type_kind = base;
+    result->ptr_depth = depth;
+    result->struct_name_ptr = struct_name_ptr;
+    result->struct_name_len = struct_name_len;
+    return (u64)result;
 }

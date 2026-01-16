@@ -30,6 +30,7 @@ func parse_const_decl(p: u64) -> u64 {
     var name_tok: u64 = parse_peek(p);
     var name_ptr: u64 = tok_ptr(name_tok);
     var name_len: u64 = tok_len(name_tok);
+
     parse_consume(p, TOKEN_IDENTIFIER);
     
     parse_consume(p, TOKEN_EQ);
@@ -118,11 +119,11 @@ func parse_param(p: u64) -> u64 {
     var struct_name_len: u64 = 0;
     
     if (parse_match(p, TOKEN_COLON)) {
-        var ty: u64 = parse_type_ex(p);
-        type_kind = *(ty);
-        ptr_depth = *(ty + 8);
-        struct_name_ptr = *(ty + 16);
-        struct_name_len = *(ty + 24);
+        var ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
+        type_kind = ty->type_kind;
+        ptr_depth = ty->ptr_depth;
+        struct_name_ptr = ty->struct_name_ptr;
+        struct_name_len = ty->struct_name_len;
     }
     
     var param: *Param = (*Param)heap_alloc(48);
@@ -160,11 +161,11 @@ func parse_func_decl(p: u64) -> u64 {
     var ret_struct_name_len: u64 = 0;
     
     if (parse_match(p, TOKEN_ARROW)) {
-        var ty: u64 = parse_type_ex(p);
-        ret_type = *(ty);
-        ret_ptr_depth = *(ty + 8);
-        ret_struct_name_ptr = *(ty + 16);
-        ret_struct_name_len = *(ty + 24);
+        var ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
+        ret_type = ty->type_kind;
+        ret_ptr_depth = ty->ptr_depth;
+        ret_struct_name_ptr = ty->struct_name_ptr;
+        ret_struct_name_len = ty->struct_name_len;
     }
     
     var body: u64 = parse_block(p);
@@ -197,18 +198,16 @@ func parse_struct_def(p: u64) -> u64 {
         
         parse_consume(p, TOKEN_COLON);
         
-        var field_type: u64 = parse_type(p);
-        var field_type_kind: u64 = *(field_type);
-        var field_ptr_depth: u64 = *(field_type + 8);
+        var field_type: *TypeInfo = (*TypeInfo)parse_type(p);
         
         // If the field is a struct type, capture the struct name
         var field_struct_name_ptr: u64 = 0;
         var field_struct_name_len: u64 = 0;
-        if (field_type_kind == TYPE_STRUCT) {
-            var tok_vec: u64 = *(p);
-            var prev_idx: u64 = *(p + 8) - 1;
-            if (prev_idx >= 0 && prev_idx < vec_len(tok_vec)) {
-                var prev_tok: u64 = vec_get(tok_vec, prev_idx);
+        if ( field_type->type_kind == TYPE_STRUCT) {
+            var parser: *Parser = (*Parser)p;
+            var prev_idx: u64 = parser->cur - 1;
+            if (prev_idx >= 0 && prev_idx < vec_len(parser->tokens_vec)) {
+                var prev_tok: u64 = vec_get(parser->tokens_vec, prev_idx);
                 field_struct_name_ptr = tok_ptr(prev_tok);
                 field_struct_name_len = tok_len(prev_tok);
             }
@@ -219,10 +218,10 @@ func parse_struct_def(p: u64) -> u64 {
         var field_desc: *FieldDesc = (*FieldDesc)heap_alloc(48);
         field_desc->name_ptr = field_name_ptr;
         field_desc->name_len = field_name_len;
-        field_desc->type_kind = field_type_kind;
+        field_desc->type_kind =  field_type->type_kind;
         field_desc->struct_name_ptr = field_struct_name_ptr;
         field_desc->struct_name_len = field_struct_name_len;
-        field_desc->ptr_depth = field_ptr_depth;
+        field_desc->ptr_depth = field_type->ptr_depth;
         
         vec_push(fields, field_desc);
     }
@@ -400,13 +399,12 @@ func parse_program(p: u64) -> u64 {
         } else if (k == TOKEN_VAR) {
             parse_consume(p, TOKEN_VAR);
             var tok: u64 = parse_peek(p);
-            var name_ptr: u64 = tok_ptr(tok);
-            var name_len: u64 = tok_len(tok);
+            
             parse_consume(p, TOKEN_IDENTIFIER);
             parse_consume(p, TOKEN_SEMICOLON);
             var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(16);
-            ginfo->name_ptr = name_ptr;
-            ginfo->name_len = name_len;
+            ginfo->name_ptr = tok_ptr(tok);
+            ginfo->name_len = tok_len(tok);
             vec_push(globals, ginfo);
         } else if (k == TOKEN_IMPORT) {
             vec_push(imports, parse_import_decl(p));

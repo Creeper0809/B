@@ -33,7 +33,7 @@ func parse_var_decl(p: u64) -> u64 {
     var struct_name_len: u64 = 0;
     
     if (parse_match(p, TOKEN_COLON)) {
-        var before_type_idx: u64 = *(p + 8);  // Save position
+        var before_type_idx: u64 = (*Parser)p->cur;  // Save position
         
         var ty: u64 = parse_type(p);
         type_kind = *(ty);
@@ -41,11 +41,11 @@ func parse_var_decl(p: u64) -> u64 {
         
         // If TYPE_STRUCT, get the struct name from previous token
         if (type_kind == TYPE_STRUCT) {
-            var tok_vec: u64 = *(p);
-            var prev_idx: u64 = *(p + 8) - 1;
+            var parser: *Parser = (*Parser)p;
+            var prev_idx: u64 = parser->cur - 1;
             if (prev_idx >= 0) {
-                if (prev_idx < vec_len(tok_vec)) {
-                    var prev_tok: u64 = vec_get(tok_vec, prev_idx);
+                if (prev_idx < vec_len(parser->tokens_vec)) {
+                    var prev_tok: u64 = vec_get(parser->tokens_vec, prev_idx);
                     struct_name_ptr = tok_ptr(prev_tok);
                     struct_name_len = tok_len(prev_tok);
                 }

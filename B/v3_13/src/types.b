@@ -130,6 +130,20 @@ const TYPE_STRUCT = 20;
 // Parser Data Structures
 // ============================================
 
+// Parser state (16 bytes)
+struct Parser {
+    tokens_vec: u64;
+    cur: u64;
+}
+
+// Type information (32 bytes)
+struct TypeInfo {
+    type_kind: u64;
+    ptr_depth: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+}
+
 // Struct field descriptor (48 bytes)
 struct FieldDesc {
     name_ptr: u64;

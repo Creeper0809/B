@@ -13,17 +13,16 @@ import lexer;
 // Parser structure: [tokens_vec, cur]
 
 func parse_new(tokens: u64) -> u64 {
-    var p: u64 = heap_alloc(16);
-    *(p) = tokens;
-    *(p + 8) = 0;
-    return p;
+    var p: *Parser = (*Parser)heap_alloc(16);
+    p->tokens_vec = tokens;
+    p->cur = 0;
+    return (u64)p;
 }
 
 func parse_peek(p: u64) -> u64 {
-    var vec: u64 = *(p);
-    var cur: u64 = *(p + 8);
-    if (cur >= vec_len(vec)) { return 0; }
-    return vec_get(vec, cur);
+    var parser: *Parser = (*Parser)p;
+    if (parser->cur >= vec_len(parser->tokens_vec)) { return 0; }
+    return vec_get(parser->tokens_vec, parser->cur);
 }
 
 func parse_peek_kind(p: u64) -> u64 {
@@ -33,14 +32,14 @@ func parse_peek_kind(p: u64) -> u64 {
 }
 
 func parse_adv(p: u64) -> u64 {
-    *(p + 8) = *(p + 8) + 1;
+    var parser: *Parser = (*Parser)p;
+    parser->cur = parser->cur + 1;
 }
 
 func parse_prev(p: u64) -> u64 {
-    var vec: u64 = *(p);
-    var cur: u64 = *(p + 8);
-    if (cur == 0) { return 0; }
-    return vec_get(vec, cur - 1);
+    var parser: *Parser = (*Parser)p;
+    if (parser->cur == 0) { return 0; }
+    return vec_get(parser->tokens_vec, parser->cur - 1);
 }
 
 func parse_match(p: u64, kind: u64) -> u64 {

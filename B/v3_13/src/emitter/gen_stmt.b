@@ -17,11 +17,9 @@ import ast;
 func cg_block(node: u64) -> u64 {
     var stmts: u64 = *(node + 8);
     var len: u64 = vec_len(stmts);
-    var i: u64 = 0;
-    while (i < len) {
+    for(var i: u64 = 0; i < len;i++){
         cg_stmt(vec_get(stmts, i));
-        i = i + 1;
-    }
+   }
 }
 
 // ============================================
