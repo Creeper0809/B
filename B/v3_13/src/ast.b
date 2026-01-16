@@ -123,12 +123,14 @@ struct AstDeref8 {
     operand: u64;
 }
 
-// AST Cast node layout (32 bytes)
+// AST Cast node layout (48 bytes)
 struct AstCast {
     kind: u64;
     expr: u64;
     target_type: u64;
     target_ptr_depth: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
 }
 
 // AST_ADDR_OF: [kind, operand]
@@ -155,13 +157,26 @@ func ast_deref8(operand: u64) -> u64 {
     return (u64)n;
 }
 
-// AST_CAST: [kind, expr, target_type, target_ptr_depth]
+// AST_CAST: [kind, expr, target_type, target_ptr_depth, struct_name_ptr, struct_name_len]
 func ast_cast(expr: u64, target_type: u64, ptr_depth: u64) -> u64 {
-    var n: *AstCast = (*AstCast)(heap_alloc(32));
+    var n: *AstCast = (*AstCast)(heap_alloc(48));
     n->kind = AST_CAST;
     n->expr = expr;
     n->target_type = target_type;
     n->target_ptr_depth = ptr_depth;
+    n->struct_name_ptr = 0;
+    n->struct_name_len = 0;
+    return (u64)n;
+}
+
+func ast_cast_ex(expr: u64, target_type: u64, ptr_depth: u64, struct_name_ptr: u64, struct_name_len: u64) -> u64 {
+    var n: *AstCast = (*AstCast)(heap_alloc(48));
+    n->kind = AST_CAST;
+    n->expr = expr;
+    n->target_type = target_type;
+    n->target_ptr_depth = ptr_depth;
+    n->struct_name_ptr = struct_name_ptr;
+    n->struct_name_len = struct_name_len;
     return (u64)n;
 }
 

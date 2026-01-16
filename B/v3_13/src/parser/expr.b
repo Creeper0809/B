@@ -104,10 +104,25 @@ func parse_primary(p: u64) -> u64 {
         var next_k: u64 = parse_peek_kind(p);
         if (next_k == TOKEN_STAR || next_k == TOKEN_U8 || next_k == TOKEN_U16 || 
             next_k == TOKEN_U32 || next_k == TOKEN_U64 || next_k == TOKEN_I64) {
-            var ty: u64 = parse_type(p);
+            var ty: *TypeInfo = (*TypeInfo)parse_type(p);
             parse_consume(p, TOKEN_RPAREN);
             var operand: u64 = parse_unary(p);
-            return ast_cast(operand, *(ty), *(ty + 8));
+            
+            // If struct type, get struct name from TypeInfo (parse_type doesn't set it, so lookup)
+            var struct_name_ptr: u64 = 0;
+            var struct_name_len: u64 = 0;
+            if (ty->type_kind == TYPE_STRUCT) {
+                // Get struct name from previous token
+                var parser: *Parser = (*Parser)p;
+                var prev_idx: u64 = parser->cur - 1;
+                if (prev_idx >= 0 && prev_idx < vec_len(parser->tokens_vec)) {
+                    var prev_tok: u64 = vec_get(parser->tokens_vec, prev_idx);
+                    struct_name_ptr = tok_ptr(prev_tok);
+                    struct_name_len = tok_len(prev_tok);
+                }
+            }
+            
+            return ast_cast_ex(operand, ty->type_kind, ty->ptr_depth, struct_name_ptr, struct_name_len);
         }
         
         var expr: u64 = parse_expr(p);

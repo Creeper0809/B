@@ -193,9 +193,18 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
     
     if (kind == AST_CAST) {
-        var result: u64 = heap_alloc(16);
-        *(result) = *(node + 16);
-        *(result + 8) = *(node + 24);
+        var cast_node: *AstCast = (*AstCast)node;
+        var result: u64 = heap_alloc(24);
+        *(result) = cast_node->target_type;
+        *(result + 8) = cast_node->target_ptr_depth;
+        
+        // If it's a struct type, find the struct_def
+        if (cast_node->target_type == TYPE_STRUCT) {
+            var struct_def: u64 = get_struct_def(cast_node->struct_name_ptr, cast_node->struct_name_len);
+            *(result + 16) = struct_def;
+        } else {
+            *(result + 16) = 0;
+        }
         return result;
     }
     
