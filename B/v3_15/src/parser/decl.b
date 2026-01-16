@@ -126,7 +126,7 @@ func parse_param(p: u64) -> u64 {
         struct_name_len = ty->struct_name_len;
     }
     
-    var param: *Param = (*Param)heap_alloc(48);
+    var param: *Param = (*Param)heap_alloc(SIZEOF_PARAM);
     param->name_ptr = ((*Token)name_tok)->ptr;
     param->name_len = ((*Token)name_tok)->len;
     param->type_kind = type_kind;
@@ -215,7 +215,7 @@ func parse_struct_def(p: u64) -> u64 {
         
         parse_consume(p, TOKEN_SEMICOLON);
         
-        var field_desc: *FieldDesc = (*FieldDesc)heap_alloc(48);
+        var field_desc: *FieldDesc = (*FieldDesc)heap_alloc(SIZEOF_FIELD_DESC);
         field_desc->name_ptr = field_name_ptr;
         field_desc->name_len = field_name_len;
         field_desc->type_kind =  field_type->type_kind;
