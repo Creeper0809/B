@@ -125,3 +125,53 @@ const TYPE_U64 = 4;
 const TYPE_I64 = 5;
 const TYPE_PTR = 10;
 const TYPE_STRUCT = 20;
+
+// ============================================
+// Parser Data Structures
+// ============================================
+
+// Struct field descriptor (48 bytes)
+struct FieldDesc {
+    name_ptr: u64;
+    name_len: u64;
+    type_kind: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+    ptr_depth: u64;
+}
+
+// Global variable info (16 bytes)
+struct GlobalInfo {
+    name_ptr: u64;
+    name_len: u64;
+}
+
+// ============================================
+// Parser Data Structures
+// ============================================
+
+// Function parameter (48 bytes)
+struct Param {
+    name_ptr: u64;
+    name_len: u64;
+    type_kind: u64;
+    ptr_depth: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+}
+
+// Struct field descriptor (48 bytes)
+struct FieldDesc {
+    name_ptr: u64;
+    name_len: u64;
+    type_kind: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+    ptr_depth: u64;
+}
+
+// Global variable info (16 bytes)
+struct GlobalInfo {
+    name_ptr: u64;
+    name_len: u64;
+}

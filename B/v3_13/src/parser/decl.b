@@ -125,14 +125,13 @@ func parse_param(p: u64) -> u64 {
         struct_name_len = *(ty + 24);
     }
     
-    // Layout: [name_ptr:8][name_len:8][type_kind:8][ptr_depth:8][struct_name_ptr:8][struct_name_len:8]
-    var param: u64 = heap_alloc(48);
-    *(param) = tok_ptr(name_tok);
-    *(param + 8) = tok_len(name_tok);
-    *(param + 16) = type_kind;
-    *(param + 24) = ptr_depth;
-    *(param + 32) = struct_name_ptr;
-    *(param + 40) = struct_name_len;
+    var param: *Param = (*Param)heap_alloc(48);
+    param->name_ptr = tok_ptr(name_tok);
+    param->name_len = tok_len(name_tok);
+    param->type_kind = type_kind;
+    param->ptr_depth = ptr_depth;
+    param->struct_name_ptr = struct_name_ptr;
+    param->struct_name_len = struct_name_len;
     return param;
 }
 
@@ -217,14 +216,13 @@ func parse_struct_def(p: u64) -> u64 {
         
         parse_consume(p, TOKEN_SEMICOLON);
         
-        // field_desc = [name_ptr:8][name_len:8][type:8][struct_name_ptr:8][struct_name_len:8][ptr_depth:8]
-        var field_desc: u64 = heap_alloc(48);
-        *(field_desc) = field_name_ptr;
-        *(field_desc + 8) = field_name_len;
-        *(field_desc + 16) = field_type_kind;
-        *(field_desc + 24) = field_struct_name_ptr;
-        *(field_desc + 32) = field_struct_name_len;
-        *(field_desc + 40) = field_ptr_depth;
+        var field_desc: *FieldDesc = (*FieldDesc)heap_alloc(48);
+        field_desc->name_ptr = field_name_ptr;
+        field_desc->name_len = field_name_len;
+        field_desc->type_kind = field_type_kind;
+        field_desc->struct_name_ptr = field_struct_name_ptr;
+        field_desc->struct_name_len = field_struct_name_len;
+        field_desc->ptr_depth = field_ptr_depth;
         
         vec_push(fields, field_desc);
     }
@@ -406,9 +404,9 @@ func parse_program(p: u64) -> u64 {
             var name_len: u64 = tok_len(tok);
             parse_consume(p, TOKEN_IDENTIFIER);
             parse_consume(p, TOKEN_SEMICOLON);
-            var ginfo: u64 = heap_alloc(16);
-            *(ginfo) = name_ptr;
-            *(ginfo + 8) = name_len;
+            var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(16);
+            ginfo->name_ptr = name_ptr;
+            ginfo->name_len = name_len;
             vec_push(globals, ginfo);
         } else if (k == TOKEN_IMPORT) {
             vec_push(imports, parse_import_decl(p));

@@ -108,14 +108,10 @@ func sizeof_type(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_na
         var total_size: u64 = 0;
         
         for (var i: u64 = 0; i < num_fields; i++) {
-            var field: u64 = vec_get(fields, i);
-            var field_type: u64 = *(field + 16);
-            var field_struct_name_ptr: u64 = *(field + 24);
-            var field_struct_name_len: u64 = *(field + 32);
-            var field_ptr_depth: u64 = *(field + 40);
+            var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
             
             // Recursively calculate field size
-            var field_size: u64 = sizeof_type(field_type, field_ptr_depth, field_struct_name_ptr, field_struct_name_len);
+            var field_size: u64 = sizeof_type(field->type_kind, field->ptr_depth, field->struct_name_ptr, field->struct_name_len);
             total_size = total_size + field_size;
         }
         
@@ -138,21 +134,14 @@ func get_field_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64)
     var offset: u64 = 0;
     
     for (var i: u64 = 0; i < num_fields; i++) {
-        var field: u64 = vec_get(fields, i);
-        var fname_ptr: u64 = *(field);
-        var fname_len: u64 = *(field + 8);
+        var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
         
-        if (str_eq(fname_ptr, fname_len, field_name_ptr, field_name_len)) {
+        if (str_eq(field->name_ptr, field->name_len, field_name_ptr, field_name_len)) {
             return offset;
         }
         
         // Calculate field size based on type
-        var field_type: u64 = *(field + 16);
-        var field_struct_name_ptr: u64 = *(field + 24);
-        var field_struct_name_len: u64 = *(field + 32);
-        var field_ptr_depth: u64 = *(field + 40);
-        
-        var field_size: u64 = sizeof_type(field_type, field_ptr_depth, field_struct_name_ptr, field_struct_name_len);
+        var field_size: u64 = sizeof_type(field->type_kind, field->ptr_depth, field->struct_name_ptr, field->struct_name_len);
         offset = offset + field_size;
     }
     

@@ -110,10 +110,8 @@ func is_global_var(name_ptr: u64, name_len: u64) -> u64 {
     var len: u64 = vec_len(g_globals);
     var i: u64 = 0;
     while (i < len) {
-        var ginfo: u64 = vec_get(g_globals, i);
-        var g_ptr: u64 = *(ginfo);
-        var g_len: u64 = *(ginfo + 8);
-        if (str_eq(g_ptr, g_len, name_ptr, name_len)) {
+        var ginfo: *GlobalInfo = (*GlobalInfo)vec_get(g_globals, i);
+        if (str_eq(ginfo->name_ptr, ginfo->name_len, name_ptr, name_len)) {
             return 1;
         }
         i = i + 1;
@@ -260,12 +258,10 @@ func globals_emit_bss() -> u64 {
     
     var i: u64 = 0;
     while (i < count) {
-        var ginfo: u64 = vec_get(g_globals, i);
-        var name_ptr: u64 = *(ginfo);
-        var name_len: u64 = *(ginfo + 8);
+        var ginfo: *GlobalInfo = (*GlobalInfo)vec_get(g_globals, i);
         
         emit("_gvar_", 6);
-        emit(name_ptr, name_len);
+        emit(ginfo->name_ptr, ginfo->name_len);
         emit(": resq 1\n", 9);
         
         i = i + 1;

@@ -262,12 +262,8 @@ func cg_struct_literal_init(init: u64, offset: u64) -> u64 {
     var field_offset: u64 = 0;
     for (var i: u64 = 0; i < num_values; i++) {
         if (i < num_fields) {
-            var field: u64 = vec_get(fields, i);
-            var field_type: u64 = *(field + 16);
-            var field_struct_name_ptr: u64 = *(field + 24);
-            var field_struct_name_len: u64 = *(field + 32);
-            var field_ptr_depth: u64 = *(field + 40);
-            var field_size: u64 = sizeof_type(field_type, field_ptr_depth, field_struct_name_ptr, field_struct_name_len);
+            var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
+            var field_size: u64 = sizeof_type(field->type_kind, field->ptr_depth, field->struct_name_ptr, field->struct_name_len);
             
             // Evaluate field value
             cg_expr(vec_get(values, i));
