@@ -19,21 +19,20 @@ func cg_expr(node: u64) -> u64 {
     var symtab: u64 = emitter_get_symtab();
     
     if (kind == AST_LITERAL) {
-        var val: u64 = *(node + 8);
+        var n: *AstLiteral = (*AstLiteral)node;
         emit("    mov rax, ", 13);
-        if (val < 0) {
-            emit_i64(val);
+        if (n->val < 0) {
+            emit_i64(n->val);
         } else {
-            emit_u64(val);
+            emit_u64(n->val);
         }
         emit_nl();
         return;
     }
     
     if (kind == AST_STRING) {
-        var str_ptr: u64 = *(node + 8);
-        var str_len: u64 = *(node + 16);
-        var label_id: u64 = string_get_label(str_ptr, str_len);
+        var n: *AstString = (*AstString)node;
+        var label_id: u64 = string_get_label(n->ptr, n->len);
         emit("    lea rax, [rel _str", 22);
         emit_u64(label_id);
         emit("]\n", 2);
@@ -41,10 +40,9 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_IDENT) {
-        var name_ptr: u64 = *(node + 8);
-        var name_len: u64 = *(node + 16);
+        var n: *AstIdent = (*AstIdent)node;
         
-        var c_result: *ConstLookupResult = (*ConstLookupResult)const_find(name_ptr, name_len);
+        var c_result: *ConstLookupResult = (*ConstLookupResult)const_find(n->name_ptr, n->name_len);
         if (c_result->found == 1) {
             emit("    mov rax, ", 13);
             emit_u64(c_result->value);
@@ -52,14 +50,14 @@ func cg_expr(node: u64) -> u64 {
             return;
         }
         
-        if (is_global_var(name_ptr, name_len)) {
+        if (is_global_var(n->name_ptr, n->name_len)) {
             emit("    mov rax, [rel _gvar_", 24);
-            emit(name_ptr, name_len);
+            emit(n->name_ptr, n->name_len);
             emit("]\n", 2);
             return;
         }
         
-        var offset: u64 = symtab_find(symtab, name_ptr, name_len);
+        var offset: u64 = symtab_find(symtab, n->name_ptr, n->name_len);
         
         emit("    mov rax, [rbp", 17);
         if (offset < 0) { emit_i64(offset); }
@@ -79,12 +77,11 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_UNARY) {
-        var op: u64 = *(node + 8);
-        var operand: u64 = *(node + 16);
+        var n: *AstUnary = (*AstUnary)node;
         
-        cg_expr(operand);
-        if (op == TOKEN_MINUS) { emit("    neg rax\n", 12); }
-        else if (op == TOKEN_BANG) {
+        cg_expr(n->operand);
+        if (n->op == TOKEN_MINUS) { emit("    neg rax\n", 12); }
+        else if (n->op == TOKEN_BANG) {
             emit("    test rax, rax\n", 18);
             emit("    setz al\n", 12);
             emit("    movzx rax, al\n", 18);
@@ -93,10 +90,9 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_ADDR_OF) {
-        var operand: u64 = *(node + 8);
-        var name_ptr: u64 = *(operand + 8);
-        var name_len: u64 = *(operand + 16);
-        var offset: u64 = symtab_find(symtab, name_ptr, name_len);
+        var n: *AstAddrOf = (*AstAddrOf)node;
+        var operand_ident: *AstIdent = (*AstIdent)n->operand;
+        var offset: u64 = symtab_find(symtab, operand_ident->name_ptr, operand_ident->name_len);
         
         emit("    lea rax, [rbp", 17);
         if (offset < 0) { emit_i64(offset); }
@@ -106,23 +102,21 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_DEREF) {
-        var operand: u64 = *(node + 8);
-        cg_expr(operand);
+        var n: *AstDeref = (*AstDeref)node;
+        cg_expr(n->operand);
         
-        var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
-        var base_type: u64 = *(op_type);
-        var ptr_depth: u64 = *(op_type + 8);
+        var op_type: *TypeInfo = (*TypeInfo)get_expr_type_with_symtab(n->operand, symtab);
         
-        if (ptr_depth == 1) {
-            if (base_type == TYPE_U8) {
+        if (op_type->ptr_depth == 1) {
+            if (op_type->type_kind == TYPE_U8) {
                 emit("    movzx rax, byte [rax]\n", 26);
                 return;
             }
-            if (base_type == TYPE_U16) {
+            if (op_type->type_kind == TYPE_U16) {
                 emit("    movzx rax, word [rax]\n", 26);
                 return;
             }
-            if (base_type == TYPE_U32) {
+            if (op_type->type_kind == TYPE_U32) {
                 emit("    mov eax, [rax]\n", 19);
                 return;
             }
@@ -132,33 +126,31 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_DEREF8) {
-        var operand: u64 = *(node + 8);
-        cg_expr(operand);
+        var n: *AstDeref8 = (*AstDeref8)node;
+        cg_expr(n->operand);
         emit("    movzx rax, byte [rax]\n", 26);
         return;
     }
     
     if (kind == AST_CAST) {
-        var expr: u64 = *(node + 8);
-        cg_expr(expr);
+        var n: *AstCast = (*AstCast)node;
+        cg_expr(n->expr);
         return;
     }
     
     if (kind == AST_CALL) {
-        var name_ptr: u64 = *(node + 8);
-        var name_len: u64 = *(node + 16);
-        var args: u64 = *(node + 24);
-        var nargs: u64 = vec_len(args);
+        var n: *AstCall = (*AstCall)node;
+        var nargs: u64 = vec_len(n->args);
         
         var i: u64 = nargs - 1;
         while (i >= 0) {
-            cg_expr(vec_get(args, i));
+            cg_expr(vec_get(n->args, i));
             emit("    push rax\n", 13);
             i = i - 1;
         }
         
         emit("    call ", 9);
-        emit(name_ptr, name_len);
+        emit(n->name_ptr, n->name_len);
         emit_nl();
         
         if (nargs > 0) {
@@ -181,15 +173,13 @@ func cg_expr(node: u64) -> u64 {
 // ============================================
 
 func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
-    var object: u64 = *(node + 8);
-    var member_ptr: u64 = *(node + 16);
-    var member_len: u64 = *(node + 24);
+    var n: *AstMemberAccess = (*AstMemberAccess)node;
     
-    var obj_kind: u64 = ast_kind(object);
+    var obj_kind: u64 = ast_kind(n->object);
     
     // Handle ptr->field (object is AST_DEREF)
     if (obj_kind == AST_DEREF) {
-        var ptr_expr: u64 = *(object + 8);
+        var obj_deref: *AstDeref = (*AstDeref)n->object;
         
         // Evaluate pointer expression to get pointer value
         cg_expr(ptr_expr);
@@ -233,29 +223,27 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     // Handle nested member access: outer.inner.field
     if (obj_kind == AST_MEMBER_ACCESS) {
         // Recursively get the address of the nested object
-        cg_lvalue(object);
+        cg_lvalue(n->object);
         emit("    push rax\n", 13);
         
         // Get the type of the nested object
-        var obj_type: u64 = get_expr_type_with_symtab(object, symtab);
+        var obj_type: *TypeInfo = (*TypeInfo)get_expr_type_with_symtab(n->object, symtab);
         if (obj_type == 0) {
             emit_stderr("[ERROR] Cannot determine type of nested member access\n", 55);
             return;
         }
         
-        var base_type: u64 = *(obj_type);
-        if (base_type != TYPE_STRUCT) {
+        if (obj_type->type_kind != TYPE_STRUCT) {
             emit_stderr("[ERROR] Nested member access on non-struct\n", 44);
             return;
         }
         
-        var struct_def: u64 = *(obj_type + 16);
-        if (struct_def == 0) {
+        if (obj_type->struct_def == 0) {
             emit_stderr("[ERROR] Struct definition not found for nested access\n", 55);
             return;
         }
         
-        var field_offset: u64 = get_field_offset(struct_def, member_ptr, member_len);
+        var field_offset: u64 = get_field_offset(obj_type->struct_def, n->member_ptr, n->member_len);
         
         // Pop base address and add field offset
         emit("    pop rax\n", 12);
@@ -274,28 +262,24 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         return;
     }
     
-    var obj_name_ptr: u64 = *(object + 8);
-    var obj_name_len: u64 = *(object + 16);
+    var obj_ident: *AstIdent = (*AstIdent)n->object;
     
     // Get variable info from symtab
-    var var_offset: u64 = symtab_find(symtab, obj_name_ptr, obj_name_len);
-    var var_type: u64 = symtab_get_type(symtab, obj_name_ptr, obj_name_len);
-    var type_kind: u64 = *(var_type);
+    var var_offset: u64 = symtab_find(symtab, obj_ident->name_ptr, obj_ident->name_len);
+    var var_type: *TypeInfo = (*TypeInfo)symtab_get_type(symtab, obj_ident->name_ptr, obj_ident->name_len);
     
-    if (type_kind != TYPE_STRUCT) {
+    if (var_type->type_kind != TYPE_STRUCT) {
         emit_stderr("[ERROR] Member access on non-struct type\n", 42);
         return;
     }
     
     // Get struct_def directly from type_info
-    var struct_def: u64 = *(var_type + 16);
-    
-    if (struct_def == 0) {
+    if (var_type->struct_def == 0) {
         emit_stderr("[ERROR] Struct definition not found in type_info\n", 52);
         return;
     }
     
-    var field_offset: u64 = get_field_offset(struct_def, member_ptr, member_len);
+    var field_offset: u64 = get_field_offset(var_type->struct_def, n->member_ptr, n->member_len);
     
     // Calculate address: lea rax, [rbp + var_offset + field_offset]
     emit("    lea rax, [rbp", 17);
@@ -313,22 +297,20 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
 // ============================================
 
 func cg_binary_expr(node: u64, symtab: u64) -> u64 {
-    var op: u64 = *(node + 8);
-    var left: u64 = *(node + 16);
-    var right: u64 = *(node + 24);
+    var n: *AstBinary = (*AstBinary)node;
 
     // Short-circuit evaluation for && and ||
-    if (op == TOKEN_ANDAND) {
+    if (n->op == TOKEN_ANDAND) {
         var l_false: u64 = new_label();
         var l_end: u64 = new_label();
 
-        cg_expr(left);
+        cg_expr(n->left);
         emit("    test rax, rax\n", 18);
         emit("    jz ", 7);
         emit_label(l_false);
         emit("\n", 1);
 
-        cg_expr(right);
+        cg_expr(n->right);
         emit("    test rax, rax\n", 18);
         emit("    setne al\n", 13);
         emit("    movzx rax, al\n", 18);
@@ -342,17 +324,17 @@ func cg_binary_expr(node: u64, symtab: u64) -> u64 {
         return;
     }
 
-    if (op == TOKEN_OROR) {
+    if (n->op == TOKEN_OROR) {
         var l_true: u64 = new_label();
         var l_end: u64 = new_label();
 
-        cg_expr(left);
+        cg_expr(n->left);
         emit("    test rax, rax\n", 18);
         emit("    jnz ", 8);
         emit_label(l_true);
         emit("\n", 1);
 
-        cg_expr(right);
+        cg_expr(n->right);
         emit("    test rax, rax\n", 18);
         emit("    setne al\n", 13);
         emit("    movzx rax, al\n", 18);
@@ -367,19 +349,18 @@ func cg_binary_expr(node: u64, symtab: u64) -> u64 {
     }
     
     // Standard binary: evaluate both sides
-    cg_expr(left);
+    cg_expr(n->left);
     emit("    push rax\n", 13);
-    cg_expr(right);
+    cg_expr(n->right);
     emit("    mov rbx, rax\n", 17);
     emit("    pop rax\n", 12);
     
     // Pointer arithmetic scaling
-    var left_type: u64 = get_expr_type_with_symtab(left, symtab);
-    var ptr_depth: u64 = *(left_type + 8);
+    var left_type: *TypeInfo = (*TypeInfo)get_expr_type_with_symtab(n->left, symtab);
     
-    if (ptr_depth > 0) {
-        if (op == TOKEN_PLUS || op == TOKEN_MINUS) {
-            var psize: u64 = get_pointee_size(*(left_type), ptr_depth);
+    if (left_type->ptr_depth > 0) {
+        if (n->op == TOKEN_PLUS || n->op == TOKEN_MINUS) {
+            var psize: u64 = get_pointee_size(left_type->type_kind, left_type->ptr_depth);
             if (psize > 1) {
                 emit("    imul rbx, ", 14);
                 emit_u64(psize);
@@ -389,58 +370,58 @@ func cg_binary_expr(node: u64, symtab: u64) -> u64 {
     }
     
     // Arithmetic operators
-    if (op == TOKEN_PLUS) { emit("    add rax, rbx\n", 17); }
-    else if (op == TOKEN_MINUS) { emit("    sub rax, rbx\n", 17); }
-    else if (op == TOKEN_STAR) { emit("    imul rax, rbx\n", 18); }
-    else if (op == TOKEN_SLASH) {
+    if (n->op == TOKEN_PLUS) { emit("    add rax, rbx\n", 17); }
+    else if (n->op == TOKEN_MINUS) { emit("    sub rax, rbx\n", 17); }
+    else if (n->op == TOKEN_STAR) { emit("    imul rax, rbx\n", 18); }
+    else if (n->op == TOKEN_SLASH) {
         emit("    xor rdx, rdx\n", 17);
         emit("    div rbx\n", 12);
     }
-    else if (op == TOKEN_PERCENT) {
+    else if (n->op == TOKEN_PERCENT) {
         emit("    xor rdx, rdx\n", 17);
         emit("    div rbx\n", 12);
         emit("    mov rax, rdx\n", 17);
     }
     // Bitwise operators
-    else if (op == TOKEN_CARET) { emit("    xor rax, rbx\n", 17); }
-    else if (op == TOKEN_AMPERSAND) { emit("    and rax, rbx\n", 17); }
-    else if (op == TOKEN_PIPE) { emit("    or rax, rbx\n", 16); }
+    else if (n->op == TOKEN_CARET) { emit("    xor rax, rbx\n", 17); }
+    else if (n->op == TOKEN_AMPERSAND) { emit("    and rax, rbx\n", 17); }
+    else if (n->op == TOKEN_PIPE) { emit("    or rax, rbx\n", 16); }
     // Shift operators
-    else if (op == TOKEN_LSHIFT) { 
+    else if (n->op == TOKEN_LSHIFT) { 
         emit("    mov rcx, rbx\n", 17);
         emit("    shl rax, cl\n", 16);
     }
-    else if (op == TOKEN_RSHIFT) {
+    else if (n->op == TOKEN_RSHIFT) {
         emit("    mov rcx, rbx\n", 17);
         emit("    shr rax, cl\n", 16);
     }
     // Comparison operators
-    else if (op == TOKEN_LT) {
+    else if (n->op == TOKEN_LT) {
         emit("    cmp rax, rbx\n", 17);
         emit("    setl al\n", 12);
         emit("    movzx rax, al\n", 18);
     }
-    else if (op == TOKEN_GT) {
+    else if (n->op == TOKEN_GT) {
         emit("    cmp rax, rbx\n", 17);
         emit("    setg al\n", 12);
         emit("    movzx rax, al\n", 18);
     }
-    else if (op == TOKEN_LTEQ) {
+    else if (n->op == TOKEN_LTEQ) {
         emit("    cmp rax, rbx\n", 17);
         emit("    setle al\n", 13);
         emit("    movzx rax, al\n", 18);
     }
-    else if (op == TOKEN_GTEQ) {
+    else if (n->op == TOKEN_GTEQ) {
         emit("    cmp rax, rbx\n", 17);
         emit("    setge al\n", 13);
         emit("    movzx rax, al\n", 18);
     }
-    else if (op == TOKEN_EQEQ) {
+    else if (n->op == TOKEN_EQEQ) {
         emit("    cmp rax, rbx\n", 17);
         emit("    sete al\n", 12);
         emit("    movzx rax, al\n", 18);
     }
-    else if (op == TOKEN_BANGEQ) {
+    else if (n->op == TOKEN_BANGEQ) {
         emit("    cmp rax, rbx\n", 17);
         emit("    setne al\n", 13);
         emit("    movzx rax, al\n", 18);
@@ -456,17 +437,16 @@ func cg_lvalue(node: u64) -> u64 {
     var symtab: u64 = emitter_get_symtab();
     
     if (kind == AST_IDENT) {
-        var name_ptr: u64 = *(node + 8);
-        var name_len: u64 = *(node + 16);
+        var n: *AstIdent = (*AstIdent)node;
         
-        if (is_global_var(name_ptr, name_len)) {
+        if (is_global_var(n->name_ptr, n->name_len)) {
             emit("    lea rax, [rel _gvar_", 24);
-            emit(name_ptr, name_len);
+            emit(n->name_ptr, n->name_len);
             emit("]\n", 2);
             return;
         }
         
-        var offset: u64 = symtab_find(symtab, name_ptr, name_len);
+        var offset: u64 = symtab_find(symtab, n->name_ptr, n->name_len);
         
         emit("    lea rax, [rbp", 17);
         if (offset < 0) { emit_i64(offset); }
@@ -476,14 +456,14 @@ func cg_lvalue(node: u64) -> u64 {
     }
     
     if (kind == AST_DEREF) {
-        var operand: u64 = *(node + 8);
-        cg_expr(operand);
+        var n: *AstDeref = (*AstDeref)node;
+        cg_expr(n->operand);
         return;
     }
     
     if (kind == AST_DEREF8) {
-        var operand: u64 = *(node + 8);
-        cg_expr(operand);
+        var n: *AstDeref8 = (*AstDeref8)node;
+        cg_expr(n->operand);
         return;
     }
     
@@ -498,15 +478,13 @@ func cg_lvalue(node: u64) -> u64 {
 // ============================================
 
 func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
-    var object: u64 = *(node + 8);
-    var member_ptr: u64 = *(node + 16);
-    var member_len: u64 = *(node + 24);
+    var n: *AstMemberAccess = (*AstMemberAccess)node;
     
-    var obj_kind: u64 = ast_kind(object);
+    var obj_kind: u64 = ast_kind(n->object);
     
     // Handle ptr->field (object is AST_DEREF)
     if (obj_kind == AST_DEREF) {
-        var ptr_expr: u64 = *(object + 8);
+        var obj_deref: *AstDeref = (*AstDeref)n->object;
         
         // Evaluate pointer expression to get pointer value
         cg_expr(ptr_expr);
@@ -549,29 +527,27 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
     // Handle nested member access: outer.inner.field (lvalue)
     if (obj_kind == AST_MEMBER_ACCESS) {
         // Recursively get the address of the nested object
-        cg_lvalue(object);
+        cg_lvalue(n->object);
         emit("    push rax\n", 13);
         
         // Get the type of the nested object
-        var obj_type: u64 = get_expr_type_with_symtab(object, symtab);
+        var obj_type: *TypeInfo = (*TypeInfo)get_expr_type_with_symtab(n->object, symtab);
         if (obj_type == 0) {
             emit_stderr("[ERROR] Cannot determine type of nested member in lvalue\n", 58);
             return;
         }
         
-        var base_type: u64 = *(obj_type);
-        if (base_type != TYPE_STRUCT) {
+        if (obj_type->type_kind != TYPE_STRUCT) {
             emit_stderr("[ERROR] Nested member access on non-struct in lvalue\n", 54);
             return;
         }
         
-        var struct_def: u64 = *(obj_type + 16);
-        if (struct_def == 0) {
+        if (obj_type->struct_def == 0) {
             emit_stderr("[ERROR] Struct definition not found for nested lvalue\n", 55);
             return;
         }
         
-        var field_offset: u64 = get_field_offset(struct_def, member_ptr, member_len);
+        var field_offset: u64 = get_field_offset(obj_type->struct_def, n->member_ptr, n->member_len);
         
         // Pop base address and add field offset
         emit("    pop rax\n", 12);
@@ -589,17 +565,16 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         return;
     }
     
-    var obj_name_ptr: u64 = *(object + 8);
-    var obj_name_len: u64 = *(object + 16);
+    var obj_ident: *AstIdent = (*AstIdent)n->object;
     
     // Get variable info from symtab
-    var var_offset: u64 = symtab_find(symtab, obj_name_ptr, obj_name_len);
-    var var_type: u64 = symtab_get_type(symtab, obj_name_ptr, obj_name_len);
+    var var_offset: u64 = symtab_find(symtab, obj_ident->name_ptr, obj_ident->name_len);
+    var var_type: *TypeInfo = (*TypeInfo)symtab_get_type(symtab, obj_ident->name_ptr, obj_ident->name_len);
     
     // Get struct_def directly from type_info
     var struct_def: u64 = 0;
     if (var_type != 0) {
-        struct_def = *(var_type + 16);
+        struct_def = var_type->struct_def;
     }
     
     if (struct_def == 0) {
@@ -607,7 +582,7 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         return;
     }
     
-    var field_offset: u64 = get_field_offset(struct_def, member_ptr, member_len);
+    var field_offset: u64 = get_field_offset(struct_def, n->member_ptr, n->member_len);
     
     // Calculate address: lea rax, [rbp + var_offset + field_offset]
     emit("    lea rax, [rbp", 17);
