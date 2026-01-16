@@ -19,7 +19,8 @@ func cg_expr(node: u64) -> u64 {
     var symtab: u64 = emitter_get_symtab();
     
     if (kind == AST_LITERAL) {
-        var val: u64 = *(node + 8);
+        var lit: *AstLiteral = (*AstLiteral)node;
+        var val: u64 = lit->value;
         emit("    mov rax, ", 13);
         if (val < 0) {
             emit_i64(val);
@@ -31,8 +32,9 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_STRING) {
-        var str_ptr: u64 = *(node + 8);
-        var str_len: u64 = *(node + 16);
+        var str: *AstString = (*AstString)node;
+        var str_ptr: u64 = str->str_ptr;
+        var str_len: u64 = str->str_len;
         var label_id: u64 = string_get_label(str_ptr, str_len);
         emit("    lea rax, [rel _str", 22);
         emit_u64(label_id);
@@ -41,8 +43,9 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_IDENT) {
-        var name_ptr: u64 = *(node + 8);
-        var name_len: u64 = *(node + 16);
+        var ident: *AstIdent = (*AstIdent)node;
+        var name_ptr: u64 = ident->name_ptr;
+        var name_len: u64 = ident->name_len;
         
         var c_result: u64 = const_find(name_ptr, name_len);
         if (*(c_result) == 1) {
@@ -79,8 +82,9 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_UNARY) {
-        var op: u64 = *(node + 8);
-        var operand: u64 = *(node + 16);
+        var unary: *AstUnary = (*AstUnary)node;
+        var op: u64 = unary->op;
+        var operand: u64 = unary->operand;
         
         cg_expr(operand);
         if (op == TOKEN_MINUS) { emit("    neg rax\n", 12); }
@@ -93,9 +97,11 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_ADDR_OF) {
-        var operand: u64 = *(node + 8);
-        var name_ptr: u64 = *(operand + 8);
-        var name_len: u64 = *(operand + 16);
+        var addr_of: *AstAddrOf = (*AstAddrOf)node;
+        var operand: u64 = addr_of->operand;
+        var ident: *AstIdent = (*AstIdent)operand;
+        var name_ptr: u64 = ident->name_ptr;
+        var name_len: u64 = ident->name_len;
         var offset: u64 = symtab_find(symtab, name_ptr, name_len);
         
         emit("    lea rax, [rbp", 17);
@@ -106,12 +112,14 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_DEREF) {
-        var operand: u64 = *(node + 8);
+        var deref: *AstDeref = (*AstDeref)node;
+        var operand: u64 = deref->operand;
         cg_expr(operand);
         
         var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
-        var base_type: u64 = *(op_type);
-        var ptr_depth: u64 = *(op_type + 8);
+        var type_info: *TypeInfo = (*TypeInfo)op_type;
+        var base_type: u64 = type_info->type_kind;
+        var ptr_depth: u64 = type_info->ptr_depth;
         
         if (ptr_depth == 1) {
             if (base_type == TYPE_U8) {
@@ -132,22 +140,25 @@ func cg_expr(node: u64) -> u64 {
     }
     
     if (kind == AST_DEREF8) {
-        var operand: u64 = *(node + 8);
+        var deref8: *AstDeref8 = (*AstDeref8)node;
+        var operand: u64 = deref8->operand;
         cg_expr(operand);
         emit("    movzx rax, byte [rax]\n", 26);
         return;
     }
     
     if (kind == AST_CAST) {
-        var expr: u64 = *(node + 8);
+        var cast: *AstCast = (*AstCast)node;
+        var expr: u64 = cast->expr;
         cg_expr(expr);
         return;
     }
     
     if (kind == AST_CALL) {
-        var name_ptr: u64 = *(node + 8);
-        var name_len: u64 = *(node + 16);
-        var args: u64 = *(node + 24);
+        var call: *AstCall = (*AstCall)node;
+        var name_ptr: u64 = call->name_ptr;
+        var name_len: u64 = call->name_len;
+        var args: u64 = call->args_vec;
         var nargs: u64 = vec_len(args);
         
         var i: u64 = nargs - 1;
@@ -181,9 +192,10 @@ func cg_expr(node: u64) -> u64 {
 // ============================================
 
 func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
-    var object: u64 = *(node + 8);
-    var member_ptr: u64 = *(node + 16);
-    var member_len: u64 = *(node + 24);
+    var member_access: *AstMemberAccess = (*AstMemberAccess)node;
+    var object: u64 = member_access->object;
+    var member_ptr: u64 = member_access->member_ptr;
+    var member_len: u64 = member_access->member_len;
     
     var obj_kind: u64 = ast_kind(object);
     
@@ -313,9 +325,10 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
 // ============================================
 
 func cg_binary_expr(node: u64, symtab: u64) -> u64 {
-    var op: u64 = *(node + 8);
-    var left: u64 = *(node + 16);
-    var right: u64 = *(node + 24);
+    var binary: *AstBinary = (*AstBinary)node;
+    var op: u64 = binary->op;
+    var left: u64 = binary->left;
+    var right: u64 = binary->right;
 
     // Short-circuit evaluation for && and ||
     if (op == TOKEN_ANDAND) {
@@ -456,8 +469,9 @@ func cg_lvalue(node: u64) -> u64 {
     var symtab: u64 = emitter_get_symtab();
     
     if (kind == AST_IDENT) {
-        var name_ptr: u64 = *(node + 8);
-        var name_len: u64 = *(node + 16);
+        var ident: *AstIdent = (*AstIdent)node;
+        var name_ptr: u64 = ident->name_ptr;
+        var name_len: u64 = ident->name_len;
         
         if (is_global_var(name_ptr, name_len)) {
             emit("    lea rax, [rel _gvar_", 24);
@@ -476,13 +490,15 @@ func cg_lvalue(node: u64) -> u64 {
     }
     
     if (kind == AST_DEREF) {
-        var operand: u64 = *(node + 8);
+        var deref: *AstDeref = (*AstDeref)node;
+        var operand: u64 = deref->operand;
         cg_expr(operand);
         return;
     }
     
     if (kind == AST_DEREF8) {
-        var operand: u64 = *(node + 8);
+        var deref8: *AstDeref8 = (*AstDeref8)node;
+        var operand: u64 = deref8->operand;
         cg_expr(operand);
         return;
     }
@@ -498,9 +514,10 @@ func cg_lvalue(node: u64) -> u64 {
 // ============================================
 
 func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
-    var object: u64 = *(node + 8);
-    var member_ptr: u64 = *(node + 16);
-    var member_len: u64 = *(node + 24);
+    var member_access: *AstMemberAccess = (*AstMemberAccess)node;
+    var object: u64 = member_access->object;
+    var member_ptr: u64 = member_access->member_ptr;
+    var member_len: u64 = member_access->member_len;
     
     var obj_kind: u64 = ast_kind(object);
     
