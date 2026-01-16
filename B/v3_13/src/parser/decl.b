@@ -321,11 +321,11 @@ func parse_impl_block(p: u64) -> u64 {
         if (parse_peek_kind(p) == TOKEN_EOF) { break; }
         
         if (parse_peek_kind(p) == TOKEN_FUNC) {
-            var func_node: u64 = parse_func_decl(p);
+            var func_node: *AstFunc = (*AstFunc)parse_func_decl(p);
             
             // Rename function: methodName -> StructName_methodName
-            var original_name_ptr: u64 = *(func_node + 8);
-            var original_name_len: u64 = *(func_node + 16);
+            var original_name_ptr: u64 = func_node->name_ptr;
+            var original_name_len: u64 = func_node->name_len;
             
             // Create new name: StructName_methodName
             var new_name: u64 = vec_new(64);
@@ -346,10 +346,10 @@ func parse_impl_block(p: u64) -> u64 {
             }
             
             // Update function name
-            *(func_node + 8) = new_name_ptr;
-            *(func_node + 16) = new_name_len;
+            func_node->name_ptr = new_name_ptr;
+            func_node->name_len = new_name_len;
             
-            vec_push(funcs, func_node);
+            vec_push(funcs, (u64)func_node);
         } else {
             emit_stderr("[ERROR] impl block can only contain functions\n", 48);
             break;
