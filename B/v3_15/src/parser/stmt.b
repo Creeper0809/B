@@ -52,7 +52,7 @@ func parse_var_decl(p: u64) -> u64 {
     
     parse_consume(p, TOKEN_SEMICOLON);
     
-    var decl: *AstVarDecl = (*AstVarDecl)ast_var_decl((*Token)name_tok->ptr, (*Token)name_tok->len, type_kind, ptr_depth, init);
+    var decl: *AstVarDecl = (*AstVarDecl)ast_var_decl(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, type_kind, ptr_depth, init);
     decl->struct_name_ptr = struct_name_ptr;
     decl->struct_name_len = struct_name_len;
     return (u64)decl;
@@ -329,7 +329,7 @@ func parse_asm_stmt(p: u64) -> u64 {
         }
         
         var tok: u64 = parse_peek(p);
-        var cur_line: u64 = (*Token)tok->line;
+        var cur_line: u64 = ((*Token)tok)->line;
         
         if (prev_line >= 0) {
             if (cur_line > prev_line) {
@@ -340,8 +340,8 @@ func parse_asm_stmt(p: u64) -> u64 {
         }
         prev_line = cur_line;
         
-        var ptr: u64 = (*Token)tok->ptr;
-        var len: u64 = (*Token)tok->len;
+        var ptr: u64 = ((*Token)tok)->ptr;
+        var len: u64 = ((*Token)tok)->len;
 
         for (var i: u64 = 0; i < len; i++) {
             vec_push(asm_text, *(*u8)(ptr + i));

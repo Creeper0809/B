@@ -63,14 +63,14 @@ func emitter_get_ret_struct_name_len() -> u64 { return g_current_func_ret_struct
 // ============================================
 
 func emitter_init() -> u64 {
-    // Create symtab using Symtab struct
+    // Create symtab inline instead of calling symtab_new
+    // symtab = [names_vec, offsets_vec, types_vec, count, stack_offset]
     g_symtab = heap_alloc(40);
-    var s: *Symtab = (*Symtab)g_symtab;
-    s->names_vec = vec_new(64);
-    s->offsets_vec = vec_new(64);
-    s->types_vec = vec_new(64);
-    s->count = 0;
-    s->stack_offset = 0 - 8;  // starts at -8
+    *(g_symtab) = vec_new(64);       // names
+    *(g_symtab + 8) = vec_new(64);   // offsets
+    *(g_symtab + 16) = vec_new(64);  // types
+    *(g_symtab + 24) = 0;            // count
+    *(g_symtab + 32) = 0 - 8;        // stack_offset (starts at -8)
     
     g_label_counter = 0;
     g_strings = vec_new(32);
@@ -92,12 +92,12 @@ func emitter_load_consts(consts: u64) -> u64 {
     var clen: u64 = vec_len(consts);
     var ci: u64 = 0;
     while (ci < clen) {
-        var c_node: *AstConstDecl = (*AstConstDecl)vec_get(consts, ci);
-        var cinfo: *ConstInfo = (*ConstInfo)heap_alloc(24);
-        cinfo->name_ptr = c_node->name_ptr;
-        cinfo->name_len = c_node->name_len;
-        cinfo->value = c_node->value;
-        vec_push(g_consts, (u64)cinfo);
+        var c: u64 = vec_get(consts, ci);
+        var cinfo: u64 = heap_alloc(24);
+        *(cinfo) = *(c + 8);      // name_ptr
+        *(cinfo + 8) = *(c + 16); // name_len
+        *(cinfo + 16) = *(c + 24); // value
+        vec_push(g_consts, cinfo);
         ci = ci + 1;
     }
 }
@@ -127,18 +127,20 @@ func const_find(name_ptr: u64, name_len: u64) -> u64 {
     var len: u64 = vec_len(g_consts);
     var i: u64 = 0;
     while (i < len) {
-        var c: *ConstInfo = (*ConstInfo)vec_get(g_consts, i);
-        if (str_eq(c->name_ptr, c->name_len, name_ptr, name_len)) {
-            var result: *ConstLookupResult = (*ConstLookupResult)heap_alloc(16);
-            result->found = 1;
-            result->value = c->value;
-            return (u64)result;
+        var c: u64 = vec_get(g_consts, i);
+        var c_ptr: u64 = *(c);
+        var c_len: u64 = *(c + 8);
+        if (str_eq(c_ptr, c_len, name_ptr, name_len)) {
+            var result: u64 = heap_alloc(16);
+            *(result) = 1;           // found
+            *(result + 8) = *(c + 16); // value
+            return result;
         }
         i = i + 1;
     }
-    var result: *ConstLookupResult = (*ConstLookupResult)heap_alloc(16);
-    result->found = 0;
-    return (u64)result;
+    var result: u64 = heap_alloc(16);
+    *(result) = 0;  // not found
+    return result;
 }
 
 // ============================================
@@ -175,10 +177,12 @@ func string_get_label(str_ptr: u64, str_len: u64) -> u64 {
     var count: u64 = vec_len(g_strings);
     
     while (i < count) {
-        var entry: *StringEntry = (*StringEntry)vec_get(g_strings, i);
+        var entry: u64 = vec_get(g_strings, i);
+        var e_ptr: u64 = *(entry);
+        var e_len: u64 = *(entry + 8);
         
-        if (str_eq(entry->str_ptr, entry->str_len, str_ptr, str_len)) {
-            return entry->label_id;
+        if (str_eq(e_ptr, e_len, str_ptr, str_len)) {
+            return *(entry + 16);
         }
         i = i + 1;
     }
@@ -186,11 +190,11 @@ func string_get_label(str_ptr: u64, str_len: u64) -> u64 {
     var label_id: u64 = g_label_counter;
     g_label_counter = g_label_counter + 1;
     
-    var entry: *StringEntry = (*StringEntry)heap_alloc(24);
-    entry->str_ptr = str_ptr;
-    entry->str_len = str_len;
-    entry->label_id = label_id;
-    vec_push(g_strings, (u64)entry);
+    var entry: u64 = heap_alloc(24);
+    *(entry) = str_ptr;
+    *(entry + 8) = str_len;
+    *(entry + 16) = label_id;
+    vec_push(g_strings, entry);
     
     return label_id;
 }
@@ -204,20 +208,23 @@ func string_emit_data() -> u64 {
     
     var i: u64 = 0;
     while (i < count) {
-        var entry: *StringEntry = (*StringEntry)vec_get(g_strings, i);
+        var entry: u64 = vec_get(g_strings, i);
+        var str_ptr: u64 = *(entry);
+        var str_len: u64 = *(entry + 8);
+        var label_id: u64 = *(entry + 16);
         
         emit("_str", 4);
-        emit_u64(entry->label_id);
+        emit_u64(label_id);
         emit(": db ", 5);
         
         var j: u64 = 1;
-        while (j < entry->str_len - 1) {
-            var c: u64 = *(*u8)(entry->str_ptr + j);
+        while (j < str_len - 1) {
+            var c: u64 = *(*u8)(str_ptr + j);
             
             if (c == 92) {  // backslash
                 j = j + 1;
-                if (j < entry->str_len - 1) {
-                    var ec: u64 = *(*u8)(entry->str_ptr + j);
+                if (j < str_len - 1) {
+                    var ec: u64 = *(*u8)(str_ptr + j);
                     if (ec == 110) { emit("10", 2); }       // \n
                     else if (ec == 116) { emit("9", 1); }   // \t
                     else if (ec == 48) { emit("0", 1); }    // \0
@@ -230,7 +237,7 @@ func string_emit_data() -> u64 {
             }
             
             j = j + 1;
-            if (j < entry->str_len - 1) { emit(",", 1); }
+            if (j < str_len - 1) { emit(",", 1); }
         }
         
         emit(",0\n", 3);

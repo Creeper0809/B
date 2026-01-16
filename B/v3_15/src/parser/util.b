@@ -28,7 +28,7 @@ func parse_peek(p: u64) -> u64 {
 func parse_peek_kind(p: u64) -> u64 {
     var tok: u64 = parse_peek(p);
     if (tok == 0) { return TOKEN_EOF; }
-    return (*Token)tok->kind;
+    return ((*Token)tok)->kind;
 }
 
 func parse_adv(p: u64) -> u64 {
@@ -61,14 +61,14 @@ func parse_consume(p: u64, kind: u64) -> u64 {
         var tok: u64 = parse_peek(p);
         if (tok != 0) {
             emit(" at ", 4);
-            emit_u64((*Token)tok->line);
+            emit_u64(((*Token)tok)->line);
             emit(":", 1);
-            emit_u64((*Token)tok->col);
+            emit_u64(((*Token)tok)->col);
             emit(" token=", 7);
             if (got == TOKEN_EOF) {
                 emit("<eof>", 5);
             } else {
-                emit((*Token)tok->ptr, (*Token)tok->len);
+                emit(((*Token)tok)->ptr, ((*Token)tok)->len);
             }
         }
         emit_nl();
@@ -81,8 +81,8 @@ func parse_consume(p: u64, kind: u64) -> u64 {
 // ============================================
 
 func parse_num_val(tok: u64) -> u64 {
-    var ptr: u64 = (*Token)tok->ptr;
-    var len: u64 = (*Token)tok->len;
+    var ptr: u64 = ((*Token)tok)->ptr;
+    var len: u64 = ((*Token)tok)->len;
     var val: u64 = 0;
 
     // i64 max = 9223372036854775807
@@ -95,9 +95,9 @@ func parse_num_val(tok: u64) -> u64 {
 
         if (val > max_div10) {
             emit_stderr("[ERROR] Integer literal overflow at ", 38);
-            emit_u64((*Token)tok->line);
+            emit_u64(((*Token)tok)->line);
             emit_stderr(":", 1);
-            emit_u64((*Token)tok->col);
+            emit_u64(((*Token)tok)->col);
             emit_stderr(" literal=", 9);
             emit_stderr(ptr, len);
             emit_nl();
@@ -106,9 +106,9 @@ func parse_num_val(tok: u64) -> u64 {
         if (val == max_div10) {
             if (digit > max_mod10) {
                 emit_stderr("[ERROR] Integer literal overflow at ", 38);
-                emit_u64((*Token)tok->line);
+                emit_u64(((*Token)tok)->line);
                 emit_stderr(":", 1);
-                emit_u64((*Token)tok->col);
+                emit_u64(((*Token)tok)->col);
                 emit_stderr(" literal=", 9);
                 emit_stderr(ptr, len);
                 emit_nl();

@@ -56,10 +56,9 @@ func cg_func(node: u64) -> u64 {
     for(var i: u64 = 0 ; i < nparams ; i++){
          var p: *FuncParam = (*FuncParam)vec_get(fn->params_vec, i);
         
-        var st: *Symtab = (*Symtab)g_symtab;
-        var names: u64  = st->names_vec;
-        var offsets: u64 = st->offsets_vec;
-        var types: u64 = st->types_vec;
+        var names: u64  = *(g_symtab);
+        var offsets: u64 = *(g_symtab + 8);
+        var types: u64 = *(g_symtab + 16);
         
         var name_info: u64 = heap_alloc(16);
         *(name_info) = p->name_ptr;
@@ -87,7 +86,7 @@ func cg_func(node: u64) -> u64 {
         }
         vec_push(types, type_info);
         
-        st->count = st->count + 1;
+        *(g_symtab + 24) = *(g_symtab + 24) + 1;
     }
     
     cg_block(fn->body);

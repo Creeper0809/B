@@ -18,38 +18,34 @@ import types;
 
 func symtab_new() -> u64 {
     var s: u64 = heap_alloc(40);
-    var st: *Symtab = (*Symtab)s;
-    st->names_vec = vec_new(64);
-    st->offsets_vec = vec_new(64);
-    st->types_vec = vec_new(64);
-    st->count = 0;
-    st->stack_offset = 0;
+    *(s) = vec_new(64);       // names
+    *(s + 8) = vec_new(64);   // offsets
+    *(s + 16) = vec_new(64);  // types
+    *(s + 24) = 0;            // count
+    *(s + 32) = 0;            // stack_offset
     return s;
 }
 
 func symtab_clear(s: u64) -> u64 {
-    var st: *Symtab = (*Symtab)s;
-    st->count = 0;
-    st->stack_offset = 0;
-    
-    var names: u64 = st->names_vec;
+    *(s + 24) = 0;            // count = 0
+    *(s + 32) = 0;            // stack_offset = 0
+    var names: u64 = *(s);
     *(names + 8) = 0;         // names.len = 0
-    var offsets: u64 = st->offsets_vec;
+    var offsets: u64 = *(s + 8);
     *(offsets + 8) = 0;       // offsets.len = 0
-    var types: u64 = st->types_vec;
+    var types: u64 = *(s + 16);
     *(types + 8) = 0;         // types.len = 0
 }
 
 func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth: u64, size: u64) -> u64 {
-    var st: *Symtab = (*Symtab)s;
-    var names: u64 = st->names_vec;
-    var offsets: u64 = st->offsets_vec;
-    var types: u64 = st->types_vec;
-    var count: u64 = st->count;
+    var names: u64 = *(s);
+    var offsets: u64 = *(s + 8);
+    var types: u64 = *(s + 16);
+    var count: u64 = *(s + 24);
     
     // Allocate on stack (grow downward)
-    var offset: u64 = st->stack_offset - size;
-    st->stack_offset = offset;
+    var offset: u64 = *(s + 32) - size;
+    *(s + 32) = offset;
     
     // Add name info
     var name_info: u64 = heap_alloc(16);
@@ -67,16 +63,15 @@ func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth:
     *(type_info + 16) = 0;  // struct_def pointer (filled later for TYPE_STRUCT)
     vec_push(types, type_info);
     
-    st->count = count + 1;
+    *(s + 24) = count + 1;
     
     return offset;
 }
 
 func symtab_find(s: u64, name_ptr: u64, name_len: u64) -> u64 {
-    var st: *Symtab = (*Symtab)s;
-    var names: u64 = st->names_vec;
-    var offsets: u64 = st->offsets_vec;
-    var count: u64 = st->count;
+    var names: u64 = *(s);
+    var offsets: u64 = *(s + 8);
+    var count: u64 = *(s + 24);
     
     var i: u64 = count - 1;
     while (i >= 0) {
@@ -94,10 +89,9 @@ func symtab_find(s: u64, name_ptr: u64, name_len: u64) -> u64 {
 }
 
 func symtab_get_type(s: u64, name_ptr: u64, name_len: u64) -> u64 {
-    var st: *Symtab = (*Symtab)s;
-    var names: u64 = st->names_vec;
-    var types: u64 = st->types_vec;
-    var count: u64 = st->count;
+    var names: u64 = *(s);
+    var types: u64 = *(s + 16);
+    var count: u64 = *(s + 24);
     
     var i: u64 = count - 1;
     while (i >= 0) {
@@ -115,10 +109,9 @@ func symtab_get_type(s: u64, name_ptr: u64, name_len: u64) -> u64 {
 }
 
 func symtab_update_type(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth: u64) -> u64 {
-    var st: *Symtab = (*Symtab)s;
-    var names: u64 = st->names_vec;
-    var types: u64 = st->types_vec;
-    var count: u64 = st->count;
+    var names: u64 = *(s);
+    var types: u64 = *(s + 16);
+    var count: u64 = *(s + 24);
     
     var i: u64 = count - 1;
     while (i >= 0) {

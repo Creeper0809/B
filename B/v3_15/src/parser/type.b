@@ -27,8 +27,8 @@ func parse_base_type(p: u64) -> u64 {
     // Check for struct type name
     if (k == TOKEN_IDENTIFIER) {
         var tok: u64 = parse_peek(p);
-        var name_ptr: u64 = (*Token)tok->ptr;
-        var name_len: u64 = (*Token)tok->len;
+        var name_ptr: u64 = ((*Token)tok)->ptr;
+        var name_len: u64 = ((*Token)tok)->len;
         
         // Call is_struct_type (defined in main.b)
         if (is_struct_type(name_ptr, name_len) != 0) {
@@ -74,8 +74,8 @@ func parse_type_ex(p: u64) -> u64 {
     else if (k == TOKEN_I64) { parse_adv(p); base = TYPE_I64; }
     else if (k == TOKEN_IDENTIFIER) {
         var tok: u64 = parse_peek(p);
-        var name_ptr: u64 = (*Token)tok->ptr;
-        var name_len: u64 = (*Token)tok->len;
+        var name_ptr: u64 = ((*Token)tok)->ptr;
+        var name_len: u64 = ((*Token)tok)->len;
         if (is_struct_type(name_ptr, name_len) != 0) {
             parse_adv(p);
             base = TYPE_STRUCT;

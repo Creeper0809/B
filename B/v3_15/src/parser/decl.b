@@ -28,8 +28,8 @@ func parse_const_decl(p: u64) -> u64 {
     parse_consume(p, TOKEN_CONST);
     
     var name_tok: u64 = parse_peek(p);
-    var name_ptr: u64 = (*Token)name_tok->ptr;
-    var name_len: u64 = (*Token)name_tok->len;
+    var name_ptr: u64 = ((*Token)name_tok)->ptr;
+    var name_len: u64 = ((*Token)name_tok)->len;
 
     parse_consume(p, TOKEN_IDENTIFIER);
     
@@ -49,7 +49,7 @@ func parse_const_decl(p: u64) -> u64 {
         parse_consume(p, TOKEN_NUMBER);
     } else if (parse_peek_kind(p) == TOKEN_CHAR) {
         var char_tok: u64 = parse_peek(p);
-        var char_ptr: u64 = (*Token)char_tok->ptr;
+        var char_ptr: u64 = ((*Token)char_tok)->ptr;
         value = *(*u8)(char_ptr + 1);
         // Handle escape sequences
         if (*(*u8)(char_ptr + 1) == 92) {
@@ -85,8 +85,8 @@ func parse_import_decl(p: u64) -> u64 {
     var first_tok: u64 = parse_peek(p);
     parse_consume(p, TOKEN_IDENTIFIER);
     
-    var path_ptr: u64 = (*Token)first_tok->ptr;
-    var path_len: u64 = (*Token)first_tok->len;
+    var path_ptr: u64  = ((*Token)first_tok)->ptr;
+    var path_len: u64 = ((*Token)first_tok)->len;
     
     while (parse_match(p, TOKEN_DOT)) {
         var next_tok: u64 = parse_peek(p);
@@ -96,8 +96,8 @@ func parse_import_decl(p: u64) -> u64 {
         *(*u8)slash = 47;
         
         var tmp: u64 = str_concat(path_ptr, path_len, slash, 1);
-        path_ptr = str_concat(tmp, path_len + 1, (*Token)next_tok->ptr, (*Token)next_tok->len);
-        path_len = path_len + 1 + (*Token)next_tok->len;
+        path_ptr = str_concat(tmp, path_len + 1, ((*Token)next_tok)->ptr, ((*Token)next_tok)->len);
+        path_len = path_len + 1 + ((*Token)next_tok)->len;
     }
     
     parse_consume(p, TOKEN_SEMICOLON);
@@ -127,8 +127,8 @@ func parse_param(p: u64) -> u64 {
     }
     
     var param: *Param = (*Param)heap_alloc(48);
-    param->name_ptr = (*Token)name_tok->ptr;
-    param->name_len = (*Token)name_tok->len;
+    param->name_ptr = ((*Token)name_tok)->ptr;
+    param->name_len = ((*Token)name_tok)->len;
     param->type_kind = type_kind;
     param->ptr_depth = ptr_depth;
     param->struct_name_ptr = struct_name_ptr;
@@ -170,7 +170,7 @@ func parse_func_decl(p: u64) -> u64 {
     
     var body: u64 = parse_block(p);
     
-    return ast_func_ex((*Token)name_tok->ptr, (*Token)name_tok->len, params, ret_type, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len, body);
+    return ast_func_ex(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, params, ret_type, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len, body);
 }
 
 // ============================================
@@ -181,8 +181,8 @@ func parse_struct_def(p: u64) -> u64 {
     parse_consume(p, TOKEN_STRUCT);
     
     var name_tok: u64 = parse_peek(p);
-    var name_ptr: u64 = (*Token)name_tok->ptr;
-    var name_len: u64 = (*Token)name_tok->len;
+    var name_ptr: u64 = ((*Token)name_tok)->ptr;
+    var name_len: u64 = ((*Token)name_tok)->len;
     parse_consume(p, TOKEN_IDENTIFIER);
     
     parse_consume(p, TOKEN_LBRACE);
@@ -192,8 +192,8 @@ func parse_struct_def(p: u64) -> u64 {
     // Parse fields: field_name : type ;
     while (parse_peek_kind(p) != TOKEN_RBRACE) {
         var field_name_tok: u64 = parse_peek(p);
-        var field_name_ptr: u64 = (*Token)field_name_tok->ptr;
-        var field_name_len: u64 = (*Token)field_name_tok->len;
+        var field_name_ptr: u64 = ((*Token)field_name_tok)->ptr;
+        var field_name_len: u64 = ((*Token)field_name_tok)->len;
         parse_consume(p, TOKEN_IDENTIFIER);
         
         parse_consume(p, TOKEN_COLON);
@@ -208,8 +208,8 @@ func parse_struct_def(p: u64) -> u64 {
             var prev_idx: u64 = parser->cur - 1;
             if (prev_idx >= 0 && prev_idx < vec_len(parser->tokens_vec)) {
                 var prev_tok: u64 = vec_get(parser->tokens_vec, prev_idx);
-                field_struct_name_ptr = (*Token)prev_tok->ptr;
-                field_struct_name_len = (*Token)prev_tok->len;
+                field_struct_name_ptr = ((*Token)prev_tok)->ptr;
+                field_struct_name_len = ((*Token)prev_tok)->len;
             }
         }
         
@@ -240,8 +240,8 @@ func parse_enum_def(p: u64) -> u64 {
     parse_consume(p, TOKEN_ENUM);
     
     var enum_name_tok: u64 = parse_peek(p);
-    var enum_name_ptr: u64 = (*Token)enum_name_tok->ptr;
-    var enum_name_len: u64 = (*Token)enum_name_tok->len;
+    var enum_name_ptr: u64 = ((*Token)enum_name_tok)->ptr;
+    var enum_name_len: u64 = ((*Token)enum_name_tok)->len;
     parse_consume(p, TOKEN_IDENTIFIER);
     
     parse_consume(p, TOKEN_LBRACE);
@@ -253,8 +253,8 @@ func parse_enum_def(p: u64) -> u64 {
         if (parse_peek_kind(p) == TOKEN_EOF) { break; }
         
         var member_tok: u64 = parse_peek(p);
-        var member_ptr: u64 = (*Token)member_tok->ptr;
-        var member_len: u64 = (*Token)member_tok->len;
+        var member_ptr: u64 = ((*Token)member_tok)->ptr;
+        var member_len: u64 = ((*Token)member_tok)->len;
         parse_consume(p, TOKEN_IDENTIFIER);
         
         // Check for explicit value
@@ -308,8 +308,8 @@ func parse_impl_block(p: u64) -> u64 {
     
     // Get struct name
     var struct_name_tok: u64 = parse_peek(p);
-    var struct_name_ptr: u64 = (*Token)struct_name_tok->ptr;
-    var struct_name_len: u64 = (*Token)struct_name_tok->len;
+    var struct_name_ptr: u64 = ((*Token)struct_name_tok)->ptr;
+    var struct_name_len: u64 = ((*Token)struct_name_tok)->len;
     parse_consume(p, TOKEN_IDENTIFIER);
     
     parse_consume(p, TOKEN_LBRACE);
@@ -403,8 +403,8 @@ func parse_program(p: u64) -> u64 {
             parse_consume(p, TOKEN_IDENTIFIER);
             parse_consume(p, TOKEN_SEMICOLON);
             var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(16);
-            ginfo->name_ptr = (*Token)tok->ptr;
-            ginfo->name_len = (*Token)tok->len;
+            ginfo->name_ptr = ((*Token)tok)->ptr;
+            ginfo->name_len = ((*Token)tok)->len;
             vec_push(globals, ginfo);
         } else if (k == TOKEN_IMPORT) {
             vec_push(imports, parse_import_decl(p));

@@ -104,30 +104,24 @@ func parse_primary(p: u64) -> u64 {
         var next_k: u64 = parse_peek_kind(p);
         if (next_k == TOKEN_STAR || next_k == TOKEN_U8 || next_k == TOKEN_U16 || 
             next_k == TOKEN_U32 || next_k == TOKEN_U64 || next_k == TOKEN_I64) {
-            var ty: *TypeInfo = (*TypeInfo)parse_type(p);
+            // Use parse_type_ex to get struct name directly
+            // TypeInfo layout: [type_kind:8][ptr_depth:8][struct_name_ptr:8][struct_name_len:8]
+            var ty: u64 = parse_type_ex(p);
+            var type_kind: u64 = *(*u64)ty;
+            var ptr_depth: u64 = *(*u64)(ty + 8);
+            var struct_name_ptr: u64 = *(*u64)(ty + 16);
+            var struct_name_len: u64 = *(*u64)(ty + 24);
+            
             parse_consume(p, TOKEN_RPAREN);
             var operand: u64 = parse_unary(p);
             
-            // If struct type, get struct name from TypeInfo (parse_type doesn't set it, so lookup)
-            var struct_name_ptr: u64 = 0;
-            var struct_name_len: u64 = 0;
-            if (ty->type_kind == TYPE_STRUCT) {
-                // Get struct name from previous token
-                var parser: *Parser = (*Parser)p;
-                var prev_idx: u64 = parser->cur - 1;
-                if (prev_idx >= 0 && prev_idx < vec_len(parser->tokens_vec)) {
-                    var prev_tok: u64 = vec_get(parser->tokens_vec, prev_idx);
-                    struct_name_ptr = tok_ptr(prev_tok);
-                    struct_name_len = tok_len(prev_tok);
-                }
-            }
-            
-            return ast_cast_ex(operand, ty->type_kind, ty->ptr_depth, struct_name_ptr, struct_name_len);
+            return ast_cast_ex(operand, type_kind, ptr_depth, struct_name_ptr, struct_name_len);
         }
         
         var expr: u64 = parse_expr(p);
         parse_consume(p, TOKEN_RPAREN);
-        return expr;
+        // Handle postfix operators after parenthesized expression: (expr)->field, (expr).field, (expr)[idx]
+        return parse_postfix_from(p, expr);
     }
     
     if (k == TOKEN_IDENTIFIER) {
@@ -191,9 +185,7 @@ func parse_primary(p: u64) -> u64 {
 // Postfix Expression
 // ============================================
 
-func parse_postfix(p: u64) -> u64 {
-    var left: u64 = parse_primary(p);
-    
+func parse_postfix_from(p: u64, left: u64) -> u64 {
     while (1) {
         var k: u64 = parse_peek_kind(p);
         
@@ -220,6 +212,11 @@ func parse_postfix(p: u64) -> u64 {
     }
     
     return left;
+}
+
+func parse_postfix(p: u64) -> u64 {
+    var left: u64 = parse_primary(p);
+    return parse_postfix_from(p, left);
 }
 
 // ============================================

@@ -130,6 +130,8 @@ func tok_new(kind: u64, ptr: u64, len: u64, line: u64, col: u64) -> u64 {
     return (u64)t;
 }
 
+
+
 func lex_next(l: u64) -> u64 {
     lex_skip_ws_and_comments(l);
     
@@ -294,7 +296,7 @@ func lex_all(src: u64, len: u64) -> u64 {
     while (1) {
         var tok: u64 = lex_next(l);
         vec_push(tokens, tok);
-        if ((*Token)tok->kind == TOKEN_EOF) { break; }
+        if (((*Token)tok)->kind == TOKEN_EOF) { break; }
     }
     return tokens;
 }
