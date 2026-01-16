@@ -44,10 +44,10 @@ func cg_expr(node: u64) -> u64 {
         var name_ptr: u64 = *(node + 8);
         var name_len: u64 = *(node + 16);
         
-        var c_result: u64 = const_find(name_ptr, name_len);
-        if (*(c_result) == 1) {
+        var c_result: *ConstLookupResult = (*ConstLookupResult)const_find(name_ptr, name_len);
+        if (c_result->found == 1) {
             emit("    mov rax, ", 13);
-            emit_u64(*(c_result + 8));
+            emit_u64(c_result->value);
             emit_nl();
             return;
         }

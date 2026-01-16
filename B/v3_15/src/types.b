@@ -167,6 +167,19 @@ struct ConstInfo {
     value: u64;
 }
 
+// Constant lookup result (16 bytes)
+struct ConstLookupResult {
+    found: u64;
+    value: u64;
+}
+
+// String table entry (24 bytes)
+struct StringEntry {
+    str_ptr: u64;
+    str_len: u64;
+    label_id: u64;
+}
+
 // Symbol table structure (40 bytes)
 struct Symtab {
     names_vec: u64;      // vector of [name_ptr, name_len] pairs

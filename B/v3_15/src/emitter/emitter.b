@@ -129,16 +129,16 @@ func const_find(name_ptr: u64, name_len: u64) -> u64 {
     while (i < len) {
         var c: *ConstInfo = (*ConstInfo)vec_get(g_consts, i);
         if (str_eq(c->name_ptr, c->name_len, name_ptr, name_len)) {
-            var result: u64 = heap_alloc(16);
-            *(result) = 1;           // found
-            *(result + 8) = c->value; // value
-            return result;
+            var result: *ConstLookupResult = (*ConstLookupResult)heap_alloc(16);
+            result->found = 1;
+            result->value = c->value;
+            return (u64)result;
         }
         i = i + 1;
     }
-    var result: u64 = heap_alloc(16);
-    *(result) = 0;  // not found
-    return result;
+    var result: *ConstLookupResult = (*ConstLookupResult)heap_alloc(16);
+    result->found = 0;
+    return (u64)result;
 }
 
 // ============================================
@@ -175,12 +175,10 @@ func string_get_label(str_ptr: u64, str_len: u64) -> u64 {
     var count: u64 = vec_len(g_strings);
     
     while (i < count) {
-        var entry: u64 = vec_get(g_strings, i);
-        var e_ptr: u64 = *(entry);
-        var e_len: u64 = *(entry + 8);
+        var entry: *StringEntry = (*StringEntry)vec_get(g_strings, i);
         
-        if (str_eq(e_ptr, e_len, str_ptr, str_len)) {
-            return *(entry + 16);
+        if (str_eq(entry->str_ptr, entry->str_len, str_ptr, str_len)) {
+            return entry->label_id;
         }
         i = i + 1;
     }
@@ -188,11 +186,11 @@ func string_get_label(str_ptr: u64, str_len: u64) -> u64 {
     var label_id: u64 = g_label_counter;
     g_label_counter = g_label_counter + 1;
     
-    var entry: u64 = heap_alloc(24);
-    *(entry) = str_ptr;
-    *(entry + 8) = str_len;
-    *(entry + 16) = label_id;
-    vec_push(g_strings, entry);
+    var entry: *StringEntry = (*StringEntry)heap_alloc(24);
+    entry->str_ptr = str_ptr;
+    entry->str_len = str_len;
+    entry->label_id = label_id;
+    vec_push(g_strings, (u64)entry);
     
     return label_id;
 }
@@ -206,23 +204,20 @@ func string_emit_data() -> u64 {
     
     var i: u64 = 0;
     while (i < count) {
-        var entry: u64 = vec_get(g_strings, i);
-        var str_ptr: u64 = *(entry);
-        var str_len: u64 = *(entry + 8);
-        var label_id: u64 = *(entry + 16);
+        var entry: *StringEntry = (*StringEntry)vec_get(g_strings, i);
         
         emit("_str", 4);
-        emit_u64(label_id);
+        emit_u64(entry->label_id);
         emit(": db ", 5);
         
         var j: u64 = 1;
-        while (j < str_len - 1) {
-            var c: u64 = *(*u8)(str_ptr + j);
+        while (j < entry->str_len - 1) {
+            var c: u64 = *(*u8)(entry->str_ptr + j);
             
             if (c == 92) {  // backslash
                 j = j + 1;
-                if (j < str_len - 1) {
-                    var ec: u64 = *(*u8)(str_ptr + j);
+                if (j < entry->str_len - 1) {
+                    var ec: u64 = *(*u8)(entry->str_ptr + j);
                     if (ec == 110) { emit("10", 2); }       // \n
                     else if (ec == 116) { emit("9", 1); }   // \t
                     else if (ec == 48) { emit("0", 1); }    // \0
@@ -235,7 +230,7 @@ func string_emit_data() -> u64 {
             }
             
             j = j + 1;
-            if (j < str_len - 1) { emit(",", 1); }
+            if (j < entry->str_len - 1) { emit(",", 1); }
         }
         
         emit(",0\n", 3);
