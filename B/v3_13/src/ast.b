@@ -8,10 +8,46 @@ import types;
 // ============================================
 
 // AST Literal node layout (16 bytes)
-// NOTE: 기존 포인터 산술 레이아웃([kind, value])과 동일하게 유지한다.
 struct AstLiteral {
     kind: u64;
     value: u64;
+}
+
+// AST Identifier node layout (24 bytes)
+struct AstIdent {
+    kind: u64;
+    name_ptr: u64;
+    name_len: u64;
+}
+
+// AST String node layout (24 bytes)
+struct AstString {
+    kind: u64;
+    str_ptr: u64;
+    str_len: u64;
+}
+
+// AST Binary operation node layout (32 bytes)
+struct AstBinary {
+    kind: u64;
+    op: u64;
+    left: u64;
+    right: u64;
+}
+
+// AST Unary operation node layout (24 bytes)
+struct AstUnary {
+    kind: u64;
+    op: u64;
+    operand: u64;
+}
+
+// AST Function call node layout (32 bytes)
+struct AstCall {
+    kind: u64;
+    name_ptr: u64;
+    name_len: u64;
+    args_vec: u64;
 }
 
 // AST_LITERAL: [kind, value]
@@ -24,300 +60,480 @@ func ast_literal(val: u64) -> u64 {
 
 // AST_IDENT: [kind, name_ptr, name_len]
 func ast_ident(name_ptr: u64, name_len: u64) -> u64 {
-    var n: u64 = heap_alloc(24);
-    *(n) = AST_IDENT;
-    *(n + 8) = name_ptr;
-    *(n + 16) = name_len;
-    return n;
+    var n: *AstIdent = (*AstIdent)(heap_alloc(24));
+    n->kind = AST_IDENT;
+    n->name_ptr = name_ptr;
+    n->name_len = name_len;
+    return (u64)n;
 }
 
 // AST_STRING: [kind, str_ptr, str_len]
 func ast_string(str_ptr: u64, str_len: u64) -> u64 {
-    var n: u64 = heap_alloc(24);
-    *(n) = AST_STRING;
-    *(n + 8) = str_ptr;
-    *(n + 16) = str_len;
-    return n;
+    var n: *AstString = (*AstString)(heap_alloc(24));
+    n->kind = AST_STRING;
+    n->str_ptr = str_ptr;
+    n->str_len = str_len;
+    return (u64)n;
 }
 
 // AST_BINARY: [kind, op, left, right]
 func ast_binary(op: u64, left: u64, right: u64) -> u64 {
-    var n: u64 = heap_alloc(32);
-    *(n) = AST_BINARY;
-    *(n + 8) = op;
-    *(n + 16) = left;
-    *(n + 24) = right;
-    return n;
+    var n: *AstBinary = (*AstBinary)(heap_alloc(32));
+    n->kind = AST_BINARY;
+    n->op = op;
+    n->left = left;
+    n->right = right;
+    return (u64)n;
 }
 
 // AST_UNARY: [kind, op, operand]
 func ast_unary(op: u64, operand: u64) -> u64 {
-    var n: u64 = heap_alloc(24);
-    *(n) = AST_UNARY;
-    *(n + 8) = op;
-    *(n + 16) = operand;
-    return n;
+    var n: *AstUnary = (*AstUnary)(heap_alloc(24));
+    n->kind = AST_UNARY;
+    n->op = op;
+    n->operand = operand;
+    return (u64)n;
 }
 
 // AST_CALL: [kind, name_ptr, name_len, args_vec]
 func ast_call(name_ptr: u64, name_len: u64, args: u64) -> u64 {
-    var n: u64 = heap_alloc(32);
-    *(n) = AST_CALL;
-    *(n + 8) = name_ptr;
-    *(n + 16) = name_len;
-    *(n + 24) = args;
-    return n;
+    var n: *AstCall = (*AstCall)(heap_alloc(32));
+    n->kind = AST_CALL;
+    n->name_ptr = name_ptr;
+    n->name_len = name_len;
+    n->args_vec = args;
+    return (u64)n;
+}
+
+// AST Address-of node layout (16 bytes)
+struct AstAddrOf {
+    kind: u64;
+    operand: u64;
+}
+
+// AST Dereference node layout (16 bytes)
+struct AstDeref {
+    kind: u64;
+    operand: u64;
+}
+
+// AST Byte dereference node layout (16 bytes)
+struct AstDeref8 {
+    kind: u64;
+    operand: u64;
+}
+
+// AST Cast node layout (32 bytes)
+struct AstCast {
+    kind: u64;
+    expr: u64;
+    target_type: u64;
+    target_ptr_depth: u64;
 }
 
 // AST_ADDR_OF: [kind, operand]
 func ast_addr_of(operand: u64) -> u64 {
-    var n: u64 = heap_alloc(16);
-    *(n) = AST_ADDR_OF;
-    *(n + 8) = operand;
-    return n;
+    var n: *AstAddrOf = (*AstAddrOf)(heap_alloc(16));
+    n->kind = AST_ADDR_OF;
+    n->operand = operand;
+    return (u64)n;
 }
 
 // AST_DEREF: [kind, operand]
 func ast_deref(operand: u64) -> u64 {
-    var n: u64 = heap_alloc(16);
-    *(n) = AST_DEREF;
-    *(n + 8) = operand;
-    return n;
+    var n: *AstDeref = (*AstDeref)(heap_alloc(16));
+    n->kind = AST_DEREF;
+    n->operand = operand;
+    return (u64)n;
 }
 
 // AST_DEREF8: [kind, operand] - byte dereference
 func ast_deref8(operand: u64) -> u64 {
-    var n: u64 = heap_alloc(16);
-    *(n) = AST_DEREF8;
-    *(n + 8) = operand;
-    return n;
+    var n: *AstDeref8 = (*AstDeref8)(heap_alloc(16));
+    n->kind = AST_DEREF8;
+    n->operand = operand;
+    return (u64)n;
 }
 
 // AST_CAST: [kind, expr, target_type, target_ptr_depth]
 func ast_cast(expr: u64, target_type: u64, ptr_depth: u64) -> u64 {
-    var n: u64 = heap_alloc(32);
-    *(n) = AST_CAST;
-    *(n + 8) = expr;
-    *(n + 16) = target_type;
-    *(n + 24) = ptr_depth;
-    return n;
+    var n: *AstCast = (*AstCast)(heap_alloc(32));
+    n->kind = AST_CAST;
+    n->expr = expr;
+    n->target_type = target_type;
+    n->target_ptr_depth = ptr_depth;
+    return (u64)n;
 }
 
 // ============================================
 // Statement Nodes
 // ============================================
 
+// AST Return statement node layout (16 bytes)
+struct AstReturn {
+    kind: u64;
+    expr: u64;
+}
+
+// AST Variable declaration node layout (64 bytes)
+struct AstVarDecl {
+    kind: u64;
+    name_ptr: u64;
+    name_len: u64;
+    type_kind: u64;
+    ptr_depth: u64;
+    init_expr: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+}
+
+// AST Constant declaration node layout (32 bytes)
+struct AstConstDecl {
+    kind: u64;
+    name_ptr: u64;
+    name_len: u64;
+    value: u64;
+}
+
+// AST Assignment node layout (24 bytes)
+struct AstAssign {
+    kind: u64;
+    target: u64;
+    value: u64;
+}
+
 // AST_RETURN: [kind, expr]
 func ast_return(expr: u64) -> u64 {
-    var n: u64 = heap_alloc(16);
-    *(n) = AST_RETURN;
-    *(n + 8) = expr;
-    return n;
+    var n: *AstReturn = (*AstReturn)(heap_alloc(16));
+    n->kind = AST_RETURN;
+    n->expr = expr;
+    return (u64)n;
 }
 
 // AST_VAR_DECL: [kind, name_ptr, name_len, type_kind, ptr_depth, init_expr]
 func ast_var_decl(name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth: u64, init: u64) -> u64 {
-    var n: u64 = heap_alloc(64);
-    *(n) = AST_VAR_DECL;
-    *(n + 8) = name_ptr;
-    *(n + 16) = name_len;
-    *(n + 24) = type_kind;
-    *(n + 32) = ptr_depth;
-    *(n + 40) = init;
-    *(n + 48) = 0;  // struct_name_ptr (will be set if TYPE_STRUCT)
-    *(n + 56) = 0;  // struct_name_len
-    return n;
+    var n: *AstVarDecl = (*AstVarDecl)(heap_alloc(64));
+    n->kind = AST_VAR_DECL;
+    n->name_ptr = name_ptr;
+    n->name_len = name_len;
+    n->type_kind = type_kind;
+    n->ptr_depth = ptr_depth;
+    n->init_expr = init;
+    n->struct_name_ptr = 0;
+    n->struct_name_len = 0;
+    return (u64)n;
 }
 
 // AST_CONST_DECL: [kind, name_ptr, name_len, value]
 func ast_const_decl(name_ptr: u64, name_len: u64, value: u64) -> u64 {
-    var n: u64 = heap_alloc(32);
-    *(n) = AST_CONST_DECL;
-    *(n + 8) = name_ptr;
-    *(n + 16) = name_len;
-    *(n + 24) = value;
-    return n;
+    var n: *AstConstDecl = (*AstConstDecl)(heap_alloc(32));
+    n->kind = AST_CONST_DECL;
+    n->name_ptr = name_ptr;
+    n->name_len = name_len;
+    n->value = value;
+    return (u64)n;
 }
 
 // AST_ASSIGN: [kind, target, value]
 func ast_assign(target: u64, value: u64) -> u64 {
-    var n: u64 = heap_alloc(24);
-    *(n) = AST_ASSIGN;
-    *(n + 8) = target;
-    *(n + 16) = value;
-    return n;
+    var n: *AstAssign = (*AstAssign)(heap_alloc(24));
+    n->kind = AST_ASSIGN;
+    n->target = target;
+    n->value = value;
+    return (u64)n;
+}
+
+// AST Expression statement node layout (16 bytes)
+struct AstExprStmt {
+    kind: u64;
+    expr: u64;
+}
+
+// AST If statement node layout (32 bytes)
+struct AstIf {
+    kind: u64;
+    cond: u64;
+    then_block: u64;
+    else_block: u64;
+}
+
+// AST While loop node layout (24 bytes)
+struct AstWhile {
+    kind: u64;
+    cond: u64;
+    body: u64;
+}
+
+// AST For loop node layout (40 bytes)
+struct AstFor {
+    kind: u64;
+    init: u64;
+    cond: u64;
+    update: u64;
+    body: u64;
 }
 
 // AST_EXPR_STMT: [kind, expr]
 func ast_expr_stmt(expr: u64) -> u64 {
-    var n: u64 = heap_alloc(16);
-    *(n) = AST_EXPR_STMT;
-    *(n + 8) = expr;
-    return n;
+    var n: *AstExprStmt = (*AstExprStmt)(heap_alloc(16));
+    n->kind = AST_EXPR_STMT;
+    n->expr = expr;
+    return (u64)n;
 }
 
 // AST_IF: [kind, cond, then_block, else_block]
 func ast_if(cond: u64, then_blk: u64, else_blk: u64) -> u64 {
-    var n: u64 = heap_alloc(32);
-    *(n) = AST_IF;
-    *(n + 8) = cond;
-    *(n + 16) = then_blk;
-    *(n + 24) = else_blk;
-    return n;
+    var n: *AstIf = (*AstIf)(heap_alloc(32));
+    n->kind = AST_IF;
+    n->cond = cond;
+    n->then_block = then_blk;
+    n->else_block = else_blk;
+    return (u64)n;
 }
 
 // AST_WHILE: [kind, cond, body]
 func ast_while(cond: u64, body: u64) -> u64 {
-    var n: u64 = heap_alloc(24);
-    *(n) = AST_WHILE;
-    *(n + 8) = cond;
-    *(n + 16) = body;
-    return n;
+    var n: *AstWhile = (*AstWhile)(heap_alloc(24));
+    n->kind = AST_WHILE;
+    n->cond = cond;
+    n->body = body;
+    return (u64)n;
 }
 
 // AST_FOR: [kind, init, cond, update, body]
 func ast_for(init: u64, cond: u64, update: u64, body: u64) -> u64 {
-    var n: u64 = heap_alloc(40);
-    *(n) = AST_FOR;
-    *(n + 8) = init;
-    *(n + 16) = cond;
-    *(n + 24) = update;
-    *(n + 32) = body;
-    return n;
+    var n: *AstFor = (*AstFor)(heap_alloc(40));
+    n->kind = AST_FOR;
+    n->init = init;
+    n->cond = cond;
+    n->update = update;
+    n->body = body;
+    return (u64)n;
+}
+
+// AST Switch statement node layout (24 bytes)
+struct AstSwitch {
+    kind: u64;
+    expr: u64;
+    cases_vec: u64;
+}
+
+// AST Case node layout (32 bytes)
+struct AstCase {
+    kind: u64;
+    value: u64;
+    body: u64;
+    is_default: u64;
+}
+
+// AST Break statement node layout (8 bytes)
+struct AstBreak {
+    kind: u64;
+}
+
+// AST Continue statement node layout (8 bytes)
+struct AstContinue {
+    kind: u64;
+}
+
+// AST Inline assembly node layout (16 bytes)
+struct AstAsm {
+    kind: u64;
+    text_vec: u64;
+}
+
+// AST Block node layout (16 bytes)
+struct AstBlock {
+    kind: u64;
+    stmts_vec: u64;
 }
 
 // AST_SWITCH: [kind, expr, cases_vec]
 func ast_switch(expr: u64, cases: u64) -> u64 {
-    var n: u64 = heap_alloc(24);
-    *(n) = AST_SWITCH;
-    *(n + 8) = expr;
-    *(n + 16) = cases;
-    return n;
+    var n: *AstSwitch = (*AstSwitch)(heap_alloc(24));
+    n->kind = AST_SWITCH;
+    n->expr = expr;
+    n->cases_vec = cases;
+    return (u64)n;
 }
 
 // AST_CASE: [kind, value, body, is_default]
 func ast_case(value: u64, body: u64, is_default: u64) -> u64 {
-    var n: u64 = heap_alloc(32);
-    *(n) = AST_CASE;
-    *(n + 8) = value;
-    *(n + 16) = body;
-    *(n + 24) = is_default;
-    return n;
+    var n: *AstCase = (*AstCase)(heap_alloc(32));
+    n->kind = AST_CASE;
+    n->value = value;
+    n->body = body;
+    n->is_default = is_default;
+    return (u64)n;
 }
 
 // AST_BREAK: [kind]
 func ast_break() -> u64 {
-    var n: u64 = heap_alloc(8);
-    *(n) = AST_BREAK;
-    return n;
+    var n: *AstBreak = (*AstBreak)(heap_alloc(8));
+    n->kind = AST_BREAK;
+    return (u64)n;
 }
+
 // AST_CONTINUE: [kind]
 func ast_continue() -> u64 {
-    var n: u64 = heap_alloc(8);
-    *(n) = AST_CONTINUE;
-    return n;
+    var n: *AstContinue = (*AstContinue)(heap_alloc(8));
+    n->kind = AST_CONTINUE;
+    return (u64)n;
 }
+
 // AST_ASM: [kind, text_vec]
 func ast_asm(text_vec: u64) -> u64 {
-    var n: u64 = heap_alloc(16);
-    *(n) = AST_ASM;
-    *(n + 8) = text_vec;
-    return n;
+    var n: *AstAsm = (*AstAsm)(heap_alloc(16));
+    n->kind = AST_ASM;
+    n->text_vec = text_vec;
+    return (u64)n;
 }
 
 // AST_BLOCK: [kind, stmts_vec]
 func ast_block(stmts: u64) -> u64 {
-    var n: u64 = heap_alloc(16);
-    *(n) = AST_BLOCK;
-    *(n + 8) = stmts;
-    return n;
+    var n: *AstBlock = (*AstBlock)(heap_alloc(16));
+    n->kind = AST_BLOCK;
+    n->stmts_vec = stmts;
+    return (u64)n;
 }
 
 // ============================================
 // Top-level Nodes
 // ============================================
 
+// AST Function definition node layout (72 bytes)
+struct AstFunc {
+    kind: u64;
+    name_ptr: u64;
+    name_len: u64;
+    params_vec: u64;
+    ret_type: u64;
+    body: u64;
+    ret_ptr_depth: u64;
+    ret_struct_name_ptr: u64;
+    ret_struct_name_len: u64;
+}
+
+// AST Program node layout (48 bytes)
+struct AstProgram {
+    kind: u64;
+    funcs_vec: u64;
+    consts_vec: u64;
+    imports_vec: u64;
+    globals_vec: u64;
+    structs_vec: u64;
+}
+
+// AST Import statement node layout (24 bytes)
+struct AstImport {
+    kind: u64;
+    path_ptr: u64;
+    path_len: u64;
+}
+
+// AST Struct definition node layout (32 bytes)
+struct AstStructDef {
+    kind: u64;
+    name_ptr: u64;
+    name_len: u64;
+    fields_vec: u64;
+}
+
+// AST Member access node layout (32 bytes)
+struct AstMemberAccess {
+    kind: u64;
+    object: u64;
+    member_ptr: u64;
+    member_len: u64;
+}
+
+// AST Struct literal node layout (24 bytes)
+struct AstStructLiteral {
+    kind: u64;
+    struct_def: u64;
+    values_vec: u64;
+}
+
 // AST_FUNC: [kind, name_ptr, name_len, params_vec, ret_type, body]
-// AST_FUNC: [kind, name_ptr, name_len, params, ret_type, body, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len]
 // Legacy ast_func() now creates 72-byte nodes with extra fields zeroed for compatibility
 func ast_func(name_ptr: u64, name_len: u64, params: u64, ret_type: u64, body: u64) -> u64 {
-    var n: u64 = heap_alloc(72);
-    *(n) = AST_FUNC;
-    *(n + 8) = name_ptr;
-    *(n + 16) = name_len;
-    *(n + 24) = params;
-    *(n + 32) = ret_type;
-    *(n + 40) = body;
-    *(n + 48) = 0;  // ret_ptr_depth = 0
-    *(n + 56) = 0;  // ret_struct_name_ptr = 0
-    *(n + 64) = 0;  // ret_struct_name_len = 0
-    return n;
+    var n: *AstFunc = (*AstFunc)(heap_alloc(72));
+    n->kind = AST_FUNC;
+    n->name_ptr = name_ptr;
+    n->name_len = name_len;
+    n->params_vec = params;
+    n->ret_type = ret_type;
+    n->body = body;
+    n->ret_ptr_depth = 0;
+    n->ret_struct_name_ptr = 0;
+    n->ret_struct_name_len = 0;
+    return (u64)n;
 }
 
 // AST_FUNC (extended): [kind, name_ptr, name_len, params, ret_type, body, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len]
 func ast_func_ex(name_ptr: u64, name_len: u64, params: u64, ret_type: u64, ret_ptr_depth: u64, ret_struct_name_ptr: u64, ret_struct_name_len: u64, body: u64) -> u64 {
-    var n: u64 = heap_alloc(72);
-    *(n) = AST_FUNC;
-    *(n + 8) = name_ptr;
-    *(n + 16) = name_len;
-    *(n + 24) = params;
-    *(n + 32) = ret_type;
-    *(n + 40) = body;
-    *(n + 48) = ret_ptr_depth;
-    *(n + 56) = ret_struct_name_ptr;
-    *(n + 64) = ret_struct_name_len;
-    return n;
+    var n: *AstFunc = (*AstFunc)(heap_alloc(72));
+    n->kind = AST_FUNC;
+    n->name_ptr = name_ptr;
+    n->name_len = name_len;
+    n->params_vec = params;
+    n->ret_type = ret_type;
+    n->body = body;
+    n->ret_ptr_depth = ret_ptr_depth;
+    n->ret_struct_name_ptr = ret_struct_name_ptr;
+    n->ret_struct_name_len = ret_struct_name_len;
+    return (u64)n;
 }
 
 // AST_PROGRAM: [kind, funcs_vec, consts_vec, imports_vec, globals_vec]
 func ast_program(funcs: u64, consts: u64, imports: u64) -> u64 {
-    var n: u64 = heap_alloc(48);
-    *(n) = AST_PROGRAM;
-    *(n + 8) = funcs;
-    *(n + 16) = consts;
-    *(n + 24) = imports;
-    *(n + 32) = 0;    // globals (will be set by parse_program)
-    *(n + 40) = 0;    // structs (will be set by parse_program)
-    return n;
+    var n: *AstProgram = (*AstProgram)(heap_alloc(48));
+    n->kind = AST_PROGRAM;
+    n->funcs_vec = funcs;
+    n->consts_vec = consts;
+    n->imports_vec = imports;
+    n->globals_vec = 0;
+    n->structs_vec = 0;
+    return (u64)n;
 }
 
 // AST_IMPORT: [kind, path_ptr, path_len]
 func ast_import(path_ptr: u64, path_len: u64) -> u64 {
-    var n: u64 = heap_alloc(24);
-    *(n) = AST_IMPORT;
-    *(n + 8) = path_ptr;
-    *(n + 16) = path_len;
-    return n;
+    var n: *AstImport = (*AstImport)(heap_alloc(24));
+    n->kind = AST_IMPORT;
+    n->path_ptr = path_ptr;
+    n->path_len = path_len;
+    return (u64)n;
 }
 
 // AST_STRUCT_DEF: [kind, name_ptr, name_len, fields_vec]
 func ast_struct_def(name_ptr: u64, name_len: u64, fields: u64) -> u64 {
-    var n: u64 = heap_alloc(32);
-    *(n) = AST_STRUCT_DEF;
-    *(n + 8) = name_ptr;
-    *(n + 16) = name_len;
-    *(n + 24) = fields;
-    return n;
+    var n: *AstStructDef = (*AstStructDef)(heap_alloc(32));
+    n->kind = AST_STRUCT_DEF;
+    n->name_ptr = name_ptr;
+    n->name_len = name_len;
+    n->fields_vec = fields;
+    return (u64)n;
 }
 
 // AST_MEMBER_ACCESS: [kind, object, member_ptr, member_len]
 func ast_member_access(object: u64, member_ptr: u64, member_len: u64) -> u64 {
-    var n: u64 = heap_alloc(32);
-    *(n) = AST_MEMBER_ACCESS;
-    *(n + 8) = object;
-    *(n + 16) = member_ptr;
-    *(n + 24) = member_len;
-    return n;
+    var n: *AstMemberAccess = (*AstMemberAccess)(heap_alloc(32));
+    n->kind = AST_MEMBER_ACCESS;
+    n->object = object;
+    n->member_ptr = member_ptr;
+    n->member_len = member_len;
+    return (u64)n;
 }
 
 // AST_STRUCT_LITERAL: struct_def_ptr, values (vec of exprs)
 // Layout: [kind:8][struct_def:8][values:8]
 func ast_struct_literal(struct_def: u64, values: u64) -> u64 {
-    var n: u64 = heap_alloc(24);
-    *(n) = AST_STRUCT_LITERAL;
-    *(n + 8) = struct_def;
-    *(n + 16) = values;
-    return n;
+    var n: *AstStructLiteral = (*AstStructLiteral)(heap_alloc(24));
+    n->kind = AST_STRUCT_LITERAL;
+    n->struct_def = struct_def;
+    n->values_vec = values;
+    return (u64)n;
 }
 
 // ============================================

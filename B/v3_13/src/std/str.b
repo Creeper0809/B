@@ -1,7 +1,4 @@
 // str.b - String utilities for v3.8
-
-import std.io;
-
 func str_eq(s1, len1, s2, len2) {
     if (len1 != len2) { return 0; }
     for(var i = 0; i<len1;i++){

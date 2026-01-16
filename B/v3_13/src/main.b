@@ -349,7 +349,7 @@ func main(argc: u64, argv: u64) -> u64 {
     var src_suffix: u64 = "/src";
     g_lib_dir = str_concat3(b_prefix, 2, version, str_len(version), src_suffix, 4);
     g_lib_dir_len = str_len(g_lib_dir);
-    
+
     g_loaded_modules = hashmap_new(64);
     g_all_funcs = vec_new(64);
     g_all_consts = vec_new(128);

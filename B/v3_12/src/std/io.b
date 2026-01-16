@@ -1,5 +1,6 @@
 // io.b - System call implementations for v3.8
 // Low-level I/O and memory allocation
+import std.io;
 
 var heap_inited;
 var heap_brk;
@@ -142,4 +143,10 @@ func print_i64(n) {
     } else {
         print_u64(n);
     }
+}
+
+func emitln(s: u64) {
+    var len: u64 = str_len(s);
+    sys_write(1, s, len);
+    sys_write(1, "\n", 1);
 }

@@ -22,96 +22,79 @@ import emitter.gen_stmt;
 // Function Codegen
 // ============================================
 
+// Function parameter layout (48 bytes)
+struct FuncParam {
+    name_ptr: u64;
+    name_len: u64;
+    type_kind: u64;
+    ptr_depth: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+}
+
 func cg_func(node: u64) -> u64 {
-    var name_ptr: u64 = *(node + 8);
-    var name_len: u64 = *(node + 16);
-    var params: u64 = *(node + 24);
-    var ret_type: u64 = *(node + 32);
-    var body: u64 = *(node + 40);
-    
-    // Check if this is an extended AST_FUNC node (72 bytes)
-    var ret_ptr_depth: u64 = *(node + 48);
-    var ret_struct_name_ptr: u64 = *(node + 56);
-    var ret_struct_name_len: u64 = *(node + 64);
+    var fn: *AstFunc = (*AstFunc)node;
     
     // Store return type information
-    emitter_set_ret_type(ret_type);
-    emitter_set_ret_ptr_depth(ret_ptr_depth);
-    emitter_set_ret_struct_name(ret_struct_name_ptr, ret_struct_name_len);
+    emitter_set_ret_type(fn->ret_type);
+    emitter_set_ret_ptr_depth(fn->ret_ptr_depth);
+    emitter_set_ret_struct_name(fn->ret_struct_name_ptr, fn->ret_struct_name_len);
     
     var g_symtab: u64 = emitter_get_symtab();
     symtab_clear(g_symtab);
-    
-    emit(name_ptr, name_len);
+
+    emit(fn->name_ptr, fn->name_len);
     emit(":\n", 2);
     
-    emit("    push rbp\n", 13);
-    emit("    mov rbp, rsp\n", 17);
-    emit("    sub rsp, 1024\n", 18);
+    emitln("    push rbp");
+    emitln("    mov rbp, rsp");
+    emitln("    sub rsp, 1024");
     
     var g_structs_vec: u64 = typeinfo_get_structs();
     
-    var nparams: u64 = vec_len(params);
-    var i: u64 = 0;
-    while (i < nparams) {
-        var param: u64 = vec_get(params, i);
-        var pname: u64 = *(param);
-        var plen: u64 = *(param + 8);
-        var ptype: u64 = *(param + 16);
-        var pdepth: u64  = *(param + 24);
-        var pstruct_name_ptr: u64 = *(param + 32);
-        var pstruct_name_len: u64 = *(param + 40);
+    var nparams: u64 = vec_len(fn->params_vec);
+    for(var i: u64 = 0 ; i < nparams ; i++){
+         var p: *FuncParam = (*FuncParam)vec_get(fn->params_vec, i);
         
         var names: u64  = *(g_symtab);
         var offsets: u64 = *(g_symtab + 8);
         var types: u64 = *(g_symtab + 16);
         
         var name_info: u64 = heap_alloc(16);
-        *(name_info) = pname;
-        *(name_info + 8) = plen;
+        *(name_info) = p->name_ptr;
+        *(name_info + 8) = p->name_len;
         vec_push(names, name_info);
         
         vec_push(offsets, 16 + i * 8);
         
         var type_info: u64 = heap_alloc(24);
-        *(type_info) = ptype;
-        *(type_info + 8) = pdepth;
+        *(type_info) = p->type_kind;
+        *(type_info + 8) = p->ptr_depth;
         *(type_info + 16) = 0;
 
         // If this is a struct, resolve its struct_def now
-        if (ptype == TYPE_STRUCT) {
-            if (g_structs_vec != 0) {
-                if (pstruct_name_ptr != 0) {
-                    var num_structs: u64 = vec_len(g_structs_vec);
-                    var si: u64 = 0;
-                    while (si < num_structs) {
-                        var sd: u64 = vec_get(g_structs_vec, si);
-                        var sname_ptr: u64 = *(sd + 8);
-                        var sname_len: u64 = *(sd + 16);
-                        if (sname_len == pstruct_name_len) {
-                            if (str_eq(sname_ptr, sname_len, pstruct_name_ptr, pstruct_name_len) != 0) {
-                                *(type_info + 16) = sd;
-                                break;
-                            }
-                        }
-                        si = si + 1;
-                    }
+        if (p->type_kind == TYPE_STRUCT && g_structs_vec != 0 && p->struct_name_ptr != 0) {
+            var num_structs: u64 = vec_len(g_structs_vec);
+            for(var si: u64 = 0 ; si < num_structs ; si++){
+                var sd_ptr: u64 = vec_get(g_structs_vec, si);
+                var sd: *AstStructDef = (*AstStructDef)sd_ptr;
+                if (sd->name_len == p->struct_name_len && str_eq(sd->name_ptr, sd->name_len, p->struct_name_ptr, p->struct_name_len) != 0) {
+                    *(type_info + 16) = sd_ptr;
+                    break;
                 }
             }
         }
         vec_push(types, type_info);
         
         *(g_symtab + 24) = *(g_symtab + 24) + 1;
-        
-        i = i + 1;
     }
     
-    cg_block(body);
+    cg_block(fn->body);
     
-    emit("    xor eax, eax\n", 17);
-    emit("    mov rsp, rbp\n", 17);
-    emit("    pop rbp\n", 12);
-    emit("    ret\n", 8);
+    emitln("   xor eax, eax");
+    emitln("    mov rsp, rbp");
+    emitln("    pop rbp");
+    emitln("   ret");
 }
 
 // ============================================
@@ -119,56 +102,48 @@ func cg_func(node: u64) -> u64 {
 // ============================================
 
 func cg_program(prog: u64) -> u64 {
-    var funcs: u64 = *(prog + 8);
-    var consts: u64 = *(prog + 16);
-    var globals: u64  = *(prog + 32);
-    var structs: u64 = *(prog + 40);
+    var program: *AstProgram = (*AstProgram)prog;
     
     // Initialize emitter state
     emitter_init();
     
     // Set structs for typeinfo module
-    typeinfo_set_structs(structs);
+    typeinfo_set_structs(program->structs_vec);
     
     // Set globals
-    if (globals == 0) {
+    if (program->globals_vec == 0) {
         emitter_set_globals(vec_new(32));
     } else {
-        emitter_set_globals(globals);
+        emitter_set_globals(program->globals_vec);
     }
     
     // Copy constants
     var g_consts: u64 = emitter_get_consts();
-    var clen: u64 = vec_len(consts);
-    var ci: u64 = 0;
-    while (ci < clen) {
-        var c: u64 = vec_get(consts, ci);
+    for(var ci: u64 = 0;ci < vec_len(program->consts_vec) ;ci++){
+        var c_ptr: u64 = vec_get(program->consts_vec, ci);
+        var c: *AstConstDecl = (*AstConstDecl)c_ptr;
         var cinfo: u64 = heap_alloc(24);
-        *(cinfo) = *(c + 8);
-        *(cinfo + 8) = *(c + 16);
-        *(cinfo + 16) = *(c + 24);
+        *(cinfo) = c->name_ptr;
+        *(cinfo + 8) = c->name_len;
+        *(cinfo + 16) = c->value;
         vec_push(g_consts, cinfo);
-        ci = ci + 1;
     }
     
-    emit("default rel\n", 12);
-    emit("section .text\n", 14);
-    emit("global _start\n", 14);
-    emit("_start:\n", 8);
-    emit("    pop rdi          ; argc\n", 28);
-    emit("    mov rsi, rsp     ; argv\n", 28);
-    emit("    push rsi\n", 13);
-    emit("    push rdi\n", 13);
-    emit("    call main\n", 14);
-    emit("    mov rdi, rax\n", 17);
-    emit("    mov rax, 60\n", 16);
-    emit("    syscall\n", 12);
+    emitln("default rel");
+    emitln("section .text");
+    emitln("global _start");
+    emitln("_start:");
+    emitln("    pop rdi          ; argc");
+    emitln("    mov rsi, rsp     ; argv");
+    emitln("    push rsi");
+    emitln("    push rdi");
+    emitln("    call main");
+    emitln("    mov rdi, rax");
+    emitln("    mov rax, 60");
+    emitln("    syscall");
     
-    var len: u64 = vec_len(funcs);
-    var i: u64 = 0;
-    while (i < len) {
-        cg_func(vec_get(funcs, i));
-        i = i + 1;
+    for(var i : u64 = 0; i < vec_len(program->funcs_vec);i++){
+        cg_func(vec_get(program->funcs_vec, i));
     }
     
     string_emit_data();
