@@ -162,9 +162,10 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var name_ptr: u64 = *(node + 8);
         var name_len: u64 = *(node + 16);
         // Need to call symtab_get_type - done by caller with symtab param
-        var names: u64 = *(symtab);
-        var types: u64 = *(symtab + 16);
-        var count: u64 = *(symtab + 24);
+        var st: *Symtab = (*Symtab)symtab;
+        var names: u64 = st->names_vec;
+        var types: u64 = st->types_vec;
+        var count: u64 = st->count;
         
         var i: u64 = count - 1;
         while (i >= 0) {

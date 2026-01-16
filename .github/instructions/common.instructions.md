@@ -39,11 +39,11 @@ After completing ANY coding task, you MUST perform the following two actions aut
      - 어떤 기술적 요구사항이 있었는가?
      - DoD (Definition of Done)는 무엇이었는가?
   3. **Action (수행한 작업)**:
-     - 어떤 코드를 변경하거나 추가했는가? (코드 스니펫 포함)
+     - 어떤 코드를 변경하거나 추가했는가? (코드 스니펫 포함) - 제일 중요
      - 어떤 파일들을 수정했는가?
      - 구현 과정에서 어떤 결정을 내렸는가?
      - **Challenges & Troubleshooting (중요)**:
-       - 구체적인 어려움 (파싱 모호성, 로직 에러 등)
+       - 구체적인 어려움 (파싱 모호성, 로직 에러 등) - 제일 중요
        - 디버깅 과정 상세 기술
        - 문제 해결 방법
   4. **Result (결과 및 최종 구현)**:

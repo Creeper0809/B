@@ -63,14 +63,14 @@ func emitter_get_ret_struct_name_len() -> u64 { return g_current_func_ret_struct
 // ============================================
 
 func emitter_init() -> u64 {
-    // Create symtab inline instead of calling symtab_new
-    // symtab = [names_vec, offsets_vec, types_vec, count, stack_offset]
+    // Create symtab using Symtab struct
     g_symtab = heap_alloc(40);
-    *(g_symtab) = vec_new(64);       // names
-    *(g_symtab + 8) = vec_new(64);   // offsets
-    *(g_symtab + 16) = vec_new(64);  // types
-    *(g_symtab + 24) = 0;            // count
-    *(g_symtab + 32) = 0 - 8;        // stack_offset (starts at -8)
+    var s: *Symtab = (*Symtab)g_symtab;
+    s->names_vec = vec_new(64);
+    s->offsets_vec = vec_new(64);
+    s->types_vec = vec_new(64);
+    s->count = 0;
+    s->stack_offset = 0 - 8;  // starts at -8
     
     g_label_counter = 0;
     g_strings = vec_new(32);

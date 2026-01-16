@@ -160,6 +160,15 @@ struct GlobalInfo {
     name_len: u64;
 }
 
+// Symbol table structure (40 bytes)
+struct Symtab {
+    names_vec: u64;      // vector of [name_ptr, name_len] pairs
+    offsets_vec: u64;    // vector of stack offsets (i64)
+    types_vec: u64;      // vector of [type_kind, ptr_depth, struct_def] triples
+    count: u64;          // number of symbols
+    stack_offset: u64;   // current stack offset for allocation (grows downward)
+}
+
 // ============================================
 // Lexer Data Structures
 // ============================================
