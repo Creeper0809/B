@@ -66,11 +66,12 @@ func emitter_init() -> u64 {
     // Create symtab inline instead of calling symtab_new
     // symtab = [names_vec, offsets_vec, types_vec, count, stack_offset]
     g_symtab = heap_alloc(40);
-    *(g_symtab) = vec_new(64);       // names
-    *(g_symtab + 8) = vec_new(64);   // offsets
-    *(g_symtab + 16) = vec_new(64);  // types
-    *(g_symtab + 24) = 0;            // count
-    *(g_symtab + 32) = 0 - 8;        // stack_offset (starts at -8)
+    var symtab: *Symtab = (*Symtab)g_symtab;
+    symtab->names_vec = vec_new(64);
+    symtab->offsets_vec = vec_new(64);
+    symtab->types_vec = vec_new(64);
+    symtab->count = 0;
+    symtab->stack_offset = 0 - 8;        // stack_offset (starts at -8)
     
     g_label_counter = 0;
     g_strings = vec_new(32);
@@ -93,10 +94,12 @@ func emitter_load_consts(consts: u64) -> u64 {
     var ci: u64 = 0;
     while (ci < clen) {
         var c: u64 = vec_get(consts, ci);
+        var const_decl: *AstConstDecl = (*AstConstDecl)c;
         var cinfo: u64 = heap_alloc(24);
-        *(cinfo) = *(c + 8);      // name_ptr
-        *(cinfo + 8) = *(c + 16); // name_len
-        *(cinfo + 16) = *(c + 24); // value
+        var cinfo_struct: *ConstInfo = (*ConstInfo)cinfo;
+        cinfo_struct->name_ptr = const_decl->name_ptr;
+        cinfo_struct->name_len = const_decl->name_len;
+        cinfo_struct->value = const_decl->value;
         vec_push(g_consts, cinfo);
         ci = ci + 1;
     }
@@ -128,18 +131,19 @@ func const_find(name_ptr: u64, name_len: u64) -> u64 {
     var i: u64 = 0;
     while (i < len) {
         var c: u64 = vec_get(g_consts, i);
-        var c_ptr: u64 = *(c);
-        var c_len: u64 = *(c + 8);
-        if (str_eq(c_ptr, c_len, name_ptr, name_len)) {
+        var cinfo: *ConstInfo = (*ConstInfo)c;
+        if (str_eq(cinfo->name_ptr, cinfo->name_len, name_ptr, name_len)) {
             var result: u64 = heap_alloc(16);
-            *(result) = 1;           // found
-            *(result + 8) = *(c + 16); // value
+            var result_struct: *ConstResult = (*ConstResult)result;
+            result_struct->found = 1;
+            result_struct->value = cinfo->value;
             return result;
         }
         i = i + 1;
     }
     var result: u64 = heap_alloc(16);
-    *(result) = 0;  // not found
+    var result_struct: *ConstResult = (*ConstResult)result;
+    result_struct->found = 0;
     return result;
 }
 
@@ -178,11 +182,10 @@ func string_get_label(str_ptr: u64, str_len: u64) -> u64 {
     
     while (i < count) {
         var entry: u64 = vec_get(g_strings, i);
-        var e_ptr: u64 = *(entry);
-        var e_len: u64 = *(entry + 8);
+        var str_entry: *StringEntry = (*StringEntry)entry;
         
-        if (str_eq(e_ptr, e_len, str_ptr, str_len)) {
-            return *(entry + 16);
+        if (str_eq(str_entry->str_ptr, str_entry->str_len, str_ptr, str_len)) {
+            return str_entry->label_id;
         }
         i = i + 1;
     }
@@ -191,9 +194,10 @@ func string_get_label(str_ptr: u64, str_len: u64) -> u64 {
     g_label_counter = g_label_counter + 1;
     
     var entry: u64 = heap_alloc(24);
-    *(entry) = str_ptr;
-    *(entry + 8) = str_len;
-    *(entry + 16) = label_id;
+    var str_entry: *StringEntry = (*StringEntry)entry;
+    str_entry->str_ptr = str_ptr;
+    str_entry->str_len = str_len;
+    str_entry->label_id = label_id;
     vec_push(g_strings, entry);
     
     return label_id;
@@ -209,9 +213,10 @@ func string_emit_data() -> u64 {
     var i: u64 = 0;
     while (i < count) {
         var entry: u64 = vec_get(g_strings, i);
-        var str_ptr: u64 = *(entry);
-        var str_len: u64 = *(entry + 8);
-        var label_id: u64 = *(entry + 16);
+        var str_entry: *StringEntry = (*StringEntry)entry;
+        var str_ptr: u64 = str_entry->str_ptr;
+        var str_len: u64 = str_entry->str_len;
+        var label_id: u64 = str_entry->label_id;
         
         emit("_str", 4);
         emit_u64(label_id);

@@ -160,6 +160,35 @@ struct GlobalInfo {
     name_len: u64;
 }
 
+// Constant info (24 bytes)
+struct ConstInfo {
+    name_ptr: u64;
+    name_len: u64;
+    value: u64;
+}
+
+// Constant lookup result (16 bytes)
+struct ConstResult {
+    found: u64;
+    value: u64;
+}
+
+// String literal entry (24 bytes)
+struct StringEntry {
+    str_ptr: u64;
+    str_len: u64;
+    label_id: u64;
+}
+
+// Symbol table (40 bytes)
+struct Symtab {
+    names_vec: u64;
+    offsets_vec: u64;
+    types_vec: u64;
+    count: u64;
+    stack_offset: u64;
+}
+
 // ============================================
 // Lexer Data Structures
 // ============================================
