@@ -215,8 +215,9 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
             return;
         }
         
-        var base_type: u64 = *(ptr_type);
-        var ptr_depth: u64 = *(ptr_type + 8);
+        var ti: *TypeInfo = (*TypeInfo)ptr_type;
+        var base_type: u64 = ti->type_kind;
+        var ptr_depth: u64 = ti->ptr_depth;
         
         if (ptr_depth == 0 || base_type != TYPE_STRUCT) {
             emit_stderr("[ERROR] Arrow operator requires pointer to struct\n", 51);
@@ -224,7 +225,7 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         }
         
         // Get struct_def from pointer's base type
-        var struct_def: u64 = *(ptr_type + 16);
+        var struct_def: u64 = ti->struct_def;
         if (struct_def == 0) {
             emit_stderr("[ERROR] Struct definition not found for pointer type\n", 54);
             return;
@@ -256,13 +257,14 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
             return;
         }
         
-        var base_type: u64 = *(obj_type);
+        var obj_ti: *TypeInfo = (*TypeInfo)obj_type;
+        var base_type: u64 = obj_ti->type_kind;
         if (base_type != TYPE_STRUCT) {
             emit_stderr("[ERROR] Nested member access on non-struct\n", 44);
             return;
         }
         
-        var struct_def: u64 = *(obj_type + 16);
+        var struct_def: u64 = obj_ti->struct_def;
         if (struct_def == 0) {
             emit_stderr("[ERROR] Struct definition not found for nested access\n", 55);
             return;
@@ -293,7 +295,8 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     // Get variable info from symtab
     var var_offset: u64 = symtab_find(symtab, obj_name_ptr, obj_name_len);
     var var_type: u64 = symtab_get_type(symtab, obj_name_ptr, obj_name_len);
-    var type_kind: u64 = *(var_type);
+    var var_ti: *TypeInfo = (*TypeInfo)var_type;
+    var type_kind: u64 = var_ti->type_kind;
     
     if (type_kind != TYPE_STRUCT) {
         emit_stderr("[ERROR] Member access on non-struct type\n", 42);
@@ -301,7 +304,7 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     }
     
     // Get struct_def directly from type_info
-    var struct_def: u64 = *(var_type + 16);
+    var struct_def: u64 = var_ti->struct_def;
     
     if (struct_def == 0) {
         emit_stderr("[ERROR] Struct definition not found in type_info\n", 52);
@@ -389,11 +392,12 @@ func cg_binary_expr(node: u64, symtab: u64) -> u64 {
     
     // Pointer arithmetic scaling
     var left_type: u64 = get_expr_type_with_symtab(left, symtab);
-    var ptr_depth: u64 = *(left_type + 8);
+    var left_ti: *TypeInfo = (*TypeInfo)left_type;
+    var ptr_depth: u64 = left_ti->ptr_depth;
     
     if (ptr_depth > 0) {
         if (op == TOKEN_PLUS || op == TOKEN_MINUS) {
-            var psize: u64 = get_pointee_size(*(left_type), ptr_depth);
+            var psize: u64 = get_pointee_size(left_ti->type_kind, ptr_depth);
             if (psize > 1) {
                 emit("    imul rbx, ", 14);
                 emit_u64(psize);
@@ -537,8 +541,9 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
             return;
         }
         
-        var base_type: u64 = *(ptr_type);
-        var ptr_depth: u64 = *(ptr_type + 8);
+        var ti: *TypeInfo = (*TypeInfo)ptr_type;
+        var base_type: u64 = ti->type_kind;
+        var ptr_depth: u64 = ti->ptr_depth;
         
         if (ptr_depth == 0 || base_type != TYPE_STRUCT) {
             emit_stderr("[ERROR] Arrow operator requires pointer to struct\n", 51);
@@ -546,7 +551,7 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         }
         
         // Get struct_def from pointer's base type
-        var struct_def: u64 = *(ptr_type + 16);
+        var struct_def: u64 = ti->struct_def;
         if (struct_def == 0) {
             emit_stderr("[ERROR] Struct definition not found for pointer type\n", 54);
             return;
@@ -577,13 +582,14 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
             return;
         }
         
-        var base_type: u64 = *(obj_type);
+        var obj_lv_ti: *TypeInfo = (*TypeInfo)obj_type;
+        var base_type: u64 = obj_lv_ti->type_kind;
         if (base_type != TYPE_STRUCT) {
             emit_stderr("[ERROR] Nested member access on non-struct in lvalue\n", 54);
             return;
         }
         
-        var struct_def: u64 = *(obj_type + 16);
+        var struct_def: u64 = obj_lv_ti->struct_def;
         if (struct_def == 0) {
             emit_stderr("[ERROR] Struct definition not found for nested lvalue\n", 55);
             return;
@@ -617,7 +623,8 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
     // Get struct_def directly from type_info
     var struct_def: u64 = 0;
     if (var_type != 0) {
-        struct_def = *(var_type + 16);
+        var var_lv_ti: *TypeInfo = (*TypeInfo)var_type;
+        struct_def = var_lv_ti->struct_def;
     }
     
     if (struct_def == 0) {

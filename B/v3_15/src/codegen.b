@@ -67,10 +67,13 @@ func cg_func(node: u64) -> u64 {
         
         vec_push(offsets, 16 + i * 8);
         
-        var type_info: u64 = heap_alloc(24);
-        *(type_info) = p->type_kind;
-        *(type_info + 8) = p->ptr_depth;
-        *(type_info + 16) = 0;
+        var type_info: u64 = heap_alloc(40);
+        var ti: *TypeInfo = (*TypeInfo)type_info;
+        ti->type_kind = p->type_kind;
+        ti->ptr_depth = p->ptr_depth;
+        ti->struct_name_ptr = p->struct_name_ptr;
+        ti->struct_name_len = p->struct_name_len;
+        ti->struct_def = 0;
 
         // If this is a struct, resolve its struct_def now
         if (p->type_kind == TYPE_STRUCT && g_structs_vec != 0 && p->struct_name_ptr != 0) {
@@ -79,7 +82,7 @@ func cg_func(node: u64) -> u64 {
                 var sd_ptr: u64 = vec_get(g_structs_vec, si);
                 var sd: *AstStructDef = (*AstStructDef)sd_ptr;
                 if (sd->name_len == p->struct_name_len && str_eq(sd->name_ptr, sd->name_len, p->struct_name_ptr, p->struct_name_len) != 0) {
-                    *(type_info + 16) = sd_ptr;
+                    ti->struct_def = sd_ptr;
                     break;
                 }
             }

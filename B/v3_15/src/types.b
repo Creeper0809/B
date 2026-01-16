@@ -136,12 +136,13 @@ struct Parser {
     cur: u64;
 }
 
-// Type information (32 bytes)
+// Type information (40 bytes)
 struct TypeInfo {
     type_kind: u64;
     ptr_depth: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    struct_def: u64;
 }
 
 // Struct field descriptor (48 bytes)
@@ -187,6 +188,13 @@ struct Symtab {
     types_vec: u64;
     count: u64;
     stack_offset: u64;
+}
+
+// Vector structure (24 bytes)
+struct Vec {
+    data_ptr: u64;
+    length: u64;
+    capacity: u64;
 }
 
 // ============================================

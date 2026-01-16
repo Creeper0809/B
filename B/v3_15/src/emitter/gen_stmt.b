@@ -15,7 +15,8 @@ import ast;
 // ============================================
 
 func cg_block(node: u64) -> u64 {
-    var stmts: u64 = *(node + 8);
+    var block: *AstBlock = (*AstBlock)node;
+    var stmts: u64 = block->stmts_vec;
     var len: u64 = vec_len(stmts);
     for(var i: u64 = 0; i < len;i++){
         cg_stmt(vec_get(stmts, i));
@@ -47,7 +48,8 @@ func cg_stmt(node: u64) -> u64 {
     }
     
     if (kind == AST_EXPR_STMT) {
-        var expr: u64 = *(node + 8);
+        var expr_stmt: *AstExprStmt = (*AstExprStmt)node;
+        var expr: u64 = expr_stmt->expr;
         cg_expr(expr);
         return;
     }
@@ -116,7 +118,8 @@ func cg_stmt(node: u64) -> u64 {
 // ============================================
 
 func cg_return_stmt(node: u64, symtab: u64) -> u64 {
-    var expr: u64 = *(node + 8);
+    var ret: *AstReturn = (*AstReturn)node;
+    var expr: u64 = ret->expr;
     
     if (expr != 0) {
         var ret_type: u64 = emitter_get_ret_type();
@@ -170,13 +173,14 @@ func cg_return_stmt(node: u64, symtab: u64) -> u64 {
 // ============================================
 
 func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
-    var name_ptr: u64 = *(node + 8);
-    var name_len: u64 = *(node + 16);
-    var type_kind: u64 = *(node + 24);
-    var ptr_depth: u64 = *(node + 32);
-    var init: u64 = *(node + 40);
-    var struct_name_ptr: u64 = *(node + 48);
-    var struct_name_len: u64 = *(node + 56);
+    var decl: *AstVarDecl = (*AstVarDecl)node;
+    var name_ptr: u64 = decl->name_ptr;
+    var name_len: u64 = decl->name_len;
+    var type_kind: u64 = decl->type_kind;
+    var ptr_depth: u64 = decl->ptr_depth;
+    var init: u64 = decl->init_expr;
+    var struct_name_ptr: u64 = decl->struct_name_ptr;
+    var struct_name_len: u64 = decl->struct_name_len;
     
     // Calculate size based on type
     var size: u64 = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
@@ -190,8 +194,9 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
             var num_structs: u64 = vec_len(g_structs_vec);
             for (var i: u64 = 0; i < num_structs; i++) {
                 var sd: u64 = vec_get(g_structs_vec, i);
-                var sname_ptr: u64 = *(sd + 8);
-                var sname_len: u64 = *(sd + 16);
+                var struct_def: *AstStructDef = (*AstStructDef)sd;
+                var sname_ptr: u64 = struct_def->name_ptr;
+                var sname_len: u64 = struct_def->name_len;
                 if (str_eq(sname_ptr, sname_len, struct_name_ptr, struct_name_len)) {
                     struct_def = sd;
                     break;
@@ -199,7 +204,8 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
             }
         }
         var type_info: u64 = symtab_get_type(symtab, name_ptr, name_len);
-        *(type_info + 16) = struct_def;
+        var ti: *TypeInfo = (*TypeInfo)type_info;
+        ti->struct_def = struct_def;
     }
     
     if (init != 0) {
@@ -214,8 +220,9 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
         if (type_kind != 0) {
             var init_type: u64 = get_expr_type_with_symtab(init, symtab);
             if (init_type != 0) {
-                var it_base: u64 = *(init_type);
-                var it_depth: u64 = *(init_type + 8);
+                var it_info: *TypeInfo = (*TypeInfo)init_type;
+                var it_base: u64 = it_info->type_kind;
+                var it_depth: u64 = it_info->ptr_depth;
                 check_type_compat(it_base, it_depth, type_kind, ptr_depth);
             }
         }
@@ -250,10 +257,12 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
 }
 
 func cg_struct_literal_init(init: u64, offset: u64) -> u64 {
-    var struct_def: u64 = *(init + 8);
-    var values: u64 = *(init + 16);
+    var lit: *AstStructLiteral = (*AstStructLiteral)init;
+    var struct_def: u64 = lit->struct_def;
+    var values: u64 = lit->values_vec;
     var num_values: u64 = vec_len(values);
-    var fields: u64 = *(struct_def + 24);
+    var sd: *AstStructDef = (*AstStructDef)struct_def;
+    var fields: u64 = sd->fields_vec;
     var num_fields: u64 = vec_len(fields);
     
     // Initialize each field
@@ -283,21 +292,24 @@ func cg_struct_literal_init(init: u64, offset: u64) -> u64 {
 // ============================================
 
 func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
-    var target: u64 = *(node + 8);
-    var value: u64 = *(node + 16);
+    var assign: *AstAssign = (*AstAssign)node;
+    var target: u64 = assign->target;
+    var value: u64 = assign->value;
     
     var target_kind: u64 = ast_kind(target);
     if (target_kind == AST_IDENT) {
-        var name_ptr: u64 = *(target + 8);
-        var name_len: u64 = *(target + 16);
+        var ident: *AstIdent = (*AstIdent)target;
+        var name_ptr: u64 = ident->name_ptr;
+        var name_len: u64 = ident->name_len;
         
         var target_type: u64 = symtab_get_type(symtab, name_ptr, name_len);
         var value_type: u64 = get_expr_type_with_symtab(value, symtab);
         
         if (target_type != 0 && value_type != 0) {
-            var vt_depth: u64 = *(value_type + 8);
+            var vt_info: *TypeInfo = (*TypeInfo)value_type;
+            var vt_depth: u64 = vt_info->ptr_depth;
             if (vt_depth > 0) {
-                var vt_base: u64 = *(value_type);
+                var vt_base: u64 = vt_info->type_kind;
                 symtab_update_type(symtab, name_ptr, name_len, vt_base, vt_depth);
             }
         }
@@ -309,10 +321,12 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
     emit("    pop rbx\n", 12);
     
     if (target_kind == AST_DEREF) {
-        var deref_operand: u64 = *(target + 8);
+        var deref: *AstDeref = (*AstDeref)target;
+        var deref_operand: u64 = deref->operand;
         var op_type: u64 = get_expr_type_with_symtab(deref_operand, symtab);
-        var base_type: u64 = *(op_type);
-        var ptr_depth: u64 = *(op_type + 8);
+        var ti: *TypeInfo = (*TypeInfo)op_type;
+        var base_type: u64 = ti->type_kind;
+        var ptr_depth: u64 = ti->ptr_depth;
         
         if (ptr_depth == 1) {
             if (base_type == TYPE_U8) {
@@ -338,16 +352,18 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
     // Check if this is a struct-to-struct copy
     var target_type: u64 = get_expr_type_with_symtab(target, symtab);
     if (target_type != 0) {
-        var tt_base: u64 = *(target_type);
-        var tt_depth: u64 = *(target_type + 8);
+        var tt_info: *TypeInfo = (*TypeInfo)target_type;
+        var tt_base: u64 = tt_info->type_kind;
+        var tt_depth: u64 = tt_info->ptr_depth;
         
         // If it's a direct struct (not pointer), do multi-qword copy
         if (tt_base == TYPE_STRUCT && tt_depth == 0) {
-            var struct_def: u64 = *(target_type + 16);
+            var struct_def: u64 = tt_info->struct_def;
             if (struct_def != 0) {
                 // Get struct name to calculate size
-                var struct_name_ptr: u64 = *(struct_def + 8);
-                var struct_name_len: u64 = *(struct_def + 16);
+                var sd: *AstStructDef = (*AstStructDef)struct_def;
+                var struct_name_ptr: u64 = sd->name_ptr;
+                var struct_name_len: u64 = sd->name_len;
                 var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, struct_name_ptr, struct_name_len);
                 
                 // rax = dest address, rbx = value (but we need lvalue!)
@@ -388,9 +404,10 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
 // ============================================
 
 func cg_if_stmt(node: u64) -> u64 {
-    var cond: u64 = *(node + 8);
-    var then_blk: u64 = *(node + 16);
-    var else_blk: u64 = *(node + 24);
+    var if_stmt: *AstIf = (*AstIf)node;
+    var cond: u64 = if_stmt->cond;
+    var then_blk: u64 = if_stmt->then_block;
+    var else_blk: u64 = if_stmt->else_block;
     
     var else_label: u64 = new_label();
     var end_label: u64 = new_label();
@@ -418,8 +435,9 @@ func cg_if_stmt(node: u64) -> u64 {
 }
 
 func cg_while_stmt(node: u64) -> u64 {
-    var cond: u64 = *(node + 8);
-    var body: u64 = *(node + 16);
+    var while_stmt: *AstWhile = (*AstWhile)node;
+    var cond: u64 = while_stmt->cond;
+    var body: u64 = while_stmt->body;
     
     var start_label: u64 = new_label();
     var end_label: u64 = new_label();
@@ -440,9 +458,11 @@ func cg_while_stmt(node: u64) -> u64 {
     cg_block(body);
     
     var len: u64 = vec_len(g_loop_labels);
-    *(g_loop_labels + 8) = len - 1;
+    var loop_vec: *Vec = (*Vec)g_loop_labels;
+    loop_vec->length = len - 1;
     len = vec_len(g_loop_continue_labels);
-    *(g_loop_continue_labels + 8) = len - 1;
+    var cont_vec: *Vec = (*Vec)g_loop_continue_labels;
+    cont_vec->length = len - 1;
     
     emit("    jmp ", 8);
     emit_label(start_label);
@@ -452,10 +472,11 @@ func cg_while_stmt(node: u64) -> u64 {
 }
 
 func cg_for_stmt(node: u64) -> u64 {
-    var init: u64 = *(node + 8);
-    var cond: u64 = *(node + 16);
-    var update: u64 = *(node + 24);
-    var body: u64 = *(node + 32);
+    var for_stmt: *AstFor = (*AstFor)node;
+    var init: u64 = for_stmt->init;
+    var cond: u64 = for_stmt->cond;
+    var update: u64 = for_stmt->update;
+    var body: u64 = for_stmt->body;
     
     if (init != 0) { cg_stmt(init); }
     
@@ -481,9 +502,11 @@ func cg_for_stmt(node: u64) -> u64 {
     cg_block(body);
     
     var labels_len: u64 = vec_len(g_loop_labels);
-    *(g_loop_labels + 8) = labels_len - 1;
+    var loop_vec: *Vec = (*Vec)g_loop_labels;
+    loop_vec->length = labels_len - 1;
     labels_len = vec_len(g_loop_continue_labels);
-    *(g_loop_continue_labels + 8) = labels_len - 1;
+    var cont_vec: *Vec = (*Vec)g_loop_continue_labels;
+    cont_vec->length = labels_len - 1;
     
     emit_label_def(update_label);
     
@@ -497,8 +520,9 @@ func cg_for_stmt(node: u64) -> u64 {
 }
 
 func cg_switch_stmt(node: u64) -> u64 {
-    var expr: u64 = *(node + 8);
-    var cases: u64 = *(node + 16);
+    var switch_stmt: *AstSwitch = (*AstSwitch)node;
+    var expr: u64 = switch_stmt->expr;
+    var cases: u64 = switch_stmt->cases_vec;
     
     cg_expr(expr);
     emit("    push rax\n", 13);
@@ -513,10 +537,11 @@ func cg_switch_stmt(node: u64) -> u64 {
     var i: u64 = 0;
     while (i < num_cases) {
         var case_node: u64 = vec_get(cases, i);
-        var is_default: u64 = *(case_node + 24);
+        var case_stmt: *AstCase = (*AstCase)case_node;
+        var is_default: u64 = case_stmt->is_default;
         
         if (is_default == 0) {
-            var value: u64 = *(case_node + 8);
+            var value: u64 = case_stmt->value;
             var next_label: u64 = new_label();
             
             emit("    mov rax, [rsp]\n", 19);
@@ -529,7 +554,7 @@ func cg_switch_stmt(node: u64) -> u64 {
             emit_label(next_label);
             emit_nl();
             
-            var body: u64 = *(case_node + 16);
+            var body: u64 = case_stmt->body;
             cg_block(body);
             
             emit("    jmp ", 8);
@@ -538,7 +563,7 @@ func cg_switch_stmt(node: u64) -> u64 {
             
             emit_label_def(next_label);
         } else {
-            var body: u64 = *(case_node + 16);
+            var body: u64 = case_stmt->body;
             cg_block(body);
         }
         
@@ -547,14 +572,16 @@ func cg_switch_stmt(node: u64) -> u64 {
     
     // Pop end_label from g_loop_labels
     var len: u64 = vec_len(g_loop_labels);
-    *(g_loop_labels + 8) = len - 1;
+    var loop_vec: *Vec = (*Vec)g_loop_labels;
+    loop_vec->length = len - 1;
     
     emit("    add rsp, 8\n", 15);
     emit_label_def(end_label);
 }
 
 func cg_asm_stmt(node: u64) -> u64 {
-    var text_vec: u64 = *(node + 8);
+    var asm_stmt: *AstAsm = (*AstAsm)node;
+    var text_vec: u64 = asm_stmt->text_vec;
     var asm_len: u64 = vec_len(text_vec);
     
     var i: u64 = 0;

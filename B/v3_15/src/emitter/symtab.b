@@ -3,7 +3,7 @@
 // Symbol table structure: [names_vec, offsets_vec, types_vec, count, stack_offset]
 // - names_vec: vector of [name_ptr, name_len] pairs
 // - offsets_vec: vector of stack offsets (i64)
-// - types_vec: vector of [type_kind, ptr_depth, struct_def] triples
+// - types_vec: vector of TypeInfo (TypeInfo is 40 bytes)
 // - count: number of symbols
 // - stack_offset: current stack offset for allocation
 
@@ -57,10 +57,13 @@ func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth:
     vec_push(offsets, offset);
     
     // Add type info
-    var type_info: u64 = heap_alloc(24);
-    *(type_info) = type_kind;
-    *(type_info + 8) = ptr_depth;
-    *(type_info + 16) = 0;  // struct_def pointer (filled later for TYPE_STRUCT)
+    var type_info: u64 = heap_alloc(40);
+    var ti: *TypeInfo = (*TypeInfo)type_info;
+    ti->type_kind = type_kind;
+    ti->ptr_depth = ptr_depth;
+    ti->struct_name_ptr = 0;
+    ti->struct_name_len = 0;
+    ti->struct_def = 0;
     vec_push(types, type_info);
     
     *(s + 24) = count + 1;
@@ -73,8 +76,11 @@ func symtab_find(s: u64, name_ptr: u64, name_len: u64) -> u64 {
     var offsets: u64 = *(s + 8);
     var count: u64 = *(s + 24);
     
-    var i: u64 = count - 1;
-    while (i >= 0) {
+    if (count == 0) { return 0; }
+
+    var idx: i64 = (i64)count - 1;
+    while (idx >= 0) {
+        var i: u64 = (u64)idx;
         var name_info: u64 = vec_get(names, i);
         var n_ptr: u64 = *(name_info);
         var n_len: u64 = *(name_info + 8);
@@ -82,7 +88,8 @@ func symtab_find(s: u64, name_ptr: u64, name_len: u64) -> u64 {
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
             return vec_get(offsets, i);
         }
-        i = i - 1;
+
+        idx = idx - 1;
     }
     
     return 0;
@@ -93,8 +100,11 @@ func symtab_get_type(s: u64, name_ptr: u64, name_len: u64) -> u64 {
     var types: u64 = *(s + 16);
     var count: u64 = *(s + 24);
     
-    var i: u64 = count - 1;
-    while (i >= 0) {
+    if (count == 0) { return 0; }
+
+    var idx: i64 = (i64)count - 1;
+    while (idx >= 0) {
+        var i: u64 = (u64)idx;
         var name_info: u64 = vec_get(names, i);
         var n_ptr: u64 = *(name_info);
         var n_len: u64 = *(name_info + 8);
@@ -102,7 +112,8 @@ func symtab_get_type(s: u64, name_ptr: u64, name_len: u64) -> u64 {
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
             return vec_get(types, i);
         }
-        i = i - 1;
+
+        idx = idx - 1;
     }
     
     return 0;
@@ -113,18 +124,23 @@ func symtab_update_type(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, pt
     var types: u64 = *(s + 16);
     var count: u64 = *(s + 24);
     
-    var i: u64 = count - 1;
-    while (i >= 0) {
+    if (count == 0) { return; }
+
+    var idx: i64 = (i64)count - 1;
+    while (idx >= 0) {
+        var i: u64 = (u64)idx;
         var name_info: u64 = vec_get(names, i);
         var n_ptr: u64 = *(name_info);
         var n_len: u64 = *(name_info + 8);
         
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
             var type_info: u64 = vec_get(types, i);
-            *(type_info) = type_kind;
-            *(type_info + 8) = ptr_depth;
+            var ti: *TypeInfo = (*TypeInfo)type_info;
+            ti->type_kind = type_kind;
+            ti->ptr_depth = ptr_depth;
             return;
         }
-        i = i - 1;
+
+        idx = idx - 1;
     }
 }

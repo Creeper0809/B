@@ -82,6 +82,13 @@
 - [x] `ast_literal()` 1건을 struct 기반으로 변경(레이아웃 유지) + 회귀 테스트 추가: 99_ast_literal_smoke
 - [x] 개발일지(2026-01-14)에 `static`/`impl`/`enum` 설명 보강(Addendum)
 
+### v3_15 타입 정보(TypeInfo) 리팩토링 메모 (2026-01-17)
+
+- [x] `TypeInfo`를 40 bytes(5x u64)로 확장하고 `struct_def` 포함
+- [x] `symtab`/`typeinfo`/`codegen`에서 TypeInfo 생성·저장을 40 bytes 구조체로 통일(16/24 bytes 트리플 제거)
+- [x] `u64` 역순 탐색 루프(`while (i >= 0)`)를 `i64` 인덱스로 수정(언더플로우/무한 루프 방지)
+- [x] 회귀 테스트 추가: `B/v3_15/test/b/92_typeinfo_member_chain.b` + 전체 테스트 PASS
+
 ---
 
 ## 부트스트랩 핫픽스 (v3.6 컴파일러)

@@ -12,6 +12,28 @@ import std.util;
 import types;
 import ast;
 
+func typeinfo_make(base_type: u64, ptr_depth: u64) -> u64 {
+    var result: u64 = heap_alloc(40);
+    var ti: *TypeInfo = (*TypeInfo)result;
+    ti->type_kind = base_type;
+    ti->ptr_depth = ptr_depth;
+    ti->struct_name_ptr = 0;
+    ti->struct_name_len = 0;
+    ti->struct_def = 0;
+    return result;
+}
+
+func typeinfo_make_struct(ptr_depth: u64, struct_name_ptr: u64, struct_name_len: u64, struct_def: u64) -> u64 {
+    var result: u64 = heap_alloc(40);
+    var ti: *TypeInfo = (*TypeInfo)result;
+    ti->type_kind = TYPE_STRUCT;
+    ti->ptr_depth = ptr_depth;
+    ti->struct_name_ptr = struct_name_ptr;
+    ti->struct_name_len = struct_name_len;
+    ti->struct_def = struct_def;
+    return result;
+}
+
 // Global struct definitions (set by codegen before use)
 var g_structs_vec;
 
@@ -165,9 +187,14 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var names: u64 = *(symtab);
         var types: u64 = *(symtab + 16);
         var count: u64 = *(symtab + 24);
-        
-        var i: u64 = count - 1;
-        while (i >= 0) {
+
+        if (count == 0) {
+            return typeinfo_make(TYPE_I64, 0);
+        }
+
+        var idx: i64 = (i64)count - 1;
+        while (idx >= 0) {
+            var i: u64 = (u64)idx;
             var name_info: u64 = vec_get(names, i);
             var n_ptr: u64 = *(name_info);
             var n_len: u64 = *(name_info + 8);
@@ -175,47 +202,40 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
                 return vec_get(types, i);
             }
-            i = i - 1;
+
+            idx = idx - 1;
         }
-        
+
         // Not found - return default type
-        var result: u64 = heap_alloc(16);
-        *(result) = TYPE_I64;
-        *(result + 8) = 0;
-        return result;
+        return typeinfo_make(TYPE_I64, 0);
     }
     
     if (kind == AST_STRING) {
-        var result: u64 = heap_alloc(16);
-        *(result) = TYPE_U8;
-        *(result + 8) = 1;
-        return result;
+        return typeinfo_make(TYPE_U8, 1);
     }
     
     if (kind == AST_CAST) {
         var cast_node: *AstCast = (*AstCast)node;
-        var result: u64 = heap_alloc(24);
-        *(result) = cast_node->target_type;
-        *(result + 8) = cast_node->target_ptr_depth;
-        
-        // If it's a struct type, find the struct_def
         if (cast_node->target_type == TYPE_STRUCT) {
             var struct_def: u64 = get_struct_def(cast_node->struct_name_ptr, cast_node->struct_name_len);
-            *(result + 16) = struct_def;
-        } else {
-            *(result + 16) = 0;
+            return typeinfo_make_struct(cast_node->target_ptr_depth, cast_node->struct_name_ptr, cast_node->struct_name_len, struct_def);
         }
-        return result;
+
+        return typeinfo_make(cast_node->target_type, cast_node->target_ptr_depth);
     }
     
     if (kind == AST_ADDR_OF) {
         var operand: u64 = *(node + 8);
         var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
         if (op_type != 0) {
-            var result: u64 = heap_alloc(24);
-            *(result) = *(op_type);
-            *(result + 8) = *(op_type + 8) + 1;
-            *(result + 16) = *(op_type + 16);  // Copy struct_def
+            var result: u64 = heap_alloc(40);
+            var op_ti: *TypeInfo = (*TypeInfo)op_type;
+            var res_ti: *TypeInfo = (*TypeInfo)result;
+            res_ti->type_kind = op_ti->type_kind;
+            res_ti->ptr_depth = op_ti->ptr_depth + 1;
+            res_ti->struct_def = op_ti->struct_def;
+            res_ti->struct_name_ptr = 0;
+            res_ti->struct_name_len = 0;
             return result;
         }
     }
@@ -224,22 +244,23 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var operand: u64 = *(node + 8);
         var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
         if (op_type != 0) {
-            var depth: u64 = *(op_type + 8);
+            var op_ti: *TypeInfo = (*TypeInfo)op_type;
+            var depth: u64 = op_ti->ptr_depth;
             if (depth > 0) {
-                var result: u64 = heap_alloc(24);
-                *(result) = *(op_type);
-                *(result + 8) = depth - 1;
-                *(result + 16) = *(op_type + 16);  // Copy struct_def
+                var result: u64 = heap_alloc(40);
+                var res_ti: *TypeInfo = (*TypeInfo)result;
+                res_ti->type_kind = op_ti->type_kind;
+                res_ti->ptr_depth = depth - 1;
+                res_ti->struct_def = op_ti->struct_def;
+                res_ti->struct_name_ptr = 0;
+                res_ti->struct_name_len = 0;
                 return result;
             }
         }
     }
     
     if (kind == AST_DEREF8) {
-        var result: u64 = heap_alloc(16);
-        *(result) = TYPE_U8;
-        *(result + 8) = 0;
-        return result;
+        return typeinfo_make(TYPE_U8, 0);
     }
     
     if (kind == AST_MEMBER_ACCESS) {
@@ -251,8 +272,9 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var obj_type: u64 = get_expr_type_with_symtab(object, symtab);
         if (obj_type == 0) { return 0; }
         
-        var base_type: u64 = *(obj_type);
-        var ptr_depth: u64 = *(obj_type + 8);
+        var obj_ti: *TypeInfo = (*TypeInfo)obj_type;
+        var base_type: u64 = obj_ti->type_kind;
+        var ptr_depth: u64 = obj_ti->ptr_depth;
         
         // Handle ptr->field (dereference pointer first)
         if (ptr_depth > 0) {
@@ -261,7 +283,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         
         if (base_type != TYPE_STRUCT) { return 0; }
         
-        var struct_def: u64 = *(obj_type + 16);
+        var struct_def: u64 = obj_ti->struct_def;
         if (struct_def == 0) { return 0; }
         
         // Find the field in the struct
@@ -280,11 +302,6 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var field_ptr_depth: u64 = *(field + 40);
                 
                 // Return the field's type
-                var result: u64 = heap_alloc(24);
-                *(result) = field_type;
-                *(result + 8) = field_ptr_depth;
-                
-                // If field is a struct, find its struct_def
                 if (field_type == TYPE_STRUCT) {
                     var field_struct_def: u64 = 0;
                     if (g_structs_vec != 0) {
@@ -299,10 +316,10 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                             }
                         }
                     }
-                    *(result + 16) = field_struct_def;
+                    return typeinfo_make_struct(field_ptr_depth, field_struct_name_ptr, field_struct_name_len, field_struct_def);
                 }
-                
-                return result;
+
+                return typeinfo_make(field_type, field_ptr_depth);
             }
         }
         
@@ -311,11 +328,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     
     if (kind == AST_STRUCT_LITERAL) {
         var struct_def: u64 = *(node + 8);
-        var result: u64 = heap_alloc(24);
-        *(result) = TYPE_STRUCT;
-        *(result + 8) = 0;  // ptr_depth = 0
-        *(result + 16) = struct_def;
-        return result;
+        return typeinfo_make_struct(0, 0, 0, struct_def);
     }
     
     if (kind == AST_BINARY) {
@@ -326,10 +339,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             op == TOKEN_LT || op == TOKEN_GT ||
             op == TOKEN_LTEQ || op == TOKEN_GTEQ ||
             op == TOKEN_EQEQ || op == TOKEN_BANGEQ) {
-            var result: u64 = heap_alloc(16);
-            *(result) = TYPE_I64;
-            *(result + 8) = 0;
-            return result;
+            return typeinfo_make(TYPE_I64, 0);
         }
 
         var left: u64 = *(node + 16);
@@ -338,22 +348,32 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         if (op == TOKEN_PLUS || op == TOKEN_MINUS) {
             var left_type: u64 = get_expr_type_with_symtab(left, symtab);
             if (left_type != 0) {
-                var l_depth: u64 = *(left_type + 8);
+                var left_ti: *TypeInfo = (*TypeInfo)left_type;
+                var l_depth: u64 = left_ti->ptr_depth;
                 if (l_depth > 0) {
-                    var result: u64 = heap_alloc(16);
-                    *(result) = *(left_type);
-                    *(result + 8) = l_depth;
+                    var result: u64 = heap_alloc(40);
+                    var res_ti: *TypeInfo = (*TypeInfo)result;
+                    res_ti->type_kind = left_ti->type_kind;
+                    res_ti->ptr_depth = l_depth;
+                    res_ti->struct_def = left_ti->struct_def;
+                    res_ti->struct_name_ptr = 0;
+                    res_ti->struct_name_len = 0;
                     return result;
                 }
             }
 
             var right_type: u64 = get_expr_type_with_symtab(right, symtab);
             if (right_type != 0) {
-                var r_depth: u64 = *(right_type + 8);
+                var right_ti: *TypeInfo = (*TypeInfo)right_type;
+                var r_depth: u64 = right_ti->ptr_depth;
                 if (r_depth > 0) {
-                    var result: u64 = heap_alloc(16);
-                    *(result) = *(right_type);
-                    *(result + 8) = r_depth;
+                    var result: u64 = heap_alloc(40);
+                    var res_ti: *TypeInfo = (*TypeInfo)result;
+                    res_ti->type_kind = right_ti->type_kind;
+                    res_ti->ptr_depth = r_depth;
+                    res_ti->struct_def = right_ti->struct_def;
+                    res_ti->struct_name_ptr = 0;
+                    res_ti->struct_name_len = 0;
                     return result;
                 }
             }
@@ -361,15 +381,9 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
     
     if (kind == AST_LITERAL) {
-        var result: u64 = heap_alloc(16);
-        *(result) = TYPE_I64;
-        *(result + 8) = 0;
-        return result;
+        return typeinfo_make(TYPE_I64, 0);
     }
     
     // Default
-    var result: u64 = heap_alloc(16);
-    *(result) = TYPE_I64;
-    *(result + 8) = 0;
-    return result;
+    return typeinfo_make(TYPE_I64, 0);
 }
