@@ -414,8 +414,8 @@ func parse_program(p: u64) -> u64 {
         }
     }
     
-    var prog: u64  = ast_program(funcs, consts, imports);
-    *(prog + 32) = globals;
-    *(prog + 40) = structs;  // structs 추가
-    return prog;
+    var prog: *AstProgram = (*AstProgram)ast_program(funcs, consts, imports);
+    prog->globals_vec = globals;
+    prog->structs_vec = structs;
+    return (u64)prog;
 }
