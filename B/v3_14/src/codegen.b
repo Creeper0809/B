@@ -1,0 +1,151 @@
+// codegen.b - Code generator wrapper for v3.13
+//
+// This is a thin wrapper that re-exports functionality from:
+// - symtab.b: Symbol table management
+// - typeinfo.b: Type size/compatibility calculations
+// - emitter.b: ASM output helpers and global state
+// - gen_expr.b: Expression code generation
+// - gen_stmt.b: Statement code generation
+
+import std.io;
+import types;
+import std.util;
+import std.vec;
+import ast;
+import emitter.symtab;
+import emitter.typeinfo;
+import emitter.emitter;
+import emitter.gen_expr;
+import emitter.gen_stmt;
+
+// ============================================
+// Function Codegen
+// ============================================
+
+// Function parameter layout (48 bytes)
+struct FuncParam {
+    name_ptr: u64;
+    name_len: u64;
+    type_kind: u64;
+    ptr_depth: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+}
+
+func cg_func(node: u64) -> u64 {
+    var fn: *AstFunc = (*AstFunc)node;
+    
+    // Store return type information
+    emitter_set_ret_type(fn->ret_type);
+    emitter_set_ret_ptr_depth(fn->ret_ptr_depth);
+    emitter_set_ret_struct_name(fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+    
+    var g_symtab: u64 = emitter_get_symtab();
+    symtab_clear(g_symtab);
+
+    emit(fn->name_ptr, fn->name_len);
+    emit(":\n", 2);
+    
+    emitln("    push rbp");
+    emitln("    mov rbp, rsp");
+    emitln("    sub rsp, 1024");
+    
+    var g_structs_vec: u64 = typeinfo_get_structs();
+    
+    var nparams: u64 = vec_len(fn->params_vec);
+    for(var i: u64 = 0 ; i < nparams ; i++){
+         var p: *FuncParam = (*FuncParam)vec_get(fn->params_vec, i);
+        
+        var names: u64  = *(g_symtab);
+        var offsets: u64 = *(g_symtab + 8);
+        var types: u64 = *(g_symtab + 16);
+        
+        var name_info: u64 = heap_alloc(16);
+        *(name_info) = p->name_ptr;
+        *(name_info + 8) = p->name_len;
+        vec_push(names, name_info);
+        
+        vec_push(offsets, 16 + i * 8);
+        
+        var type_info: u64 = heap_alloc(24);
+        *(type_info) = p->type_kind;
+        *(type_info + 8) = p->ptr_depth;
+        *(type_info + 16) = 0;
+
+        // If this is a struct, resolve its struct_def now
+        if (p->type_kind == TYPE_STRUCT && g_structs_vec != 0 && p->struct_name_ptr != 0) {
+            var num_structs: u64 = vec_len(g_structs_vec);
+            for(var si: u64 = 0 ; si < num_structs ; si++){
+                var sd_ptr: u64 = vec_get(g_structs_vec, si);
+                var sd: *AstStructDef = (*AstStructDef)sd_ptr;
+                if (sd->name_len == p->struct_name_len && str_eq(sd->name_ptr, sd->name_len, p->struct_name_ptr, p->struct_name_len) != 0) {
+                    *(type_info + 16) = sd_ptr;
+                    break;
+                }
+            }
+        }
+        vec_push(types, type_info);
+        
+        *(g_symtab + 24) = *(g_symtab + 24) + 1;
+    }
+    
+    cg_block(fn->body);
+    
+    emitln("   xor eax, eax");
+    emitln("    mov rsp, rbp");
+    emitln("    pop rbp");
+    emitln("   ret");
+}
+
+// ============================================
+// Program Codegen
+// ============================================
+
+func cg_program(prog: u64) -> u64 {
+    var program: *AstProgram = (*AstProgram)prog;
+    
+    // Initialize emitter state
+    emitter_init();
+    
+    // Set structs for typeinfo module
+    typeinfo_set_structs(program->structs_vec);
+    
+    // Set globals
+    if (program->globals_vec == 0) {
+        emitter_set_globals(vec_new(32));
+    } else {
+        emitter_set_globals(program->globals_vec);
+    }
+    
+    // Copy constants
+    var g_consts: u64 = emitter_get_consts();
+    for(var ci: u64 = 0;ci < vec_len(program->consts_vec) ;ci++){
+        var c_ptr: u64 = vec_get(program->consts_vec, ci);
+        var c: *AstConstDecl = (*AstConstDecl)c_ptr;
+        var cinfo: u64 = heap_alloc(24);
+        *(cinfo) = c->name_ptr;
+        *(cinfo + 8) = c->name_len;
+        *(cinfo + 16) = c->value;
+        vec_push(g_consts, cinfo);
+    }
+    
+    emitln("default rel");
+    emitln("section .text");
+    emitln("global _start");
+    emitln("_start:");
+    emitln("    pop rdi          ; argc");
+    emitln("    mov rsi, rsp     ; argv");
+    emitln("    push rsi");
+    emitln("    push rdi");
+    emitln("    call main");
+    emitln("    mov rdi, rax");
+    emitln("    mov rax, 60");
+    emitln("    syscall");
+    
+    for(var i : u64 = 0; i < vec_len(program->funcs_vec);i++){
+        cg_func(vec_get(program->funcs_vec, i));
+    }
+    
+    string_emit_data();
+    globals_emit_bss();
+}

@@ -1,0 +1,269 @@
+// emitter.b - ASM output helpers, labels, string/data tables, global state
+//
+// This module contains:
+// - Global codegen state (symtab, label counter, strings, loops, etc.)
+// - Label generation and emission
+// - String literal table management
+// - Global variable BSS emission
+// - Constant lookup
+
+import std.io;
+import std.vec;
+import std.util;
+import types;
+
+// ============================================
+// Global Codegen State
+// ============================================
+
+var g_symtab;                       // Symbol table for current function
+var g_label_counter;                // Label counter for unique labels
+var g_consts;                       // Global constants table
+var g_strings;                      // String literals table
+var g_loop_labels;                  // Stack of loop end labels for break
+var g_loop_continue_labels;         // Stack of loop continue labels
+var g_globals;                      // Global variables list
+
+// Current function return type information (for struct return)
+var g_current_func_ret_type;
+var g_current_func_ret_ptr_depth;
+var g_current_func_ret_struct_name_ptr;
+var g_current_func_ret_struct_name_len;
+
+// ============================================
+// State Accessors
+// ============================================
+
+func emitter_get_symtab() -> u64 { return g_symtab; }
+func emitter_set_symtab(s: u64) -> u64 { g_symtab = s; }
+
+func emitter_get_globals() -> u64 { return g_globals; }
+func emitter_set_globals(g: u64) -> u64 { g_globals = g; }
+
+func emitter_get_consts() -> u64 { return g_consts; }
+func emitter_set_consts(c: u64) -> u64 { g_consts = c; }
+
+func emitter_get_loop_labels() -> u64 { return g_loop_labels; }
+func emitter_get_continue_labels() -> u64 { return g_loop_continue_labels; }
+
+func emitter_set_ret_type(t: u64) -> u64 { g_current_func_ret_type = t; }
+func emitter_set_ret_ptr_depth(d: u64) -> u64 { g_current_func_ret_ptr_depth = d; }
+func emitter_set_ret_struct_name(ptr: u64, len: u64) -> u64 {
+    g_current_func_ret_struct_name_ptr = ptr;
+    g_current_func_ret_struct_name_len = len;
+}
+
+func emitter_get_ret_type() -> u64 { return g_current_func_ret_type; }
+func emitter_get_ret_ptr_depth() -> u64 { return g_current_func_ret_ptr_depth; }
+func emitter_get_ret_struct_name_ptr() -> u64 { return g_current_func_ret_struct_name_ptr; }
+func emitter_get_ret_struct_name_len() -> u64 { return g_current_func_ret_struct_name_len; }
+
+// ============================================
+// Initialization
+// ============================================
+
+func emitter_init() -> u64 {
+    // Create symtab inline instead of calling symtab_new
+    // symtab = [names_vec, offsets_vec, types_vec, count, stack_offset]
+    g_symtab = heap_alloc(40);
+    *(g_symtab) = vec_new(64);       // names
+    *(g_symtab + 8) = vec_new(64);   // offsets
+    *(g_symtab + 16) = vec_new(64);  // types
+    *(g_symtab + 24) = 0;            // count
+    *(g_symtab + 32) = 0 - 8;        // stack_offset (starts at -8)
+    
+    g_label_counter = 0;
+    g_strings = vec_new(32);
+    g_loop_labels = vec_new(16);
+    g_loop_continue_labels = vec_new(16);
+    g_consts = vec_new(64);
+}
+
+func emitter_set_globals_from_prog(globals: u64) -> u64 {
+    if (globals == 0) {
+        g_globals = vec_new(32);
+    } else {
+        g_globals = globals;
+    }
+}
+
+func emitter_load_consts(consts: u64) -> u64 {
+    g_consts = vec_new(64);
+    var clen: u64 = vec_len(consts);
+    var ci: u64 = 0;
+    while (ci < clen) {
+        var c: u64 = vec_get(consts, ci);
+        var cinfo: u64 = heap_alloc(24);
+        *(cinfo) = *(c + 8);      // name_ptr
+        *(cinfo + 8) = *(c + 16); // name_len
+        *(cinfo + 16) = *(c + 24); // value
+        vec_push(g_consts, cinfo);
+        ci = ci + 1;
+    }
+}
+
+// ============================================
+// Global Variable Check
+// ============================================
+
+func is_global_var(name_ptr: u64, name_len: u64) -> u64 {
+    var len: u64 = vec_len(g_globals);
+    var i: u64 = 0;
+    while (i < len) {
+        var ginfo: *GlobalInfo = (*GlobalInfo)vec_get(g_globals, i);
+        if (str_eq(ginfo->name_ptr, ginfo->name_len, name_ptr, name_len)) {
+            return 1;
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+// ============================================
+// Constants Lookup
+// ============================================
+
+func const_find(name_ptr: u64, name_len: u64) -> u64 {
+    var len: u64 = vec_len(g_consts);
+    var i: u64 = 0;
+    while (i < len) {
+        var c: u64 = vec_get(g_consts, i);
+        var c_ptr: u64 = *(c);
+        var c_len: u64 = *(c + 8);
+        if (str_eq(c_ptr, c_len, name_ptr, name_len)) {
+            var result: u64 = heap_alloc(16);
+            *(result) = 1;           // found
+            *(result + 8) = *(c + 16); // value
+            return result;
+        }
+        i = i + 1;
+    }
+    var result: u64 = heap_alloc(16);
+    *(result) = 0;  // not found
+    return result;
+}
+
+// ============================================
+// Labels
+// ============================================
+
+func new_label() -> u64 {
+    var l: u64 = g_label_counter;
+    g_label_counter = g_label_counter + 1;
+    return l;
+}
+
+func emit_label(n: u64) -> u64 {
+    emit(".L", 2);
+    emit_u64(n);
+}
+
+func emit_label_def(n: u64) -> u64 {
+    emit_label(n);
+    emit(":", 1);
+    emit_nl();
+}
+
+// ============================================
+// String Literals Table
+// ============================================
+
+func string_table_init() -> u64 {
+    g_strings = vec_new(32);
+}
+
+func string_get_label(str_ptr: u64, str_len: u64) -> u64 {
+    var i: u64 = 0;
+    var count: u64 = vec_len(g_strings);
+    
+    while (i < count) {
+        var entry: u64 = vec_get(g_strings, i);
+        var e_ptr: u64 = *(entry);
+        var e_len: u64 = *(entry + 8);
+        
+        if (str_eq(e_ptr, e_len, str_ptr, str_len)) {
+            return *(entry + 16);
+        }
+        i = i + 1;
+    }
+    
+    var label_id: u64 = g_label_counter;
+    g_label_counter = g_label_counter + 1;
+    
+    var entry: u64 = heap_alloc(24);
+    *(entry) = str_ptr;
+    *(entry + 8) = str_len;
+    *(entry + 16) = label_id;
+    vec_push(g_strings, entry);
+    
+    return label_id;
+}
+
+func string_emit_data() -> u64 {
+    var count: u64 = vec_len(g_strings);
+    
+    if (count == 0) { return; }
+    
+    emit("\nsection .data\n", 15);
+    
+    var i: u64 = 0;
+    while (i < count) {
+        var entry: u64 = vec_get(g_strings, i);
+        var str_ptr: u64 = *(entry);
+        var str_len: u64 = *(entry + 8);
+        var label_id: u64 = *(entry + 16);
+        
+        emit("_str", 4);
+        emit_u64(label_id);
+        emit(": db ", 5);
+        
+        var j: u64 = 1;
+        while (j < str_len - 1) {
+            var c: u64 = *(*u8)(str_ptr + j);
+            
+            if (c == 92) {  // backslash
+                j = j + 1;
+                if (j < str_len - 1) {
+                    var ec: u64 = *(*u8)(str_ptr + j);
+                    if (ec == 110) { emit("10", 2); }       // \n
+                    else if (ec == 116) { emit("9", 1); }   // \t
+                    else if (ec == 48) { emit("0", 1); }    // \0
+                    else if (ec == 92) { emit("92", 2); }   // \\
+                    else if (ec == 34) { emit("34", 2); }   // \"
+                    else { emit_u64(ec); }
+                }
+            } else {
+                emit_u64(c);
+            }
+            
+            j = j + 1;
+            if (j < str_len - 1) { emit(",", 1); }
+        }
+        
+        emit(",0\n", 3);
+        i = i + 1;
+    }
+}
+
+// ============================================
+// Global Variables BSS Emission
+// ============================================
+
+func globals_emit_bss() -> u64 {
+    var count: u64 = vec_len(g_globals);
+    
+    if (count == 0) { return; }
+    
+    emit("\nsection .bss\n", 14);
+    
+    var i: u64 = 0;
+    while (i < count) {
+        var ginfo: *GlobalInfo = (*GlobalInfo)vec_get(g_globals, i);
+        
+        emit("_gvar_", 6);
+        emit(ginfo->name_ptr, ginfo->name_len);
+        emit(": resq 1\n", 9);
+        
+        i = i + 1;
+    }
+}
