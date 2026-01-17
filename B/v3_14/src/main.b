@@ -338,10 +338,17 @@ func main(argc: u64, argv: u64) -> u64 {
     g_base_dir = path_dirname(filename, filename_len);
     g_base_dir_len = str_len(g_base_dir);
 
-    // Read version from config.ini
-    var version: u64 = read_version_from_config("B/v3_13/config.ini");
+    // Find version directory by going up from base_dir
+    var up_one: u64 = path_dirname(g_base_dir, g_base_dir_len);
+    var version_dir: u64 = path_dirname(up_one, str_len(up_one));
+    var version_dir_len: u64 = str_len(version_dir);
+    
+    // Read version from config.ini in version directory
+    var slash_config: u64 = "/config.ini";
+    var config_path: u64 = str_concat(version_dir, version_dir_len, slash_config, 11);
+    var version: u64 = read_version_from_config(config_path);
     if (version == 0) {
-        version = "v3_13";  // Fallback to hardcoded default
+        version = "v3_14";  // Fallback to hardcoded default
     }
     
     // Build lib_dir path: "B/{version}/src"
