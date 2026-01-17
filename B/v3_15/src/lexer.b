@@ -115,6 +115,7 @@ func lex_check_keyword(ptr: u64, len: u64) -> u64 {
     if (str_eq(ptr, len, "u32", 3)) { return TOKEN_U32; }
     if (str_eq(ptr, len, "u64", 3)) { return TOKEN_U64; }
     if (str_eq(ptr, len, "i64", 3)) { return TOKEN_I64; }
+    if (str_eq(ptr, len, "__LINE__", 8)) { return TOKEN_LINE_MACRO; }
     return TOKEN_IDENTIFIER;
 }
 
@@ -291,7 +292,7 @@ func lex_next(l: u64) -> u64 {
 }
 
 func lex_all(src: u64, len: u64) -> u64 {
-    push_trace("lex_all", "lexer.b", 293);
+    push_trace("lex_all", "lexer.b", __LINE__);
     
     var l: u64 = lex_new(src, len);
     var tokens: u64 = vec_new(256);

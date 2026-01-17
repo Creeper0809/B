@@ -64,6 +64,13 @@ func parse_primary(p: u64) -> u64 {
         return ast_literal(parse_num_val(tok));
     }
 
+    if (k == TOKEN_LINE_MACRO) {
+        var tok: u64 = parse_peek(p);
+        parse_adv(p);
+        var line: u64 = ((*Token)tok)->line;
+        return ast_literal(line);
+    }
+
     if (k == TOKEN_TRUE) {
         parse_adv(p);
         return ast_literal(1);

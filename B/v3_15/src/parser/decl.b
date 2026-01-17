@@ -137,7 +137,7 @@ func parse_param(p: u64) -> u64 {
 }
 
 func parse_func_decl(p: u64) -> u64 {
-    push_trace("parse_func_decl", "parser/decl.b", 140);
+    push_trace("parse_func_decl", "parser/decl.b", __LINE__);
     
     parse_consume(p, TOKEN_FUNC);
     
@@ -356,7 +356,7 @@ func parse_impl_block(p: u64) -> u64 {
 // ============================================
 
 func parse_program(p: u64) -> u64 {
-    push_trace("parse_program", "parser/decl.b", 355);
+    push_trace("parse_program", "parser/decl.b", __LINE__);
     
     var funcs: u64 = vec_new(16);
     var consts: u64 = vec_new(64);

@@ -359,7 +359,7 @@ func parse_asm_stmt(p: u64) -> u64 {
 // ============================================
 
 func parse_block(p: u64) -> u64 {
-    push_trace("parse_block", "parser/stmt.b", 361);
+    push_trace("parse_block", "parser/stmt.b", __LINE__);
     
     parse_consume(p, TOKEN_LBRACE);
     

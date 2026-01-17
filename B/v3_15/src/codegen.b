@@ -105,7 +105,7 @@ func cg_func(node: u64) -> u64 {
 // ============================================
 
 func cg_program(prog: u64) -> u64 {
-    push_trace("cg_program", "codegen.b", 107);
+    push_trace("cg_program", "codegen.b", __LINE__);
     
     var program: *AstProgram = (*AstProgram)prog;
     
