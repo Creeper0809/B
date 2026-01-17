@@ -357,6 +357,8 @@ func main(argc: u64, argv: u64) -> u64 {
     g_lib_dir = str_concat3(b_prefix, 2, version, str_len(version), src_suffix, 4);
     g_lib_dir_len = str_len(g_lib_dir);
 
+    push_trace("main", 4, "main.b", 6, 0);
+    
     g_loaded_modules = hashmap_new(64);
     g_all_funcs = vec_new(64);
     g_all_consts = vec_new(128);
@@ -366,10 +368,12 @@ func main(argc: u64, argv: u64) -> u64 {
 
     // Implicit standard library prelude (std/* available without explicit import)
     if (!load_std_prelude()) {
+        pop_trace();
         return 1;
     }
     
     if (!load_module(filename, filename_len)) {
+        pop_trace();
         return 1;
     }
     
@@ -380,5 +384,6 @@ func main(argc: u64, argv: u64) -> u64 {
     
     cg_program(merged_prog);
     
+    pop_trace();
     return 0;
 }

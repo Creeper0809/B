@@ -102,6 +102,8 @@ func cg_func(node: u64) -> u64 {
 // ============================================
 
 func cg_program(prog: u64) -> u64 {
+    push_trace("cg_program", 10, "codegen.b", 9, 107);
+    
     var program: *AstProgram = (*AstProgram)prog;
     
     // Initialize emitter state
@@ -148,4 +150,6 @@ func cg_program(prog: u64) -> u64 {
     
     string_emit_data();
     globals_emit_bss();
+    
+    pop_trace();
 }

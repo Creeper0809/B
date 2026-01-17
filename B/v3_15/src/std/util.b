@@ -26,7 +26,7 @@ func init_stack_trace() {
     g_stack_initialized = 1;
 }
 
-func push_trace(func_name, func_name_len, file_name, file_name_len, line) {
+func push_trace(func_name, file_name, line) {
     if (!g_stack_initialized) {
         init_stack_trace();
     }
@@ -34,6 +34,9 @@ func push_trace(func_name, func_name_len, file_name, file_name_len, line) {
     if (g_stack_depth >= STACK_TRACE_MAX_DEPTH) {
         return;
     }
+    
+    var func_name_len = str_len(func_name);
+    var file_name_len = str_len(file_name);
     
     var frame_ptr = g_stack_frames + (g_stack_depth * STACK_FRAME_SIZE);
     *(*u64)(frame_ptr + 0) = func_name;

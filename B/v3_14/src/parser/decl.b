@@ -366,6 +366,8 @@ func parse_impl_block(p: u64) -> u64 {
 // ============================================
 
 func parse_program(p: u64) -> u64 {
+    push_trace("parse_program", 13, "parser/decl.b", 13, 368);
+    
     var funcs: u64 = vec_new(16);
     var consts: u64 = vec_new(64);
     var imports: u64 = vec_new(16);
@@ -417,5 +419,7 @@ func parse_program(p: u64) -> u64 {
     var prog: *AstProgram = (*AstProgram)ast_program(funcs, consts, imports);
     prog->globals_vec = globals;
     prog->structs_vec = structs;
+    
+    pop_trace();
     return (u64)prog;
 }

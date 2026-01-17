@@ -291,6 +291,8 @@ func lex_next(l: u64) -> u64 {
 }
 
 func lex_all(src: u64, len: u64) -> u64 {
+    push_trace("lex_all", "lexer.b", 293);
+    
     var l: u64 = lex_new(src, len);
     var tokens: u64 = vec_new(256);
     while (1) {
@@ -298,5 +300,7 @@ func lex_all(src: u64, len: u64) -> u64 {
         vec_push(tokens, tok);
         if (((*Token)tok)->kind == TOKEN_EOF) { break; }
     }
+    
+    pop_trace();
     return tokens;
 }

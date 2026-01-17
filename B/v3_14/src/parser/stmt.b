@@ -359,6 +359,8 @@ func parse_asm_stmt(p: u64) -> u64 {
 // ============================================
 
 func parse_block(p: u64) -> u64 {
+    push_trace("parse_block", 11, "parser/stmt.b", 13, 374);
+    
     parse_consume(p, TOKEN_LBRACE);
     
     var stmts: u64 = vec_new(16);
@@ -369,6 +371,8 @@ func parse_block(p: u64) -> u64 {
     }
     
     parse_consume(p, TOKEN_RBRACE);
+    
+    pop_trace();
     return ast_block(stmts);
 }
 

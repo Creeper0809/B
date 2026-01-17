@@ -137,6 +137,8 @@ func parse_param(p: u64) -> u64 {
 }
 
 func parse_func_decl(p: u64) -> u64 {
+    push_trace("parse_func_decl", "parser/decl.b", 140);
+    
     parse_consume(p, TOKEN_FUNC);
     
     var name_tok: u64 = parse_peek(p);
@@ -170,6 +172,7 @@ func parse_func_decl(p: u64) -> u64 {
     
     var body: u64 = parse_block(p);
     
+    pop_trace();
     return ast_func_ex(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, params, ret_type, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len, body);
 }
 
@@ -353,6 +356,8 @@ func parse_impl_block(p: u64) -> u64 {
 // ============================================
 
 func parse_program(p: u64) -> u64 {
+    push_trace("parse_program", "parser/decl.b", 355);
+    
     var funcs: u64 = vec_new(16);
     var consts: u64 = vec_new(64);
     var imports: u64 = vec_new(16);
@@ -404,5 +409,7 @@ func parse_program(p: u64) -> u64 {
     var prog: *AstProgram = (*AstProgram)ast_program(funcs, consts, imports);
     prog->globals_vec = globals;
     prog->structs_vec = structs;
+    
+    pop_trace();
     return (u64)prog;
 }
