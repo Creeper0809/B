@@ -155,6 +155,23 @@ func cg_expr(node: u64) -> u64 {
         return;
     }
     
+    if (kind == AST_SIZEOF) {
+        var sizeof_node: *AstSizeof = (*AstSizeof)node;
+        var type_kind: u64 = sizeof_node->type_kind;
+        var ptr_depth: u64 = sizeof_node->ptr_depth;
+        var struct_name_ptr: u64 = sizeof_node->struct_name_ptr;
+        var struct_name_len: u64 = sizeof_node->struct_name_len;
+        
+        // Calculate size at compile time
+        var size: u64 = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+        
+        // Emit as literal constant
+        emit("    mov rax, ", 13);
+        emit_u64(size);
+        emit_nl();
+        return;
+    }
+    
     if (kind == AST_CALL) {
         var call: *AstCall = (*AstCall)node;
         var name_ptr: u64 = call->name_ptr;

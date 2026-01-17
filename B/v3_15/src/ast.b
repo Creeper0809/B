@@ -144,6 +144,16 @@ struct AstCast {
     struct_name_len: u64;
 }
 
+// AST Sizeof node layout (40 bytes)
+const SIZEOF_AST_SIZEOF = 40;
+struct AstSizeof {
+    kind: u64;
+    type_kind: u64;
+    ptr_depth: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+}
+
 // AST_ADDR_OF: [kind, operand]
 func ast_addr_of(operand: u64) -> u64 {
     var n: *AstAddrOf = (*AstAddrOf)(heap_alloc(SIZEOF_AST_ADDR_OF));
@@ -186,6 +196,17 @@ func ast_cast_ex(expr: u64, target_type: u64, ptr_depth: u64, struct_name_ptr: u
     n->expr = expr;
     n->target_type = target_type;
     n->target_ptr_depth = ptr_depth;
+    n->struct_name_ptr = struct_name_ptr;
+    n->struct_name_len = struct_name_len;
+    return (u64)n;
+}
+
+// AST_SIZEOF: [kind, type_kind, ptr_depth, struct_name_ptr, struct_name_len]
+func ast_sizeof(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_name_len: u64) -> u64 {
+    var n: *AstSizeof = (*AstSizeof)(heap_alloc(SIZEOF_AST_SIZEOF));
+    n->kind = AST_SIZEOF;
+    n->type_kind = type_kind;
+    n->ptr_depth = ptr_depth;
     n->struct_name_ptr = struct_name_ptr;
     n->struct_name_len = struct_name_len;
     return (u64)n;

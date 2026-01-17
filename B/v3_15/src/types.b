@@ -32,6 +32,7 @@ const TOKEN_IMPL = 39;
 
 // Compiler macros
 const TOKEN_LINE_MACRO = 45;
+const TOKEN_SIZEOF = 46;
 
 // Type keywords
 const TOKEN_U8 = 40;
@@ -94,6 +95,7 @@ const AST_CAST = 108;
 const AST_STRING = 109;
 const AST_MEMBER_ACCESS = 110;
 const AST_STRUCT_LITERAL = 111;
+const AST_SIZEOF = 112;
 
 // Statements
 const AST_RETURN = 200;

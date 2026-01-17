@@ -116,6 +116,7 @@ func lex_check_keyword(ptr: u64, len: u64) -> u64 {
     if (str_eq(ptr, len, "u64", 3)) { return TOKEN_U64; }
     if (str_eq(ptr, len, "i64", 3)) { return TOKEN_I64; }
     if (str_eq(ptr, len, "__LINE__", 8)) { return TOKEN_LINE_MACRO; }
+    if (str_eq(ptr, len, "sizeof", 6)) { return TOKEN_SIZEOF; }
     return TOKEN_IDENTIFIER;
 }
 

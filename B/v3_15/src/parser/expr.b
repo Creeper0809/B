@@ -87,6 +87,22 @@ func parse_primary(p: u64) -> u64 {
         return ast_string(((*Token)tok)->ptr, ((*Token)tok)->len);
     }
     
+    if (k == TOKEN_SIZEOF) {
+        parse_adv(p);
+        parse_consume(p, TOKEN_LPAREN);
+        
+        // Parse type: sizeof(u64), sizeof(*u8), sizeof(StructName), sizeof(*StructName)
+        var ty: u64 = parse_type_ex(p);
+        var type_kind: u64 = *(*u64)ty;
+        var ptr_depth: u64 = *(*u64)(ty + 8);
+        var struct_name_ptr: u64 = *(*u64)(ty + 16);
+        var struct_name_len: u64 = *(*u64)(ty + 24);
+        
+        parse_consume(p, TOKEN_RPAREN);
+        
+        return ast_sizeof(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+    }
+    
     if (k == TOKEN_AMPERSAND) {
         parse_adv(p);
         var tok: u64 = parse_peek(p);
