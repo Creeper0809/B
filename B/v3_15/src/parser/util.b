@@ -10,6 +10,47 @@ import std.vec;
 import std.util;
 import lexer;
 
+// ============================================
+// Error Reporting Helpers
+// ============================================
+
+func report_parse_error(expected_kind: u64, actual_kind: u64, tok: u64) -> u64 {
+    begin_error_capture();
+    set_error_context("Token mismatch", 14);
+    
+    emit_stderr("[ERROR] Expected token kind ", 29);
+    emit_u64_stderr(expected_kind);
+    emit_stderr(" but got ", 9);
+    emit_u64_stderr(actual_kind);
+
+    if (tok != 0) {
+        emit_stderr(" at ", 4);
+        emit_u64_stderr(((*Token)tok)->line);
+        emit_stderr(":", 1);
+        emit_u64_stderr(((*Token)tok)->col);
+        emit_stderr(" token=", 7);
+        if (actual_kind == TOKEN_EOF) {
+            emit_stderr("<eof>", 5);
+        } else {
+            emit_stderr(((*Token)tok)->ptr, ((*Token)tok)->len);
+        }
+    }
+    emit_stderr_nl();
+    panic();
+}
+
+func report_integer_overflow_error(tok: u64) -> u64 {
+    set_error_context("Integer overflow", 16);
+    emit_stderr("[ERROR] Integer literal overflow at ", 38);
+    emit_u64(((*Token)tok)->line);
+    emit_stderr(":", 1);
+    emit_u64(((*Token)tok)->col);
+    emit_stderr(" literal=", 9);
+    emit_stderr(((*Token)tok)->ptr, ((*Token)tok)->len);
+    emit_nl();
+    panic();
+}
+
 // Parser structure: [tokens_vec, cur]
 
 func parse_new(tokens: u64) -> u64 {
@@ -52,30 +93,9 @@ func parse_match(p: u64, kind: u64) -> u64 {
 
 func parse_consume(p: u64, kind: u64) -> u64 {
     if (!parse_match(p, kind)) {
-        begin_error_capture();
-        set_error_context("Token mismatch", 14);
-        
-        emit_stderr("[ERROR] Expected token kind ", 29);
-        emit_u64_stderr(kind);
-        emit_stderr(" but got ", 9);
-        var got: u64 = parse_peek_kind(p);
-        emit_u64_stderr(got);
-
         var tok: u64 = parse_peek(p);
-        if (tok != 0) {
-            emit_stderr(" at ", 4);
-            emit_u64_stderr(((*Token)tok)->line);
-            emit_stderr(":", 1);
-            emit_u64_stderr(((*Token)tok)->col);
-            emit_stderr(" token=", 7);
-            if (got == TOKEN_EOF) {
-                emit_stderr("<eof>", 5);
-            } else {
-                emit_stderr(((*Token)tok)->ptr, ((*Token)tok)->len);
-            }
-        }
-        emit_stderr_nl();
-        panic();
+        var got: u64 = parse_peek_kind(p);
+        report_parse_error(kind, got, tok);
     }
 }
 
@@ -97,27 +117,11 @@ func parse_num_val(tok: u64) -> u64 {
         var digit: u64 = c - 48;
 
         if (val > max_div10) {
-            set_error_context("Integer overflow", 16);
-            emit_stderr("[ERROR] Integer literal overflow at ", 38);
-            emit_u64(((*Token)tok)->line);
-            emit_stderr(":", 1);
-            emit_u64(((*Token)tok)->col);
-            emit_stderr(" literal=", 9);
-            emit_stderr(ptr, len);
-            emit_nl();
-            panic();
+            report_integer_overflow_error(tok);
         }
         if (val == max_div10) {
             if (digit > max_mod10) {
-                set_error_context("Integer overflow", 16);
-                emit_stderr("[ERROR] Integer literal overflow at ", 38);
-                emit_u64(((*Token)tok)->line);
-                emit_stderr(":", 1);
-                emit_u64(((*Token)tok)->col);
-                emit_stderr(" literal=", 9);
-                emit_stderr(ptr, len);
-                emit_nl();
-                panic();
+                report_integer_overflow_error(tok);
             }
         }
 
