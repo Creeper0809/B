@@ -526,50 +526,69 @@ func cg_switch_stmt(node: u64) -> u64 {
     var expr: u64 = switch_stmt->expr;
     var cases: u64 = switch_stmt->cases_vec;
     
+    // Evaluate switch expression once
     cg_expr(expr);
-    emit("    push rax\n", 13);
     
     var end_label: u64 = new_label();
+    var default_label: u64 = 0;
+    var has_default: u64 = 0;
     
     // Push end_label to g_loop_labels so that break works
     var g_loop_labels: u64 = emitter_get_loop_labels();
     vec_push(g_loop_labels, end_label);
     
     var num_cases: u64 = vec_len(cases);
+    
+    // Analyze cases to decide optimization strategy
+    var use_jump_table: u64 = 0;
+    var min_val: i64 = 0;
+    var max_val: i64 = 0;
+    var case_count: u64 = 0;
+    
+    // Count non-default cases and find min/max values
     var i: u64 = 0;
     while (i < num_cases) {
         var case_node: u64 = vec_get(cases, i);
         var case_stmt: *AstCase = (*AstCase)case_node;
-        var is_default: u64 = case_stmt->is_default;
         
-        if (is_default == 0) {
-            var value: u64 = case_stmt->value;
-            var next_label: u64 = new_label();
+        if (case_stmt->is_default == 0) {
+            // Try to evaluate case value as constant
+            var value_node: u64 = case_stmt->value;
+            var value_kind: u64 = ast_kind(value_node);
             
-            emit("    mov rax, [rsp]\n", 19);
-            emit("    push rax\n", 13);
-            cg_expr(value);
-            emit("    mov rbx, rax\n", 17);
-            emit("    pop rax\n", 12);
-            emit("    cmp rax, rbx\n", 17);
-            emit("    jne ", 8);
-            emit_label(next_label);
-            emit_nl();
-            
-            var body: u64 = case_stmt->body;
-            cg_block(body);
-            
-            emit("    jmp ", 8);
-            emit_label(end_label);
-            emit_nl();
-            
-            emit_label_def(next_label);
+            if (value_kind == AST_LITERAL) {
+                var lit: *AstLiteral = (*AstLiteral)value_node;
+                var val: i64 = (i64)(lit->value);
+                
+                if (case_count == 0) {
+                    min_val = val;
+                    max_val = val;
+                } else {
+                    if (val < min_val) { min_val = val; }
+                    if (val > max_val) { max_val = val; }
+                }
+                case_count = case_count + 1;
+            }
         } else {
-            var body: u64 = case_stmt->body;
-            cg_block(body);
+            has_default = 1;
         }
         
         i = i + 1;
+    }
+    
+    // Use jump table if: 3+ cases, range <= 256, density > 40%
+    var range: i64 = max_val - min_val + 1;
+    if (case_count >= 3 && range > 0 && range <= 256) {
+        var density: u64 = (case_count * 100) / (u64)range;
+        if (density >= 40) {
+            use_jump_table = 1;
+        }
+    }
+    
+    if (use_jump_table == 1) {
+        cg_switch_jump_table(cases, min_val, max_val, end_label, has_default);
+    } else {
+        cg_switch_linear(cases, end_label, has_default);
     }
     
     // Pop end_label from g_loop_labels
@@ -577,8 +596,217 @@ func cg_switch_stmt(node: u64) -> u64 {
     var loop_vec: *Vec = (*Vec)g_loop_labels;
     loop_vec->length = len - 1;
     
-    emit("    add rsp, 8\n", 15);
     emit_label_def(end_label);
+}
+
+// Linear comparison switch (original behavior, improved)
+func cg_switch_linear(cases: u64, end_label: u64, has_default: u64) -> u64 {
+    emitln("    push rax    ; switch value");
+    
+    var num_cases: u64 = vec_len(cases);
+    var default_label: u64 = 0;
+    var symtab: u64 = emitter_get_symtab();
+    
+    // First pass: generate comparisons and find default
+    var case_labels: u64 = vec_new(num_cases);
+    var i: u64 = 0;
+    while (i < num_cases) {
+        var case_node: u64 = vec_get(cases, i);
+        var case_stmt: *AstCase = (*AstCase)case_node;
+        var is_default: u64 = case_stmt->is_default;
+        
+        var case_label: u64 = new_label();
+        vec_push(case_labels, case_label);
+        
+        if (is_default == 1) {
+            default_label = case_label;
+        } else {
+            // Generate comparison for this case
+            var value: u64 = case_stmt->value;
+            var value_kind: u64 = ast_kind(value);
+            
+            // Check if we're comparing strings (AST_STRING or pointer type)
+            var is_string_compare: u64 = 0;
+            if (value_kind == AST_STRING) {
+                is_string_compare = 1;
+            }
+            
+            if (is_string_compare == 1) {
+                // String comparison using str_eq(s1, len1, s2, len2)
+                // Push in reverse order (stack grows down)
+                
+                // Get case string and its length first
+                cg_expr(value);
+                emitln("    push rax");
+                emitln("    call str_len");
+                emitln("    mov rbx, rax    ; len2");
+                emitln("    pop rax    ; s2");
+                emitln("    push rbx    ; len2");
+                emitln("    push rax    ; s2");
+                
+                // Get switch value and its length
+                emitln("    mov rax, [rsp+16]    ; reload switch value");
+                emitln("    push rax");
+                emitln("    call str_len");
+                emitln("    mov rbx, rax    ; len1");
+                emitln("    pop rax    ; s1");
+                emitln("    push rbx    ; len1");
+                emitln("    push rax    ; s1");
+                
+                // Call str_eq(s1, len1, s2, len2)
+                emitln("    call str_eq");
+                emitln("    add rsp, 32");
+                emitln("    test rax, rax");
+                emit("    jnz ", 8);
+                emit_label(case_label);
+                emit_nl();
+            } else {
+                // Integer comparison
+                emitln("    mov rax, [rsp]    ; reload switch value");
+                emitln("    push rax");
+                cg_expr(value);
+                emit("    mov rbx, rax\n", 17);
+                emit("    pop rax\n", 12);
+                emit("    cmp rax, rbx\n", 17);
+                emit("    je ", 7);
+                emit_label(case_label);
+                emit_nl();
+            }
+        }
+        
+        i = i + 1;
+    }
+    
+    // If no match, jump to default or end
+    if (has_default == 1) {
+        emit("    jmp ", 8);
+        emit_label(default_label);
+        emit_nl();
+    } else {
+        emit("    jmp ", 8);
+        emit_label(end_label);
+        emit_nl();
+    }
+    
+    // Second pass: generate case bodies
+    i = 0;
+    while (i < num_cases) {
+        var case_node: u64 = vec_get(cases, i);
+        var case_stmt: *AstCase = (*AstCase)case_node;
+        var body: u64 = case_stmt->body;
+        var case_label: u64 = vec_get(case_labels, i);
+        
+        emit_label_def(case_label);
+        cg_block(body);
+        
+        i = i + 1;
+    }
+    
+    emit("    add rsp, 8    ; pop switch value\n", 37);
+}
+
+// Jump table switch (optimized for dense integer ranges)
+func cg_switch_jump_table(cases: u64, min_val: i64, max_val: i64, end_label: u64, has_default: u64) -> u64 {
+    var num_cases: u64 = vec_len(cases);
+    var range: i64 = max_val - min_val + 1;
+    var table_label: u64 = new_label();
+    var default_label: u64 = end_label;
+    
+    // Create case label mapping
+    var case_labels: u64 = vec_new(num_cases);
+    var value_to_label: u64 = vec_new((u64)range);
+    
+    // Initialize all table entries to default
+    var j: u64 = 0;
+    while (j < (u64)range) {
+        vec_push(value_to_label, end_label);
+        j = j + 1;
+    }
+    
+    // First pass: create labels and build value->label mapping
+    var i: u64 = 0;
+    while (i < num_cases) {
+        var case_node: u64 = vec_get(cases, i);
+        var case_stmt: *AstCase = (*AstCase)case_node;
+        var case_label: u64 = new_label();
+        vec_push(case_labels, case_label);
+        
+        if (case_stmt->is_default == 1) {
+            default_label = case_label;
+            // Update all unassigned entries to point to default
+            j = 0;
+            while (j < (u64)range) {
+                if (vec_get(value_to_label, j) == end_label) {
+                    vec_set(value_to_label, j, default_label);
+                }
+                j = j + 1;
+            }
+        } else {
+            var value_node: u64 = case_stmt->value;
+            var value_kind: u64 = ast_kind(value_node);
+            if (value_kind == AST_LITERAL) {
+                var lit: *AstLiteral = (*AstLiteral)value_node;
+                var val: i64 = (i64)(lit->value);
+                var idx: u64 = (u64)(val - min_val);
+                vec_set(value_to_label, idx, case_label);
+            }
+        }
+        
+        i = i + 1;
+    }
+    
+    // Generate bounds check and jump table lookup
+    emit("    ; Jump table switch (range: ", 30);
+    emit_i64(min_val);
+    emit(" to ", 4);
+    emit_i64(max_val);
+    emit(")\n", 2);
+    
+    // Check if value is in range [min_val, max_val]
+    if (min_val != 0) {
+        emit("    sub rax, ", 13);
+        emit_i64(min_val);
+        emit("    ; normalize to 0-based\n", 27);
+    }
+    emit("    cmp rax, ", 13);
+    emit_u64((u64)range);
+    emit_nl();
+    emit("    jae ", 8);
+    emit_label(default_label);
+    emit("    ; out of range\n", 19);
+    
+    // Jump via table: jmp [table + rax*8]
+    emit("    lea rbx, [rel ", 18);
+    emit(" ", 1);
+    emit_label(table_label);
+    emit("]\n", 2);
+    emit("    jmp [rbx + rax*8]\n", 21);
+    
+    // Emit jump table
+    emit_nl();
+    emit_label_def(table_label);
+    j = 0;
+    while (j < (u64)range) {
+        emit("    dq ", 7);
+        emit_label(vec_get(value_to_label, j));
+        emit_nl();
+        j = j + 1;
+    }
+    emit_nl();
+    
+    // Second pass: generate case bodies
+    i = 0;
+    while (i < num_cases) {
+        var case_node: u64 = vec_get(cases, i);
+        var case_stmt: *AstCase = (*AstCase)case_node;
+        var body: u64 = case_stmt->body;
+        var case_label: u64 = vec_get(case_labels, i);
+        
+        emit_label_def(case_label);
+        cg_block(body);
+        
+        i = i + 1;
+    }
 }
 
 func cg_asm_stmt(node: u64) -> u64 {
