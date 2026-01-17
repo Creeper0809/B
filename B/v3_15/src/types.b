@@ -96,6 +96,7 @@ const AST_STRING = 109;
 const AST_MEMBER_ACCESS = 110;
 const AST_STRUCT_LITERAL = 111;
 const AST_SIZEOF = 112;
+const AST_METHOD_CALL = 113;
 
 // Statements
 const AST_RETURN = 200;

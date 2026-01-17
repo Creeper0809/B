@@ -513,6 +513,16 @@ struct AstMemberAccess {
     member_len: u64;
 }
 
+// AST Method call node layout (40 bytes)
+const SIZEOF_AST_METHOD_CALL = 40;
+struct AstMethodCall {
+    kind: u64;
+    receiver: u64;
+    method_ptr: u64;
+    method_len: u64;
+    args_vec: u64;
+}
+
 // AST Struct literal node layout (24 bytes)
 const SIZEOF_AST_STRUCT_LITERAL = 24;
 struct AstStructLiteral {
@@ -590,6 +600,17 @@ func ast_member_access(object: u64, member_ptr: u64, member_len: u64) -> u64 {
     n->object = object;
     n->member_ptr = member_ptr;
     n->member_len = member_len;
+    return (u64)n;
+}
+
+// AST_METHOD_CALL: [kind, receiver, method_ptr, method_len, args_vec]
+func ast_method_call(receiver: u64, method_ptr: u64, method_len: u64, args: u64) -> u64 {
+    var n: *AstMethodCall = (*AstMethodCall)(heap_alloc(SIZEOF_AST_METHOD_CALL));
+    n->kind = AST_METHOD_CALL;
+    n->receiver = receiver;
+    n->method_ptr = method_ptr;
+    n->method_len = method_len;
+    n->args_vec = args;
     return (u64)n;
 }
 

@@ -221,14 +221,53 @@ func parse_postfix_from(p: u64, left: u64) -> u64 {
             parse_adv(p);
             var field_tok: u64 = parse_peek(p);
             parse_consume(p, TOKEN_IDENTIFIER);
-            left = ast_member_access(left, ((*Token)field_tok)->ptr, ((*Token)field_tok)->len);
+            
+            // Check if next token is '(' -> method call
+            if (parse_peek_kind(p) == TOKEN_LPAREN) {
+                parse_adv(p);
+                var args: u64 = vec_new(4);
+                
+                if (parse_peek_kind(p) != TOKEN_RPAREN) {
+                    vec_push(args, parse_expr(p));
+                    while (parse_peek_kind(p) == TOKEN_COMMA) {
+                        parse_adv(p);
+                        vec_push(args, parse_expr(p));
+                    }
+                }
+                
+                parse_consume(p, TOKEN_RPAREN);
+                left = ast_method_call(left, ((*Token)field_tok)->ptr, ((*Token)field_tok)->len, args);
+            } else {
+                // Regular member access
+                left = ast_member_access(left, ((*Token)field_tok)->ptr, ((*Token)field_tok)->len);
+            }
         } else if (k == TOKEN_ARROW) {
             parse_adv(p);
             var field_tok: u64 = parse_peek(p);
             parse_consume(p, TOKEN_IDENTIFIER);
-            // ptr->field = (*ptr).field
-            var deref: u64 = ast_deref(left);
-            left = ast_member_access(deref, ((*Token)field_tok)->ptr, ((*Token)field_tok)->len);
+            
+            // Check if next token is '(' -> method call
+            if (parse_peek_kind(p) == TOKEN_LPAREN) {
+                parse_adv(p);
+                var args: u64 = vec_new(4);
+                
+                if (parse_peek_kind(p) != TOKEN_RPAREN) {
+                    vec_push(args, parse_expr(p));
+                    while (parse_peek_kind(p) == TOKEN_COMMA) {
+                        parse_adv(p);
+                        vec_push(args, parse_expr(p));
+                    }
+                }
+                
+                parse_consume(p, TOKEN_RPAREN);
+                // ptr->method() = (*ptr).method()
+                var deref: u64 = ast_deref(left);
+                left = ast_method_call(deref, ((*Token)field_tok)->ptr, ((*Token)field_tok)->len, args);
+            } else {
+                // Regular member access: ptr->field = (*ptr).field
+                var deref: u64 = ast_deref(left);
+                left = ast_member_access(deref, ((*Token)field_tok)->ptr, ((*Token)field_tok)->len);
+            }
         } else {
             break;
         }

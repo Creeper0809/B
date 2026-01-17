@@ -27,14 +27,14 @@ func main() {
     var p1: Point;
     var p2: Point;
     
-    Point_init(&p1, 10, 20);
-    Point_init(&p2, 3, 4);
+    p1.init(10, 20);
+    p2.init(3, 4);
     
     // p1.sum() = 30
-    var sum1 = Point_sum(&p1);
+    var sum1 = p1.sum();
     
     // distance_squared = (10-3)^2 + (20-4)^2 = 49 + 256 = 305
-    var dist = Point_distance_squared(&p1, &p2);
+    var dist = p1.distance_squared(&p2);
     
     // result = 30 + 305 - 293 = 42
     return sum1 + dist - 293;

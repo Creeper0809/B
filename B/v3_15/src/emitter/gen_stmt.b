@@ -206,6 +206,8 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
         var type_info: u64 = symtab_get_type(symtab, name_ptr, name_len);
         var ti: *TypeInfo = (*TypeInfo)type_info;
         ti->struct_def = struct_def;
+        ti->struct_name_ptr = struct_name_ptr;
+        ti->struct_name_len = struct_name_len;
     }
     
     if (init != 0) {

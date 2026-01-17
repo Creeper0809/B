@@ -198,6 +198,11 @@ func cg_expr(node: u64) -> u64 {
         return;
     }
     
+    if (kind == AST_METHOD_CALL) {
+        cg_method_call(node, symtab);
+        return;
+    }
+    
     if (kind == AST_STRUCT_LITERAL) {
         // Struct literals should only appear in var initializers (handled in cg_stmt)
         emit("    xor eax, eax\n", 17);
@@ -657,4 +662,50 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
     if (total_offset < 0) { emit_i64(total_offset); }
     else { emit("+", 1); emit_u64(total_offset); }
     emit("]\n", 2);
+}
+
+// ============================================
+// Method Call Code Generation
+// ============================================
+
+func cg_method_call(node: u64, symtab: u64) -> u64 {
+    var method_call: *AstMethodCall = (*AstMethodCall)node;
+    var receiver: u64 = method_call->receiver;
+    var method_ptr: u64 = method_call->method_ptr;
+    var method_len: u64 = method_call->method_len;
+    var args: u64 = method_call->args_vec;
+    var nargs: u64 = vec_len(args);
+    
+    // Push user args (in reverse order)
+    var i: u64 = nargs - 1;
+    while (i >= 0) {
+        cg_expr(vec_get(args, i));
+        emit("    push rax\n", 13);
+        i = i - 1;
+    }
+    
+    // Push receiver address (first arg = self)
+    cg_lvalue(receiver, symtab);
+    emit("    push rax\n", 13);
+    
+    // Get receiver type to determine struct name
+    var receiver_type: u64 = get_expr_type_with_symtab(receiver, symtab);
+    var type_info: *TypeInfo = (*TypeInfo)receiver_type;
+    var struct_name_ptr: u64 = type_info->struct_name_ptr;
+    var struct_name_len: u64 = type_info->struct_name_len;
+    
+    // Call StructName_method()
+    emit("    call ", 9);
+    emit(struct_name_ptr, struct_name_len);
+    emit("_", 1);
+    emit(method_ptr, method_len);
+    emit_nl();
+    
+    // Clean up stack (receiver + user args)
+    var total_args: u64 = nargs + 1;
+    if (total_args > 0) {
+        emit("    add rsp, ", 13);
+        emit_u64(total_args * 8);
+        emit_nl();
+    }
 }
