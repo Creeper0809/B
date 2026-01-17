@@ -208,7 +208,7 @@ func string_emit_data() -> u64 {
     
     if (count == 0) { return; }
     
-    emit("\nsection .data\n", 15);
+    emitln("\nsection .data");
     
     var i: u64 = 0;
     while (i < count) {
@@ -245,7 +245,7 @@ func string_emit_data() -> u64 {
             if (j < str_len - 1) { emit(",", 1); }
         }
         
-        emit(",0\n", 3);
+        emitln(",0");
         i = i + 1;
     }
 }
@@ -259,7 +259,7 @@ func globals_emit_bss() -> u64 {
     
     if (count == 0) { return; }
     
-    emit("\nsection .bss\n", 14);
+    emitln("\nsection .bss");
     
     var i: u64 = 0;
     while (i < count) {
@@ -267,7 +267,7 @@ func globals_emit_bss() -> u64 {
         
         emit("_gvar_", 6);
         emit(ginfo->name_ptr, ginfo->name_len);
-        emit(": resq 1\n", 9);
+        emitln(": resq 1");
         
         i = i + 1;
     }

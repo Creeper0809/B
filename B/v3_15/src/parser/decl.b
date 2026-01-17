@@ -198,20 +198,7 @@ func parse_struct_def(p: u64) -> u64 {
         
         parse_consume(p, TOKEN_COLON);
         
-        var field_type: *TypeInfo = (*TypeInfo)parse_type(p);
-        
-        // If the field is a struct type, capture the struct name
-        var field_struct_name_ptr: u64 = 0;
-        var field_struct_name_len: u64 = 0;
-        if ( field_type->type_kind == TYPE_STRUCT) {
-            var parser: *Parser = (*Parser)p;
-            var prev_idx: u64 = parser->cur - 1;
-            if (prev_idx >= 0 && prev_idx < vec_len(parser->tokens_vec)) {
-                var prev_tok: u64 = vec_get(parser->tokens_vec, prev_idx);
-                field_struct_name_ptr = ((*Token)prev_tok)->ptr;
-                field_struct_name_len = ((*Token)prev_tok)->len;
-            }
-        }
+        var field_type: *TypeInfo = (*TypeInfo)parse_type_ex(p);
         
         parse_consume(p, TOKEN_SEMICOLON);
         
@@ -219,8 +206,8 @@ func parse_struct_def(p: u64) -> u64 {
         field_desc->name_ptr = field_name_ptr;
         field_desc->name_len = field_name_len;
         field_desc->type_kind =  field_type->type_kind;
-        field_desc->struct_name_ptr = field_struct_name_ptr;
-        field_desc->struct_name_len = field_struct_name_len;
+        field_desc->struct_name_ptr = field_type->struct_name_ptr;
+        field_desc->struct_name_len = field_type->struct_name_len;
         field_desc->ptr_depth = field_type->ptr_depth;
         
         vec_push(fields, field_desc);

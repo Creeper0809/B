@@ -112,6 +112,7 @@ func ast_call(name_ptr: u64, name_len: u64, args: u64) -> u64 {
 }
 
 // AST Address-of node layout (16 bytes)
+
 const SIZEOF_AST_ADDR_OF = 16;
 struct AstAddrOf {
     kind: u64;
