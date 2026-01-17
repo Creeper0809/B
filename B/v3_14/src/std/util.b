@@ -6,12 +6,94 @@ import std.path;
 import std.char;
 
 // ============================================
+// Stack Trace
+// ============================================
+
+// Stack frame: [func_name:8][func_name_len:8][file_name:8][file_name_len:8][line:8] = 40 bytes
+const STACK_TRACE_MAX_DEPTH = 128;
+const STACK_FRAME_SIZE = 40;
+
+var g_stack_frames;
+var g_stack_depth;
+var g_stack_initialized;
+
+func init_stack_trace() {
+    if (g_stack_initialized) {
+        return;
+    }
+    g_stack_frames = heap_alloc(STACK_TRACE_MAX_DEPTH * STACK_FRAME_SIZE);
+    g_stack_depth = 0;
+    g_stack_initialized = 1;
+}
+
+func push_trace(func_name, func_name_len, file_name, file_name_len, line) {
+    if (!g_stack_initialized) {
+        init_stack_trace();
+    }
+    
+    if (g_stack_depth >= STACK_TRACE_MAX_DEPTH) {
+        return;
+    }
+    
+    var frame_ptr = g_stack_frames + (g_stack_depth * STACK_FRAME_SIZE);
+    *(*u64)(frame_ptr + 0) = func_name;
+    *(*u64)(frame_ptr + 8) = func_name_len;
+    *(*u64)(frame_ptr + 16) = file_name;
+    *(*u64)(frame_ptr + 24) = file_name_len;
+    *(*u64)(frame_ptr + 32) = line;
+    
+    g_stack_depth = g_stack_depth + 1;
+}
+
+func pop_trace() {
+    if (g_stack_depth > 0) {
+        g_stack_depth = g_stack_depth - 1;
+    }
+}
+
+func print_stack_trace() {
+    if (!g_stack_initialized) {
+        emit_stderr("  (no stack trace available)", 28);
+        emit_stderr_nl();
+        return;
+    }
+    
+    if (g_stack_depth == 0) {
+        emit_stderr("  (stack trace is empty)", 24);
+        emit_stderr_nl();
+        return;
+    }
+    
+    emit_stderr("Stack trace (most recent call first):", 38);
+    emit_stderr_nl();
+    
+    var i = g_stack_depth;
+    while (i > 0) {
+        i = i - 1;
+        
+        var frame_ptr = g_stack_frames + (i * STACK_FRAME_SIZE);
+        var func_name = *(*u64)(frame_ptr + 0);
+        var func_name_len = *(*u64)(frame_ptr + 8);
+        var file_name = *(*u64)(frame_ptr + 16);
+        var file_name_len = *(*u64)(frame_ptr + 24);
+        
+        emit_stderr("  at ", 5);
+        emit_stderr(func_name, func_name_len);
+        emit_stderr(" (", 2);
+        emit_stderr(file_name, file_name_len);
+        emit_stderr(")", 1);
+        emit_stderr_nl();
+    }
+}
+
+// ============================================
 // Error Handling
 // ============================================
 
 func panic() {
-    emit("[PANIC] Compiler error - exiting", 32);
-    emit_nl();
+    emit_stderr("[PANIC] Compiler error - exiting", 33);
+    emit_stderr_nl();
+    print_stack_trace();
     var x = *(0);
 }
 
