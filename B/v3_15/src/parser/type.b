@@ -24,17 +24,10 @@ func parse_base_type(p: u64) -> u64 {
     if (k == TOKEN_U64) { parse_adv(p); return TYPE_U64; }
     if (k == TOKEN_I64) { parse_adv(p); return TYPE_I64; }
     
-    // Check for struct type name
+    // Check for struct type name (allow any identifier in type position)
     if (k == TOKEN_IDENTIFIER) {
-        var tok: u64 = parse_peek(p);
-        var name_ptr: u64 = ((*Token)tok)->ptr;
-        var name_len: u64 = ((*Token)tok)->len;
-        
-        // Call is_struct_type (defined in main.b)
-        if (is_struct_type(name_ptr, name_len) != 0) {
-            parse_adv(p);
-            return TYPE_STRUCT;
-        }
+        parse_adv(p);
+        return TYPE_STRUCT;
     }
     
     return TYPE_VOID;
@@ -76,12 +69,10 @@ func parse_type_ex(p: u64) -> u64 {
         var tok: u64 = parse_peek(p);
         var name_ptr: u64 = ((*Token)tok)->ptr;
         var name_len: u64 = ((*Token)tok)->len;
-        if (is_struct_type(name_ptr, name_len) != 0) {
-            parse_adv(p);
-            base = TYPE_STRUCT;
-            struct_name_ptr = name_ptr;
-            struct_name_len = name_len;
-        }
+        parse_adv(p);
+        base = TYPE_STRUCT;
+        struct_name_ptr = name_ptr;
+        struct_name_len = name_len;
     }
 
     var result: *TypeInfo = (*TypeInfo)heap_alloc(32);

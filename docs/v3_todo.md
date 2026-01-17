@@ -88,6 +88,11 @@
 - [x] `symtab`/`typeinfo`/`codegen`에서 TypeInfo 생성·저장을 40 bytes 구조체로 통일(16/24 bytes 트리플 제거)
 - [x] `u64` 역순 탐색 루프(`while (i >= 0)`)를 `i64` 인덱스로 수정(언더플로우/무한 루프 방지)
 - [x] 회귀 테스트 추가: `B/v3_15/test/b/92_typeinfo_member_chain.b` + 전체 테스트 PASS
+- [x] switch 문자열 비교 개선: `str_eq` + `str_len` 기반 비교로 포인터 비교 버그 제거, `emitln` 적용으로 고정 문자열 길이 계산 오류 방지
+- [x] 회귀 테스트 추가: `B/v3_15/test/b/77_switch_string.b` + 전체 테스트 PASS
+- [x] StringBuilder 구현을 impl 기반으로 전환 (`StringBuilder.init/new/append_*`), 래퍼 API 유지 + 테스트 `97_string_builder` 갱신
+- [x] `sb_append` 래퍼 추가로 간단한 append 호출 지원
+- [x] 타입 파서 완화: type 위치의 식별자를 struct 타입으로 허용해 import된 struct(`StringBuilder`) 사용 가능
 
 ---
 
