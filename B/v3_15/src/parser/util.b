@@ -14,25 +14,162 @@ import lexer;
 // Error Reporting Helpers
 // ============================================
 
+func token_kind_name(kind: u64) -> u64 {
+    if (kind == TOKEN_EOF) { return "EOF"; }
+    if (kind == TOKEN_NUMBER) { return "number"; }
+    if (kind == TOKEN_IDENTIFIER) { return "identifier"; }
+    if (kind == TOKEN_STRING) { return "string"; }
+    if (kind == TOKEN_LPAREN) { return "'('"; }
+    if (kind == TOKEN_RPAREN) { return "')'"; }
+    if (kind == TOKEN_LBRACE) { return "'{'"; }
+    if (kind == TOKEN_RBRACE) { return "'}'"; }
+    if (kind == TOKEN_LBRACKET) { return "'['"; }
+    if (kind == TOKEN_RBRACKET) { return "']'"; }
+    if (kind == TOKEN_SEMICOLON) { return "';'"; }
+    if (kind == TOKEN_COLON) { return "':'"; }
+    if (kind == TOKEN_COMMA) { return "','"; }
+    if (kind == TOKEN_DOT) { return "'.'"; }
+    if (kind == TOKEN_ARROW) { return "'->'"; }
+    if (kind == TOKEN_PLUS) { return "'+'"; }
+    if (kind == TOKEN_MINUS) { return "'-'"; }
+    if (kind == TOKEN_STAR) { return "'*'"; }
+    if (kind == TOKEN_SLASH) { return "'/'"; }
+    if (kind == TOKEN_PERCENT) { return "'%'"; }
+    if (kind == TOKEN_EQ) { return "'='"; }
+    if (kind == TOKEN_EQEQ) { return "'=='"; }
+    if (kind == TOKEN_BANGEQ) { return "'!='"; }
+    if (kind == TOKEN_LT) { return "'<'"; }
+    if (kind == TOKEN_LE) { return "'<='"; }
+    if (kind == TOKEN_GT) { return "'>'"; }
+    if (kind == TOKEN_GE) { return "'>='"; }
+    if (kind == TOKEN_AMPERSAND) { return "'&'"; }
+    if (kind == TOKEN_PIPE) { return "'|'"; }
+    if (kind == TOKEN_CARET) { return "'^'"; }
+    if (kind == TOKEN_ANDAND) { return "'&&'"; }
+    if (kind == TOKEN_OROR) { return "'||'"; }
+    if (kind == TOKEN_BANG) { return "'!'"; }
+    if (kind == TOKEN_PLUSPLUS) { return "'++'"; }
+    if (kind == TOKEN_MINUSMINUS) { return "'--'"; }
+    if (kind == TOKEN_VAR) { return "'var'"; }
+    if (kind == TOKEN_FUNC) { return "'func'"; }
+    if (kind == TOKEN_RETURN) { return "'return'"; }
+    if (kind == TOKEN_IF) { return "'if'"; }
+    if (kind == TOKEN_ELSE) { return "'else'"; }
+    if (kind == TOKEN_WHILE) { return "'while'"; }
+    if (kind == TOKEN_FOR) { return "'for'"; }
+    if (kind == TOKEN_BREAK) { return "'break'"; }
+    if (kind == TOKEN_CONTINUE) { return "'continue'"; }
+    if (kind == TOKEN_IMPORT) { return "'import'"; }
+    if (kind == TOKEN_STRUCT) { return "'struct'"; }
+    if (kind == TOKEN_ENUM) { return "'enum'"; }
+    if (kind == TOKEN_CONST) { return "'const'"; }
+    if (kind == TOKEN_TRUE) { return "'true'"; }
+    if (kind == TOKEN_FALSE) { return "'false'"; }
+    if (kind == TOKEN_SIZEOF) { return "'sizeof'"; }
+    return "unknown token";
+}
+
+func token_kind_name_len(kind: u64) -> u64 {
+    if (kind == TOKEN_EOF) { return 3; }
+    if (kind == TOKEN_NUMBER) { return 6; }
+    if (kind == TOKEN_IDENTIFIER) { return 10; }
+    if (kind == TOKEN_STRING) { return 6; }
+    if (kind == TOKEN_LPAREN) { return 3; }
+    if (kind == TOKEN_RPAREN) { return 3; }
+    if (kind == TOKEN_LBRACE) { return 3; }
+    if (kind == TOKEN_RBRACE) { return 3; }
+    if (kind == TOKEN_LBRACKET) { return 3; }
+    if (kind == TOKEN_RBRACKET) { return 3; }
+    if (kind == TOKEN_SEMICOLON) { return 3; }
+    if (kind == TOKEN_COLON) { return 3; }
+    if (kind == TOKEN_COMMA) { return 3; }
+    if (kind == TOKEN_DOT) { return 3; }
+    if (kind == TOKEN_ARROW) { return 4; }
+    if (kind == TOKEN_PLUS) { return 3; }
+    if (kind == TOKEN_MINUS) { return 3; }
+    if (kind == TOKEN_STAR) { return 3; }
+    if (kind == TOKEN_SLASH) { return 3; }
+    if (kind == TOKEN_PERCENT) { return 3; }
+    if (kind == TOKEN_EQ) { return 3; }
+    if (kind == TOKEN_EQEQ) { return 4; }
+    if (kind == TOKEN_BANGEQ) { return 4; }
+    if (kind == TOKEN_LT) { return 3; }
+    if (kind == TOKEN_LE) { return 4; }
+    if (kind == TOKEN_GT) { return 3; }
+    if (kind == TOKEN_GE) { return 4; }
+    if (kind == TOKEN_AMPERSAND) { return 3; }
+    if (kind == TOKEN_PIPE) { return 3; }
+    if (kind == TOKEN_CARET) { return 3; }
+    if (kind == TOKEN_ANDAND) { return 4; }
+    if (kind == TOKEN_OROR) { return 4; }
+    if (kind == TOKEN_BANG) { return 3; }
+    if (kind == TOKEN_PLUSPLUS) { return 4; }
+    if (kind == TOKEN_MINUSMINUS) { return 4; }
+    if (kind == TOKEN_VAR) { return 5; }
+    if (kind == TOKEN_FUNC) { return 6; }
+    if (kind == TOKEN_RETURN) { return 8; }
+    if (kind == TOKEN_IF) { return 4; }
+    if (kind == TOKEN_ELSE) { return 6; }
+    if (kind == TOKEN_WHILE) { return 7; }
+    if (kind == TOKEN_FOR) { return 5; }
+    if (kind == TOKEN_BREAK) { return 7; }
+    if (kind == TOKEN_CONTINUE) { return 10; }
+    if (kind == TOKEN_IMPORT) { return 8; }
+    if (kind == TOKEN_STRUCT) { return 8; }
+    if (kind == TOKEN_ENUM) { return 6; }
+    if (kind == TOKEN_CONST) { return 7; }
+    if (kind == TOKEN_TRUE) { return 6; }
+    if (kind == TOKEN_FALSE) { return 7; }
+    if (kind == TOKEN_SIZEOF) { return 8; }
+    return 13;  // "unknown token"
+}
+
+func get_source_ptr() -> u64 {
+    var ptr: u64;
+    asm {
+        mov rax, [_gvar_g_file_ptr]
+        mov [rbp-8], rax
+    }
+    return ptr;
+}
+
+func get_source_len() -> u64 {
+    var len: u64;
+    asm {
+        mov rax, [_gvar_g_file_len]
+        mov [rbp-8], rax
+    }
+    return len;
+}
+
 func report_parse_error(expected_kind: u64, actual_kind: u64, tok: u64) -> u64 {
     begin_error_capture();
     set_error_context("Token mismatch", 14);
     
-    emit_stderr("[ERROR] Expected token kind ", 29);
-    emit_u64_stderr(expected_kind);
-    emit_stderr(" but got ", 9);
-    emit_u64_stderr(actual_kind);
-
+    emit_stderr("\n[ERROR] Parse error at line ", 30);
     if (tok != 0) {
-        emit_stderr(" at ", 4);
         emit_u64_stderr(((*Token)tok)->line);
-        emit_stderr(":", 1);
+        emit_stderr(", column ", 9);
         emit_u64_stderr(((*Token)tok)->col);
-        emit_stderr(" token=", 7);
-        if (actual_kind == TOKEN_EOF) {
-            emit_stderr("<eof>", 5);
-        } else {
-            emit_stderr(((*Token)tok)->ptr, ((*Token)tok)->len);
+    }
+    emit_stderr_nl();
+    
+    emit_stderr("  Expected: ", 12);
+    emit_stderr(token_kind_name(expected_kind), token_kind_name_len(expected_kind));
+    emit_stderr_nl();
+    
+    emit_stderr("  Got:      ", 12);
+    emit_stderr(token_kind_name(actual_kind), token_kind_name_len(actual_kind));
+    
+    if (tok != 0) {
+        if (actual_kind != TOKEN_EOF) {
+            if (actual_kind == TOKEN_IDENTIFIER) {
+                emit_stderr(" ", 1);
+                emit_stderr(((*Token)tok)->ptr, ((*Token)tok)->len);
+            } else if (actual_kind == TOKEN_NUMBER) {
+                emit_stderr(" ", 1);
+                emit_stderr(((*Token)tok)->ptr, ((*Token)tok)->len);
+            }
         }
     }
     emit_stderr_nl();

@@ -144,13 +144,3 @@ impl StringBuilder {
         return StringBuilder_append_bytes(self, buf, i);
     }
 }
-
-// Backward-compatible wrapper functions
-func sb_new(cap: u64) -> u64 { return StringBuilder_new(cap); }
-func sb_clear(sb: u64) -> u64 { return StringBuilder_clear((*StringBuilder)sb); }
-func sb_len(sb: u64) -> u64 { return StringBuilder_len((*StringBuilder)sb); }
-func sb_ptr(sb: u64) -> u64 { return StringBuilder_ptr((*StringBuilder)sb); }
-func sb_append_bytes(sb: u64, p: u64, n: u64) -> u64 { return StringBuilder_append_bytes((*StringBuilder)sb, p, n); }
-func sb_append_cstr(sb: u64, s: u64) -> u64 { return StringBuilder_append_cstr((*StringBuilder)sb, s); }
-func sb_append(sb: u64, s: u64) -> u64 { return StringBuilder_append((*StringBuilder)sb, s); }
-func sb_append_u64_dec(sb: u64, x: u64) -> u64 { return StringBuilder_append_u64_dec((*StringBuilder)sb, x); }

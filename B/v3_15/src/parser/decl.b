@@ -144,6 +144,9 @@ func parse_func_decl(p: u64) -> u64 {
     var name_tok: u64 = parse_peek(p);
     parse_consume(p, TOKEN_IDENTIFIER);
     
+    // Set parsing context for better error messages
+    set_parsing_context(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, ((*Token)name_tok)->line);
+    
     parse_consume(p, TOKEN_LPAREN);
     
     var params: u64 = vec_new(8);

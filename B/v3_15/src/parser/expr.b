@@ -56,11 +56,13 @@ func parse_ptr_access(p: u64) -> u64 {
 // ============================================
 
 func parse_primary(p: u64) -> u64 {
+    push_trace("parse_primary", "parser/expr.b", 60);
     var k: u64 = parse_peek_kind(p);
     
     if (k == TOKEN_NUMBER) {
         var tok: u64 = parse_peek(p);
         parse_adv(p);
+        pop_trace();
         return ast_literal(parse_num_val(tok));
     }
 
@@ -68,22 +70,26 @@ func parse_primary(p: u64) -> u64 {
         var tok: u64 = parse_peek(p);
         parse_adv(p);
         var line: u64 = ((*Token)tok)->line;
+        pop_trace();
         return ast_literal(line);
     }
 
     if (k == TOKEN_TRUE) {
         parse_adv(p);
+        pop_trace();
         return ast_literal(1);
     }
 
     if (k == TOKEN_FALSE) {
         parse_adv(p);
+        pop_trace();
         return ast_literal(0);
     }
     
     if (k == TOKEN_STRING) {
         var tok: u64 = parse_peek(p);
         parse_adv(p);
+        pop_trace();
         return ast_string(((*Token)tok)->ptr, ((*Token)tok)->len);
     }
     
@@ -100,6 +106,7 @@ func parse_primary(p: u64) -> u64 {
         
         parse_consume(p, TOKEN_RPAREN);
         
+        pop_trace();
         return ast_sizeof(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
     }
     
@@ -108,16 +115,19 @@ func parse_primary(p: u64) -> u64 {
         var tok: u64 = parse_peek(p);
         if (parse_peek_kind(p) != TOKEN_IDENTIFIER) {
             emit_stderr("[ERROR] Expected identifier after &\n", 37);
+            pop_trace();
             return 0;
         }
         parse_adv(p);
         var ident: u64 = ast_ident(((*Token)tok)->ptr, ((*Token)tok)->len);
+        pop_trace();
         return ast_addr_of(ident);
     }
     
     if (k == TOKEN_STAR) {
         parse_adv(p);
         var operand: u64 = parse_unary(p);
+        pop_trace();
         return ast_deref(operand);
     }
     
@@ -138,12 +148,14 @@ func parse_primary(p: u64) -> u64 {
             parse_consume(p, TOKEN_RPAREN);
             var operand: u64 = parse_unary(p);
             
+            pop_trace();
             return ast_cast_ex(operand, type_kind, ptr_depth, struct_name_ptr, struct_name_len);
         }
         
         var expr: u64 = parse_expr(p);
         parse_consume(p, TOKEN_RPAREN);
         // Handle postfix operators after parenthesized expression: (expr)->field, (expr).field, (expr)[idx]
+        pop_trace();
         return parse_postfix_from(p, expr);
     }
     
@@ -153,6 +165,7 @@ func parse_primary(p: u64) -> u64 {
         if (ptr_kind > 0) {
             var result: u64 = parse_ptr_access(p);
             if (result != 0) {
+                pop_trace();
                 return result;
             }
         }
@@ -181,6 +194,7 @@ func parse_primary(p: u64) -> u64 {
                 }
                 parse_consume(p, TOKEN_RBRACE);
                 
+                pop_trace();
                 return ast_struct_literal(struct_def, values);
             }
         }
@@ -195,12 +209,15 @@ func parse_primary(p: u64) -> u64 {
                 }
             }
             parse_consume(p, TOKEN_RPAREN);
+            pop_trace();
             return ast_call(((*Token)tok)->ptr, ((*Token)tok)->len, args);
         }
         
+        pop_trace();
         return ast_ident(((*Token)tok)->ptr, ((*Token)tok)->len);
     }
     
+    pop_trace();
     return 0;
 }
 
@@ -523,5 +540,8 @@ func parse_logor(p: u64) -> u64 {
 }
 
 func parse_expr(p: u64) -> u64 {
-    return parse_logor(p);
+    push_trace("parse_expr", "parser/expr.b", 528);
+    var result: u64 = parse_logor(p);
+    pop_trace();
+    return result;
 }

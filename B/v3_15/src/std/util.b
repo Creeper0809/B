@@ -24,6 +24,11 @@ var g_error_buffer;
 var g_error_buffer_pos;
 var g_capturing_error;
 
+// Parsing context (for user-facing error messages)
+var g_current_func_name;
+var g_current_func_name_len;
+var g_current_func_line;
+
 func init_stack_trace() {
     if (g_stack_initialized) {
         return;
@@ -103,6 +108,12 @@ func print_stack_trace() {
 // Error Handling
 // ============================================
 
+func set_parsing_context(func_name, func_name_len, line) {
+    g_current_func_name = func_name;
+    g_current_func_name_len = func_name_len;
+    g_current_func_line = line;
+}
+
 func begin_error_capture() {
     if (g_error_buffer == 0) {
         g_error_buffer = heap_alloc(512);
@@ -130,6 +141,24 @@ func emit_error(msg, len) {
 
 func panic() {
     end_error_capture();
+    
+    // Print user code context first
+    if (g_current_func_name != 0) {
+        emit_stderr_nl();
+        emit_stderr("Parsing context:", 16);
+        emit_stderr_nl();
+        emit_stderr("  -> In function: ", 18);
+        emit_stderr(g_current_func_name, g_current_func_name_len);
+        emit_stderr(" (line ", 7);
+        emit_i64_stderr(g_current_func_line);
+        emit_stderr(")", 1);
+        emit_stderr_nl();
+    }
+    
+    // Print compiler trace
+    emit_stderr_nl();
+    emit_stderr("Compiler internal trace:", 24);
+    emit_stderr_nl();
     print_stack_trace();
     
     if (g_error_buffer_pos > 0) {

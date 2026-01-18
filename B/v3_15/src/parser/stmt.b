@@ -377,28 +377,69 @@ func parse_block(p: u64) -> u64 {
 }
 
 func parse_stmt(p: u64) -> u64 {
+    push_trace("parse_stmt", "parser/stmt.b", 383);
     var k: u64 = parse_peek_kind(p);
 
     if (k == TOKEN_PLUSPLUS) {
         var stmt: u64 = parse_prefix_incdec_assign(p);
         parse_consume(p, TOKEN_SEMICOLON);
+        pop_trace();
         return stmt;
     }
     if (k == TOKEN_MINUSMINUS) {
         var stmt: u64 = parse_prefix_incdec_assign(p);
         parse_consume(p, TOKEN_SEMICOLON);
+        pop_trace();
         return stmt;
     }
     
-    if (k == TOKEN_VAR) { return parse_var_decl(p); }
-    if (k == TOKEN_IF) { return parse_if_stmt(p); }
-    if (k == TOKEN_WHILE) { return parse_while_stmt(p); }
-    if (k == TOKEN_FOR) { return parse_for_stmt(p); }
-    if (k == TOKEN_SWITCH) { return parse_switch_stmt(p); }
-    if (k == TOKEN_BREAK) { return parse_break_stmt(p); }
-    if (k == TOKEN_CONTINUE) { return parse_continue_stmt(p); }
-    if (k == TOKEN_ASM) { return parse_asm_stmt(p); }
-    if (k == TOKEN_RETURN) { return parse_return_stmt(p); }
+    if (k == TOKEN_VAR) {
+        var result: u64 = parse_var_decl(p);
+        pop_trace();
+        return result;
+    }
+    if (k == TOKEN_IF) {
+        var result: u64 = parse_if_stmt(p);
+        pop_trace();
+        return result;
+    }
+    if (k == TOKEN_WHILE) {
+        var result: u64 = parse_while_stmt(p);
+        pop_trace();
+        return result;
+    }
+    if (k == TOKEN_FOR) {
+        var result: u64 = parse_for_stmt(p);
+        pop_trace();
+        return result;
+    }
+    if (k == TOKEN_SWITCH) {
+        var result: u64 = parse_switch_stmt(p);
+        pop_trace();
+        return result;
+    }
+    if (k == TOKEN_BREAK) {
+        var result: u64 = parse_break_stmt(p);
+        pop_trace();
+        return result;
+    }
+    if (k == TOKEN_CONTINUE) {
+        var result: u64 = parse_continue_stmt(p);
+        pop_trace();
+        return result;
+    }
+    if (k == TOKEN_ASM) {
+        var result: u64 = parse_asm_stmt(p);
+        pop_trace();
+        return result;
+    }
+    if (k == TOKEN_RETURN) {
+        var result: u64 = parse_return_stmt(p);
+        pop_trace();
+        return result;
+    }
     
-    return parse_assign_or_expr(p);
+    var result: u64 = parse_assign_or_expr(p);
+    pop_trace();
+    return result;
 }
