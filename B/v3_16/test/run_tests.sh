@@ -51,7 +51,7 @@ echo "========================================"
 echo ""
 
 # Find all test files (exclude module files)
-TEST_FILES=$(ls $TEST_DIR/*.b 2>/dev/null | grep -E '/[0-9][0-9]_' | sort)
+TEST_FILES=$(ls $TEST_DIR/*.b 2>/dev/null | grep -E '/[0-9]+_' | sort -V)
 
 if [ -z "$TEST_FILES" ]; then
     echo "No test files found in $TEST_DIR"
