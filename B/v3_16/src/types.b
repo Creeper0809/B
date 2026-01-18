@@ -166,8 +166,8 @@ struct TypeInfo {
     array_len: u64;
 }
 
-// Struct field descriptor (56 bytes)
-const SIZEOF_FIELD_DESC = 56;
+// Struct field descriptor (80 bytes)
+const SIZEOF_FIELD_DESC = 80;
 struct FieldDesc {
     name_ptr: u64;
     name_len: u64;
@@ -176,6 +176,9 @@ struct FieldDesc {
     struct_name_len: u64;
     ptr_depth: u64;
     offset: u64;
+    elem_type_kind: u64;
+    elem_ptr_depth: u64;
+    array_len: u64;
 }
 
 // Global variable info (16 bytes)
@@ -239,8 +242,8 @@ struct Lexer {
 // Parser Data Structures
 // ============================================
 
-// Function parameter (48 bytes)
-const SIZEOF_PARAM = 48;
+// Function parameter (72 bytes)
+const SIZEOF_PARAM = 72;
 struct Param {
     name_ptr: u64;
     name_len: u64;
@@ -248,4 +251,7 @@ struct Param {
     ptr_depth: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    elem_type_kind: u64;
+    elem_ptr_depth: u64;
+    array_len: u64;
 }

@@ -293,11 +293,37 @@ func cg_expr(node: u64) -> u64 {
         var name_len: u64 = call->name_len;
         var args: u64 = call->args_vec;
         var nargs: u64 = vec_len(args);
+        var total_arg_bytes: u64 = 0;
         
         var i: u64 = nargs - 1;
         while (i >= 0) {
-            cg_expr(vec_get(args, i));
+            var arg: u64 = vec_get(args, i);
+            var arg_type: u64 = get_expr_type_with_symtab(arg, symtab);
+            if (arg_type != 0) {
+                var at: *TypeInfo = (*TypeInfo)arg_type;
+                if (at->type_kind == TYPE_SLICE && at->ptr_depth == 0) {
+                    var arg_kind: u64 = ast_kind(arg);
+                    if (arg_kind == AST_SLICE) {
+                        var slice_node: *AstSlice = (*AstSlice)arg;
+                        cg_expr(slice_node->len_expr);
+                        emit("    push rax\n", 13);
+                        cg_expr(slice_node->ptr_expr);
+                        emit("    push rax\n", 13);
+                    } else {
+                        cg_lvalue(arg);
+                        emit("    mov rbx, [rax+8]\n", 21);
+                        emit("    push rbx\n", 13);
+                        emit("    mov rbx, [rax]\n", 19);
+                        emit("    push rbx\n", 13);
+                    }
+                    total_arg_bytes = total_arg_bytes + 16;
+                    i = i - 1;
+                    continue;
+                }
+            }
+            cg_expr(arg);
             emit("    push rax\n", 13);
+            total_arg_bytes = total_arg_bytes + 8;
             i = i - 1;
         }
         
@@ -305,9 +331,9 @@ func cg_expr(node: u64) -> u64 {
         emit(name_ptr, name_len);
         emit_nl();
         
-        if (nargs > 0) {
+        if (total_arg_bytes > 0) {
             emit("    add rsp, ", 13);
-            emit_u64(nargs * 8);
+            emit_u64(total_arg_bytes);
             emit_nl();
         }
         return;
@@ -369,13 +395,23 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         }
         
         var field_offset: u64 = get_field_offset(struct_def, member_ptr, member_len);
+        var field_desc: u64 = get_field_desc(struct_def, member_ptr, member_len);
         
-        // Pop pointer value, add field offset, and load value
+        // Pop pointer value, add field offset
         emit("    pop rax\n", 12);
         if (field_offset > 0) {
             emit("    add rax, ", 13);
             emit_u64(field_offset);
             emit("\n", 1);
+        }
+        if (field_desc == 0) { return; }
+        var fd: *FieldDesc = (*FieldDesc)field_desc;
+        if (fd->type_kind == TYPE_ARRAY) { return; }
+        if (fd->type_kind == TYPE_SLICE) { emit("    mov rax, [rax]\n", 19); return; }
+        if (fd->ptr_depth == 0) {
+            if (fd->type_kind == TYPE_U8) { emit("    movzx rax, byte [rax]\n", 26); return; }
+            if (fd->type_kind == TYPE_U16) { emit("    movzx rax, word [rax]\n", 26); return; }
+            if (fd->type_kind == TYPE_U32) { emit("    mov eax, [rax]\n", 19); return; }
         }
         emit("    mov rax, [rax]\n", 19);
         return;
@@ -408,6 +444,7 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         }
         
         var field_offset: u64 = get_field_offset(struct_def, member_ptr, member_len);
+        var field_desc: u64 = get_field_desc(struct_def, member_ptr, member_len);
         
         // Pop base address and add field offset
         emit("    pop rax\n", 12);
@@ -415,6 +452,15 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
             emit("    add rax, ", 13);
             emit_u64(field_offset);
             emit("\n", 1);
+        }
+        if (field_desc == 0) { return; }
+        var fd2: *FieldDesc = (*FieldDesc)field_desc;
+        if (fd2->type_kind == TYPE_ARRAY) { return; }
+        if (fd2->type_kind == TYPE_SLICE) { emit("    mov rax, [rax]\n", 19); return; }
+        if (fd2->ptr_depth == 0) {
+            if (fd2->type_kind == TYPE_U8) { emit("    movzx rax, byte [rax]\n", 26); return; }
+            if (fd2->type_kind == TYPE_U16) { emit("    movzx rax, word [rax]\n", 26); return; }
+            if (fd2->type_kind == TYPE_U32) { emit("    mov eax, [rax]\n", 19); return; }
         }
         emit("    mov rax, [rax]\n", 19);
         return;
@@ -449,6 +495,7 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     }
     
     var field_offset: u64 = get_field_offset(struct_def, member_ptr, member_len);
+    var field_desc: u64 = get_field_desc(struct_def, member_ptr, member_len);
     
     // Calculate address: lea rax, [rbp + var_offset + field_offset]
     emit("    lea rax, [rbp", 17);
@@ -457,7 +504,16 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     else { emit("+", 1); emit_u64(total_offset); }
     emit("]\n", 2);
     
-    // Load value from address
+    if (field_desc != 0) {
+        var fd3: *FieldDesc = (*FieldDesc)field_desc;
+        if (fd3->type_kind == TYPE_ARRAY) { return; }
+        if (fd3->type_kind == TYPE_SLICE) { emit("    mov rax, [rax]\n", 19); return; }
+        if (fd3->ptr_depth == 0) {
+            if (fd3->type_kind == TYPE_U8) { emit("    movzx rax, byte [rax]\n", 26); return; }
+            if (fd3->type_kind == TYPE_U16) { emit("    movzx rax, word [rax]\n", 26); return; }
+            if (fd3->type_kind == TYPE_U32) { emit("    mov eax, [rax]\n", 19); return; }
+        }
+    }
     emit("    mov rax, [rax]\n", 19);
 }
 

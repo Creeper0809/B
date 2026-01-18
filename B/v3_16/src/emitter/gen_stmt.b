@@ -156,6 +156,24 @@ func cg_return_stmt(node: u64, symtab: u64) -> u64 {
                     emit("    mov rdx, [r10+8]\n", 21); // Load next 8 bytes into rdx
                 }
             }
+        } else if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
+            var expr_kind2: u64 = ast_kind(expr);
+            if (expr_kind2 == AST_SLICE) {
+                var slice_node: *AstSlice = (*AstSlice)expr;
+                cg_expr(slice_node->ptr_expr);
+                emit("    mov rbx, rax\n", 19);
+                cg_expr(slice_node->len_expr);
+                emit("    mov rdx, rax\n", 19);
+                emit("    mov rax, rbx\n", 19);
+            } else if (expr_kind2 == AST_CALL) {
+                cg_expr(expr);
+                // rax/rdx already set by callee
+            } else {
+                cg_lvalue(expr);
+                emit("    mov rbx, [rax]\n", 19);
+                emit("    mov rdx, [rax+8]\n", 21);
+                emit("    mov rax, rbx\n", 19);
+            }
         } else {
             // Normal return (non-struct or pointer to struct)
             cg_expr(expr);
@@ -288,6 +306,19 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
                 emit("], rax\n", 7);
                 return;
             }
+            if (init_kind == AST_CALL) {
+                cg_expr(init);
+                emit("    mov [rbp", 12);
+                if (offset < 0) { emit_i64(offset); }
+                else { emit("+", 1); emit_u64(offset); }
+                emit("], rax\n", 7);
+                emit("    mov [rbp", 12);
+                var offc: u64 = offset + 8;
+                if (offc < 0) { emit_i64(offc); }
+                else { emit("+", 1); emit_u64(offc); }
+                emit("], rdx\n", 7);
+                return;
+            }
             // Copy from another slice value
             cg_lvalue(init);
             emit("    mov rbx, [rax]\n", 19);
@@ -372,7 +403,7 @@ func cg_struct_literal_init(init: u64, offset: u64) -> u64 {
     for (var i: u64 = 0; i < num_values; i++) {
         if (i < num_fields) {
             var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
-            var field_size: u64 = sizeof_type(field->type_kind, field->ptr_depth, field->struct_name_ptr, field->struct_name_len);
+            var field_size: u64 = sizeof_field_desc(field);
             
             // Evaluate field value
             cg_expr(vec_get(values, i));
@@ -419,11 +450,16 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
     }
 
     // Slice assignment: copy ptr+len
-    if (target_kind == AST_IDENT) {
-        var ident2: *AstIdent = (*AstIdent)target;
-        var t_name_ptr: u64 = ident2->name_ptr;
-        var t_name_len: u64 = ident2->name_len;
-        var t_type: u64 = symtab_get_type(symtab, t_name_ptr, t_name_len);
+    if (target_kind == AST_IDENT || target_kind == AST_MEMBER_ACCESS) {
+        var t_type: u64 = 0;
+        if (target_kind == AST_IDENT) {
+            var ident2: *AstIdent = (*AstIdent)target;
+            var t_name_ptr: u64 = ident2->name_ptr;
+            var t_name_len: u64 = ident2->name_len;
+            t_type = symtab_get_type(symtab, t_name_ptr, t_name_len);
+        } else {
+            t_type = get_expr_type_with_symtab(target, symtab);
+        }
         if (t_type != 0) {
             var tt: *TypeInfo = (*TypeInfo)t_type;
             if (tt->type_kind == TYPE_SLICE && tt->ptr_depth == 0) {
@@ -433,6 +469,15 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
                     emit("    mov rbx, rax\n", 17);
                     cg_expr(slice_node->len_expr);
                     emit("    mov rcx, rax\n", 17);
+                    cg_lvalue(target);
+                    emit("    mov [rax], rbx\n", 19);
+                    emit("    mov [rax+8], rcx\n", 21);
+                    return;
+                }
+                if (value_kind == AST_CALL) {
+                    cg_expr(value);
+                    emit("    mov rbx, rax\n", 17);
+                    emit("    mov rcx, rdx\n", 17);
                     cg_lvalue(target);
                     emit("    mov [rax], rbx\n", 19);
                     emit("    mov [rax+8], rcx\n", 21);

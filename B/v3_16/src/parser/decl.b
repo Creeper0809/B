@@ -127,6 +127,9 @@ func parse_param(p: u64) -> u64 {
     var ptr_depth: u64 = 0;
     var struct_name_ptr: u64 = 0;
     var struct_name_len: u64 = 0;
+    var elem_type_kind: u64 = 0;
+    var elem_ptr_depth: u64 = 0;
+    var array_len: u64 = 0;
     
     if (parse_match(p, TOKEN_COLON)) {
         var ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
@@ -134,8 +137,11 @@ func parse_param(p: u64) -> u64 {
         ptr_depth = ty->ptr_depth;
         struct_name_ptr = ty->struct_name_ptr;
         struct_name_len = ty->struct_name_len;
-        if (type_kind == TYPE_ARRAY || type_kind == TYPE_SLICE) {
-            emit_stderr("[ERROR] Array/slice types are not supported in parameters\n", 58);
+        elem_type_kind = ty->elem_type_kind;
+        elem_ptr_depth = ty->elem_ptr_depth;
+        array_len = ty->array_len;
+        if (type_kind == TYPE_ARRAY) {
+            emit_stderr("[ERROR] Array types are not supported in parameters\n", 52);
             panic("Parse error");
         }
     }
@@ -147,6 +153,9 @@ func parse_param(p: u64) -> u64 {
     param->ptr_depth = ptr_depth;
     param->struct_name_ptr = struct_name_ptr;
     param->struct_name_len = struct_name_len;
+    param->elem_type_kind = elem_type_kind;
+    param->elem_ptr_depth = elem_ptr_depth;
+    param->array_len = array_len;
     return param;
 }
 
@@ -185,8 +194,8 @@ func parse_func_decl(p: u64) -> u64 {
         ret_ptr_depth = ty->ptr_depth;
         ret_struct_name_ptr = ty->struct_name_ptr;
         ret_struct_name_len = ty->struct_name_len;
-        if (ret_type == TYPE_ARRAY || ret_type == TYPE_SLICE) {
-            emit_stderr("[ERROR] Array/slice return types are not supported\n", 51);
+        if (ret_type == TYPE_ARRAY) {
+            emit_stderr("[ERROR] Array return types are not supported\n", 45);
             panic("Parse error");
         }
     }
@@ -223,10 +232,6 @@ func parse_struct_def(p: u64) -> u64 {
         parse_consume(p, TOKEN_COLON);
         
         var field_type: *TypeInfo = (*TypeInfo)parse_type_ex(p);
-        if (field_type->type_kind == TYPE_ARRAY || field_type->type_kind == TYPE_SLICE) {
-            emit_stderr("[ERROR] Array/slice types are not supported in struct fields\n", 61);
-            panic("Parse error");
-        }
         
         parse_consume(p, TOKEN_SEMICOLON);
         
@@ -237,6 +242,9 @@ func parse_struct_def(p: u64) -> u64 {
         field_desc->struct_name_ptr = field_type->struct_name_ptr;
         field_desc->struct_name_len = field_type->struct_name_len;
         field_desc->ptr_depth = field_type->ptr_depth;
+        field_desc->elem_type_kind = field_type->elem_type_kind;
+        field_desc->elem_ptr_depth = field_type->elem_ptr_depth;
+        field_desc->array_len = field_type->array_len;
         
         vec_push(fields, field_desc);
     }

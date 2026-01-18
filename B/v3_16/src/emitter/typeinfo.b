@@ -86,6 +86,7 @@ func get_type_size(base_type: u64, ptr_depth: u64) -> u64 {
     if (base_type == TYPE_U32) { return 4; }
     if (base_type == TYPE_U64) { return 8; }
     if (base_type == TYPE_I64) { return 8; }
+    if (base_type == TYPE_SLICE) { return 16; }
     return 8;
 }
 
@@ -97,8 +98,30 @@ func get_pointee_size(base_type: u64, ptr_depth: u64) -> u64 {
         if (base_type == TYPE_U32) { return 4; }
         if (base_type == TYPE_U64) { return 8; }
         if (base_type == TYPE_I64) { return 8; }
+        if (base_type == TYPE_SLICE) { return 16; }
     }
     return 8;
+}
+
+func sizeof_field_desc(field: *FieldDesc) -> u64 {
+    if (field->type_kind == TYPE_ARRAY) {
+        var elem_size: u64 = sizeof_type(field->elem_type_kind, field->elem_ptr_depth, field->struct_name_ptr, field->struct_name_len);
+        return elem_size * field->array_len;
+    }
+    if (field->type_kind == TYPE_SLICE) { return 16; }
+    return sizeof_type(field->type_kind, field->ptr_depth, field->struct_name_ptr, field->struct_name_len);
+}
+
+func get_field_desc(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
+    var fields: u64 = *(struct_def + 24);
+    var num_fields: u64 = vec_len(fields);
+    for (var i: u64 = 0; i < num_fields; i++) {
+        var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
+        if (str_eq(field->name_ptr, field->name_len, field_name_ptr, field_name_len)) {
+            return (u64)field;
+        }
+    }
+    return 0;
 }
 
 func check_type_compat(from_base: u64, from_depth: u64, to_base: u64, to_depth: u64) -> u64 {
@@ -141,6 +164,7 @@ func sizeof_type(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_na
     if (type_kind == TYPE_U32) { return 4; }
     if (type_kind == TYPE_U64) { return 8; }
     if (type_kind == TYPE_I64) { return 8; }
+    if (type_kind == TYPE_SLICE) { return 16; }
     
     // Struct type: sum of field sizes
     if (type_kind == TYPE_STRUCT) {
@@ -169,9 +193,7 @@ func sizeof_type(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_na
         
         for (var i: u64 = 0; i < num_fields; i++) {
             var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
-            
-            // Recursively calculate field size
-            var field_size: u64 = sizeof_type(field->type_kind, field->ptr_depth, field->struct_name_ptr, field->struct_name_len);
+            var field_size: u64 = sizeof_field_desc(field);
             total_size = total_size + field_size;
         }
         
@@ -213,7 +235,7 @@ func get_field_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64)
         }
         
         // Calculate field size based on type
-        var field_size: u64 = sizeof_type(field->type_kind, field->ptr_depth, field->struct_name_ptr, field->struct_name_len);
+        var field_size: u64 = sizeof_field_desc(field);
         offset = offset + field_size;
     }
     
@@ -383,17 +405,10 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var num_fields: u64 = vec_len(fields);
         
         for (var i: u64 = 0; i < num_fields; i++) {
-            var field: u64 = vec_get(fields, i);
-            var fname_ptr: u64 = *(field);
-            var fname_len: u64 = *(field + 8);
-            
-            if (str_eq(fname_ptr, fname_len, member_ptr, member_len)) {
-                var field_type: u64 = *(field + 16);
-                var field_struct_name_ptr: u64 = *(field + 24);
-                var field_struct_name_len: u64 = *(field + 32);
-                var field_ptr_depth: u64 = *(field + 40);
-                
-                // Return the field's type
+            var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
+            if (str_eq(field->name_ptr, field->name_len, member_ptr, member_len)) {
+                var field_type: u64 = field->type_kind;
+                var field_ptr_depth: u64 = field->ptr_depth;
                 if (field_type == TYPE_STRUCT) {
                     var field_struct_def: u64 = 0;
                     if (g_structs_vec != 0) {
@@ -402,15 +417,28 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                             var sd: u64 = vec_get(g_structs_vec, j);
                             var sname_ptr: u64 = *(sd + 8);
                             var sname_len: u64 = *(sd + 16);
-                            if (str_eq(sname_ptr, sname_len, field_struct_name_ptr, field_struct_name_len)) {
+                            if (str_eq(sname_ptr, sname_len, field->struct_name_ptr, field->struct_name_len)) {
                                 field_struct_def = sd;
                                 break;
                             }
                         }
                     }
-                    return typeinfo_make_struct(field_ptr_depth, field_struct_name_ptr, field_struct_name_len, field_struct_def);
+                    return typeinfo_make_struct(field_ptr_depth, field->struct_name_ptr, field->struct_name_len, field_struct_def);
                 }
-
+                if (field_type == TYPE_ARRAY) {
+                    var elem_struct_def: u64 = 0;
+                    if (field->elem_type_kind == TYPE_STRUCT && field->struct_name_ptr != 0) {
+                        elem_struct_def = get_struct_def(field->struct_name_ptr, field->struct_name_len);
+                    }
+                    return typeinfo_make_array(field_ptr_depth, field->elem_type_kind, field->elem_ptr_depth, field->struct_name_ptr, field->struct_name_len, elem_struct_def, field->array_len);
+                }
+                if (field_type == TYPE_SLICE) {
+                    var elem_struct_def2: u64 = 0;
+                    if (field->elem_type_kind == TYPE_STRUCT && field->struct_name_ptr != 0) {
+                        elem_struct_def2 = get_struct_def(field->struct_name_ptr, field->struct_name_len);
+                    }
+                    return typeinfo_make_slice(field_ptr_depth, field->elem_type_kind, field->elem_ptr_depth, field->struct_name_ptr, field->struct_name_len, elem_struct_def2);
+                }
                 return typeinfo_make(field_type, field_ptr_depth);
             }
         }

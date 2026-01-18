@@ -30,6 +30,9 @@ struct FuncParam {
     ptr_depth: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    elem_type_kind: u64;
+    elem_ptr_depth: u64;
+    array_len: u64;
 }
 
 func cg_func(node: u64) -> u64 {
@@ -53,6 +56,7 @@ func cg_func(node: u64) -> u64 {
     var g_structs_vec: u64 = typeinfo_get_structs();
     
     var nparams: u64 = vec_len(fn->params_vec);
+    var arg_offset: u64 = 0;
     for(var i: u64 = 0 ; i < nparams ; i++){
          var p: *FuncParam = (*FuncParam)vec_get(fn->params_vec, i);
         
@@ -65,7 +69,7 @@ func cg_func(node: u64) -> u64 {
         *(name_info + 8) = p->name_len;
         vec_push(names, name_info);
         
-        vec_push(offsets, 16 + i * 8);
+        vec_push(offsets, 16 + arg_offset);
         
         var type_info: u64 = heap_alloc(SIZEOF_TYPEINFO);
         var ti: *TypeInfo = (*TypeInfo)type_info;
@@ -74,9 +78,9 @@ func cg_func(node: u64) -> u64 {
         ti->struct_name_ptr = p->struct_name_ptr;
         ti->struct_name_len = p->struct_name_len;
         ti->struct_def = 0;
-        ti->elem_type_kind = 0;
-        ti->elem_ptr_depth = 0;
-        ti->array_len = 0;
+        ti->elem_type_kind = p->elem_type_kind;
+        ti->elem_ptr_depth = p->elem_ptr_depth;
+        ti->array_len = p->array_len;
 
         // If this is a struct, resolve its struct_def now
         // This applies even for pointer types (*Point) - we store the base struct def
@@ -91,9 +95,26 @@ func cg_func(node: u64) -> u64 {
                 }
             }
         }
+        if (p->elem_type_kind == TYPE_STRUCT && g_structs_vec != 0 && p->struct_name_ptr != 0) {
+            var num_structs2: u64 = vec_len(g_structs_vec);
+            for(var sj: u64 = 0 ; sj < num_structs2 ; sj++){
+                var sd_ptr2: u64 = vec_get(g_structs_vec, sj);
+                var sd2: *AstStructDef = (*AstStructDef)sd_ptr2;
+                if (sd2->name_len == p->struct_name_len && str_eq(sd2->name_ptr, sd2->name_len, p->struct_name_ptr, p->struct_name_len) != 0) {
+                    ti->struct_def = sd_ptr2;
+                    break;
+                }
+            }
+        }
         vec_push(types, type_info);
         
         *(g_symtab + 24) = *(g_symtab + 24) + 1;
+
+        if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
+            arg_offset = arg_offset + 16;
+        } else {
+            arg_offset = arg_offset + 8;
+        }
     }
     
     cg_block(fn->body);
