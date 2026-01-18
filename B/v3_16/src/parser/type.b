@@ -74,11 +74,15 @@ func parse_type(p: u64) -> u64 {
     result->ptr_depth = depth;
     result->is_tagged = is_tagged;
     if (is_tagged == 1 && tag_layout_ptr != 0) {
-        result->struct_name_ptr = tag_layout_ptr;
-        result->struct_name_len = tag_layout_len;
+        result->struct_name_ptr = 0;
+        result->struct_name_len = 0;
+        result->tag_layout_ptr = tag_layout_ptr;
+        result->tag_layout_len = tag_layout_len;
     } else {
         result->struct_name_ptr = 0;
         result->struct_name_len = 0;
+        result->tag_layout_ptr = 0;
+        result->tag_layout_len = 0;
     }
     result->struct_def = 0;
     result->elem_type_kind = 0;
@@ -158,6 +162,8 @@ func parse_type_ex(p: u64) -> u64 {
         }
         result_arr->struct_name_ptr = elem_ty->struct_name_ptr;
         result_arr->struct_name_len = elem_ty->struct_name_len;
+        result_arr->tag_layout_ptr = 0;
+        result_arr->tag_layout_len = 0;
         result_arr->struct_def = 0;
         result_arr->elem_type_kind = elem_ty->type_kind;
         result_arr->elem_ptr_depth = elem_ty->ptr_depth;
@@ -196,11 +202,15 @@ func parse_type_ex(p: u64) -> u64 {
     result->ptr_depth = depth;
     result->is_tagged = is_tagged;
     if (is_tagged == 1 && tag_layout_ptr != 0) {
-        result->struct_name_ptr = tag_layout_ptr;
-        result->struct_name_len = tag_layout_len;
+        result->struct_name_ptr = 0;
+        result->struct_name_len = 0;
+        result->tag_layout_ptr = tag_layout_ptr;
+        result->tag_layout_len = tag_layout_len;
     } else {
         result->struct_name_ptr = struct_name_ptr;
         result->struct_name_len = struct_name_len;
+        result->tag_layout_ptr = 0;
+        result->tag_layout_len = 0;
     }
     result->struct_def = 0;
     result->elem_type_kind = 0;

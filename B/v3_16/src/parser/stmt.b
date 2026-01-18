@@ -32,6 +32,8 @@ func parse_var_decl(p: u64) -> u64 {
     var is_tagged: u64 = 0;
     var struct_name_ptr: u64 = 0;
     var struct_name_len: u64 = 0;
+    var tag_layout_ptr: u64 = 0;
+    var tag_layout_len: u64 = 0;
     var elem_type_kind: u64 = 0;
     var elem_ptr_depth: u64 = 0;
     var array_len: u64 = 0;
@@ -44,6 +46,8 @@ func parse_var_decl(p: u64) -> u64 {
         elem_type_kind = ty_info->elem_type_kind;
         elem_ptr_depth = ty_info->elem_ptr_depth;
         array_len = ty_info->array_len;
+        tag_layout_ptr = ty_info->tag_layout_ptr;
+        tag_layout_len = ty_info->tag_layout_len;
         
         // If TYPE_STRUCT, get struct name from TypeInfo
         if (type_kind == TYPE_STRUCT) {
@@ -56,9 +60,9 @@ func parse_var_decl(p: u64) -> u64 {
             struct_name_len = ty_info->struct_name_len;
         }
         // tagged layout name (non-struct base)
-        if (is_tagged == 1 && ty_info->struct_name_ptr != 0 && type_kind != TYPE_STRUCT && type_kind != TYPE_ARRAY && type_kind != TYPE_SLICE) {
-            struct_name_ptr = ty_info->struct_name_ptr;
-            struct_name_len = ty_info->struct_name_len;
+        if (is_tagged == 1 && tag_layout_ptr != 0 && type_kind != TYPE_STRUCT && type_kind != TYPE_ARRAY && type_kind != TYPE_SLICE) {
+            struct_name_ptr = 0;
+            struct_name_len = 0;
         }
     }
     
@@ -74,6 +78,8 @@ func parse_var_decl(p: u64) -> u64 {
     decl->is_tagged = is_tagged;
     decl->struct_name_ptr = struct_name_ptr;
     decl->struct_name_len = struct_name_len;
+    decl->tag_layout_ptr = tag_layout_ptr;
+    decl->tag_layout_len = tag_layout_len;
     decl->elem_type_kind = elem_type_kind;
     decl->elem_ptr_depth = elem_ptr_depth;
     decl->array_len = array_len;

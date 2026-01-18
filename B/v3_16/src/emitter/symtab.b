@@ -64,6 +64,8 @@ func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth:
     ti->is_tagged = 0;
     ti->struct_name_ptr = 0;
     ti->struct_name_len = 0;
+    ti->tag_layout_ptr = 0;
+    ti->tag_layout_len = 0;
     ti->struct_def = 0;
     ti->elem_type_kind = 0;
     ti->elem_ptr_depth = 0;

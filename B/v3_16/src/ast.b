@@ -149,8 +149,8 @@ struct AstSlice {
     len_expr: u64;
 }
 
-// AST Cast node layout (56 bytes)
-const SIZEOF_AST_CAST = 56;
+// AST Cast node layout (72 bytes)
+const SIZEOF_AST_CAST = 72;
 struct AstCast {
     kind: u64;
     expr: u64;
@@ -159,6 +159,8 @@ struct AstCast {
     target_is_tagged: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    tag_layout_ptr: u64;
+    tag_layout_len: u64;
 }
 
 // AST Sizeof node layout (40 bytes)
@@ -213,7 +215,7 @@ func ast_slice(ptr_expr: u64, len_expr: u64) -> u64 {
     return (u64)n;
 }
 
-// AST_CAST: [kind, expr, target_type, target_ptr_depth, target_is_tagged, struct_name_ptr, struct_name_len]
+// AST_CAST: [kind, expr, target_type, target_ptr_depth, target_is_tagged, struct_name_ptr, struct_name_len, tag_layout_ptr, tag_layout_len]
 func ast_cast(expr: u64, target_type: u64, ptr_depth: u64) -> u64 {
     var n: *AstCast = (*AstCast)(heap_alloc(SIZEOF_AST_CAST));
     n->kind = AST_CAST;
@@ -223,10 +225,12 @@ func ast_cast(expr: u64, target_type: u64, ptr_depth: u64) -> u64 {
     n->target_is_tagged = 0;
     n->struct_name_ptr = 0;
     n->struct_name_len = 0;
+    n->tag_layout_ptr = 0;
+    n->tag_layout_len = 0;
     return (u64)n;
 }
 
-func ast_cast_ex(expr: u64, target_type: u64, ptr_depth: u64, is_tagged: u64, struct_name_ptr: u64, struct_name_len: u64) -> u64 {
+func ast_cast_ex(expr: u64, target_type: u64, ptr_depth: u64, is_tagged: u64, struct_name_ptr: u64, struct_name_len: u64, tag_layout_ptr: u64, tag_layout_len: u64) -> u64 {
     var n: *AstCast = (*AstCast)(heap_alloc(SIZEOF_AST_CAST));
     n->kind = AST_CAST;
     n->expr = expr;
@@ -235,6 +239,8 @@ func ast_cast_ex(expr: u64, target_type: u64, ptr_depth: u64, is_tagged: u64, st
     n->target_is_tagged = is_tagged;
     n->struct_name_ptr = struct_name_ptr;
     n->struct_name_len = struct_name_len;
+    n->tag_layout_ptr = tag_layout_ptr;
+    n->tag_layout_len = tag_layout_len;
     return (u64)n;
 }
 
@@ -260,8 +266,8 @@ struct AstReturn {
     expr: u64;
 }
 
-// AST Variable declaration node layout (96 bytes)
-const SIZEOF_AST_VAR_DECL = 96;
+// AST Variable declaration node layout (112 bytes)
+const SIZEOF_AST_VAR_DECL = 112;
 struct AstVarDecl {
     kind: u64;
     name_ptr: u64;
@@ -272,6 +278,8 @@ struct AstVarDecl {
     init_expr: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    tag_layout_ptr: u64;
+    tag_layout_len: u64;
     elem_type_kind: u64;
     elem_ptr_depth: u64;
     array_len: u64;
@@ -314,6 +322,8 @@ func ast_var_decl(name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth: u64, 
     n->init_expr = init;
     n->struct_name_ptr = 0;
     n->struct_name_len = 0;
+    n->tag_layout_ptr = 0;
+    n->tag_layout_len = 0;
     n->elem_type_kind = 0;
     n->elem_ptr_depth = 0;
     n->array_len = 0;
@@ -507,8 +517,8 @@ func ast_block(stmts: u64) -> u64 {
 // Top-level Nodes
 // ============================================
 
-// AST Function definition node layout (80 bytes)
-const SIZEOF_AST_FUNC = 80;
+// AST Function definition node layout (96 bytes)
+const SIZEOF_AST_FUNC = 96;
 struct AstFunc {
     kind: u64;
     name_ptr: u64;
@@ -520,6 +530,8 @@ struct AstFunc {
     ret_is_tagged: u64;
     ret_struct_name_ptr: u64;
     ret_struct_name_len: u64;
+    ret_tag_layout_ptr: u64;
+    ret_tag_layout_len: u64;
 }
 
 // AST Program node layout (48 bytes)
@@ -592,11 +604,13 @@ func ast_func(name_ptr: u64, name_len: u64, params: u64, ret_type: u64, body: u6
     n->ret_is_tagged = 0;
     n->ret_struct_name_ptr = 0;
     n->ret_struct_name_len = 0;
+    n->ret_tag_layout_ptr = 0;
+    n->ret_tag_layout_len = 0;
     return (u64)n;
 }
 
-// AST_FUNC (extended): [kind, name_ptr, name_len, params, ret_type, body, ret_ptr_depth, ret_is_tagged, ret_struct_name_ptr, ret_struct_name_len]
-func ast_func_ex(name_ptr: u64, name_len: u64, params: u64, ret_type: u64, ret_ptr_depth: u64, ret_is_tagged: u64, ret_struct_name_ptr: u64, ret_struct_name_len: u64, body: u64) -> u64 {
+// AST_FUNC (extended): [kind, name_ptr, name_len, params, ret_type, body, ret_ptr_depth, ret_is_tagged, ret_struct_name_ptr, ret_struct_name_len, ret_tag_layout_ptr, ret_tag_layout_len]
+func ast_func_ex(name_ptr: u64, name_len: u64, params: u64, ret_type: u64, ret_ptr_depth: u64, ret_is_tagged: u64, ret_struct_name_ptr: u64, ret_struct_name_len: u64, ret_tag_layout_ptr: u64, ret_tag_layout_len: u64, body: u64) -> u64 {
     var n: *AstFunc = (*AstFunc)(heap_alloc(SIZEOF_AST_FUNC));
     n->kind = AST_FUNC;
     n->name_ptr = name_ptr;
@@ -608,6 +622,8 @@ func ast_func_ex(name_ptr: u64, name_len: u64, params: u64, ret_type: u64, ret_p
     n->ret_is_tagged = ret_is_tagged;
     n->ret_struct_name_ptr = ret_struct_name_ptr;
     n->ret_struct_name_len = ret_struct_name_len;
+    n->ret_tag_layout_ptr = ret_tag_layout_ptr;
+    n->ret_tag_layout_len = ret_tag_layout_len;
     return (u64)n;
 }
 

@@ -31,6 +31,8 @@ struct FuncParam {
     is_tagged: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    tag_layout_ptr: u64;
+    tag_layout_len: u64;
     elem_type_kind: u64;
     elem_ptr_depth: u64;
     array_len: u64;
@@ -79,6 +81,8 @@ func cg_func(node: u64) -> u64 {
         ti->is_tagged = p->is_tagged;
         ti->struct_name_ptr = p->struct_name_ptr;
         ti->struct_name_len = p->struct_name_len;
+        ti->tag_layout_ptr = p->tag_layout_ptr;
+        ti->tag_layout_len = p->tag_layout_len;
         ti->struct_def = 0;
         ti->elem_type_kind = p->elem_type_kind;
         ti->elem_ptr_depth = p->elem_ptr_depth;

@@ -200,6 +200,8 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
     var init: u64 = decl->init_expr;
     var struct_name_ptr: u64 = decl->struct_name_ptr;
     var struct_name_len: u64 = decl->struct_name_len;
+    var tag_layout_ptr: u64 = decl->tag_layout_ptr;
+    var tag_layout_len: u64 = decl->tag_layout_len;
     var elem_type_kind: u64 = decl->elem_type_kind;
     var elem_ptr_depth: u64 = decl->elem_ptr_depth;
     var array_len: u64 = decl->array_len;
@@ -222,6 +224,10 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
     if (is_tagged == 1 && struct_name_ptr != 0 && type_kind != TYPE_STRUCT && type_kind != TYPE_ARRAY && type_kind != TYPE_SLICE) {
         ti0->struct_name_ptr = struct_name_ptr;
         ti0->struct_name_len = struct_name_len;
+    }
+    if (is_tagged == 1 && tag_layout_ptr != 0) {
+        ti0->tag_layout_ptr = tag_layout_ptr;
+        ti0->tag_layout_len = tag_layout_len;
     }
     
     // If base type is struct, find struct_def and store pointer in type_info
@@ -294,7 +300,7 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
                 var it_base: u64 = it_info->type_kind;
                 var it_depth: u64 = it_info->ptr_depth;
                 var it_tagged: u64 = it_info->is_tagged;
-                check_type_compat(it_base, it_depth, it_tagged, type_kind, ptr_depth, decl->is_tagged);
+                check_type_compat(it_base, it_depth, it_tagged, it_info->tag_layout_ptr, it_info->tag_layout_len, type_kind, ptr_depth, decl->is_tagged, decl->tag_layout_ptr, decl->tag_layout_len);
             }
         }
         
@@ -345,6 +351,17 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
         }
 
         cg_expr(init);
+        if (is_tagged == 1 && ptr_depth > 0) {
+            var init_type2: u64 = get_expr_type_with_symtab(init, symtab);
+            if (init_type2 != 0) {
+                var it2: *TypeInfo = (*TypeInfo)init_type2;
+                if (!(it2->ptr_depth > 0 && it2->is_tagged == 1)) {
+                    emit_tagged_mask();
+                }
+            } else {
+                emit_tagged_mask();
+            }
+        }
         
         // Store small integer types with correct width (u8/u16/u32)
         if (ptr_depth == 0) {
@@ -448,8 +465,8 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
         var obj_type: u64 = get_expr_type_with_symtab(obj, symtab);
         if (obj_type != 0) {
             var ot: *TypeInfo = (*TypeInfo)obj_type;
-            if (ot->ptr_depth > 0 && ot->is_tagged == 1 && ot->struct_name_ptr != 0) {
-                var layout_def: u64 = get_struct_def(ot->struct_name_ptr, ot->struct_name_len);
+            if (ot->ptr_depth > 0 && ot->is_tagged == 1 && ot->tag_layout_ptr != 0) {
+                var layout_def: u64 = get_struct_def(ot->tag_layout_ptr, ot->tag_layout_len);
                 if (layout_def == 0) {
                     emit("[ERROR] Tagged layout struct not found\n", 41);
                     panic("Codegen error");
@@ -508,6 +525,70 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
                 emit("    mov [rax], rbx\n", 19);
                 return;
             }
+            if (ot->ptr_depth == 0 && ot->type_kind == TYPE_STRUCT && ot->struct_def != 0) {
+                var packed_flag2: u64 = *(ot->struct_def + 32);
+                if (packed_flag2 == 1) {
+                    var total_bits2: u64 = get_packed_layout_total_bits(ot->struct_def);
+                    var field_offset2: u64 = get_packed_field_bit_offset(ot->struct_def, member_ptr, member_len);
+                    var field_width2: u64 = get_packed_field_bit_width(ot->struct_def, member_ptr, member_len);
+                    var shift_bits2: u64 = field_offset2;
+                    var size_bytes2: u64 = (total_bits2 + 7) / 8;
+
+                    cg_expr(value);
+                    emit("    mov r9, rax\n", 16);
+                    cg_lvalue(obj);
+                    if (size_bytes2 == 1) {
+                        emit("    movzx rbx, byte [rax]\n", 30);
+                    } else if (size_bytes2 == 2) {
+                        emit("    movzx rbx, word [rax]\n", 30);
+                    } else if (size_bytes2 == 4) {
+                        emit("    mov ebx, [rax]\n", 19);
+                    } else {
+                        emit("    mov rbx, [rax]\n", 19);
+                    }
+
+                    if (field_width2 < 64) {
+                        emit_mask_to_rdx(field_width2);
+                        emit("    and r9, rdx\n", 16);
+                    }
+                    if (shift_bits2 > 0) {
+                        emit("    mov rcx, ", 13);
+                        emit_u64(shift_bits2);
+                        emit_nl();
+                        emit("    shl r9, cl\n", 15);
+                    }
+
+                    if (field_width2 < 64) {
+                        emit_mask_to_rdx(field_width2);
+                        if (shift_bits2 > 0) {
+                            emit("    mov r10, rdx\n", 17);
+                            emit("    mov rcx, ", 13);
+                            emit_u64(shift_bits2);
+                            emit_nl();
+                            emit("    shl r10, cl\n", 16);
+                        } else {
+                            emit("    mov r10, rdx\n", 17);
+                        }
+                        emit("    not r10\n", 12);
+                        emit("    and rbx, r10\n", 17);
+                    } else {
+                        emit("    xor rbx, rbx\n", 17);
+                    }
+
+                    emit("    or rbx, r9\n", 15);
+                    cg_lvalue(obj);
+                    if (size_bytes2 == 1) {
+                        emit("    mov [rax], bl\n", 18);
+                    } else if (size_bytes2 == 2) {
+                        emit("    mov [rax], bx\n", 18);
+                    } else if (size_bytes2 == 4) {
+                        emit("    mov [rax], ebx\n", 19);
+                    } else {
+                        emit("    mov [rax], rbx\n", 19);
+                    }
+                    return;
+                }
+            }
         }
     }
     if (target_kind == AST_IDENT) {
@@ -527,6 +608,13 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
             }
         }
     }
+
+    var target_type_info: u64 = 0;
+    if (target_kind == AST_IDENT) {
+        var ident3: *AstIdent = (*AstIdent)target;
+        target_type_info = symtab_get_type(symtab, ident3->name_ptr, ident3->name_len);
+    }
+    var value_type_info: u64 = get_expr_type_with_symtab(value, symtab);
 
     // Slice assignment: copy ptr+len
     if (target_kind == AST_IDENT || target_kind == AST_MEMBER_ACCESS) {
@@ -574,6 +662,19 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
     }
     
     cg_expr(value);
+    if (target_type_info != 0) {
+        var tt2: *TypeInfo = (*TypeInfo)target_type_info;
+        if (tt2->ptr_depth > 0 && tt2->is_tagged == 1) {
+            if (value_type_info != 0) {
+                var vt2: *TypeInfo = (*TypeInfo)value_type_info;
+                if (!(vt2->ptr_depth > 0 && vt2->is_tagged == 1)) {
+                    emit_tagged_mask();
+                }
+            } else {
+                emit_tagged_mask();
+            }
+        }
+    }
     emit("    push rax\n", 13);
     cg_lvalue(target);
     emit("    pop rbx\n", 12);

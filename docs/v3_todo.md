@@ -53,6 +53,10 @@
 - 15_property_hooks — 프로퍼티 훅 제거됨
 
 최근 구현:
+- [x] tagged 레이아웃 메타데이터 분리(tag_layout_ptr/len) 및 자동 마스킹 확장
+- [x] packed struct 비트필드 읽기/쓰기 접근(일반 packed struct 포함)
+- [x] tagged 레이아웃에서 addr 필드 제거(주소 암묵 처리) + 테스트 106 갱신
+- [x] 테스트 106/107 갱신 및 통과 확인
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증

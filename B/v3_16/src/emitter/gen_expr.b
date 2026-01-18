@@ -22,12 +22,12 @@ func emit_tagged_mask() -> u64 {
 }
 
 func emit_mask_to_rdx(bit_width: u64) -> u64 {
-    emit("    mov rdx, 1\n", 15);
+    emit("    mov rdx, 1\n", 16);
     emit("    mov rcx, ", 13);
     emit_u64(bit_width);
     emit_nl();
     emit("    shl rdx, cl\n", 16);
-    emit("    sub rdx, 1\n", 15);
+    emit("    sub rdx, 1\n", 16);
 }
 
 func get_packed_layout_total_bits(struct_def: u64) -> u64 {
@@ -447,8 +447,8 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     var obj_type: u64 = get_expr_type_with_symtab(object, symtab);
     if (obj_type != 0) {
         var ot: *TypeInfo = (*TypeInfo)obj_type;
-        if (ot->ptr_depth > 0 && ot->is_tagged == 1 && ot->struct_name_ptr != 0) {
-            var layout_def: u64 = get_struct_def(ot->struct_name_ptr, ot->struct_name_len);
+        if (ot->ptr_depth > 0 && ot->is_tagged == 1 && ot->tag_layout_ptr != 0) {
+            var layout_def: u64 = get_struct_def(ot->tag_layout_ptr, ot->tag_layout_len);
             if (layout_def == 0) {
                 emit("[ERROR] Tagged layout struct not found\n", 41);
                 panic("Codegen error");
@@ -476,6 +476,38 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
                 emit("    and rax, rdx\n", 17);
             }
             return;
+        }
+        if (ot->ptr_depth == 0 && ot->type_kind == TYPE_STRUCT && ot->struct_def != 0) {
+            var packed_flag2: u64 = *(ot->struct_def + 32);
+            if (packed_flag2 == 1) {
+                var total_bits2: u64 = get_packed_layout_total_bits(ot->struct_def);
+                var field_offset2: u64 = get_packed_field_bit_offset(ot->struct_def, member_ptr, member_len);
+                var field_width2: u64 = get_packed_field_bit_width(ot->struct_def, member_ptr, member_len);
+                var shift_bits2: u64 = field_offset2;
+                var size_bytes2: u64 = (total_bits2 + 7) / 8;
+
+                cg_lvalue(object);
+                if (size_bytes2 == 1) {
+                    emit("    movzx rax, byte [rax]\n", 30);
+                } else if (size_bytes2 == 2) {
+                    emit("    movzx rax, word [rax]\n", 30);
+                } else if (size_bytes2 == 4) {
+                    emit("    mov eax, [rax]\n", 19);
+                } else {
+                    emit("    mov rax, [rax]\n", 19);
+                }
+                if (shift_bits2 > 0) {
+                    emit("    mov rcx, ", 13);
+                    emit_u64(shift_bits2);
+                    emit_nl();
+                    emit("    shr rax, cl\n", 16);
+                }
+                if (field_width2 < 64) {
+                    emit_mask_to_rdx(field_width2);
+                    emit("    and rax, rdx\n", 17);
+                }
+                return;
+            }
         }
     }
 

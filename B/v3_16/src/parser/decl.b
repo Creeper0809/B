@@ -128,6 +128,8 @@ func parse_param(p: u64) -> u64 {
     var is_tagged: u64 = 0;
     var struct_name_ptr: u64 = 0;
     var struct_name_len: u64 = 0;
+    var tag_layout_ptr: u64 = 0;
+    var tag_layout_len: u64 = 0;
     var elem_type_kind: u64 = 0;
     var elem_ptr_depth: u64 = 0;
     var array_len: u64 = 0;
@@ -139,6 +141,8 @@ func parse_param(p: u64) -> u64 {
         is_tagged = ty->is_tagged;
         struct_name_ptr = ty->struct_name_ptr;
         struct_name_len = ty->struct_name_len;
+        tag_layout_ptr = ty->tag_layout_ptr;
+        tag_layout_len = ty->tag_layout_len;
         elem_type_kind = ty->elem_type_kind;
         elem_ptr_depth = ty->elem_ptr_depth;
         array_len = ty->array_len;
@@ -147,6 +151,8 @@ func parse_param(p: u64) -> u64 {
             type_kind = elem_type_kind;
             ptr_depth = elem_ptr_depth + 1;
             is_tagged = 0;
+            tag_layout_ptr = 0;
+            tag_layout_len = 0;
         }
     }
     
@@ -158,6 +164,8 @@ func parse_param(p: u64) -> u64 {
     param->is_tagged = is_tagged;
     param->struct_name_ptr = struct_name_ptr;
     param->struct_name_len = struct_name_len;
+    param->tag_layout_ptr = tag_layout_ptr;
+    param->tag_layout_len = tag_layout_len;
     param->elem_type_kind = elem_type_kind;
     param->elem_ptr_depth = elem_ptr_depth;
     param->array_len = array_len;
@@ -193,6 +201,8 @@ func parse_func_decl(p: u64) -> u64 {
     var ret_is_tagged: u64 = 0;
     var ret_struct_name_ptr: u64 = 0;
     var ret_struct_name_len: u64 = 0;
+    var ret_tag_layout_ptr: u64 = 0;
+    var ret_tag_layout_len: u64 = 0;
     
     if (parse_match(p, TOKEN_ARROW)) {
         var ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
@@ -201,6 +211,8 @@ func parse_func_decl(p: u64) -> u64 {
         ret_is_tagged = ty->is_tagged;
         ret_struct_name_ptr = ty->struct_name_ptr;
         ret_struct_name_len = ty->struct_name_len;
+        ret_tag_layout_ptr = ty->tag_layout_ptr;
+        ret_tag_layout_len = ty->tag_layout_len;
         if (ret_type == TYPE_ARRAY) {
             // Array return decays to pointer to first element
             ret_type = ty->elem_type_kind;
@@ -208,13 +220,15 @@ func parse_func_decl(p: u64) -> u64 {
             ret_is_tagged = 0;
             ret_struct_name_ptr = ty->struct_name_ptr;
             ret_struct_name_len = ty->struct_name_len;
+            ret_tag_layout_ptr = 0;
+            ret_tag_layout_len = 0;
         }
     }
     
     var body: u64 = parse_block(p);
     
     pop_trace();
-    return ast_func_ex(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, params, ret_type, ret_ptr_depth, ret_is_tagged, ret_struct_name_ptr, ret_struct_name_len, body);
+    return ast_func_ex(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, params, ret_type, ret_ptr_depth, ret_is_tagged, ret_struct_name_ptr, ret_struct_name_len, ret_tag_layout_ptr, ret_tag_layout_len, body);
 }
 
 // ============================================
@@ -265,6 +279,8 @@ func parse_struct_def(p: u64) -> u64 {
         var field_ptr_depth: u64 = 0;
         var field_struct_name_ptr: u64 = 0;
         var field_struct_name_len: u64 = 0;
+        var field_tag_layout_ptr: u64 = 0;
+        var field_tag_layout_len: u64 = 0;
         var field_elem_type_kind: u64 = 0;
         var field_elem_ptr_depth: u64 = 0;
         var field_array_len: u64 = 0;
@@ -310,6 +326,8 @@ func parse_struct_def(p: u64) -> u64 {
             field_type_kind = field_type->type_kind;
             field_struct_name_ptr = field_type->struct_name_ptr;
             field_struct_name_len = field_type->struct_name_len;
+            field_tag_layout_ptr = field_type->tag_layout_ptr;
+            field_tag_layout_len = field_type->tag_layout_len;
             field_ptr_depth = field_type->ptr_depth;
             field_is_tagged = field_type->is_tagged;
             field_elem_type_kind = field_type->elem_type_kind;
@@ -327,6 +345,8 @@ func parse_struct_def(p: u64) -> u64 {
         field_desc->struct_name_len = field_struct_name_len;
         field_desc->ptr_depth = field_ptr_depth;
         field_desc->is_tagged = field_is_tagged;
+        field_desc->tag_layout_ptr = field_tag_layout_ptr;
+        field_desc->tag_layout_len = field_tag_layout_len;
         field_desc->bit_width = field_bit_width;
         field_desc->elem_type_kind = field_elem_type_kind;
         field_desc->elem_ptr_depth = field_elem_ptr_depth;

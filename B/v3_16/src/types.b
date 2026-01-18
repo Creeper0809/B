@@ -155,22 +155,24 @@ struct Parser {
     cur: u64;
 }
 
-// Type information (72 bytes)
-const SIZEOF_TYPEINFO = 72;
+// Type information (88 bytes)
+const SIZEOF_TYPEINFO = 88;
 struct TypeInfo {
     type_kind: u64;
     ptr_depth: u64;
     is_tagged: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    tag_layout_ptr: u64;
+    tag_layout_len: u64;
     struct_def: u64;
     elem_type_kind: u64;
     elem_ptr_depth: u64;
     array_len: u64;
 }
 
-// Struct field descriptor (96 bytes)
-const SIZEOF_FIELD_DESC = 96;
+// Struct field descriptor (112 bytes)
+const SIZEOF_FIELD_DESC = 112;
 struct FieldDesc {
     name_ptr: u64;
     name_len: u64;
@@ -179,6 +181,8 @@ struct FieldDesc {
     struct_name_len: u64;
     ptr_depth: u64;
     is_tagged: u64;
+    tag_layout_ptr: u64;
+    tag_layout_len: u64;
     bit_width: u64;
     offset: u64;
     elem_type_kind: u64;
@@ -247,8 +251,8 @@ struct Lexer {
 // Parser Data Structures
 // ============================================
 
-// Function parameter (80 bytes)
-const SIZEOF_PARAM = 80;
+// Function parameter (96 bytes)
+const SIZEOF_PARAM = 96;
 struct Param {
     name_ptr: u64;
     name_len: u64;
@@ -257,6 +261,8 @@ struct Param {
     is_tagged: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    tag_layout_ptr: u64;
+    tag_layout_len: u64;
     elem_type_kind: u64;
     elem_ptr_depth: u64;
     array_len: u64;

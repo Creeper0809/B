@@ -20,6 +20,8 @@ func typeinfo_make(base_type: u64, ptr_depth: u64) -> u64 {
     ti->is_tagged = 0;
     ti->struct_name_ptr = 0;
     ti->struct_name_len = 0;
+    ti->tag_layout_ptr = 0;
+    ti->tag_layout_len = 0;
     ti->struct_def = 0;
     ti->elem_type_kind = 0;
     ti->elem_ptr_depth = 0;
@@ -35,6 +37,8 @@ func typeinfo_make_struct(ptr_depth: u64, struct_name_ptr: u64, struct_name_len:
     ti->is_tagged = 0;
     ti->struct_name_ptr = struct_name_ptr;
     ti->struct_name_len = struct_name_len;
+    ti->tag_layout_ptr = 0;
+    ti->tag_layout_len = 0;
     ti->struct_def = struct_def;
     ti->elem_type_kind = 0;
     ti->elem_ptr_depth = 0;
@@ -50,6 +54,8 @@ func typeinfo_make_array(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u6
     ti->is_tagged = 0;
     ti->struct_name_ptr = elem_struct_name_ptr;
     ti->struct_name_len = elem_struct_name_len;
+    ti->tag_layout_ptr = 0;
+    ti->tag_layout_len = 0;
     ti->struct_def = elem_struct_def;
     ti->elem_type_kind = elem_type_kind;
     ti->elem_ptr_depth = elem_ptr_depth;
@@ -65,6 +71,8 @@ func typeinfo_make_slice(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u6
     ti->is_tagged = 0;
     ti->struct_name_ptr = elem_struct_name_ptr;
     ti->struct_name_len = elem_struct_name_len;
+    ti->tag_layout_ptr = 0;
+    ti->tag_layout_len = 0;
     ti->struct_def = elem_struct_def;
     ti->elem_type_kind = elem_type_kind;
     ti->elem_ptr_depth = elem_ptr_depth;
@@ -137,7 +145,7 @@ func get_field_desc(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -
     return 0;
 }
 
-func check_type_compat(from_base: u64, from_depth: u64, from_tagged: u64, to_base: u64, to_depth: u64, to_tagged: u64) -> u64 {
+func check_type_compat(from_base: u64, from_depth: u64, from_tagged: u64, from_layout_ptr: u64, from_layout_len: u64, to_base: u64, to_depth: u64, to_tagged: u64, to_layout_ptr: u64, to_layout_len: u64) -> u64 {
     if (from_base == TYPE_ARRAY || to_base == TYPE_ARRAY || from_base == TYPE_SLICE || to_base == TYPE_SLICE) {
         if (from_base == to_base && from_depth == to_depth) { return 0; }
         return 1;
@@ -145,6 +153,9 @@ func check_type_compat(from_base: u64, from_depth: u64, from_tagged: u64, to_bas
     if (from_base == to_base) {
         if (from_depth == to_depth) {
             if (from_depth > 0 && from_tagged != to_tagged) { return 1; }
+            if (from_depth > 0 && from_tagged == 1) {
+                if (!str_eq(from_layout_ptr, from_layout_len, to_layout_ptr, to_layout_len)) { return 1; }
+            }
             return 0;
         }
     }
@@ -320,6 +331,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                     rb->is_tagged = fn->ret_is_tagged;
                     rb->struct_name_ptr = fn->ret_struct_name_ptr;
                     rb->struct_name_len = fn->ret_struct_name_len;
+                    rb->tag_layout_ptr = fn->ret_tag_layout_ptr;
+                    rb->tag_layout_len = fn->ret_tag_layout_len;
                     return result_basic;
                 }
             }
@@ -376,6 +389,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         rb->is_tagged = cast_node->target_is_tagged;
         rb->struct_name_ptr = cast_node->struct_name_ptr;
         rb->struct_name_len = cast_node->struct_name_len;
+        rb->tag_layout_ptr = cast_node->tag_layout_ptr;
+        rb->tag_layout_len = cast_node->tag_layout_len;
         return result_basic;
     }
     
@@ -392,6 +407,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             res_ti->struct_def = op_ti->struct_def;
             res_ti->struct_name_ptr = op_ti->struct_name_ptr;
             res_ti->struct_name_len = op_ti->struct_name_len;
+            res_ti->tag_layout_ptr = 0;
+            res_ti->tag_layout_len = 0;
             res_ti->elem_type_kind = op_ti->elem_type_kind;
             res_ti->elem_ptr_depth = op_ti->elem_ptr_depth;
             res_ti->array_len = op_ti->array_len;
@@ -414,6 +431,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 res_ti->struct_def = op_ti->struct_def;
                 res_ti->struct_name_ptr = op_ti->struct_name_ptr;
                 res_ti->struct_name_len = op_ti->struct_name_len;
+                res_ti->tag_layout_ptr = 0;
+                res_ti->tag_layout_len = 0;
                 res_ti->elem_type_kind = op_ti->elem_type_kind;
                 res_ti->elem_ptr_depth = op_ti->elem_ptr_depth;
                 res_ti->array_len = op_ti->array_len;
@@ -476,7 +495,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var ptr_depth: u64 = obj_ti->ptr_depth;
 
         // Tagged layout bitfield access
-        if (ptr_depth > 0 && obj_ti->is_tagged == 1 && obj_ti->struct_name_ptr != 0) {
+        if (ptr_depth > 0 && obj_ti->is_tagged == 1 && obj_ti->tag_layout_ptr != 0) {
             return typeinfo_make(TYPE_U64, 0);
         }
         
@@ -516,6 +535,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                     var result_struct: u64 = typeinfo_make_struct(field_ptr_depth, field->struct_name_ptr, field->struct_name_len, field_struct_def);
                     var rs: *TypeInfo = (*TypeInfo)result_struct;
                     rs->is_tagged = field->is_tagged;
+                    rs->tag_layout_ptr = field->tag_layout_ptr;
+                    rs->tag_layout_len = field->tag_layout_len;
                     return result_struct;
                 }
                 if (field_type == TYPE_ARRAY) {
@@ -535,6 +556,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var result_field: u64 = typeinfo_make(field_type, field_ptr_depth);
                 var rf: *TypeInfo = (*TypeInfo)result_field;
                 rf->is_tagged = field->is_tagged;
+                rf->tag_layout_ptr = field->tag_layout_ptr;
+                rf->tag_layout_len = field->tag_layout_len;
                 return result_field;
             }
         }
