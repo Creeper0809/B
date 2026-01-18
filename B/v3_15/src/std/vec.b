@@ -3,6 +3,11 @@
 import std.io;
 
 // Vec structure: [data_ptr, length, capacity] (24 bytes)
+struct Vec {
+    data_ptr: u64;
+    length: u64;
+    capacity: u64;
+}
 
 func vec_new(cap) {
     var v = heap_alloc(24);
