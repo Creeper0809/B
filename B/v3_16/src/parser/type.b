@@ -19,6 +19,7 @@ import parser.util;
 func parse_base_type(p: u64) -> u64 {
     var k: u64 = parse_peek_kind(p);
     if (k == TOKEN_U8) { parse_adv(p); return TYPE_U8; }
+    if (k == TOKEN_CHAR) { parse_adv(p); return TYPE_U8; }
     if (k == TOKEN_U16) { parse_adv(p); return TYPE_U16; }
     if (k == TOKEN_U32) { parse_adv(p); return TYPE_U32; }
     if (k == TOKEN_U64) { parse_adv(p); return TYPE_U64; }
@@ -61,6 +62,7 @@ func parse_type_ex(p: u64) -> u64 {
 
     var k: u64 = parse_peek_kind(p);
     if (k == TOKEN_U8) { parse_adv(p); base = TYPE_U8; }
+    else if (k == TOKEN_CHAR) { parse_adv(p); base = TYPE_U8; }
     else if (k == TOKEN_U16) { parse_adv(p); base = TYPE_U16; }
     else if (k == TOKEN_U32) { parse_adv(p); base = TYPE_U32; }
     else if (k == TOKEN_U64) { parse_adv(p); base = TYPE_U64; }

@@ -65,6 +65,34 @@ func cg_expr(node: u64) -> u64 {
         
         var offset: u64 = symtab_find(symtab, name_ptr, name_len);
         
+        var var_type: u64 = symtab_get_type(symtab, name_ptr, name_len);
+        if (var_type != 0) {
+            var vt: *TypeInfo = (*TypeInfo)var_type;
+            if (vt->ptr_depth == 0) {
+                if (vt->type_kind == TYPE_U8) {
+                    emit("    movzx rax, byte [rbp", 24);
+                    if (offset < 0) { emit_i64(offset); }
+                    else { emit("+", 1); emit_u64(offset); }
+                    emit("]\n", 2);
+                    return;
+                }
+                if (vt->type_kind == TYPE_U16) {
+                    emit("    movzx rax, word [rbp", 24);
+                    if (offset < 0) { emit_i64(offset); }
+                    else { emit("+", 1); emit_u64(offset); }
+                    emit("]\n", 2);
+                    return;
+                }
+                if (vt->type_kind == TYPE_U32) {
+                    emit("    mov eax, [rbp", 17);
+                    if (offset < 0) { emit_i64(offset); }
+                    else { emit("+", 1); emit_u64(offset); }
+                    emit("]\n", 2);
+                    return;
+                }
+            }
+        }
+        
         emit("    mov rax, [rbp", 17);
         if (offset < 0) { emit_i64(offset); }
         else { emit("+", 1); emit_u64(offset); }

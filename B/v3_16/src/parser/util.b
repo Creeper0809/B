@@ -71,6 +71,7 @@ func token_kind_name(kind: u64) -> u64 {
     if (kind == TOKEN_TRUE) { return "'true'"; }
     if (kind == TOKEN_FALSE) { return "'false'"; }
     if (kind == TOKEN_SIZEOF) { return "'sizeof'"; }
+    if (kind == TOKEN_CHAR) { return "'char'"; }
     return "unknown token";
 }
 
@@ -131,6 +132,7 @@ func token_kind_name_len(kind: u64) -> u64 {
     if (kind == TOKEN_TRUE) { return 6; }
     if (kind == TOKEN_FALSE) { return 7; }
     if (kind == TOKEN_SIZEOF) { return 8; }
+    if (kind == TOKEN_CHAR) { return 6; }
     return 13;  // "unknown token"
 }
 

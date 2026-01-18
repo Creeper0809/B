@@ -152,6 +152,7 @@ func lex_check_keyword(ptr: u64, len: u64) -> u64 {
         if (str_eq(ptr, len, "enum", 4)) { return TOKEN_ENUM; }
         if (str_eq(ptr, len, "impl", 4)) { return TOKEN_IMPL; }
         if (str_eq(ptr, len, "case", 4)) { return TOKEN_CASE; }
+        if (str_eq(ptr, len, "char", 4)) { return TOKEN_CHAR; }
         return TOKEN_IDENTIFIER;
     }
     

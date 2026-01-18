@@ -83,14 +83,24 @@ func parse_import_decl(p: u64) -> u64 {
     parse_consume(p, TOKEN_IMPORT);
     
     var first_tok: u64 = parse_peek(p);
-    parse_consume(p, TOKEN_IDENTIFIER);
+    var first_kind: u64 = parse_peek_kind(p);
+    if (first_kind != TOKEN_IDENTIFIER && first_kind != TOKEN_CHAR) {
+        emit_stderr("[ERROR] Expected module identifier in import\n", 45);
+        panic("Parse error");
+    }
+    parse_adv(p);
     
     var path_ptr: u64  = ((*Token)first_tok)->ptr;
     var path_len: u64 = ((*Token)first_tok)->len;
     
     while (parse_match(p, TOKEN_DOT)) {
         var next_tok: u64 = parse_peek(p);
-        parse_consume(p, TOKEN_IDENTIFIER);
+        var next_kind: u64 = parse_peek_kind(p);
+        if (next_kind != TOKEN_IDENTIFIER && next_kind != TOKEN_CHAR) {
+            emit_stderr("[ERROR] Expected module identifier in import\n", 45);
+            panic("Parse error");
+        }
+        parse_adv(p);
         
         var slash: u64 = heap_alloc(1);
         *(*u8)slash = 47;

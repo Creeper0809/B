@@ -41,6 +41,7 @@ const TOKEN_U16 = 41;
 const TOKEN_U32 = 42;
 const TOKEN_U64 = 43;
 const TOKEN_I64 = 44;
+const TOKEN_CHAR = 48;
 
 // Delimiters
 const TOKEN_LPAREN = 100;

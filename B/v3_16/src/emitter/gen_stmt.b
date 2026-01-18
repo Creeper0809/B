@@ -231,6 +231,31 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
         
         cg_expr(init);
         
+        // Store small integer types with correct width (u8/u16/u32)
+        if (ptr_depth == 0) {
+            if (type_kind == TYPE_U8) {
+                emit("    mov [rbp", 12);
+                if (offset < 0) { emit_i64(offset); }
+                else { emit("+", 1); emit_u64(offset); }
+                emit("], al\n", 6);
+                return;
+            }
+            if (type_kind == TYPE_U16) {
+                emit("    mov [rbp", 12);
+                if (offset < 0) { emit_i64(offset); }
+                else { emit("+", 1); emit_u64(offset); }
+                emit("], ax\n", 6);
+                return;
+            }
+            if (type_kind == TYPE_U32) {
+                emit("    mov [rbp", 12);
+                if (offset < 0) { emit_i64(offset); }
+                else { emit("+", 1); emit_u64(offset); }
+                emit("], eax\n", 7);
+                return;
+            }
+        }
+        
         // Check if initializing struct by value (e.g., var p: Point = Point_new(...))
         if (type_kind == TYPE_STRUCT && ptr_depth == 0) {
             // Struct returned in rax/rdx registers
@@ -349,6 +374,30 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
     if (target_kind == AST_DEREF8) {
         emit("    mov [rax], bl\n", 18);
         return;
+    }
+    
+    if (target_kind == AST_IDENT) {
+        var ident: *AstIdent = (*AstIdent)target;
+        var name_ptr: u64 = ident->name_ptr;
+        var name_len: u64 = ident->name_len;
+        var t_type: u64 = symtab_get_type(symtab, name_ptr, name_len);
+        if (t_type != 0) {
+            var tt: *TypeInfo = (*TypeInfo)t_type;
+            if (tt->ptr_depth == 0) {
+                if (tt->type_kind == TYPE_U8) {
+                    emit("    mov [rax], bl\n", 18);
+                    return;
+                }
+                if (tt->type_kind == TYPE_U16) {
+                    emit("    mov [rax], bx\n", 18);
+                    return;
+                }
+                if (tt->type_kind == TYPE_U32) {
+                    emit("    mov [rax], ebx\n", 19);
+                    return;
+                }
+            }
+        }
     }
     
     // Check if this is a struct-to-struct copy
