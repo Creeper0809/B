@@ -337,6 +337,10 @@ func lex_next(l: u64) -> u64 {
             lex_advance(l);
             return tok_new(TOKEN_PLUSPLUS, src + start, 2, line, col);
         }
+        if (lex_peek(l) == CHAR_EQ) {
+            lex_advance(l);
+            return tok_new(TOKEN_PLUS_EQ, src + start, 2, line, col);
+        }
         return tok_new(TOKEN_PLUS, src + start, 1, line, col);
     }
     if (c == CHAR_MINUS) {
@@ -348,11 +352,33 @@ func lex_next(l: u64) -> u64 {
             lex_advance(l);
             return tok_new(TOKEN_ARROW, src + start, 2, line, col);
         }
+        if (lex_peek(l) == CHAR_EQ) {
+            lex_advance(l);
+            return tok_new(TOKEN_MINUS_EQ, src + start, 2, line, col);
+        }
         return tok_new(TOKEN_MINUS, src + start, 1, line, col);
     }
-    if (c == CHAR_STAR) { return tok_new(TOKEN_STAR, src + start, 1, line, col); }
-    if (c == CHAR_SLASH) { return tok_new(TOKEN_SLASH, src + start, 1, line, col); }
-    if (c == CHAR_PERCENT) { return tok_new(TOKEN_PERCENT, src + start, 1, line, col); }
+    if (c == CHAR_STAR) {
+        if (lex_peek(l) == CHAR_EQ) {
+            lex_advance(l);
+            return tok_new(TOKEN_STAR_EQ, src + start, 2, line, col);
+        }
+        return tok_new(TOKEN_STAR, src + start, 1, line, col);
+    }
+    if (c == CHAR_SLASH) {
+        if (lex_peek(l) == CHAR_EQ) {
+            lex_advance(l);
+            return tok_new(TOKEN_SLASH_EQ, src + start, 2, line, col);
+        }
+        return tok_new(TOKEN_SLASH, src + start, 1, line, col);
+    }
+    if (c == CHAR_PERCENT) {
+        if (lex_peek(l) == CHAR_EQ) {
+            lex_advance(l);
+            return tok_new(TOKEN_PERCENT_EQ, src + start, 2, line, col);
+        }
+        return tok_new(TOKEN_PERCENT, src + start, 1, line, col);
+    }
     if (c == CHAR_CARET) { return tok_new(TOKEN_CARET, src + start, 1, line, col); }
     // NOTE: '&' and '|' are handled above to support &&/||.
     

@@ -78,6 +78,11 @@ const TOKEN_ANDAND = 78;
 const TOKEN_OROR = 79;
 const TOKEN_PLUSPLUS = 80;
 const TOKEN_MINUSMINUS = 81;
+const TOKEN_PLUS_EQ = 82;
+const TOKEN_MINUS_EQ = 83;
+const TOKEN_STAR_EQ = 84;
+const TOKEN_SLASH_EQ = 85;
+const TOKEN_PERCENT_EQ = 86;
 
 // ============================================
 // AST Node Types

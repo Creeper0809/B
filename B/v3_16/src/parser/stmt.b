@@ -115,6 +115,29 @@ func parse_assign_or_expr(p: u64) -> u64 {
         return ast_assign(expr, val);
     }
 
+    // Compound assignment: x += 5  =>  x = x + 5
+    var k: u64 = parse_peek_kind(p);
+    if (k == TOKEN_PLUS_EQ || k == TOKEN_MINUS_EQ || k == TOKEN_STAR_EQ || 
+        k == TOKEN_SLASH_EQ || k == TOKEN_PERCENT_EQ) {
+        parse_consume(p, k);
+        if (!is_assignable_expr(expr)) {
+            emit_stderr("[ERROR] Compound assignment requires assignable expression\n", 60);
+            panic("Parse error");
+        }
+        var rhs: u64 = parse_expr(p);
+        
+        // Determine binary operator
+        var bin_op: u64 = TOKEN_PLUS;
+        if (k == TOKEN_MINUS_EQ) { bin_op = TOKEN_MINUS; }
+        if (k == TOKEN_STAR_EQ) { bin_op = TOKEN_STAR; }
+        if (k == TOKEN_SLASH_EQ) { bin_op = TOKEN_SLASH; }
+        if (k == TOKEN_PERCENT_EQ) { bin_op = TOKEN_PERCENT; }
+        
+        var new_val: u64 = ast_binary(bin_op, expr, rhs);
+        parse_consume(p, TOKEN_SEMICOLON);
+        return ast_assign(expr, new_val);
+    }
+
     // Postfix ++/-- statement sugar: x++; x--;  =>  x = x +/- 1;
     var post_k: u64 = parse_peek_kind(p);
     if (post_k == TOKEN_PLUSPLUS) {
