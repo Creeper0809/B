@@ -141,8 +141,9 @@ func parse_param(p: u64) -> u64 {
         elem_ptr_depth = ty->elem_ptr_depth;
         array_len = ty->array_len;
         if (type_kind == TYPE_ARRAY) {
-            emit_stderr("[ERROR] Array types are not supported in parameters\n", 52);
-            panic("Parse error");
+            // Array parameter decays to pointer to first element
+            type_kind = elem_type_kind;
+            ptr_depth = elem_ptr_depth + 1;
         }
     }
     
@@ -195,8 +196,11 @@ func parse_func_decl(p: u64) -> u64 {
         ret_struct_name_ptr = ty->struct_name_ptr;
         ret_struct_name_len = ty->struct_name_len;
         if (ret_type == TYPE_ARRAY) {
-            emit_stderr("[ERROR] Array return types are not supported\n", 45);
-            panic("Parse error");
+            // Array return decays to pointer to first element
+            ret_type = ty->elem_type_kind;
+            ret_ptr_depth = ty->elem_ptr_depth + 1;
+            ret_struct_name_ptr = ty->struct_name_ptr;
+            ret_struct_name_len = ty->struct_name_len;
         }
     }
     

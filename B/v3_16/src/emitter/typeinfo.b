@@ -70,9 +70,15 @@ func typeinfo_make_slice(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u6
 
 // Global struct definitions (set by codegen before use)
 var g_structs_vec;
+// Global function definitions (set by codegen before use)
+var g_funcs_vec;
 
 func typeinfo_set_structs(structs: u64) -> u64 {
     g_structs_vec = structs;
+}
+
+func typeinfo_set_funcs(funcs: u64) -> u64 {
+    g_funcs_vec = funcs;
 }
 
 // ============================================
@@ -251,6 +257,32 @@ func get_field_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64)
 
 func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     var kind: u64 = ast_kind(node);
+
+    if (kind == AST_CALL) {
+        if (g_funcs_vec != 0) {
+            var call: *AstCall = (*AstCall)node;
+            var name_ptr: u64 = call->name_ptr;
+            var name_len: u64 = call->name_len;
+            var num_funcs: u64 = vec_len(g_funcs_vec);
+            for (var i: u64 = 0; i < num_funcs; i++) {
+                var fn_ptr: u64 = vec_get(g_funcs_vec, i);
+                var fn: *AstFunc = (*AstFunc)fn_ptr;
+                if (str_eq(fn->name_ptr, fn->name_len, name_ptr, name_len)) {
+                    if (fn->ret_type == TYPE_STRUCT) {
+                        var struct_def: u64 = get_struct_def(fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+                        return typeinfo_make_struct(fn->ret_ptr_depth, fn->ret_struct_name_ptr, fn->ret_struct_name_len, struct_def);
+                    }
+                    if (fn->ret_type == TYPE_SLICE) {
+                        // Slice return type: element type info is not stored on AstFunc.
+                        // Preserve slice shape (base kind + pointer depth) for codegen.
+                        return typeinfo_make(fn->ret_type, fn->ret_ptr_depth);
+                    }
+                    return typeinfo_make(fn->ret_type, fn->ret_ptr_depth);
+                }
+            }
+        }
+        return typeinfo_make(TYPE_I64, 0);
+    }
     
     if (kind == AST_IDENT) {
         var name_ptr: u64 = *(node + 8);

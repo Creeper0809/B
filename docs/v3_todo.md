@@ -60,6 +60,7 @@
 - ✅ u8/char 로컬 변수 로드/스토어 폭 보정 및 회귀 테스트(101_array_char) 추가
 - ✅ `[]T`/`[N]T` 최소 지원 (로컬 선언/인덱싱) + 슬라이스 테스트(102_slice_basic)
 - ✅ `[]T` 파라미터/리턴/구조체 필드 지원 + 배열 필드 지원 (103_slice_struct_fields)
+- ✅ `[N]T` 파라미터/리턴 디케이(포인터) + 테스트 104_array_param_return
 - ✅ `print(args...)` 매직 함수: 인자 타입별 자동 분해 출력
 - ✅ 테스트 34 (impl_method): `impl Type {}` 블록 + 메서드 호출 설탕
 - ✅ 테스트 35, 36 (defer): `defer` 문 기본 구현 (블록 스코프, return 시 실행)

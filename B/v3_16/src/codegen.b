@@ -137,8 +137,9 @@ func cg_program(prog: u64) -> u64 {
     // Initialize emitter state
     emitter_init();
     
-    // Set structs for typeinfo module
+    // Set structs and functions for typeinfo module
     typeinfo_set_structs(program->structs_vec);
+    typeinfo_set_funcs(program->funcs_vec);
     
     // Set globals
     if (program->globals_vec == 0) {
