@@ -135,17 +135,17 @@ func cg_func(node: u64) -> u64 {
 // Program Codegen
 // ============================================
 
-func cg_program(prog: u64) -> u64 {
-    push_trace("cg_program", "codegen.b", __LINE__);
-    
+func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
+    push_trace("cg_program_with_sigs", "codegen.b", __LINE__);
+
     var program: *AstProgram = (*AstProgram)prog;
-    
+
     // Initialize emitter state
     emitter_init();
-    
+
     // Set structs and functions for typeinfo module
     typeinfo_set_structs(program->structs_vec);
-    typeinfo_set_funcs(program->funcs_vec);
+    typeinfo_set_funcs(sigs);
     
     // Set globals
     if (program->globals_vec == 0) {
@@ -185,6 +185,17 @@ func cg_program(prog: u64) -> u64 {
     
     string_emit_data();
     globals_emit_bss();
+    
+    pop_trace();
+}
+
+func cg_program(prog: u64) -> u64 {
+    push_trace("cg_program", "codegen.b", __LINE__);
+    
+    var program: *AstProgram = (*AstProgram)prog;
+    
+    // Reuse full function list as signature list
+    cg_program_with_sigs(prog, program->funcs_vec);
     
     pop_trace();
 }

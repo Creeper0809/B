@@ -19,6 +19,7 @@ import codegen;
 // ============================================
 var g_loaded_modules;    // HashMap: path -> 1 (tracks loaded files)
 var g_all_funcs;         // Vec of all function ASTs
+var g_all_func_sigs;     // Vec of all function signatures (pass 1)
 var g_all_consts;        // Vec of all const ASTs
 var g_all_globals;       // Vec of all global var info
 var g_all_structs;       // HashMap: struct_name -> struct_def
@@ -233,6 +234,17 @@ func load_module(file_path: u64, file_path_len: u64) -> u64 {
     
     var tokens: u64 = lex_all(src, slen);
     
+    // Pass 1: collect function signatures only
+    var p1: u64 = parse_new(tokens);
+    var prog_sig: u64 = parse_program_pass1(p1);
+
+    var sig_funcs: u64 = *(prog_sig + 8);
+    var num_sig_funcs: u64 = vec_len(sig_funcs);
+    for (var sfi: u64 = 0; sfi < num_sig_funcs; sfi++) {
+        vec_push(g_all_func_sigs, vec_get(sig_funcs, sfi));
+    }
+
+    // Pass 2: full parse with bodies
     var p: u64 = parse_new(tokens);
     var prog: u64 = parse_program(p);
     
@@ -362,6 +374,7 @@ func main(argc: u64, argv: u64) -> u64 {
     
     g_loaded_modules = hashmap_new(64);
     g_all_funcs = vec_new(64);
+    g_all_func_sigs = vec_new(64);
     g_all_consts = vec_new(128);
     g_all_globals = vec_new(64);
     g_all_structs = hashmap_new(64);
@@ -383,7 +396,7 @@ func main(argc: u64, argv: u64) -> u64 {
     *(merged_prog + 32) = g_all_globals;
     *(merged_prog + 40) = g_all_structs_vec;
     
-    cg_program(merged_prog);
+    cg_program_with_sigs(merged_prog, g_all_func_sigs);
     
     pop_trace();
     return 0;
