@@ -57,13 +57,16 @@ func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth:
     vec_push(symtab->offsets_vec, offset);
     
     // Add type info
-    var type_info: u64 = heap_alloc(40);
+    var type_info: u64 = heap_alloc(SIZEOF_TYPEINFO);
     var ti: *TypeInfo = (*TypeInfo)type_info;
     ti->type_kind = type_kind;
     ti->ptr_depth = ptr_depth;
     ti->struct_name_ptr = 0;
     ti->struct_name_len = 0;
     ti->struct_def = 0;
+    ti->elem_type_kind = 0;
+    ti->elem_ptr_depth = 0;
+    ti->array_len = 0;
     vec_push(symtab->types_vec, type_info);
     
     symtab->count = symtab->count + 1;

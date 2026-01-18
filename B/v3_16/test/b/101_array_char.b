@@ -5,27 +5,25 @@ import io;
 import util;
 
 func test_array_basic() -> i64 {
-    // Allocate array of 5 i64s
-    var arr: *i64 = (*i64)heap_alloc(40);
+    // Stack array of 5 i64s
+    var arr: [5]i64;
     
-    // NOTE: Pointer arithmetic is byte-based.
-    // i64 요소 접근은 인덱스를 8바이트로 스케일해야 함.
     arr[0] = 10;
-    arr[8] = 20;
-    arr[16] = 30;
-    arr[24] = 40;
-    arr[32] = 50;
+    arr[1] = 20;
+    arr[2] = 30;
+    arr[3] = 40;
+    arr[4] = 50;
     
     // Read with indexing
-    var sum = arr[0] + arr[8] + arr[16] + arr[24] + arr[32];
+    var sum = arr[0] + arr[1] + arr[2] + arr[3] + arr[4];
     
     if (sum != 150) {
         return 1;
     }
     
     // Modify
-    arr[16] = 100;
-    if (arr[16] != 100) {
+    arr[2] = 100;
+    if (arr[2] != 100) {
         return 2;
     }
     
@@ -53,8 +51,8 @@ func test_char_type() -> i64 {
 }
 
 func test_char_array() -> i64 {
-    // String as char array
-    var str: *char = (*char)heap_alloc(10);
+    // Stack char array
+    var str: [6]char;
     
     str[0] = 72;   // 'H'
     str[1] = 101;  // 'e'
@@ -88,23 +86,23 @@ func test_char_array() -> i64 {
 
 func test_multidim_simulation() -> i64 {
     // Simulate 2D array: 3x3 matrix
-    var matrix: *i64 = (*i64)heap_alloc(72);  // 9 * 8 bytes
+    var matrix: [9]i64;
     
     // Fill matrix
     var val = 1;
     var i = 0;
     for (i = 0; i < 9; i++) {
-        matrix[i * 8] = val;
+        matrix[i] = val;
         val = val + 1;
     }
     
-    // Access like matrix[1][2] = matrix[(1*3 + 2) * 8]
-    if (matrix[40] != 6) {
+    // Access like matrix[1][2] = matrix[1*3 + 2]
+    if (matrix[5] != 6) {
         return 30;
     }
     
     // Sum diagonal
-    var diag_sum = matrix[0] + matrix[32] + matrix[64];  // 1 + 5 + 9 = 15
+    var diag_sum = matrix[0] + matrix[4] + matrix[8];  // 1 + 5 + 9 = 15
     if (diag_sum != 15) {
         return 31;
     }
@@ -113,23 +111,23 @@ func test_multidim_simulation() -> i64 {
 }
 
 func test_nested_array_access() -> i64 {
-    var arr: *i64 = (*i64)heap_alloc(80);  // 10 elements
+    var arr: [10]i64;
     
     var i = 0;
     for (i = 0; i < 10; i++) {
-        arr[i * 8] = i * 10;
+        arr[i] = i * 10;
     }
     
     // Test nested access
     var idx = 5;
-    if (arr[idx * 8] != 50) {
+    if (arr[idx] != 50) {
         return 40;
     }
     
     // Use array value as index
     arr[0] = 3;
     var nested_idx = arr[0];
-    if (arr[nested_idx * 8] != 30) {
+    if (arr[nested_idx] != 30) {
         return 41;
     }
     

@@ -67,13 +67,16 @@ func cg_func(node: u64) -> u64 {
         
         vec_push(offsets, 16 + i * 8);
         
-        var type_info: u64 = heap_alloc(40);
+        var type_info: u64 = heap_alloc(SIZEOF_TYPEINFO);
         var ti: *TypeInfo = (*TypeInfo)type_info;
         ti->type_kind = p->type_kind;
         ti->ptr_depth = p->ptr_depth;
         ti->struct_name_ptr = p->struct_name_ptr;
         ti->struct_name_len = p->struct_name_len;
         ti->struct_def = 0;
+        ti->elem_type_kind = 0;
+        ti->elem_ptr_depth = 0;
+        ti->array_len = 0;
 
         // If this is a struct, resolve its struct_def now
         // This applies even for pointer types (*Point) - we store the base struct def

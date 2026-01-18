@@ -13,24 +13,58 @@ import types;
 import ast;
 
 func typeinfo_make(base_type: u64, ptr_depth: u64) -> u64 {
-    var result: u64 = heap_alloc(40);
+    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = base_type;
     ti->ptr_depth = ptr_depth;
     ti->struct_name_ptr = 0;
     ti->struct_name_len = 0;
     ti->struct_def = 0;
+    ti->elem_type_kind = 0;
+    ti->elem_ptr_depth = 0;
+    ti->array_len = 0;
     return result;
 }
 
 func typeinfo_make_struct(ptr_depth: u64, struct_name_ptr: u64, struct_name_len: u64, struct_def: u64) -> u64 {
-    var result: u64 = heap_alloc(40);
+    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = TYPE_STRUCT;
     ti->ptr_depth = ptr_depth;
     ti->struct_name_ptr = struct_name_ptr;
     ti->struct_name_len = struct_name_len;
     ti->struct_def = struct_def;
+    ti->elem_type_kind = 0;
+    ti->elem_ptr_depth = 0;
+    ti->array_len = 0;
+    return result;
+}
+
+func typeinfo_make_array(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u64, elem_struct_name_ptr: u64, elem_struct_name_len: u64, elem_struct_def: u64, array_len: u64) -> u64 {
+    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var ti: *TypeInfo = (*TypeInfo)result;
+    ti->type_kind = TYPE_ARRAY;
+    ti->ptr_depth = ptr_depth;
+    ti->struct_name_ptr = elem_struct_name_ptr;
+    ti->struct_name_len = elem_struct_name_len;
+    ti->struct_def = elem_struct_def;
+    ti->elem_type_kind = elem_type_kind;
+    ti->elem_ptr_depth = elem_ptr_depth;
+    ti->array_len = array_len;
+    return result;
+}
+
+func typeinfo_make_slice(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u64, elem_struct_name_ptr: u64, elem_struct_name_len: u64, elem_struct_def: u64) -> u64 {
+    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var ti: *TypeInfo = (*TypeInfo)result;
+    ti->type_kind = TYPE_SLICE;
+    ti->ptr_depth = ptr_depth;
+    ti->struct_name_ptr = elem_struct_name_ptr;
+    ti->struct_name_len = elem_struct_name_len;
+    ti->struct_def = elem_struct_def;
+    ti->elem_type_kind = elem_type_kind;
+    ti->elem_ptr_depth = elem_ptr_depth;
+    ti->array_len = 0;
     return result;
 }
 
@@ -68,6 +102,10 @@ func get_pointee_size(base_type: u64, ptr_depth: u64) -> u64 {
 }
 
 func check_type_compat(from_base: u64, from_depth: u64, to_base: u64, to_depth: u64) -> u64 {
+    if (from_base == TYPE_ARRAY || to_base == TYPE_ARRAY || from_base == TYPE_SLICE || to_base == TYPE_SLICE) {
+        if (from_base == to_base && from_depth == to_depth) { return 0; }
+        return 1;
+    }
     if (from_base == to_base) {
         if (from_depth == to_depth) { return 0; }
     }
@@ -142,6 +180,18 @@ func sizeof_type(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_na
     
     // Default: 8 bytes
     return 8;
+}
+
+// Sizeof helper for extended types (array/slice)
+func sizeof_type_ex(ti: u64) -> u64 {
+    var info: *TypeInfo = (*TypeInfo)ti;
+    if (info->ptr_depth > 0) { return 8; }
+    if (info->type_kind == TYPE_ARRAY) {
+        var elem_size: u64 = sizeof_type(info->elem_type_kind, info->elem_ptr_depth, info->struct_name_ptr, info->struct_name_len);
+        return elem_size * info->array_len;
+    }
+    if (info->type_kind == TYPE_SLICE) { return 16; }
+    return sizeof_type(info->type_kind, info->ptr_depth, info->struct_name_ptr, info->struct_name_len);
 }
 
 // ============================================
@@ -228,7 +278,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var operand: u64 = *(node + 8);
         var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
         if (op_type != 0) {
-            var result: u64 = heap_alloc(40);
+            var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
             var op_ti: *TypeInfo = (*TypeInfo)op_type;
             var res_ti: *TypeInfo = (*TypeInfo)result;
             res_ti->type_kind = op_ti->type_kind;
@@ -236,6 +286,9 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             res_ti->struct_def = op_ti->struct_def;
             res_ti->struct_name_ptr = op_ti->struct_name_ptr;
             res_ti->struct_name_len = op_ti->struct_name_len;
+            res_ti->elem_type_kind = op_ti->elem_type_kind;
+            res_ti->elem_ptr_depth = op_ti->elem_ptr_depth;
+            res_ti->array_len = op_ti->array_len;
             return result;
         }
     }
@@ -247,13 +300,16 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             var op_ti: *TypeInfo = (*TypeInfo)op_type;
             var depth: u64 = op_ti->ptr_depth;
             if (depth > 0) {
-                var result: u64 = heap_alloc(40);
+                var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
                 var res_ti: *TypeInfo = (*TypeInfo)result;
                 res_ti->type_kind = op_ti->type_kind;
                 res_ti->ptr_depth = depth - 1;
                 res_ti->struct_def = op_ti->struct_def;
                 res_ti->struct_name_ptr = op_ti->struct_name_ptr;
                 res_ti->struct_name_len = op_ti->struct_name_len;
+                res_ti->elem_type_kind = op_ti->elem_type_kind;
+                res_ti->elem_ptr_depth = op_ti->elem_ptr_depth;
+                res_ti->array_len = op_ti->array_len;
                 return result;
             }
         }
@@ -261,6 +317,42 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     
     if (kind == AST_DEREF8) {
         return typeinfo_make(TYPE_U8, 0);
+    }
+
+    if (kind == AST_INDEX) {
+        var base: u64 = *(node + 8);
+        var base_type: u64 = get_expr_type_with_symtab(base, symtab);
+        if (base_type != 0) {
+            var bt: *TypeInfo = (*TypeInfo)base_type;
+            if (bt->ptr_depth > 0) {
+                if (bt->type_kind == TYPE_STRUCT) {
+                    return typeinfo_make_struct(bt->ptr_depth - 1, bt->struct_name_ptr, bt->struct_name_len, bt->struct_def);
+                }
+                return typeinfo_make(bt->type_kind, bt->ptr_depth - 1);
+            }
+            if (bt->type_kind == TYPE_ARRAY || bt->type_kind == TYPE_SLICE) {
+                if (bt->elem_type_kind == TYPE_STRUCT) {
+                    return typeinfo_make_struct(bt->elem_ptr_depth, bt->struct_name_ptr, bt->struct_name_len, bt->struct_def);
+                }
+                return typeinfo_make(bt->elem_type_kind, bt->elem_ptr_depth);
+            }
+        }
+        return typeinfo_make(TYPE_I64, 0);
+    }
+
+    if (kind == AST_SLICE) {
+        var ptr_expr: u64 = *(node + 8);
+        var ptr_type: u64 = get_expr_type_with_symtab(ptr_expr, symtab);
+        if (ptr_type != 0) {
+            var pt: *TypeInfo = (*TypeInfo)ptr_type;
+            if (pt->ptr_depth > 0) {
+                if (pt->type_kind == TYPE_STRUCT) {
+                    return typeinfo_make_slice(0, TYPE_STRUCT, pt->ptr_depth - 1, pt->struct_name_ptr, pt->struct_name_len, pt->struct_def);
+                }
+                return typeinfo_make_slice(0, pt->type_kind, pt->ptr_depth - 1, 0, 0, 0);
+            }
+        }
+        return typeinfo_make_slice(0, TYPE_U8, 0, 0, 0, 0);
     }
     
     if (kind == AST_MEMBER_ACCESS) {
@@ -351,13 +443,16 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var left_ti: *TypeInfo = (*TypeInfo)left_type;
                 var l_depth: u64 = left_ti->ptr_depth;
                 if (l_depth > 0) {
-                    var result: u64 = heap_alloc(40);
+                    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
                     var res_ti: *TypeInfo = (*TypeInfo)result;
                     res_ti->type_kind = left_ti->type_kind;
                     res_ti->ptr_depth = l_depth;
                     res_ti->struct_def = left_ti->struct_def;
                     res_ti->struct_name_ptr = 0;
                     res_ti->struct_name_len = 0;
+                    res_ti->elem_type_kind = left_ti->elem_type_kind;
+                    res_ti->elem_ptr_depth = left_ti->elem_ptr_depth;
+                    res_ti->array_len = left_ti->array_len;
                     return result;
                 }
             }
@@ -367,13 +462,16 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var right_ti: *TypeInfo = (*TypeInfo)right_type;
                 var r_depth: u64 = right_ti->ptr_depth;
                 if (r_depth > 0) {
-                    var result: u64 = heap_alloc(40);
+                    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
                     var res_ti: *TypeInfo = (*TypeInfo)result;
                     res_ti->type_kind = right_ti->type_kind;
                     res_ti->ptr_depth = r_depth;
                     res_ti->struct_def = right_ti->struct_def;
                     res_ti->struct_name_ptr = 0;
                     res_ti->struct_name_len = 0;
+                    res_ti->elem_type_kind = right_ti->elem_type_kind;
+                    res_ti->elem_ptr_depth = right_ti->elem_ptr_depth;
+                    res_ti->array_len = right_ti->array_len;
                     return result;
                 }
             }

@@ -14,6 +14,50 @@ import ast;
 // Expression Codegen
 // ============================================
 
+func cg_index_addr(node: u64, symtab: u64) -> u64 {
+    var idx: *AstIndex = (*AstIndex)node;
+    var base: u64 = idx->base;
+    var index: u64 = idx->index;
+
+    var elem_size: u64 = 1;
+    var use_array_addr: u64 = 0;
+    var use_slice_ptr: u64 = 0;
+
+    var base_type: u64 = get_expr_type_with_symtab(base, symtab);
+    if (base_type != 0) {
+        var bt: *TypeInfo = (*TypeInfo)base_type;
+        if (bt->ptr_depth > 0) {
+            elem_size = get_pointee_size(bt->type_kind, bt->ptr_depth);
+        } else if (bt->type_kind == TYPE_ARRAY) {
+            elem_size = sizeof_type(bt->elem_type_kind, bt->elem_ptr_depth, bt->struct_name_ptr, bt->struct_name_len);
+            use_array_addr = 1;
+        } else if (bt->type_kind == TYPE_SLICE) {
+            elem_size = sizeof_type(bt->elem_type_kind, bt->elem_ptr_depth, bt->struct_name_ptr, bt->struct_name_len);
+            use_slice_ptr = 1;
+        }
+    }
+
+    if (use_array_addr == 1) {
+        cg_lvalue(base);
+    } else if (use_slice_ptr == 1) {
+        cg_lvalue(base);
+        emit("    mov rax, [rax]\n", 19);
+    } else {
+        cg_expr(base);
+    }
+
+    emit("    push rax\n", 13);
+    cg_expr(index);
+    if (elem_size != 1) {
+        emit("    imul rax, ", 14);
+        emit_u64(elem_size);
+        emit_nl();
+    }
+    emit("    pop rbx\n", 12);
+    emit("    add rax, rbx\n", 17);
+    return;
+}
+
 func cg_expr(node: u64) -> u64 {
     var kind: u64 = ast_kind(node);
     var symtab: u64 = emitter_get_symtab();
@@ -69,6 +113,20 @@ func cg_expr(node: u64) -> u64 {
         if (var_type != 0) {
             var vt: *TypeInfo = (*TypeInfo)var_type;
             if (vt->ptr_depth == 0) {
+                if (vt->type_kind == TYPE_ARRAY) {
+                    emit("    lea rax, [rbp", 17);
+                    if (offset < 0) { emit_i64(offset); }
+                    else { emit("+", 1); emit_u64(offset); }
+                    emit("]\n", 2);
+                    return;
+                }
+                if (vt->type_kind == TYPE_SLICE) {
+                    emit("    mov rax, [rbp", 17);
+                    if (offset < 0) { emit_i64(offset); }
+                    else { emit("+", 1); emit_u64(offset); }
+                    emit("]\n", 2);
+                    return;
+                }
                 if (vt->type_kind == TYPE_U8) {
                     emit("    movzx rax, byte [rbp", 24);
                     if (offset < 0) { emit_i64(offset); }
@@ -174,6 +232,35 @@ func cg_expr(node: u64) -> u64 {
         cg_expr(operand);
         emit("    movzx rax, byte [rax]\n", 26);
         return;
+    }
+
+    if (kind == AST_INDEX) {
+        cg_index_addr(node, symtab);
+        var elem_type: u64 = get_expr_type_with_symtab(node, symtab);
+        if (elem_type != 0) {
+            var et: *TypeInfo = (*TypeInfo)elem_type;
+            if (et->ptr_depth == 0) {
+                if (et->type_kind == TYPE_U8) {
+                    emit("    movzx rax, byte [rax]\n", 26);
+                    return;
+                }
+                if (et->type_kind == TYPE_U16) {
+                    emit("    movzx rax, word [rax]\n", 26);
+                    return;
+                }
+                if (et->type_kind == TYPE_U32) {
+                    emit("    mov eax, [rax]\n", 19);
+                    return;
+                }
+            }
+        }
+        emit("    mov rax, [rax]\n", 19);
+        return;
+    }
+
+    if (kind == AST_SLICE) {
+        emit_stderr("[ERROR] Slice literal cannot be used as rvalue\n", 47);
+        panic("Codegen error");
     }
     
     if (kind == AST_CAST) {
@@ -555,6 +642,11 @@ func cg_lvalue(node: u64) -> u64 {
         var deref8: *AstDeref8 = (*AstDeref8)node;
         var operand: u64 = deref8->operand;
         cg_expr(operand);
+        return;
+    }
+
+    if (kind == AST_INDEX) {
+        cg_index_addr(node, symtab);
         return;
     }
     

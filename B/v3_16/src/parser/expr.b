@@ -174,6 +174,21 @@ func parse_primary(p: u64) -> u64 {
     if (k == TOKEN_IDENTIFIER) {
         var tok: u64 = parse_peek(p);
         parse_adv(p);
+
+        // Slice literal: slice(ptr, len)
+        if (((*Token)tok)->len == 5) {
+            if (str_eq(((*Token)tok)->ptr, ((*Token)tok)->len, "slice", 5)) {
+                if (parse_peek_kind(p) == TOKEN_LPAREN) {
+                    parse_adv(p);
+                    var ptr_expr: u64 = parse_expr(p);
+                    parse_consume(p, TOKEN_COMMA);
+                    var len_expr: u64 = parse_expr(p);
+                    parse_consume(p, TOKEN_RPAREN);
+                    pop_trace();
+                    return ast_slice(ptr_expr, len_expr);
+                }
+            }
+        }
         
         // Check for struct literal: StructName { expr, expr, ... }
         if (parse_peek_kind(p) == TOKEN_LBRACE) {
@@ -289,7 +304,7 @@ func parse_postfix_from(p: u64, left: u64) -> u64 {
             parse_adv(p);
             var idx: u64 = parse_expr(p);
             parse_consume(p, TOKEN_RBRACKET);
-            left = ast_deref(ast_binary(TOKEN_PLUS, left, idx));
+            left = ast_index(left, idx);
         } else if (k == TOKEN_DOT) {
             parse_adv(p);
             var field_tok: u64 = parse_peek(p);

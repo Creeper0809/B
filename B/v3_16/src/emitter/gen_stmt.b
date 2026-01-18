@@ -181,9 +181,20 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
     var init: u64 = decl->init_expr;
     var struct_name_ptr: u64 = decl->struct_name_ptr;
     var struct_name_len: u64 = decl->struct_name_len;
+    var elem_type_kind: u64 = decl->elem_type_kind;
+    var elem_ptr_depth: u64 = decl->elem_ptr_depth;
+    var array_len: u64 = decl->array_len;
     
     // Calculate size based on type
-    var size: u64 = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+    var size: u64 = 0;
+    if (type_kind == TYPE_ARRAY) {
+        var elem_size: u64 = sizeof_type(elem_type_kind, elem_ptr_depth, struct_name_ptr, struct_name_len);
+        size = elem_size * array_len;
+    } else if (type_kind == TYPE_SLICE) {
+        size = 16;
+    } else {
+        size = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+    }
     
     var offset: u64 = symtab_add(symtab, name_ptr, name_len, type_kind, ptr_depth, size);
     
@@ -208,9 +219,40 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
         ti->struct_def = struct_def;
         ti->struct_name_ptr = struct_name_ptr;
         ti->struct_name_len = struct_name_len;
+        ti->elem_type_kind = 0;
+        ti->elem_ptr_depth = 0;
+        ti->array_len = 0;
+    }
+
+    // If array/slice, store element type info in symtab
+    if (type_kind == TYPE_ARRAY || type_kind == TYPE_SLICE) {
+        var type_info2: u64 = symtab_get_type(symtab, name_ptr, name_len);
+        var ti2: *TypeInfo = (*TypeInfo)type_info2;
+        ti2->elem_type_kind = elem_type_kind;
+        ti2->elem_ptr_depth = elem_ptr_depth;
+        ti2->array_len = array_len;
+        ti2->struct_name_ptr = struct_name_ptr;
+        ti2->struct_name_len = struct_name_len;
+        if (elem_type_kind == TYPE_STRUCT && g_structs_vec != 0 && struct_name_ptr != 0) {
+            var num_structs2: u64 = vec_len(g_structs_vec);
+            var struct_def2: u64 = 0;
+            for (var si2: u64 = 0; si2 < num_structs2; si2++) {
+                var sd2: u64 = vec_get(g_structs_vec, si2);
+                var sdef2: *AstStructDef = (*AstStructDef)sd2;
+                if (str_eq(sdef2->name_ptr, sdef2->name_len, struct_name_ptr, struct_name_len)) {
+                    struct_def2 = sd2;
+                    break;
+                }
+            }
+            ti2->struct_def = struct_def2;
+        }
     }
     
     if (init != 0) {
+        if (type_kind == TYPE_ARRAY) {
+            emit_stderr("[ERROR] Array initialization is not supported\n", 46);
+            panic("Codegen error");
+        }
         var init_kind: u64 = ast_kind(init);
         
         // Handle struct literal initialization specially
@@ -229,6 +271,39 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
             }
         }
         
+        // Slice initialization: slice(ptr, len) or copy from another slice
+        if (type_kind == TYPE_SLICE) {
+            if (init_kind == AST_SLICE) {
+                var slice_node: *AstSlice = (*AstSlice)init;
+                cg_expr(slice_node->ptr_expr);
+                emit("    mov [rbp", 12);
+                if (offset < 0) { emit_i64(offset); }
+                else { emit("+", 1); emit_u64(offset); }
+                emit("], rax\n", 7);
+                cg_expr(slice_node->len_expr);
+                emit("    mov [rbp", 12);
+                var off2: u64 = offset + 8;
+                if (off2 < 0) { emit_i64(off2); }
+                else { emit("+", 1); emit_u64(off2); }
+                emit("], rax\n", 7);
+                return;
+            }
+            // Copy from another slice value
+            cg_lvalue(init);
+            emit("    mov rbx, [rax]\n", 19);
+            emit("    mov rcx, [rax+8]\n", 21);
+            emit("    mov [rbp", 12);
+            if (offset < 0) { emit_i64(offset); }
+            else { emit("+", 1); emit_u64(offset); }
+            emit("], rbx\n", 7);
+            emit("    mov [rbp", 12);
+            var off3: u64 = offset + 8;
+            if (off3 < 0) { emit_i64(off3); }
+            else { emit("+", 1); emit_u64(off3); }
+            emit("], rcx\n", 7);
+            return;
+        }
+
         cg_expr(init);
         
         // Store small integer types with correct width (u8/u16/u32)
@@ -324,6 +399,7 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
     var value: u64 = assign->value;
     
     var target_kind: u64 = ast_kind(target);
+    var value_kind: u64 = ast_kind(value);
     if (target_kind == AST_IDENT) {
         var ident: *AstIdent = (*AstIdent)target;
         var name_ptr: u64 = ident->name_ptr;
@@ -338,6 +414,37 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
             if (vt_depth > 0) {
                 var vt_base: u64 = vt_info->type_kind;
                 symtab_update_type(symtab, name_ptr, name_len, vt_base, vt_depth);
+            }
+        }
+    }
+
+    // Slice assignment: copy ptr+len
+    if (target_kind == AST_IDENT) {
+        var ident2: *AstIdent = (*AstIdent)target;
+        var t_name_ptr: u64 = ident2->name_ptr;
+        var t_name_len: u64 = ident2->name_len;
+        var t_type: u64 = symtab_get_type(symtab, t_name_ptr, t_name_len);
+        if (t_type != 0) {
+            var tt: *TypeInfo = (*TypeInfo)t_type;
+            if (tt->type_kind == TYPE_SLICE && tt->ptr_depth == 0) {
+                if (value_kind == AST_SLICE) {
+                    var slice_node: *AstSlice = (*AstSlice)value;
+                    cg_expr(slice_node->ptr_expr);
+                    emit("    mov rbx, rax\n", 17);
+                    cg_expr(slice_node->len_expr);
+                    emit("    mov rcx, rax\n", 17);
+                    cg_lvalue(target);
+                    emit("    mov [rax], rbx\n", 19);
+                    emit("    mov [rax+8], rcx\n", 21);
+                    return;
+                }
+                cg_lvalue(value);
+                emit("    mov rbx, [rax]\n", 19);
+                emit("    mov rcx, [rax+8]\n", 21);
+                cg_lvalue(target);
+                emit("    mov [rax], rbx\n", 19);
+                emit("    mov [rax+8], rcx\n", 21);
+                return;
             }
         }
     }
@@ -373,6 +480,29 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
     
     if (target_kind == AST_DEREF8) {
         emit("    mov [rax], bl\n", 18);
+        return;
+    }
+
+    if (target_kind == AST_INDEX) {
+        var idx_type: u64 = get_expr_type_with_symtab(target, symtab);
+        if (idx_type != 0) {
+            var it: *TypeInfo = (*TypeInfo)idx_type;
+            if (it->ptr_depth == 0) {
+                if (it->type_kind == TYPE_U8) {
+                    emit("    mov [rax], bl\n", 18);
+                    return;
+                }
+                if (it->type_kind == TYPE_U16) {
+                    emit("    mov [rax], bx\n", 18);
+                    return;
+                }
+                if (it->type_kind == TYPE_U32) {
+                    emit("    mov [rax], ebx\n", 19);
+                    return;
+                }
+            }
+        }
+        emit("    mov [rax], rbx\n", 19);
         return;
     }
     

@@ -31,14 +31,25 @@ func parse_var_decl(p: u64) -> u64 {
     var ptr_depth: u64 = 0;
     var struct_name_ptr: u64 = 0;
     var struct_name_len: u64 = 0;
+    var elem_type_kind: u64 = 0;
+    var elem_ptr_depth: u64 = 0;
+    var array_len: u64 = 0;
     
     if (parse_match(p, TOKEN_COLON)) {
         var ty_info: *TypeInfo = (*TypeInfo)parse_type_ex(p);
         type_kind = ty_info->type_kind;
         ptr_depth = ty_info->ptr_depth;
+        elem_type_kind = ty_info->elem_type_kind;
+        elem_ptr_depth = ty_info->elem_ptr_depth;
+        array_len = ty_info->array_len;
         
         // If TYPE_STRUCT, get struct name from TypeInfo
         if (type_kind == TYPE_STRUCT) {
+            struct_name_ptr = ty_info->struct_name_ptr;
+            struct_name_len = ty_info->struct_name_len;
+        }
+        // If array/slice of struct pointer, store element struct name
+        if (type_kind == TYPE_ARRAY || type_kind == TYPE_SLICE) {
             struct_name_ptr = ty_info->struct_name_ptr;
             struct_name_len = ty_info->struct_name_len;
         }
@@ -55,6 +66,9 @@ func parse_var_decl(p: u64) -> u64 {
     var decl: *AstVarDecl = (*AstVarDecl)ast_var_decl(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, type_kind, ptr_depth, init);
     decl->struct_name_ptr = struct_name_ptr;
     decl->struct_name_len = struct_name_len;
+    decl->elem_type_kind = elem_type_kind;
+    decl->elem_ptr_depth = elem_ptr_depth;
+    decl->array_len = array_len;
     return (u64)decl;
 }
 

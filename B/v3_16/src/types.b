@@ -104,6 +104,8 @@ const AST_MEMBER_ACCESS = 110;
 const AST_STRUCT_LITERAL = 111;
 const AST_SIZEOF = 112;
 const AST_METHOD_CALL = 113;
+const AST_INDEX = 114;
+const AST_SLICE = 115;
 
 // Statements
 const AST_RETURN = 200;
@@ -138,6 +140,8 @@ const TYPE_U64 = 4;
 const TYPE_I64 = 5;
 const TYPE_PTR = 10;
 const TYPE_STRUCT = 20;
+const TYPE_ARRAY = 21;
+const TYPE_SLICE = 22;
 
 // ============================================
 // Parser Data Structures
@@ -149,13 +153,17 @@ struct Parser {
     cur: u64;
 }
 
-// Type information (40 bytes)
+// Type information (64 bytes)
+const SIZEOF_TYPEINFO = 64;
 struct TypeInfo {
     type_kind: u64;
     ptr_depth: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
     struct_def: u64;
+    elem_type_kind: u64;
+    elem_ptr_depth: u64;
+    array_len: u64;
 }
 
 // Struct field descriptor (56 bytes)

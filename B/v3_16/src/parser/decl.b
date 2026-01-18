@@ -134,6 +134,10 @@ func parse_param(p: u64) -> u64 {
         ptr_depth = ty->ptr_depth;
         struct_name_ptr = ty->struct_name_ptr;
         struct_name_len = ty->struct_name_len;
+        if (type_kind == TYPE_ARRAY || type_kind == TYPE_SLICE) {
+            emit_stderr("[ERROR] Array/slice types are not supported in parameters\n", 58);
+            panic("Parse error");
+        }
     }
     
     var param: *Param = (*Param)heap_alloc(SIZEOF_PARAM);
@@ -181,6 +185,10 @@ func parse_func_decl(p: u64) -> u64 {
         ret_ptr_depth = ty->ptr_depth;
         ret_struct_name_ptr = ty->struct_name_ptr;
         ret_struct_name_len = ty->struct_name_len;
+        if (ret_type == TYPE_ARRAY || ret_type == TYPE_SLICE) {
+            emit_stderr("[ERROR] Array/slice return types are not supported\n", 51);
+            panic("Parse error");
+        }
     }
     
     var body: u64 = parse_block(p);
@@ -215,6 +223,10 @@ func parse_struct_def(p: u64) -> u64 {
         parse_consume(p, TOKEN_COLON);
         
         var field_type: *TypeInfo = (*TypeInfo)parse_type_ex(p);
+        if (field_type->type_kind == TYPE_ARRAY || field_type->type_kind == TYPE_SLICE) {
+            emit_stderr("[ERROR] Array/slice types are not supported in struct fields\n", 61);
+            panic("Parse error");
+        }
         
         parse_consume(p, TOKEN_SEMICOLON);
         

@@ -133,6 +133,22 @@ struct AstDeref8 {
     operand: u64;
 }
 
+// AST Index node layout (24 bytes)
+const SIZEOF_AST_INDEX = 24;
+struct AstIndex {
+    kind: u64;
+    base: u64;
+    index: u64;
+}
+
+// AST Slice literal node layout (24 bytes)
+const SIZEOF_AST_SLICE = 24;
+struct AstSlice {
+    kind: u64;
+    ptr_expr: u64;
+    len_expr: u64;
+}
+
 // AST Cast node layout (48 bytes)
 const SIZEOF_AST_CAST = 48;
 struct AstCast {
@@ -175,6 +191,24 @@ func ast_deref8(operand: u64) -> u64 {
     var n: *AstDeref8 = (*AstDeref8)(heap_alloc(SIZEOF_AST_DEREF8));
     n->kind = AST_DEREF8;
     n->operand = operand;
+    return (u64)n;
+}
+
+// AST_INDEX: [kind, base, index]
+func ast_index(base: u64, index: u64) -> u64 {
+    var n: *AstIndex = (*AstIndex)(heap_alloc(SIZEOF_AST_INDEX));
+    n->kind = AST_INDEX;
+    n->base = base;
+    n->index = index;
+    return (u64)n;
+}
+
+// AST_SLICE: [kind, ptr_expr, len_expr]
+func ast_slice(ptr_expr: u64, len_expr: u64) -> u64 {
+    var n: *AstSlice = (*AstSlice)(heap_alloc(SIZEOF_AST_SLICE));
+    n->kind = AST_SLICE;
+    n->ptr_expr = ptr_expr;
+    n->len_expr = len_expr;
     return (u64)n;
 }
 
@@ -223,8 +257,8 @@ struct AstReturn {
     expr: u64;
 }
 
-// AST Variable declaration node layout (64 bytes)
-const SIZEOF_AST_VAR_DECL = 64;
+// AST Variable declaration node layout (88 bytes)
+const SIZEOF_AST_VAR_DECL = 88;
 struct AstVarDecl {
     kind: u64;
     name_ptr: u64;
@@ -234,6 +268,9 @@ struct AstVarDecl {
     init_expr: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
+    elem_type_kind: u64;
+    elem_ptr_depth: u64;
+    array_len: u64;
 }
 
 // AST Constant declaration node layout (32 bytes)
@@ -272,6 +309,9 @@ func ast_var_decl(name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth: u64, 
     n->init_expr = init;
     n->struct_name_ptr = 0;
     n->struct_name_len = 0;
+    n->elem_type_kind = 0;
+    n->elem_ptr_depth = 0;
+    n->array_len = 0;
     return (u64)n;
 }
 

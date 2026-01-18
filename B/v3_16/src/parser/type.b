@@ -40,11 +40,15 @@ func parse_type(p: u64) -> u64 {
         depth = depth + 1;
     }
     var base: u64 = parse_base_type(p);
-    var result: *TypeInfo = (*TypeInfo)heap_alloc(32);
+    var result: *TypeInfo = (*TypeInfo)heap_alloc(SIZEOF_TYPEINFO);
     result->type_kind = base;
     result->ptr_depth = depth;
     result->struct_name_ptr = 0;
     result->struct_name_len = 0;
+    result->struct_def = 0;
+    result->elem_type_kind = 0;
+    result->elem_ptr_depth = 0;
+    result->array_len = 0;
     return (u64)result;
 }
 
@@ -54,6 +58,46 @@ func parse_type_ex(p: u64) -> u64 {
     var depth: u64 = 0;
     while (parse_match(p, TOKEN_STAR)) {
         depth = depth + 1;
+    }
+
+    // Array or slice type: [N]T or []T
+    if (parse_match(p, TOKEN_LBRACKET)) {
+        var is_slice: u64 = 0;
+        var arr_len: u64 = 0;
+        if (parse_match(p, TOKEN_RBRACKET)) {
+            is_slice = 1;
+        } else {
+            var len_tok: u64 = parse_peek(p);
+            if (parse_peek_kind(p) != TOKEN_NUMBER) {
+                emit_stderr("[ERROR] Array length must be a number\n", 38);
+                panic("Parse error");
+            }
+            arr_len = parse_num_val(len_tok);
+            parse_consume(p, TOKEN_NUMBER);
+            parse_consume(p, TOKEN_RBRACKET);
+        }
+
+        var elem_ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
+        if (elem_ty->type_kind == TYPE_ARRAY || elem_ty->type_kind == TYPE_SLICE) {
+            emit_stderr("[ERROR] Nested array/slice types are not supported\n", 51);
+            panic("Parse error");
+        }
+        if (elem_ty->type_kind == TYPE_STRUCT && elem_ty->ptr_depth == 0) {
+            emit_stderr("[ERROR] Array/slice of struct value is not supported\n", 53);
+            panic("Parse error");
+        }
+
+        var result_arr: *TypeInfo = (*TypeInfo)heap_alloc(SIZEOF_TYPEINFO);
+        if (is_slice == 1) { result_arr->type_kind = TYPE_SLICE; }
+        else { result_arr->type_kind = TYPE_ARRAY; }
+        result_arr->ptr_depth = depth;
+        result_arr->struct_name_ptr = elem_ty->struct_name_ptr;
+        result_arr->struct_name_len = elem_ty->struct_name_len;
+        result_arr->struct_def = 0;
+        result_arr->elem_type_kind = elem_ty->type_kind;
+        result_arr->elem_ptr_depth = elem_ty->ptr_depth;
+        result_arr->array_len = arr_len;
+        return (u64)result_arr;
     }
 
     var base: u64 = 0;
@@ -77,10 +121,14 @@ func parse_type_ex(p: u64) -> u64 {
         struct_name_len = name_len;
     }
 
-    var result: *TypeInfo = (*TypeInfo)heap_alloc(32);
+    var result: *TypeInfo = (*TypeInfo)heap_alloc(SIZEOF_TYPEINFO);
     result->type_kind = base;
     result->ptr_depth = depth;
     result->struct_name_ptr = struct_name_ptr;
     result->struct_name_len = struct_name_len;
+    result->struct_def = 0;
+    result->elem_type_kind = 0;
+    result->elem_ptr_depth = 0;
+    result->array_len = 0;
     return (u64)result;
 }
