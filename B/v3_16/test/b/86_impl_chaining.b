@@ -29,14 +29,14 @@ impl Counter {
 
 func main() -> i64 {
     var c: Counter;
-    Counter_init(&c, 5);
+    c.init(5);
     
     // Chain: 5 -> 6 -> 16 -> 32
-    Counter_increment(&c);
-    Counter_add(&c, 10);
-    Counter_multiply(&c, 2);
+    c.increment();
+    c.add(10);
+    c.multiply(2);
     
-    var result = Counter_get(&c);
+    var result = c.get();
     
     if (result == 32) {
         return 42;

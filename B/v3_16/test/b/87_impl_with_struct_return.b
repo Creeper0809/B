@@ -34,13 +34,13 @@ impl Vec2 {
 }
 
 func main() -> i64 {
-    var v1: Vec2 = Vec2_new(3, 4);
-    var v2: Vec2 = Vec2_new(1, 2);
+    var v1: Vec2 = Vec2.new(3, 4);  // static method
+    var v2: Vec2 = Vec2.new(1, 2);  // static method
     
-    var sum: Vec2 = Vec2_add(&v1, &v2);  // (4, 6)
-    var scaled: Vec2 = Vec2_scale(&sum, 2);  // (8, 12)
+    var sum: Vec2 = Vec2.add(&v1, &v2);  // static method
+    var scaled: Vec2 = Vec2.scale(&sum, 2);  // static method
     
-    var mag_sq = Vec2_magnitude_squared(&scaled);  // 64 + 144 = 208
+    var mag_sq = scaled.magnitude_squared();  // instance method with self
     
     if (mag_sq == 208) {
         return 42;

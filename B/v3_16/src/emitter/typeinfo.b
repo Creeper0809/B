@@ -234,8 +234,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             res_ti->type_kind = op_ti->type_kind;
             res_ti->ptr_depth = op_ti->ptr_depth + 1;
             res_ti->struct_def = op_ti->struct_def;
-            res_ti->struct_name_ptr = 0;
-            res_ti->struct_name_len = 0;
+            res_ti->struct_name_ptr = op_ti->struct_name_ptr;
+            res_ti->struct_name_len = op_ti->struct_name_len;
             return result;
         }
     }
@@ -252,8 +252,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 res_ti->type_kind = op_ti->type_kind;
                 res_ti->ptr_depth = depth - 1;
                 res_ti->struct_def = op_ti->struct_def;
-                res_ti->struct_name_ptr = 0;
-                res_ti->struct_name_len = 0;
+                res_ti->struct_name_ptr = op_ti->struct_name_ptr;
+                res_ti->struct_name_len = op_ti->struct_name_len;
                 return result;
             }
         }

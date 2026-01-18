@@ -31,12 +31,12 @@ func process_pairs() -> i64 {
     var p1: Pair;
     var p2: Pair;
     
-    Pair_init(&p1, 5, 7);   // 5, 7
-    Pair_init(&p2, 3, 4);   // 3, 4
+    p1.init(5, 7);   // 5, 7
+    p2.init(3, 4);   // 3, 4
     
-    var sum1 = Pair_sum(&p1);       // 12
-    var sum2 = Pair_sum(&p2);       // 7
-    var prod = Pair_product(&p2);   // 12
+    var sum1 = p1.sum();       // 12
+    var sum2 = p2.sum();       // 7
+    var prod = p2.product();   // 12
     
     return sum1 + sum2 + prod;  // 12 + 7 + 12 = 31
 }

@@ -35,12 +35,12 @@ impl Rect {
 
 func main() -> i64 {
     var p: Point;
-    Point_init(&p, 10, 20);
+    p.init(10, 20);
     
     var r: Rect;
-    Rect_init(&r, 3, 7);
+    r.init(3, 7);
     
-    var total = Point_sum(&p) + Rect_area(&r);
+    var total = p.sum() + r.area();
     // 30 + 21 = 51
     
     if (total == 51) {

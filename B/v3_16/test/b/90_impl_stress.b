@@ -59,19 +59,19 @@ impl Calculator {
 
 func main() -> i64 {
     var calc: Calculator;
-    Calculator_init(&calc);
+    calc.init();
     
     // Complex calculation sequence
-    Calculator_add(&calc, 10);      // 10
-    Calculator_mul(&calc, 5);       // 50
-    Calculator_sub(&calc, 8);       // 42
-    Calculator_add(&calc, 3);       // 45
-    Calculator_div(&calc, 3);       // 15
-    Calculator_square(&calc);       // 225
-    Calculator_mod(&calc, 100);     // 25
-    Calculator_add(&calc, 17);      // 42
+    calc.add(10);      // 10
+    calc.mul(5);       // 50
+    calc.sub(8);       // 42
+    calc.add(3);       // 45
+    calc.div(3);       // 15
+    calc.square();     // 225
+    calc.mod(100);     // 25
+    calc.add(17);      // 42
     
-    var result = Calculator_get(&calc);
+    var result = calc.get();
     
     if (result == 42) {
         return 42;
