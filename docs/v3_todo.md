@@ -66,6 +66,8 @@
 - [x] 모듈 네임스페이스 맹글링 + import as/from 선택적 import 구현
 - [x] 전역/메서드/문자열 비교 경로 맹글링 반영 및 숫자 모듈 prefix 보정
 - [x] std.str/std.char 프리루드 추가 + 110_import_alias 테스트 추가
+- [x] v3_17 전환 및 SSA 스캐폴드 구조 추가 (Intrusive Instruction + Block 포인터 리스트)
+- [x] SSA 스모크 테스트(111_ssa_smoke) 추가 및 v3_17 전체 테스트 PASS
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증
