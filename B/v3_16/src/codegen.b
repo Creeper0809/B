@@ -9,9 +9,9 @@
 
 import std.io;
 import types;
-import std.util;
 import std.vec;
 import ast;
+import compiler;
 import emitter.symtab;
 import emitter.typeinfo;
 import emitter.emitter;
@@ -40,6 +40,8 @@ struct FuncParam {
 
 func cg_func(node: u64) -> u64 {
     var fn: *AstFunc = (*AstFunc)node;
+
+    set_current_module_for_func(fn->name_ptr, fn->name_len);
     
     // Store return type information
     emitter_set_ret_type(fn->ret_type);

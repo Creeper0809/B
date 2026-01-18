@@ -1,6 +1,6 @@
 // Test 02: Comparison Operations
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func test_comparison(a, b) {
     emit("Testing ", 8);

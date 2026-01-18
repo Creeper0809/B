@@ -1,6 +1,6 @@
 // Test 14: Const Variables
-import io;
-import util;
+import std.io;
+import std.emit;
 
 const MAX_SIZE = 100;
 const MIN_SIZE = 10;

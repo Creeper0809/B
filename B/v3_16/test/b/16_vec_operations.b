@@ -1,7 +1,7 @@
 // Test 16: Vec (Dynamic Array) Operations
-import io;
-import util;
-import vec;
+import std.io;
+import std.emit;
+import std.vec;
 
 func main(argc, argv) {
     var v;

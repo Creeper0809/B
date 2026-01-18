@@ -1,8 +1,8 @@
 // lexer.b - Lexer implementation for v3.8
 
 import std.io;
+import std.str;
 import types;
-import std.util;
 import std.vec;
 
 // ============================================
@@ -130,6 +130,7 @@ func lex_check_keyword(ptr: u64, len: u64) -> u64 {
     // Fast path: length-based filtering
     if (len == 2) {
         if (str_eq(ptr, len, "if", 2)) { return TOKEN_IF; }
+        if (str_eq(ptr, len, "as", 2)) { return TOKEN_AS; }
         if (str_eq(ptr, len, "u8", 2)) { return TOKEN_U8; }
         return TOKEN_IDENTIFIER;
     }
@@ -153,6 +154,7 @@ func lex_check_keyword(ptr: u64, len: u64) -> u64 {
         if (str_eq(ptr, len, "impl", 4)) { return TOKEN_IMPL; }
         if (str_eq(ptr, len, "case", 4)) { return TOKEN_CASE; }
         if (str_eq(ptr, len, "char", 4)) { return TOKEN_CHAR; }
+        if (str_eq(ptr, len, "from", 4)) { return TOKEN_FROM; }
         return TOKEN_IDENTIFIER;
     }
     

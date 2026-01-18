@@ -1,6 +1,6 @@
 // Test 19: Complex Expressions
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func main(argc, argv) {
     var a;

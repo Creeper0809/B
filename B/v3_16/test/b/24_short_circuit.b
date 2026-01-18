@@ -1,7 +1,7 @@
 // Test 24: Short-circuit (&&, ||)
 // Expect exit code: 1
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func bump(p) {
     *p = *p + 1;

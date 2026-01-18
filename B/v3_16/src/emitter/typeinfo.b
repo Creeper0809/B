@@ -8,7 +8,6 @@
 
 import std.io;
 import std.vec;
-import std.util;
 import types;
 import ast;
 import compiler;
@@ -307,11 +306,18 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             var call: *AstCall = (*AstCall)node;
             var name_ptr: u64 = call->name_ptr;
             var name_len: u64 = call->name_len;
+            var resolved_ptr: u64 = name_ptr;
+            var resolved_len: u64 = name_len;
+            var resolved: u64 = resolve_name(name_ptr, name_len);
+            if (resolved != 0) {
+                resolved_ptr = *(resolved);
+                resolved_len = *(resolved + 8);
+            }
             var num_funcs: u64 = vec_len(g_funcs_vec);
             for (var i: u64 = 0; i < num_funcs; i++) {
                 var fn_ptr: u64 = vec_get(g_funcs_vec, i);
                 var fn: *AstFunc = (*AstFunc)fn_ptr;
-                if (str_eq(fn->name_ptr, fn->name_len, name_ptr, name_len)) {
+                if (str_eq(fn->name_ptr, fn->name_len, resolved_ptr, resolved_len)) {
                     if (fn->ret_type == TYPE_STRUCT) {
                         var struct_def: u64 = get_struct_def(fn->ret_struct_name_ptr, fn->ret_struct_name_len);
                         var result_struct: u64 = typeinfo_make_struct(fn->ret_ptr_depth, fn->ret_struct_name_ptr, fn->ret_struct_name_len, struct_def);

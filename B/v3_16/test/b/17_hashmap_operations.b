@@ -1,7 +1,8 @@
 // Test 17: HashMap Operations
-import io;
-import util;
-import hashmap;
+import std.io;
+import std.emit;
+import std.str;
+import std.hashmap;
 
 func main(argc, argv) {
     var map;

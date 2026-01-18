@@ -1,7 +1,7 @@
 // Test 25: true/false keywords
 // Expect exit code: 1
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func main(argc, argv) {
     var x;

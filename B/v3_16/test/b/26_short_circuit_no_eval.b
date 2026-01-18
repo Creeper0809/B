@@ -1,7 +1,7 @@
 // Test 26: Short-circuit must prevent crashy RHS
 // Expect exit code: 0
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func crash() {
     // If this runs, the process should segfault.

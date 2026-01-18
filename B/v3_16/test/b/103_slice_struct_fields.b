@@ -1,8 +1,8 @@
 // 103_slice_struct_fields.b - Slice params/returns and struct fields
 // Expect exit code: 42
 
-import io;
-import util;
+import std.io;
+import std.emit;
 
 struct Holder {
     arr: [3]i64;

@@ -1,7 +1,7 @@
 // Test __LINE__ macro
 
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func main(argc, argv) {
     emit("Line 6: ", 8);

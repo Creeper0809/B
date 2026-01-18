@@ -1,6 +1,7 @@
 // Test 18: Edge Cases and Corner Cases
-import io;
-import util;
+import std.io;
+import std.emit;
+import std.str;
 
 func main(argc, argv) {
     var x;

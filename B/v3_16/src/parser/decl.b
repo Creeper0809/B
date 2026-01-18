@@ -11,7 +11,6 @@
 
 import std.io;
 import std.vec;
-import std.util;
 import types;
 import lexer;
 import ast;
@@ -90,7 +89,61 @@ func parse_import_decl(p: u64) -> u64 {
         panic("Parse error");
     }
     parse_adv(p);
-    
+
+    // Selective import: import <symbol> [as <alias>] from <module>
+    if (parse_peek_kind(p) == TOKEN_AS || parse_peek_kind(p) == TOKEN_FROM) {
+        var symbol_ptr: u64 = ((*Token)first_tok)->ptr;
+        var symbol_len: u64 = ((*Token)first_tok)->len;
+        var alias_ptr: u64 = symbol_ptr;
+        var alias_len: u64 = symbol_len;
+
+        if (parse_match(p, TOKEN_AS)) {
+            var alias_tok: u64 = parse_peek(p);
+            if (parse_peek_kind(p) != TOKEN_IDENTIFIER) {
+                emit_stderr("[ERROR] Expected alias identifier in import\n", 47);
+                panic("Parse error");
+            }
+            alias_ptr = ((*Token)alias_tok)->ptr;
+            alias_len = ((*Token)alias_tok)->len;
+            parse_consume(p, TOKEN_IDENTIFIER);
+        }
+
+        parse_consume(p, TOKEN_FROM);
+
+        var mod_tok: u64 = parse_peek(p);
+        var mod_kind: u64 = parse_peek_kind(p);
+        if (mod_kind != TOKEN_IDENTIFIER && mod_kind != TOKEN_CHAR) {
+            emit_stderr("[ERROR] Expected module identifier in import\n", 45);
+            panic("Parse error");
+        }
+        parse_adv(p);
+
+        var path_ptr: u64 = ((*Token)mod_tok)->ptr;
+        var path_len: u64 = ((*Token)mod_tok)->len;
+
+        while (parse_match(p, TOKEN_DOT)) {
+            var next_tok: u64 = parse_peek(p);
+            var next_kind: u64 = parse_peek_kind(p);
+            if (next_kind != TOKEN_IDENTIFIER && next_kind != TOKEN_CHAR) {
+                emit_stderr("[ERROR] Expected module identifier in import\n", 45);
+                panic("Parse error");
+            }
+            parse_adv(p);
+
+            var slash: u64 = heap_alloc(1);
+            *(*u8)slash = 47;
+
+            var tmp: u64 = str_concat(path_ptr, path_len, slash, 1);
+            path_ptr = str_concat(tmp, path_len + 1, ((*Token)next_tok)->ptr, ((*Token)next_tok)->len);
+            path_len = path_len + 1 + ((*Token)next_tok)->len;
+        }
+
+        parse_consume(p, TOKEN_SEMICOLON);
+
+        return ast_import(path_ptr, path_len, symbol_ptr, symbol_len, alias_ptr, alias_len);
+    }
+
+    // Import module: import <module>;
     var path_ptr: u64  = ((*Token)first_tok)->ptr;
     var path_len: u64 = ((*Token)first_tok)->len;
     
@@ -103,17 +156,17 @@ func parse_import_decl(p: u64) -> u64 {
         }
         parse_adv(p);
         
-        var slash: u64 = heap_alloc(1);
-        *(*u8)slash = 47;
+        var slash2: u64 = heap_alloc(1);
+        *(*u8)slash2 = 47;
         
-        var tmp: u64 = str_concat(path_ptr, path_len, slash, 1);
-        path_ptr = str_concat(tmp, path_len + 1, ((*Token)next_tok)->ptr, ((*Token)next_tok)->len);
+        var tmp2: u64 = str_concat(path_ptr, path_len, slash2, 1);
+        path_ptr = str_concat(tmp2, path_len + 1, ((*Token)next_tok)->ptr, ((*Token)next_tok)->len);
         path_len = path_len + 1 + ((*Token)next_tok)->len;
     }
     
     parse_consume(p, TOKEN_SEMICOLON);
     
-    return ast_import(path_ptr, path_len);
+    return ast_import(path_ptr, path_len, 0, 0, 0, 0);
 }
 
 // ============================================

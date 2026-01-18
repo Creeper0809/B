@@ -1,7 +1,7 @@
 // 105_tagged_ptr_basic.b - tagged pointer auto-masking
 // Expect exit code: 42
 
-import util;
+
 
 func main() -> i64 {
     var mem = heap_alloc(8);

@@ -1,6 +1,6 @@
 // Test 20: Inline Assembly
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func get_value_asm() {
     var result;

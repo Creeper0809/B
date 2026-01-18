@@ -7,8 +7,8 @@
 
 import std.io;
 import std.vec;
-import std.util;
 import lexer;
+import compiler;
 
 // ============================================
 // Error Reporting Helpers
@@ -137,21 +137,11 @@ func token_kind_name_len(kind: u64) -> u64 {
 }
 
 func get_source_ptr() -> u64 {
-    var ptr: u64;
-    asm {
-        mov rax, [_gvar_g_file_ptr]
-        mov [rbp-8], rax
-    }
-    return ptr;
+    return compiler_get_source_ptr();
 }
 
 func get_source_len() -> u64 {
-    var len: u64;
-    asm {
-        mov rax, [_gvar_g_file_len]
-        mov [rbp-8], rax
-    }
-    return len;
+    return compiler_get_source_len();
 }
 
 func report_parse_error(expected_kind: u64, actual_kind: u64, tok: u64) -> u64 {

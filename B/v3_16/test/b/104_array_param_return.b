@@ -1,8 +1,8 @@
 // 104_array_param_return.b - Array param/return decay to pointer
 // Expect exit code: 42
 
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func sum_arr(a: [3]i64) -> i64 {
     return a[0] + a[1] + a[2];

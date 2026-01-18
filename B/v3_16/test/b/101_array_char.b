@@ -1,8 +1,8 @@
 // 101_array_char.b - Test array indexing and char type
 // Expect exit code: 42
 
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func test_array_basic() -> i64 {
     // Stack array of 5 i64s

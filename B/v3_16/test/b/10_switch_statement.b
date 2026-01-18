@@ -1,6 +1,6 @@
 // Test 10: Switch Statement
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func day_name(day) {
     if (day == 0) {

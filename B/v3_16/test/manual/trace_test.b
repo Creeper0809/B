@@ -1,7 +1,7 @@
 // trace_test.b - 스택 트레이스 테스트
 
 import std.io;
-import std.util;
+import std.diag;
 
 func level3() {
     push_trace("level3", "trace_test.b", 7);

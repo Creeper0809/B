@@ -1,7 +1,7 @@
 // Test 30: var init + function call + pointer deref/store
 // Expect exit code: 11
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func main(argc, argv) {
     // Call + cast in var-init

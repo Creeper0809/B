@@ -1,7 +1,6 @@
 // main.b - Main entry point for v3.8 modular compiler
 
 import std.io;
-import std.util;
 import compiler;
 import codegen;
 

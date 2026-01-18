@@ -20,7 +20,7 @@ Identifiers start with a letter (`a-z`, `A-Z`) followed by zero or more letters 
 
 The following are reserved keywords:
 
-`func`, `var`, `const`, `return`, `if`, `else`, `while`, `for`, `switch`, `case`, `default`, `break`, `continue`, `import`, `asm`, `true`, `false`, `struct`, `enum`, `impl`, `static`, `sizeof`, `tagged`, `packed`
+`func`, `var`, `const`, `return`, `if`, `else`, `while`, `for`, `switch`, `case`, `default`, `break`, `continue`, `import`, `as`, `from`, `asm`, `true`, `false`, `struct`, `enum`, `impl`, `static`, `sizeof`, `tagged`, `packed`
 
 Type keywords: `u8`, `u16`, `u32`, `u64`, `i64`, `char`
 
@@ -174,11 +174,17 @@ The members are accessed as `EnumName_MemberName` (e.g., `Color_RED`).
 
 ### 3.4. `import` Declarations
 
-Imports a module. The path is specified using dot notation.
+Imports a module. The path is specified using dot notation. 선택적으로 심볼을 가져오거나 별칭을 부여할 수 있습니다.
 
 ```b
 import std.io;
 import my.module;
+
+// Selective import
+import str_eq from std.str;
+
+// Selective import with alias
+import str_eq as eq from std.str;
 ```
 
 ## 4. Functions and `impl` Blocks

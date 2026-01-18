@@ -60,6 +60,12 @@
 - [x] 함수 시그니처 1차 수집 멀티패스 도입 + 전방 호출 테스트(108) 추가
 - [x] main 진입 로직 헬퍼 분리 리팩토링
 - [x] compiler 모듈로 전역/로더/구조체 레지스트리 분리
+- [x] std.mem 모듈 추가 및 memset 테스트(109) 추가
+- [x] std.util 해체 → std.diag/std.emit 분리
+- [x] std.diag/std.emit 스텁화 + std.util 부트스트랩 유지
+- [x] 모듈 네임스페이스 맹글링 + import as/from 선택적 import 구현
+- [x] 전역/메서드/문자열 비교 경로 맹글링 반영 및 숫자 모듈 prefix 보정
+- [x] std.str/std.char 프리루드 추가 + 110_import_alias 테스트 추가
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증

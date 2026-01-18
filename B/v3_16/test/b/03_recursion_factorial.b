@@ -1,6 +1,6 @@
 // Test 03: Recursion - Factorial
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func factorial(n) {
     if (n <= 1) {

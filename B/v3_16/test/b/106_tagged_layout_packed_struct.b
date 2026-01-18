@@ -1,7 +1,7 @@
 // 106_tagged_layout_packed_struct.b - tagged layout with packed struct
 // Expect exit code: 42
 
-import util;
+
 
 packed struct TaggedPtrBits {
     tag: u16;

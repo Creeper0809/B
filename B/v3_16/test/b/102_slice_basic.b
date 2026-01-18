@@ -1,8 +1,8 @@
 // 102_slice_basic.b - Test slice type basics
 // Expect exit code: 42
 
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func main() -> i64 {
     var arr: [5]i64;

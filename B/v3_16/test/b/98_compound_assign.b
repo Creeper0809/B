@@ -1,7 +1,7 @@
 // 98_compound_assign.b - Test compound assignment and increment/decrement operators
 // Expect exit code: 42
 
-import io;
+import std.io;
 
 func test_compound_assign() -> i64 {
     println("[TEST] Compound assignment operators");

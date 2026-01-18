@@ -1,6 +1,7 @@
 // Test 08: String Operations
-import io;
-import util;
+import std.io;
+import std.emit;
+import std.str;
 
 func main(argc, argv) {
     var s1;

@@ -6,10 +6,13 @@
 
 import std.io;
 import std.vec;
-import std.util;
 import types;
 import ast;
 import compiler;
+import emitter.emitter;
+import emitter.symtab;
+import emitter.typeinfo;
+import emitter.gen_expr;
 
 // ============================================
 // Block Codegen
@@ -112,6 +115,20 @@ func cg_stmt(node: u64) -> u64 {
         cg_block(node);
         return;
     }
+}
+
+func emit_call_resolved(name_ptr: u64, name_len: u64) -> u64 {
+    var resolved_ptr: u64 = name_ptr;
+    var resolved_len: u64 = name_len;
+    var resolved: u64 = resolve_name(name_ptr, name_len);
+    if (resolved != 0) {
+        resolved_ptr = *(resolved);
+        resolved_len = *(resolved + 8);
+    }
+    emit("    call ", 9);
+    emit(resolved_ptr, resolved_len);
+    emit_nl();
+    return 0;
 }
 
 // ============================================
@@ -1038,7 +1055,7 @@ func cg_switch_linear(cases: u64, end_label: u64, has_default: u64) -> u64 {
                 // Get case string and its length first
                 cg_expr(value);
                 emitln("    push rax");
-                emitln("    call str_len");
+                emit_call_resolved("str_len", 7);
                 emitln("    mov rbx, rax    ; len2");
                 emitln("    pop rax    ; s2");
                 emitln("    push rbx    ; len2");
@@ -1047,14 +1064,14 @@ func cg_switch_linear(cases: u64, end_label: u64, has_default: u64) -> u64 {
                 // Get switch value and its length
                 emitln("    mov rax, [rsp+16]    ; reload switch value");
                 emitln("    push rax");
-                emitln("    call str_len");
+                emit_call_resolved("str_len", 7);
                 emitln("    mov rbx, rax    ; len1");
                 emitln("    pop rax    ; s1");
                 emitln("    push rbx    ; len1");
                 emitln("    push rax    ; s1");
                 
                 // Call str_eq(s1, len1, s2, len2)
-                emitln("    call str_eq");
+                emit_call_resolved("str_eq", 6);
                 emitln("    add rsp, 32");
                 emitln("    test rax, rax");
                 emit("    jnz ", 8);

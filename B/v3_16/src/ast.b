@@ -545,12 +545,16 @@ struct AstProgram {
     structs_vec: u64;
 }
 
-// AST Import statement node layout (24 bytes)
-const SIZEOF_AST_IMPORT = 24;
+// AST Import statement node layout (56 bytes)
+const SIZEOF_AST_IMPORT = 56;
 struct AstImport {
     kind: u64;
     path_ptr: u64;
     path_len: u64;
+    symbol_ptr: u64;
+    symbol_len: u64;
+    alias_ptr: u64;
+    alias_len: u64;
 }
 
 // AST Struct definition node layout (40 bytes)
@@ -639,12 +643,16 @@ func ast_program(funcs: u64, consts: u64, imports: u64) -> u64 {
     return (u64)n;
 }
 
-// AST_IMPORT: [kind, path_ptr, path_len]
-func ast_import(path_ptr: u64, path_len: u64) -> u64 {
+// AST_IMPORT: [kind, path_ptr, path_len, symbol_ptr, symbol_len, alias_ptr, alias_len]
+func ast_import(path_ptr: u64, path_len: u64, symbol_ptr: u64, symbol_len: u64, alias_ptr: u64, alias_len: u64) -> u64 {
     var n: *AstImport = (*AstImport)(heap_alloc(SIZEOF_AST_IMPORT));
     n->kind = AST_IMPORT;
     n->path_ptr = path_ptr;
     n->path_len = path_len;
+    n->symbol_ptr = symbol_ptr;
+    n->symbol_len = symbol_len;
+    n->alias_ptr = alias_ptr;
+    n->alias_len = alias_len;
     return (u64)n;
 }
 

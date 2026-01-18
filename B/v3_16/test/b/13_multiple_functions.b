@@ -1,6 +1,7 @@
 // Test 13: Multiple Functions
-import io;
-import util;
+import std.io;
+import std.emit;
+import std.str;
 
 func add(a, b) {
     return a + b;

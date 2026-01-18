@@ -1,6 +1,6 @@
 // Test 15: Nested If Statements
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func classify_number(n) {
     emit("Classifying ", 12);

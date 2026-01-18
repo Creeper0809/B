@@ -1,7 +1,7 @@
 // Test 29: var init + pointer arithmetic scaling
 // Expect exit code: 8
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func main(argc, argv) {
     var mem = heap_alloc(16);

@@ -1,6 +1,6 @@
 // Test 04: Recursion - Fibonacci
-import io;
-import util;
+import std.io;
+import std.emit;
 
 func fib(n) {
     if (n < 2) {

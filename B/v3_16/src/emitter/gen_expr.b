@@ -6,10 +6,12 @@
 
 import std.io;
 import std.vec;
-import std.util;
 import types;
 import ast;
 import compiler;
+import emitter.emitter;
+import emitter.symtab;
+import emitter.typeinfo;
 
 // ============================================
 // Expression Codegen
@@ -164,27 +166,9 @@ func cg_expr(node: u64) -> u64 {
         var ident: *AstIdent = (*AstIdent)node;
         var name_ptr: u64 = ident->name_ptr;
         var name_len: u64 = ident->name_len;
-        
-        var c_result: u64 = const_find(name_ptr, name_len);
-        var result: *ConstResult = (*ConstResult)c_result;
-        if (result->found == 1) {
-            emit("    mov rax, ", 13);
-            emit_u64(result->value);
-            emit_nl();
-            return;
-        }
-        
-        if (is_global_var(name_ptr, name_len)) {
-            emit("    mov rax, [rel _gvar_", 24);
-            emit(name_ptr, name_len);
-            emit("]\n", 2);
-            return;
-        }
-        
-        var offset: u64 = symtab_find(symtab, name_ptr, name_len);
-        
         var var_type: u64 = symtab_get_type(symtab, name_ptr, name_len);
         if (var_type != 0) {
+            var offset: u64 = symtab_find(symtab, name_ptr, name_len);
             var vt: *TypeInfo = (*TypeInfo)var_type;
             if (vt->ptr_depth == 0) {
                 if (vt->type_kind == TYPE_ARRAY) {
@@ -224,7 +208,32 @@ func cg_expr(node: u64) -> u64 {
                 }
             }
         }
+
+        var resolved_ptr: u64 = name_ptr;
+        var resolved_len: u64 = name_len;
+        var resolved: u64 = resolve_name(name_ptr, name_len);
+        if (resolved != 0) {
+            resolved_ptr = *(resolved);
+            resolved_len = *(resolved + 8);
+        }
+
+        var c_result: u64 = const_find(resolved_ptr, resolved_len);
+        var result: *ConstResult = (*ConstResult)c_result;
+        if (result->found == 1) {
+            emit("    mov rax, ", 13);
+            emit_u64(result->value);
+            emit_nl();
+            return;
+        }
+
+        if (is_global_var(resolved_ptr, resolved_len)) {
+            emit("    mov rax, [rel _gvar_", 24);
+            emit(resolved_ptr, resolved_len);
+            emit("]\n", 2);
+            return;
+        }
         
+        var offset: u64 = symtab_find(symtab, name_ptr, name_len);
         emit("    mov rax, [rbp", 17);
         if (offset < 0) { emit_i64(offset); }
         else { emit("+", 1); emit_u64(offset); }
@@ -375,6 +384,13 @@ func cg_expr(node: u64) -> u64 {
         var call: *AstCall = (*AstCall)node;
         var name_ptr: u64 = call->name_ptr;
         var name_len: u64 = call->name_len;
+        var resolved_ptr: u64 = name_ptr;
+        var resolved_len: u64 = name_len;
+        var resolved: u64 = resolve_name(name_ptr, name_len);
+        if (resolved != 0) {
+            resolved_ptr = *(resolved);
+            resolved_len = *(resolved + 8);
+        }
         var args: u64 = call->args_vec;
         var nargs: u64 = vec_len(args);
         var total_arg_bytes: u64 = 0;
@@ -412,7 +428,7 @@ func cg_expr(node: u64) -> u64 {
         }
         
         emit("    call ", 9);
-        emit(name_ptr, name_len);
+        emit(resolved_ptr, resolved_len);
         emit_nl();
         
         if (total_arg_bytes > 0) {
@@ -824,10 +840,18 @@ func cg_lvalue(node: u64) -> u64 {
         var ident: *AstIdent = (*AstIdent)node;
         var name_ptr: u64 = ident->name_ptr;
         var name_len: u64 = ident->name_len;
-        
-        if (is_global_var(name_ptr, name_len)) {
+
+        var resolved_ptr: u64 = name_ptr;
+        var resolved_len: u64 = name_len;
+        var resolved: u64 = resolve_name(name_ptr, name_len);
+        if (resolved != 0) {
+            resolved_ptr = *(resolved);
+            resolved_len = *(resolved + 8);
+        }
+
+        if (is_global_var(resolved_ptr, resolved_len)) {
             emit("    lea rax, [rel _gvar_", 24);
-            emit(name_ptr, name_len);
+            emit(resolved_ptr, resolved_len);
             emit("]\n", 2);
             return;
         }
@@ -1042,10 +1066,31 @@ func cg_method_call(node: u64, symtab: u64) -> u64 {
     var struct_name_len: u64 = type_info->struct_name_len;
     
     // Call StructName_method()
+    var full_len: u64 = struct_name_len + 1 + method_len;
+    var full_ptr: u64 = heap_alloc(full_len + 1);
+    var i: u64 = 0;
+    while (i < struct_name_len) {
+        *(*u8)(full_ptr + i) = *(*u8)(struct_name_ptr + i);
+        i = i + 1;
+    }
+    *(*u8)(full_ptr + struct_name_len) = 95;
+    var j: u64 = 0;
+    while (j < method_len) {
+        *(*u8)(full_ptr + struct_name_len + 1 + j) = *(*u8)(method_ptr + j);
+        j = j + 1;
+    }
+    *(*u8)(full_ptr + full_len) = 0;
+
+    var resolved_ptr: u64 = full_ptr;
+    var resolved_len: u64 = full_len;
+    var resolved: u64 = resolve_name(full_ptr, full_len);
+    if (resolved != 0) {
+        resolved_ptr = *(resolved);
+        resolved_len = *(resolved + 8);
+    }
+
     emit("    call ", 9);
-    emit(struct_name_ptr, struct_name_len);
-    emit("_", 1);
-    emit(method_ptr, method_len);
+    emit(resolved_ptr, resolved_len);
     emit_nl();
     
     // Clean up stack (receiver + user args)
