@@ -222,6 +222,10 @@ func parse_func_decl(p: u64) -> u64 {
 // ============================================
 
 func parse_struct_def(p: u64) -> u64 {
+    var is_packed: u64 = 0;
+    if (parse_match(p, TOKEN_PACKED)) {
+        is_packed = 1;
+    }
     parse_consume(p, TOKEN_STRUCT);
     
     var name_tok: u64 = parse_peek(p);
@@ -263,7 +267,7 @@ func parse_struct_def(p: u64) -> u64 {
     
     parse_consume(p, TOKEN_RBRACE);
     
-    var struct_def: u64 = ast_struct_def(name_ptr, name_len, fields);
+    var struct_def: u64 = ast_struct_def(name_ptr, name_len, fields, is_packed);
     return struct_def;
 }
 
@@ -429,7 +433,7 @@ func parse_program(p: u64) -> u64 {
             for (var i: u64 = 0; i < num_enum_consts; i++) {
                 vec_push(consts, vec_get(enum_consts, i));
             }
-        } else if (k == TOKEN_STRUCT) {
+        } else if (k == TOKEN_STRUCT || k == TOKEN_PACKED) {
             var struct_def: u64 = parse_struct_def(p);
             vec_push(structs, struct_def);
             register_struct_type(struct_def);  // Register immediately for type checking

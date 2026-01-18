@@ -541,13 +541,14 @@ struct AstImport {
     path_len: u64;
 }
 
-// AST Struct definition node layout (32 bytes)
-const SIZEOF_AST_STRUCT_DEF = 32;
+// AST Struct definition node layout (40 bytes)
+const SIZEOF_AST_STRUCT_DEF = 40;
 struct AstStructDef {
     kind: u64;
     name_ptr: u64;
     name_len: u64;
     fields_vec: u64;
+    is_packed: u64;
 }
 
 // AST Member access node layout (32 bytes)
@@ -631,13 +632,14 @@ func ast_import(path_ptr: u64, path_len: u64) -> u64 {
     return (u64)n;
 }
 
-// AST_STRUCT_DEF: [kind, name_ptr, name_len, fields_vec]
-func ast_struct_def(name_ptr: u64, name_len: u64, fields: u64) -> u64 {
+// AST_STRUCT_DEF: [kind, name_ptr, name_len, fields_vec, is_packed]
+func ast_struct_def(name_ptr: u64, name_len: u64, fields: u64, is_packed: u64) -> u64 {
     var n: *AstStructDef = (*AstStructDef)(heap_alloc(SIZEOF_AST_STRUCT_DEF));
     n->kind = AST_STRUCT_DEF;
     n->name_ptr = name_ptr;
     n->name_len = name_len;
     n->fields_vec = fields;
+    n->is_packed = is_packed;
     return (u64)n;
 }
 

@@ -37,12 +37,25 @@ func parse_base_type(p: u64) -> u64 {
 func parse_type(p: u64) -> u64 {
     var depth: u64 = 0;
     var is_tagged: u64 = 0;
+    var tag_layout_ptr: u64 = 0;
+    var tag_layout_len: u64 = 0;
     while (parse_match(p, TOKEN_STAR)) {
         depth = depth + 1;
         if (parse_match(p, TOKEN_TAGGED)) {
             if (is_tagged == 1) {
                 emit_stderr("[ERROR] Multiple tagged modifiers are not allowed\n", 53);
                 panic("Parse error");
+            }
+            if (parse_match(p, TOKEN_LPAREN)) {
+                if (parse_peek_kind(p) != TOKEN_IDENTIFIER) {
+                    emit_stderr("[ERROR] tagged layout must be an identifier\n", 52);
+                    panic("Parse error");
+                }
+                var layout_tok: u64 = parse_peek(p);
+                tag_layout_ptr = ((*Token)layout_tok)->ptr;
+                tag_layout_len = ((*Token)layout_tok)->len;
+                parse_consume(p, TOKEN_IDENTIFIER);
+                parse_consume(p, TOKEN_RPAREN);
             }
             if (parse_peek_kind(p) == TOKEN_STAR) {
                 emit_stderr("[ERROR] tagged must apply to the outermost pointer\n", 59);
@@ -52,12 +65,21 @@ func parse_type(p: u64) -> u64 {
         }
     }
     var base: u64 = parse_base_type(p);
+    if (base == TYPE_STRUCT && tag_layout_ptr != 0) {
+        emit_stderr("[ERROR] tagged layout on struct pointers is not supported\n", 63);
+        panic("Parse error");
+    }
     var result: *TypeInfo = (*TypeInfo)heap_alloc(SIZEOF_TYPEINFO);
     result->type_kind = base;
     result->ptr_depth = depth;
     result->is_tagged = is_tagged;
-    result->struct_name_ptr = 0;
-    result->struct_name_len = 0;
+    if (is_tagged == 1 && tag_layout_ptr != 0) {
+        result->struct_name_ptr = tag_layout_ptr;
+        result->struct_name_len = tag_layout_len;
+    } else {
+        result->struct_name_ptr = 0;
+        result->struct_name_len = 0;
+    }
     result->struct_def = 0;
     result->elem_type_kind = 0;
     result->elem_ptr_depth = 0;
@@ -70,12 +92,25 @@ func parse_type(p: u64) -> u64 {
 func parse_type_ex(p: u64) -> u64 {
     var depth: u64 = 0;
     var is_tagged: u64 = 0;
+    var tag_layout_ptr: u64 = 0;
+    var tag_layout_len: u64 = 0;
     while (parse_match(p, TOKEN_STAR)) {
         depth = depth + 1;
         if (parse_match(p, TOKEN_TAGGED)) {
             if (is_tagged == 1) {
                 emit_stderr("[ERROR] Multiple tagged modifiers are not allowed\n", 53);
                 panic("Parse error");
+            }
+            if (parse_match(p, TOKEN_LPAREN)) {
+                if (parse_peek_kind(p) != TOKEN_IDENTIFIER) {
+                    emit_stderr("[ERROR] tagged layout must be an identifier\n", 52);
+                    panic("Parse error");
+                }
+                var layout_tok2: u64 = parse_peek(p);
+                tag_layout_ptr = ((*Token)layout_tok2)->ptr;
+                tag_layout_len = ((*Token)layout_tok2)->len;
+                parse_consume(p, TOKEN_IDENTIFIER);
+                parse_consume(p, TOKEN_RPAREN);
             }
             if (parse_peek_kind(p) == TOKEN_STAR) {
                 emit_stderr("[ERROR] tagged must apply to the outermost pointer\n", 59);
@@ -117,6 +152,10 @@ func parse_type_ex(p: u64) -> u64 {
         else { result_arr->type_kind = TYPE_ARRAY; }
         result_arr->ptr_depth = depth;
         result_arr->is_tagged = is_tagged;
+        if (tag_layout_ptr != 0) {
+            emit_stderr("[ERROR] tagged layout is not supported for array/slice types\n", 72);
+            panic("Parse error");
+        }
         result_arr->struct_name_ptr = elem_ty->struct_name_ptr;
         result_arr->struct_name_len = elem_ty->struct_name_len;
         result_arr->struct_def = 0;
@@ -147,12 +186,22 @@ func parse_type_ex(p: u64) -> u64 {
         struct_name_len = name_len;
     }
 
+    if (base == TYPE_STRUCT && tag_layout_ptr != 0) {
+        emit_stderr("[ERROR] tagged layout on struct pointers is not supported\n", 63);
+        panic("Parse error");
+    }
+
     var result: *TypeInfo = (*TypeInfo)heap_alloc(SIZEOF_TYPEINFO);
     result->type_kind = base;
     result->ptr_depth = depth;
     result->is_tagged = is_tagged;
-    result->struct_name_ptr = struct_name_ptr;
-    result->struct_name_len = struct_name_len;
+    if (is_tagged == 1 && tag_layout_ptr != 0) {
+        result->struct_name_ptr = tag_layout_ptr;
+        result->struct_name_len = tag_layout_len;
+    } else {
+        result->struct_name_ptr = struct_name_ptr;
+        result->struct_name_len = struct_name_len;
+    }
     result->struct_def = 0;
     result->elem_type_kind = 0;
     result->elem_ptr_depth = 0;

@@ -293,6 +293,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                     var result_basic: u64 = typeinfo_make(fn->ret_type, fn->ret_ptr_depth);
                     var rb: *TypeInfo = (*TypeInfo)result_basic;
                     rb->is_tagged = fn->ret_is_tagged;
+                    rb->struct_name_ptr = fn->ret_struct_name_ptr;
+                    rb->struct_name_len = fn->ret_struct_name_len;
                     return result_basic;
                 }
             }
@@ -347,6 +349,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var result_basic: u64 = typeinfo_make(cast_node->target_type, cast_node->target_ptr_depth);
         var rb: *TypeInfo = (*TypeInfo)result_basic;
         rb->is_tagged = cast_node->target_is_tagged;
+        rb->struct_name_ptr = cast_node->struct_name_ptr;
+        rb->struct_name_len = cast_node->struct_name_len;
         return result_basic;
     }
     

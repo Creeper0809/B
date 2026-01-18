@@ -219,6 +219,10 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
     var type_info0: u64 = symtab_get_type(symtab, name_ptr, name_len);
     var ti0: *TypeInfo = (*TypeInfo)type_info0;
     ti0->is_tagged = is_tagged;
+    if (is_tagged == 1 && struct_name_ptr != 0 && type_kind != TYPE_STRUCT && type_kind != TYPE_ARRAY && type_kind != TYPE_SLICE) {
+        ti0->struct_name_ptr = struct_name_ptr;
+        ti0->struct_name_len = struct_name_len;
+    }
     
     // If base type is struct, find struct_def and store pointer in type_info
     if (type_kind == TYPE_STRUCT) {

@@ -43,6 +43,7 @@ const TOKEN_U64 = 43;
 const TOKEN_I64 = 44;
 const TOKEN_CHAR = 48;
 const TOKEN_TAGGED = 49;
+const TOKEN_PACKED = 50;
 
 // Delimiters
 const TOKEN_LPAREN = 100;

@@ -172,6 +172,7 @@ func lex_check_keyword(ptr: u64, len: u64) -> u64 {
         if (str_eq(ptr, len, "sizeof", 6)) { return TOKEN_SIZEOF; }
         if (str_eq(ptr, len, "static", 6)) { return TOKEN_STATIC; }
         if (str_eq(ptr, len, "tagged", 6)) { return TOKEN_TAGGED; }
+        if (str_eq(ptr, len, "packed", 6)) { return TOKEN_PACKED; }
         return TOKEN_IDENTIFIER;
     }
     

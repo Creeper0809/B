@@ -55,6 +55,11 @@ func parse_var_decl(p: u64) -> u64 {
             struct_name_ptr = ty_info->struct_name_ptr;
             struct_name_len = ty_info->struct_name_len;
         }
+        // tagged layout name (non-struct base)
+        if (is_tagged == 1 && ty_info->struct_name_ptr != 0 && type_kind != TYPE_STRUCT && type_kind != TYPE_ARRAY && type_kind != TYPE_SLICE) {
+            struct_name_ptr = ty_info->struct_name_ptr;
+            struct_name_len = ty_info->struct_name_len;
+        }
     }
     
     var init: u64 = 0;
