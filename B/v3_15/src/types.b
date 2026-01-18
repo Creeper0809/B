@@ -198,13 +198,6 @@ struct Symtab {
     stack_offset: u64;
 }
 
-// Vector structure (24 bytes)
-struct Vec {
-    data_ptr: u64;
-    length: u64;
-    capacity: u64;
-}
-
 // ============================================
 // Lexer Data Structures
 // ============================================

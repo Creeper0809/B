@@ -1,8 +1,8 @@
-// vec.b - Dynamic array implementation for v3.8
+// vec.b - Dynamic array implementation (pointer arithmetic for bootstrap)
 
 import std.io;
 
-// Vec structure: [buf_ptr, len, cap]
+// Vec structure: [data_ptr, length, capacity] (24 bytes)
 
 func vec_new(cap) {
     var v = heap_alloc(24);
@@ -28,6 +28,7 @@ func vec_push(v, item) {
     // Grow if needed
     if (len >= cap) {
         var new_cap = cap * 2;
+        if (new_cap < 4) { new_cap = 4; }
         var new_buf = heap_alloc(new_cap * 8);
         var old_buf = *(v);
         // Copy old data
@@ -54,3 +55,14 @@ func vec_set(v, i, val) {
     var buf = *(v);
     *(buf + i * 8) = val;
 }
+
+func vec_pop(v) {
+    var len = *(v + 8);
+    if (len == 0) {
+        return 0;
+    }
+    *(v + 8) = len - 1;
+    var buf = *(v);
+    return *(buf + (len - 1) * 8);
+}
+

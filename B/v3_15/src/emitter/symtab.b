@@ -32,12 +32,12 @@ func symtab_clear(s: u64) -> u64 {
     symtab->count = 0;
     symtab->stack_offset = 0;
 
-    var names: *Vec = (*Vec)symtab->names_vec;
-    names->length = 0;
-    var offsets: *Vec = (*Vec)symtab->offsets_vec;
-    offsets->length = 0;
-    var types: *Vec = (*Vec)symtab->types_vec;
-    types->length = 0;
+    var names_vec: u64 = symtab->names_vec;
+    *(names_vec + 8) = 0;
+    var offsets_vec: u64 = symtab->offsets_vec;
+    *(offsets_vec + 8) = 0;
+    var types_vec: u64 = symtab->types_vec;
+    *(types_vec + 8) = 0;
 }
 
 func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth: u64, size: u64) -> u64 {

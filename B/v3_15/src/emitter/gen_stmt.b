@@ -460,11 +460,9 @@ func cg_while_stmt(node: u64) -> u64 {
     cg_block(body);
     
     var len: u64 = vec_len(g_loop_labels);
-    var loop_vec: *Vec = (*Vec)g_loop_labels;
-    loop_vec->length = len - 1;
+    *(g_loop_labels + 8) = len - 1;  // Set length
     len = vec_len(g_loop_continue_labels);
-    var cont_vec: *Vec = (*Vec)g_loop_continue_labels;
-    cont_vec->length = len - 1;
+    *(g_loop_continue_labels + 8) = len - 1;  // Set length
     
     emit("    jmp ", 8);
     emit_label(start_label);
@@ -504,11 +502,9 @@ func cg_for_stmt(node: u64) -> u64 {
     cg_block(body);
     
     var labels_len: u64 = vec_len(g_loop_labels);
-    var loop_vec: *Vec = (*Vec)g_loop_labels;
-    loop_vec->length = labels_len - 1;
+    *(g_loop_labels + 8) = labels_len - 1;
     labels_len = vec_len(g_loop_continue_labels);
-    var cont_vec: *Vec = (*Vec)g_loop_continue_labels;
-    cont_vec->length = labels_len - 1;
+    *(g_loop_continue_labels + 8) = labels_len - 1;
     
     emit_label_def(update_label);
     
@@ -593,8 +589,7 @@ func cg_switch_stmt(node: u64) -> u64 {
     
     // Pop end_label from g_loop_labels
     var len: u64 = vec_len(g_loop_labels);
-    var loop_vec: *Vec = (*Vec)g_loop_labels;
-    loop_vec->length = len - 1;
+    *(g_loop_labels + 8) = len - 1;
     
     emit_label_def(end_label);
 }
