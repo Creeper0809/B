@@ -76,6 +76,7 @@ func cg_func(node: u64) -> u64 {
         ti->struct_def = 0;
 
         // If this is a struct, resolve its struct_def now
+        // This applies even for pointer types (*Point) - we store the base struct def
         if (p->type_kind == TYPE_STRUCT && g_structs_vec != 0 && p->struct_name_ptr != 0) {
             var num_structs: u64 = vec_len(g_structs_vec);
             for(var si: u64 = 0 ; si < num_structs ; si++){

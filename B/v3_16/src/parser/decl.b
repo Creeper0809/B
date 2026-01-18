@@ -313,6 +313,13 @@ func parse_impl_block(p: u64) -> u64 {
     while (parse_peek_kind(p) != TOKEN_RBRACE) {
         if (parse_peek_kind(p) == TOKEN_EOF) { break; }
         
+        // Check for static keyword
+        var is_static: u64 = 0;
+        if (parse_peek_kind(p) == TOKEN_STATIC) {
+            is_static = 1;
+            parse_adv(p);  // consume 'static'
+        }
+        
         if (parse_peek_kind(p) == TOKEN_FUNC) {
             var func_node: *AstFunc = (*AstFunc)parse_func_decl(p);
             

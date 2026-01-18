@@ -78,7 +78,7 @@ func cg_stmt(node: u64) -> u64 {
         var g_loop_labels: u64 = emitter_get_loop_labels();
         var len: u64 = vec_len(g_loop_labels);
         if (len == 0) {
-            emit_stderr("[ERROR] break outside loop\n", 29);
+            emit("    ; ERROR: break outside loop\n", 29);
             panic();
         }
         var label: u64 = vec_get(g_loop_labels, len - 1);
@@ -92,7 +92,7 @@ func cg_stmt(node: u64) -> u64 {
         var g_loop_continue_labels: u64 = emitter_get_continue_labels();
         var len: u64 = vec_len(g_loop_continue_labels);
         if (len == 0) {
-            emit_stderr("[ERROR] continue outside loop\n", 32);
+            emit("    ; ERROR: continue outside loop\n", 32);
             panic();
         }
         var label: u64 = vec_get(g_loop_continue_labels, len - 1);
@@ -136,7 +136,7 @@ func cg_return_stmt(node: u64, symtab: u64) -> u64 {
             
             // For simplicity, support up to 16 bytes (rax + rdx)
             if (struct_size > 16) {
-                emit_stderr("[ERROR] Struct return size > 16 bytes not supported\n", 53);
+                emit("    ; ERROR: Struct return size > 16 bytes not supported\n", 53);
                 panic();
             }
             

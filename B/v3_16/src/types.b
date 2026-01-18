@@ -29,6 +29,7 @@ const TOKEN_FALSE = 36;
 const TOKEN_STRUCT = 37;
 const TOKEN_ENUM = 38;
 const TOKEN_IMPL = 39;
+const TOKEN_STATIC = 47;
 
 // Compiler macros
 const TOKEN_LINE_MACRO = 45;

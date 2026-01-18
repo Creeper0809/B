@@ -233,7 +233,7 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         // Get pointer type to find struct_def
         var ptr_type: u64 = get_expr_type_with_symtab(ptr_expr, symtab);
         if (ptr_type == 0) {
-            emit_stderr("[ERROR] Cannot determine pointer type in arrow operator\n", 57);
+            emit("    ; ERROR: Cannot determine pointer type in arrow operator\n", 64);
             return;
         }
         
@@ -242,14 +242,14 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         var ptr_depth: u64 = ti->ptr_depth;
         
         if (ptr_depth == 0 || base_type != TYPE_STRUCT) {
-            emit_stderr("[ERROR] Arrow operator requires pointer to struct\n", 51);
+            emit("    ; ERROR: Arrow operator requires pointer to struct\n", 59);
             return;
         }
         
         // Get struct_def from pointer's base type
         var struct_def: u64 = ti->struct_def;
         if (struct_def == 0) {
-            emit_stderr("[ERROR] Struct definition not found for pointer type\n", 54);
+            emit("    ; ERROR: Struct definition not found for pointer type\n", 64);
             return;
         }
         
@@ -275,20 +275,20 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         // Get the type of the nested object
         var obj_type: u64 = get_expr_type_with_symtab(object, symtab);
         if (obj_type == 0) {
-            emit_stderr("[ERROR] Cannot determine type of nested member access\n", 55);
+            emit("    ; ERROR: Cannot determine type of nested member access\n", 55);
             return;
         }
         
         var obj_ti: *TypeInfo = (*TypeInfo)obj_type;
         var base_type: u64 = obj_ti->type_kind;
         if (base_type != TYPE_STRUCT) {
-            emit_stderr("[ERROR] Nested member access on non-struct\n", 44);
+            emit("    ; ERROR: Nested member access on non-struct\n", 44);
             return;
         }
         
         var struct_def: u64 = obj_ti->struct_def;
         if (struct_def == 0) {
-            emit_stderr("[ERROR] Struct definition not found for nested access\n", 55);
+            emit("    ; ERROR: Struct definition not found for nested access\n", 55);
             return;
         }
         
@@ -307,7 +307,7 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     
     // Handle obj.field (object is AST_IDENT)
     if (obj_kind != AST_IDENT) {
-        emit_stderr("[ERROR] Member access on non-identifier\n", 41);
+        emit("    ; ERROR: Member access on non-identifier\n", 41);
         return;
     }
     
@@ -321,7 +321,7 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     var type_kind: u64 = var_ti->type_kind;
     
     if (type_kind != TYPE_STRUCT) {
-        emit_stderr("[ERROR] Member access on non-struct type\n", 42);
+        emit("    ; ERROR: Member access on non-struct type\n", 42);
         return;
     }
     
@@ -329,7 +329,7 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     var struct_def: u64 = var_ti->struct_def;
     
     if (struct_def == 0) {
-        emit_stderr("[ERROR] Struct definition not found in type_info\n", 52);
+        emit("    ; ERROR: Struct definition not found in type_info\n", 52);
         return;
     }
     
@@ -559,7 +559,7 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         // Get pointer type to find struct_def
         var ptr_type: u64 = get_expr_type_with_symtab(ptr_expr, symtab);
         if (ptr_type == 0) {
-            emit_stderr("[ERROR] Cannot determine pointer type in arrow operator\n", 57);
+            emit("    ; ERROR: Cannot determine pointer type in arrow operator\n", 64);
             return;
         }
         
@@ -568,14 +568,14 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         var ptr_depth: u64 = ti->ptr_depth;
         
         if (ptr_depth == 0 || base_type != TYPE_STRUCT) {
-            emit_stderr("[ERROR] Arrow operator requires pointer to struct\n", 51);
+            emit("    ; ERROR: Arrow operator requires pointer to struct\n", 59);
             return;
         }
         
         // Get struct_def from pointer's base type
         var struct_def: u64 = ti->struct_def;
         if (struct_def == 0) {
-            emit_stderr("[ERROR] Struct definition not found for pointer type\n", 54);
+            emit("    ; ERROR: Struct definition not found for pointer type\n", 64);
             return;
         }
         
@@ -600,20 +600,20 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         // Get the type of the nested object
         var obj_type: u64 = get_expr_type_with_symtab(object, symtab);
         if (obj_type == 0) {
-            emit_stderr("[ERROR] Cannot determine type of nested member in lvalue\n", 58);
+            emit("    ; ERROR: Cannot determine type of nested member in lvalue\n", 58);
             return;
         }
         
         var obj_lv_ti: *TypeInfo = (*TypeInfo)obj_type;
         var base_type: u64 = obj_lv_ti->type_kind;
         if (base_type != TYPE_STRUCT) {
-            emit_stderr("[ERROR] Nested member access on non-struct in lvalue\n", 54);
+            emit("    ; ERROR: Nested member access on non-struct in lvalue\n", 54);
             return;
         }
         
         var struct_def: u64 = obj_lv_ti->struct_def;
         if (struct_def == 0) {
-            emit_stderr("[ERROR] Struct definition not found for nested lvalue\n", 55);
+            emit("    ; ERROR: Struct definition not found for nested lvalue\n", 55);
             return;
         }
         
@@ -631,7 +631,7 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
     
     // Handle obj.field (object is AST_IDENT)
     if (obj_kind != AST_IDENT) {
-        emit_stderr("[ERROR] Member access on non-identifier in lvalue\n", 51);
+        emit("    ; ERROR: Member access on non-identifier in lvalue\n", 51);
         return;
     }
     
@@ -650,7 +650,7 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
     }
     
     if (struct_def == 0) {
-        emit_stderr("[ERROR] Struct definition not found in lvalue\n", 47);
+        emit("    ; ERROR: Struct definition not found in lvalue\n", 47);
         return;
     }
     

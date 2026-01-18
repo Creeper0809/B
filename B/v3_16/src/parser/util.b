@@ -214,6 +214,16 @@ func parse_adv(p: u64) -> u64 {
     parser->cur = parser->cur + 1;
 }
 
+func parser_pos(p: u64) -> u64 {
+    var parser: *Parser = (*Parser)p;
+    return parser->cur;
+}
+
+func parser_set_pos(p: u64, pos: u64) {
+    var parser: *Parser = (*Parser)p;
+    parser->cur = pos;
+}
+
 func parse_prev(p: u64) -> u64 {
     var parser: *Parser = (*Parser)p;
     if (parser->cur == 0) { return 0; }

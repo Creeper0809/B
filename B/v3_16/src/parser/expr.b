@@ -199,6 +199,62 @@ func parse_primary(p: u64) -> u64 {
             }
         }
         
+        // Check for static method call: StructName.method(...)
+        // Only process if IDENTIFIER is a known struct type, DOT is followed by IDENTIFIER and LPAREN
+        if (parse_peek_kind(p) == TOKEN_DOT) {
+            var struct_name_ptr: u64 = ((*Token)tok)->ptr;
+            var struct_name_len: u64 = ((*Token)tok)->len;
+            
+            // Only treat as static method call if this is a struct type name
+            if (is_struct_type(struct_name_ptr, struct_name_len) != 0) {
+                // Look ahead to check if this is a static method call
+                var saved_pos: u64 = parser_pos(p);
+                parse_adv(p);  // consume '.'
+                
+                if (parse_peek_kind(p) == TOKEN_IDENTIFIER) {
+                    var method_tok: u64 = parse_peek(p);
+                    parse_adv(p);  // consume method name
+                    
+                    if (parse_peek_kind(p) == TOKEN_LPAREN) {
+                        // This is a static method call: StructName.method(...)
+                    var method_name_ptr: u64 = ((*Token)method_tok)->ptr;
+                    var method_name_len: u64 = ((*Token)method_tok)->len;
+                    
+                    // Create combined name: StructName_methodName
+                    var combined_name: u64 = vec_new(64);
+                    for (var i: u64 = 0; i < struct_name_len; i++) {
+                        vec_push(combined_name, *(*u8)(struct_name_ptr + i));
+                    }
+                    vec_push(combined_name, 95);  // '_'
+                    for (var i: u64 = 0; i < method_name_len; i++) {
+                        vec_push(combined_name, *(*u8)(method_name_ptr + i));
+                    }
+                    
+                    var combined_len: u64 = vec_len(combined_name);
+                    var combined_ptr: u64 = heap_alloc(combined_len);
+                    for (var i: u64 = 0; i < combined_len; i++) {
+                        *(*u8)(combined_ptr + i) = vec_get(combined_name, i);
+                    }
+                    
+                    parse_adv(p);  // consume '('
+                    var args: u64 = vec_new(8);
+                    if (parse_peek_kind(p) != TOKEN_RPAREN) {
+                        vec_push(args, parse_expr(p));
+                        while (parse_match(p, TOKEN_COMMA)) {
+                            vec_push(args, parse_expr(p));
+                        }
+                    }
+                    parse_consume(p, TOKEN_RPAREN);
+                    pop_trace();
+                    return ast_call(combined_ptr, combined_len, args);
+                    }
+                }
+                
+                // Not a static method call, restore position and let postfix handle it
+                parser_set_pos(p, saved_pos);
+            }
+        }
+        
         if (parse_peek_kind(p) == TOKEN_LPAREN) {
             parse_adv(p);
             var args: u64 = vec_new(8);

@@ -401,15 +401,19 @@ struct 상속 → trait 정의 → impl → VTable 생성 → 다형성
 
 #### Phase 4.0.1: 제어 흐름 및 OOP 기초 (2-3개월)
 
-- [ ] **impl 블록 완전 구현** (v3에서 파싱만 지원, 실제 동작 안 함)
-  - [ ] 파서: 이미 구현됨 (v3)
-  - [ ] 타입 체크: impl 블록 함수 등록, self 파라미터 검증
-  - [ ] Symbol Table: impl 블록 함수를 타입에 바인딩
-  - [ ] Codegen: 메서드 호출 설탕 (obj.method(args) → method(&obj, args))
-  - [ ] 테스트: struct + impl + 메서드 호출 전체 검증
-  - DoD: `obj.method()` 형태로 메서드 호출 가능, 컴파일러 개발에 필수
-  - **배경**: v3에서 파싱만 구현, 실제 메서드 호출 시 링크 에러 발생
-  - **우선순위**: [CRITICAL] 컴파일러 개발에서 OOP 패턴 필수
+- [x] **impl 블록 완전 구현** (v3_16에서 완료)
+  - [x] 파서: impl 블록 파싱, 메서드 정의
+  - [x] Codegen: 메서드 호출 설탕 (obj.method(args) → StructName_method(&obj, args))
+  - [x] 정적 메서드: StructName.method() → StructName_method() 호출
+  - [x] 인스턴스 메서드: obj.method() → StructName_method(&obj) 호출
+  - [x] 테스트: 76_impl_basic.b, 97_string_builder.b 통과
+  - DoD: `obj.method()` 형태로 메서드 호출 가능
+  - **완료일**: 2026-01-18 (v3_16)
+  - **구현 세부사항**:
+    - TOKEN_STATIC 키워드 추가
+    - parse_primary에서 정적 메서드 호출 감지 (is_struct_type 확인)
+    - parse_postfix_from에서 인스턴스 메서드 호출 처리 (AST_METHOD_CALL)
+    - cg_method_call에서 struct_name_ptr 사용하여 함수 이름 생성
 
 - [ ] **match 표현식** (v3의 switch 대체)
   - [ ] 파서: match 키워드, 패턴 매칭 문법
