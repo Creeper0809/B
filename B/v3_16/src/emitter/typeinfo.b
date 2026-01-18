@@ -114,6 +114,9 @@ func get_pointee_size(base_type: u64, ptr_depth: u64) -> u64 {
 }
 
 func sizeof_field_desc(field: *FieldDesc) -> u64 {
+    if (field->bit_width > 0) {
+        return (field->bit_width + 7) / 8;
+    }
     if (field->type_kind == TYPE_ARRAY) {
         var elem_size: u64 = sizeof_type(field->elem_type_kind, field->elem_ptr_depth, field->struct_name_ptr, field->struct_name_len);
         return elem_size * field->array_len;
@@ -199,6 +202,23 @@ func sizeof_type(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_na
         }
         
         if (struct_def == 0) { return 8; }
+
+        var packed_flag: u64 = *(struct_def + 32);
+        if (packed_flag == 1) {
+            var fields_p: u64 = *(struct_def + 24);
+            var num_fields_p: u64 = vec_len(fields_p);
+            var total_bits: u64 = 0;
+            for (var pi: u64 = 0; pi < num_fields_p; pi++) {
+                var field_p: *FieldDesc = (*FieldDesc)vec_get(fields_p, pi);
+                if (field_p->bit_width > 0) {
+                    total_bits = total_bits + field_p->bit_width;
+                } else {
+                    var fsize: u64 = sizeof_field_desc(field_p);
+                    total_bits = total_bits + fsize * 8;
+                }
+            }
+            return (total_bits + 7) / 8;
+        }
         
         var fields: u64 = *(struct_def + 24);
         var num_fields: u64 = vec_len(fields);
@@ -236,6 +256,11 @@ func sizeof_type_ex(ti: u64) -> u64 {
 // Get field offset in bytes from struct definition
 // Returns 0 if field not found (caller must handle)
 func get_field_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
+    var packed_flag2: u64 = *(struct_def + 32);
+    if (packed_flag2 == 1) {
+        emit_stderr("[ERROR] Packed struct field address is not supported\n", 56);
+        panic("Codegen error");
+    }
     var fields: u64 = *(struct_def + 24);
     var num_fields: u64 = vec_len(fields);
     var offset: u64 = 0;
@@ -449,6 +474,11 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var obj_ti: *TypeInfo = (*TypeInfo)obj_type;
         var base_type: u64 = obj_ti->type_kind;
         var ptr_depth: u64 = obj_ti->ptr_depth;
+
+        // Tagged layout bitfield access
+        if (ptr_depth > 0 && obj_ti->is_tagged == 1 && obj_ti->struct_name_ptr != 0) {
+            return typeinfo_make(TYPE_U64, 0);
+        }
         
         // Handle ptr->field (dereference pointer first)
         if (ptr_depth > 0) {

@@ -21,6 +21,67 @@ func emit_tagged_mask() -> u64 {
     emit("    and rax, rbx\n", 17);
 }
 
+func emit_mask_to_rdx(bit_width: u64) -> u64 {
+    emit("    mov rdx, 1\n", 15);
+    emit("    mov rcx, ", 13);
+    emit_u64(bit_width);
+    emit_nl();
+    emit("    shl rdx, cl\n", 16);
+    emit("    sub rdx, 1\n", 15);
+}
+
+func get_packed_layout_total_bits(struct_def: u64) -> u64 {
+    var fields: u64 = *(struct_def + 24);
+    var num_fields: u64 = vec_len(fields);
+    var total_bits: u64 = 0;
+    for (var i: u64 = 0; i < num_fields; i++) {
+        var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
+        if (field->bit_width > 0) {
+            total_bits = total_bits + field->bit_width;
+        } else {
+            var fsize: u64 = sizeof_field_desc(field);
+            total_bits = total_bits + fsize * 8;
+        }
+    }
+    return total_bits;
+}
+
+func get_packed_field_bit_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
+    var fields: u64 = *(struct_def + 24);
+    var num_fields: u64 = vec_len(fields);
+    var bit_cursor: u64 = 0;
+    for (var i: u64 = 0; i < num_fields; i++) {
+        var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
+        if (str_eq(field->name_ptr, field->name_len, field_name_ptr, field_name_len)) {
+            return bit_cursor;
+        }
+        if (field->bit_width > 0) {
+            bit_cursor = bit_cursor + field->bit_width;
+        } else {
+            var fsize2: u64 = sizeof_field_desc(field);
+            bit_cursor = bit_cursor + fsize2 * 8;
+        }
+    }
+    emit("[ERROR] Packed field not found\n", 33);
+    panic("Codegen error");
+    return 0;
+}
+
+func get_packed_field_bit_width(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
+    var fields: u64 = *(struct_def + 24);
+    var num_fields: u64 = vec_len(fields);
+    for (var i: u64 = 0; i < num_fields; i++) {
+        var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
+        if (str_eq(field->name_ptr, field->name_len, field_name_ptr, field_name_len)) {
+            if (field->bit_width > 0) { return field->bit_width; }
+            return sizeof_field_desc(field) * 8;
+        }
+    }
+    emit("[ERROR] Packed field not found\n", 33);
+    panic("Codegen error");
+    return 0;
+}
+
 func cg_index_addr(node: u64, symtab: u64) -> u64 {
     var idx: *AstIndex = (*AstIndex)node;
     var base: u64 = idx->base;
@@ -383,6 +444,41 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     var member_ptr: u64 = member_access->member_ptr;
     var member_len: u64 = member_access->member_len;
     
+    var obj_type: u64 = get_expr_type_with_symtab(object, symtab);
+    if (obj_type != 0) {
+        var ot: *TypeInfo = (*TypeInfo)obj_type;
+        if (ot->ptr_depth > 0 && ot->is_tagged == 1 && ot->struct_name_ptr != 0) {
+            var layout_def: u64 = get_struct_def(ot->struct_name_ptr, ot->struct_name_len);
+            if (layout_def == 0) {
+                emit("[ERROR] Tagged layout struct not found\n", 41);
+                panic("Codegen error");
+            }
+            var packed_flag: u64 = *(layout_def + 32);
+            if (packed_flag == 0) {
+                emit("[ERROR] Tagged layout must be packed struct\n", 49);
+                panic("Codegen error");
+            }
+            var total_bits: u64 = get_packed_layout_total_bits(layout_def);
+            var field_offset: u64 = get_packed_field_bit_offset(layout_def, member_ptr, member_len);
+            var field_width: u64 = get_packed_field_bit_width(layout_def, member_ptr, member_len);
+            var start_bit: u64 = 64 - total_bits;
+            var shift_bits: u64 = start_bit + field_offset;
+
+            cg_expr(object);
+            if (shift_bits > 0) {
+                emit("    mov rcx, ", 13);
+                emit_u64(shift_bits);
+                emit_nl();
+                emit("    shr rax, cl\n", 16);
+            }
+            if (field_width < 64) {
+                emit_mask_to_rdx(field_width);
+                emit("    and rax, rdx\n", 17);
+            }
+            return;
+        }
+    }
+
     var obj_kind: u64 = ast_kind(object);
     
     // Handle ptr->field (object is AST_DEREF)

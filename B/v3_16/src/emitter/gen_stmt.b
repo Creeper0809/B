@@ -440,6 +440,76 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
     
     var target_kind: u64 = ast_kind(target);
     var value_kind: u64 = ast_kind(value);
+    if (target_kind == AST_MEMBER_ACCESS) {
+        var m: *AstMemberAccess = (*AstMemberAccess)target;
+        var obj: u64 = m->object;
+        var member_ptr: u64 = m->member_ptr;
+        var member_len: u64 = m->member_len;
+        var obj_type: u64 = get_expr_type_with_symtab(obj, symtab);
+        if (obj_type != 0) {
+            var ot: *TypeInfo = (*TypeInfo)obj_type;
+            if (ot->ptr_depth > 0 && ot->is_tagged == 1 && ot->struct_name_ptr != 0) {
+                var layout_def: u64 = get_struct_def(ot->struct_name_ptr, ot->struct_name_len);
+                if (layout_def == 0) {
+                    emit("[ERROR] Tagged layout struct not found\n", 41);
+                    panic("Codegen error");
+                }
+                var packed_flag: u64 = *(layout_def + 32);
+                if (packed_flag == 0) {
+                    emit("[ERROR] Tagged layout must be packed struct\n", 49);
+                    panic("Codegen error");
+                }
+                if (ast_kind(obj) != AST_IDENT) {
+                    emit("[ERROR] Tagged layout assignment requires identifier base\n", 62);
+                    panic("Codegen error");
+                }
+
+                var total_bits: u64 = get_packed_layout_total_bits(layout_def);
+                var field_offset: u64 = get_packed_field_bit_offset(layout_def, member_ptr, member_len);
+                var field_width: u64 = get_packed_field_bit_width(layout_def, member_ptr, member_len);
+                var start_bit: u64 = 64 - total_bits;
+                var shift_bits: u64 = start_bit + field_offset;
+
+                cg_expr(value);
+                emit("    mov r9, rax\n", 16);
+                cg_expr(obj);
+                emit("    mov rbx, rax\n", 17);
+
+                if (field_width < 64) {
+                    emit_mask_to_rdx(field_width);
+                    emit("    and r9, rdx\n", 16);
+                }
+                if (shift_bits > 0) {
+                    emit("    mov rcx, ", 13);
+                    emit_u64(shift_bits);
+                    emit_nl();
+                    emit("    shl r9, cl\n", 15);
+                }
+
+                if (field_width < 64) {
+                    emit_mask_to_rdx(field_width);
+                    if (shift_bits > 0) {
+                        emit("    mov r10, rdx\n", 17);
+                        emit("    mov rcx, ", 13);
+                        emit_u64(shift_bits);
+                        emit_nl();
+                        emit("    shl r10, cl\n", 16);
+                    } else {
+                        emit("    mov r10, rdx\n", 17);
+                    }
+                    emit("    not r10\n", 12);
+                    emit("    and rbx, r10\n", 17);
+                } else {
+                    emit("    xor rbx, rbx\n", 17);
+                }
+
+                emit("    or rbx, r9\n", 15);
+                cg_lvalue(obj);
+                emit("    mov [rax], rbx\n", 19);
+                return;
+            }
+        }
+    }
     if (target_kind == AST_IDENT) {
         var ident: *AstIdent = (*AstIdent)target;
         var name_ptr: u64 = ident->name_ptr;

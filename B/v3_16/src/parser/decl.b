@@ -221,6 +221,21 @@ func parse_func_decl(p: u64) -> u64 {
 // Struct Parsing
 // ============================================
 
+func parse_uwidth_from_ident(ptr: u64, len: u64) -> u64 {
+    if (len < 2) { return 0; }
+    var first: u64 = *(*u8)ptr;
+    if (first != 117) { return 0; }
+    var i: u64 = 1;
+    var value: u64 = 0;
+    while (i < len) {
+        var c: u64 = *(*u8)(ptr + i);
+        if (c < 48 || c > 57) { return 0; }
+        value = value * 10 + (c - 48);
+        i = i + 1;
+    }
+    return value;
+}
+
 func parse_struct_def(p: u64) -> u64 {
     var is_packed: u64 = 0;
     if (parse_match(p, TOKEN_PACKED)) {
@@ -246,21 +261,76 @@ func parse_struct_def(p: u64) -> u64 {
         
         parse_consume(p, TOKEN_COLON);
         
-        var field_type: *TypeInfo = (*TypeInfo)parse_type_ex(p);
+        var field_type_kind: u64 = 0;
+        var field_ptr_depth: u64 = 0;
+        var field_struct_name_ptr: u64 = 0;
+        var field_struct_name_len: u64 = 0;
+        var field_elem_type_kind: u64 = 0;
+        var field_elem_ptr_depth: u64 = 0;
+        var field_array_len: u64 = 0;
+        var field_is_tagged: u64 = 0;
+        var field_bit_width: u64 = 0;
+
+        if (is_packed == 1) {
+            var k: u64 = parse_peek_kind(p);
+            if (k == TOKEN_U8) {
+                parse_adv(p);
+                field_type_kind = TYPE_U8;
+                field_bit_width = 8;
+            } else if (k == TOKEN_U16) {
+                parse_adv(p);
+                field_type_kind = TYPE_U16;
+                field_bit_width = 16;
+            } else if (k == TOKEN_U32) {
+                parse_adv(p);
+                field_type_kind = TYPE_U32;
+                field_bit_width = 32;
+            } else if (k == TOKEN_U64) {
+                parse_adv(p);
+                field_type_kind = TYPE_U64;
+                field_bit_width = 64;
+            } else if (k == TOKEN_IDENTIFIER) {
+                var bw_tok: u64 = parse_peek(p);
+                var bw_ptr: u64 = ((*Token)bw_tok)->ptr;
+                var bw_len: u64 = ((*Token)bw_tok)->len;
+                parse_adv(p);
+                var bw: u64 = parse_uwidth_from_ident(bw_ptr, bw_len);
+                if (bw == 0 || bw > 64) {
+                    emit_stderr("[ERROR] packed field must be u1..u64\n", 43);
+                    panic("Parse error");
+                }
+                field_type_kind = TYPE_U64;
+                field_bit_width = bw;
+            } else {
+                emit_stderr("[ERROR] packed field must be u1..u64\n", 43);
+                panic("Parse error");
+            }
+        } else {
+            var field_type: *TypeInfo = (*TypeInfo)parse_type_ex(p);
+            field_type_kind = field_type->type_kind;
+            field_struct_name_ptr = field_type->struct_name_ptr;
+            field_struct_name_len = field_type->struct_name_len;
+            field_ptr_depth = field_type->ptr_depth;
+            field_is_tagged = field_type->is_tagged;
+            field_elem_type_kind = field_type->elem_type_kind;
+            field_elem_ptr_depth = field_type->elem_ptr_depth;
+            field_array_len = field_type->array_len;
+        }
         
         parse_consume(p, TOKEN_SEMICOLON);
         
         var field_desc: *FieldDesc = (*FieldDesc)heap_alloc(SIZEOF_FIELD_DESC);
         field_desc->name_ptr = field_name_ptr;
         field_desc->name_len = field_name_len;
-        field_desc->type_kind =  field_type->type_kind;
-        field_desc->struct_name_ptr = field_type->struct_name_ptr;
-        field_desc->struct_name_len = field_type->struct_name_len;
-        field_desc->ptr_depth = field_type->ptr_depth;
-        field_desc->is_tagged = field_type->is_tagged;
-        field_desc->elem_type_kind = field_type->elem_type_kind;
-        field_desc->elem_ptr_depth = field_type->elem_ptr_depth;
-        field_desc->array_len = field_type->array_len;
+        field_desc->type_kind =  field_type_kind;
+        field_desc->struct_name_ptr = field_struct_name_ptr;
+        field_desc->struct_name_len = field_struct_name_len;
+        field_desc->ptr_depth = field_ptr_depth;
+        field_desc->is_tagged = field_is_tagged;
+        field_desc->bit_width = field_bit_width;
+        field_desc->elem_type_kind = field_elem_type_kind;
+        field_desc->elem_ptr_depth = field_elem_ptr_depth;
+        field_desc->array_len = field_array_len;
         
         vec_push(fields, field_desc);
     }

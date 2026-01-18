@@ -4,8 +4,8 @@
 import util;
 
 packed struct TaggedPtrBits {
-    addr: u64;
-    tag: u64;
+    addr: u48;
+    tag: u16;
 }
 
 func main() -> i64 {
@@ -15,10 +15,11 @@ func main() -> i64 {
     var tagged_val: u64 = (raw & 281474976710655) | (tag << 48);
 
     var p: *tagged(TaggedPtrBits) u8 = (*tagged(TaggedPtrBits) u8)tagged_val;
+    p.tag = 1;
     *p = 77;
 
-    var v = *p;
-    if (v != 77) { return 1; }
+    if (p.tag != 1) { return 0; }
+    if (*p != 77) { return 1; }
 
     return 42;
 }

@@ -169,8 +169,8 @@ struct TypeInfo {
     array_len: u64;
 }
 
-// Struct field descriptor (88 bytes)
-const SIZEOF_FIELD_DESC = 88;
+// Struct field descriptor (96 bytes)
+const SIZEOF_FIELD_DESC = 96;
 struct FieldDesc {
     name_ptr: u64;
     name_len: u64;
@@ -179,6 +179,7 @@ struct FieldDesc {
     struct_name_len: u64;
     ptr_depth: u64;
     is_tagged: u64;
+    bit_width: u64;
     offset: u64;
     elem_type_kind: u64;
     elem_ptr_depth: u64;

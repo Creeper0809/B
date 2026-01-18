@@ -63,6 +63,8 @@
 - ✅ `[N]T` 파라미터/리턴 디케이(포인터) + 테스트 104_array_param_return
 - ✅ `*tagged T` 파서/타입 플래그 + 자동 마스킹(Phase 1/2) + 테스트 105_tagged_ptr_basic
 - ✅ `packed struct` 파싱 + `*tagged(Layout) T` 문법 + 테스트 106_tagged_layout_packed_struct
+- ✅ `packed struct` 비트필드(uN) 파싱 + size 계산
+- ✅ tagged 레이아웃 비트필드 접근/대입 lowering (상위 비트 자동 매핑)
 - ✅ `print(args...)` 매직 함수: 인자 타입별 자동 분해 출력
 - ✅ 테스트 34 (impl_method): `impl Type {}` 블록 + 메서드 호출 설탕
 - ✅ 테스트 35, 36 (defer): `defer` 문 기본 구현 (블록 스코프, return 시 실행)
