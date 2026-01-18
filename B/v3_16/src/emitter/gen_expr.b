@@ -9,6 +9,7 @@ import std.vec;
 import std.util;
 import types;
 import ast;
+import compiler;
 
 // ============================================
 // Expression Codegen

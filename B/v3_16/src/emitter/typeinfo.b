@@ -11,6 +11,7 @@ import std.vec;
 import std.util;
 import types;
 import ast;
+import compiler;
 
 func typeinfo_make(base_type: u64, ptr_depth: u64) -> u64 {
     var result: u64 = heap_alloc(SIZEOF_TYPEINFO);

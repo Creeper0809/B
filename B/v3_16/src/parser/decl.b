@@ -15,6 +15,7 @@ import std.util;
 import types;
 import lexer;
 import ast;
+import compiler;
 import parser.util;
 import parser.type;
 import parser.expr;
