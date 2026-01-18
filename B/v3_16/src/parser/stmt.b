@@ -29,6 +29,7 @@ func parse_var_decl(p: u64) -> u64 {
     
     var type_kind: u64 = TYPE_I64;
     var ptr_depth: u64 = 0;
+    var is_tagged: u64 = 0;
     var struct_name_ptr: u64 = 0;
     var struct_name_len: u64 = 0;
     var elem_type_kind: u64 = 0;
@@ -39,6 +40,7 @@ func parse_var_decl(p: u64) -> u64 {
         var ty_info: *TypeInfo = (*TypeInfo)parse_type_ex(p);
         type_kind = ty_info->type_kind;
         ptr_depth = ty_info->ptr_depth;
+        is_tagged = ty_info->is_tagged;
         elem_type_kind = ty_info->elem_type_kind;
         elem_ptr_depth = ty_info->elem_ptr_depth;
         array_len = ty_info->array_len;
@@ -64,6 +66,7 @@ func parse_var_decl(p: u64) -> u64 {
     parse_consume(p, TOKEN_SEMICOLON);
     
     var decl: *AstVarDecl = (*AstVarDecl)ast_var_decl(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, type_kind, ptr_depth, init);
+    decl->is_tagged = is_tagged;
     decl->struct_name_ptr = struct_name_ptr;
     decl->struct_name_len = struct_name_len;
     decl->elem_type_kind = elem_type_kind;

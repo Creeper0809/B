@@ -17,6 +17,7 @@ func typeinfo_make(base_type: u64, ptr_depth: u64) -> u64 {
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = base_type;
     ti->ptr_depth = ptr_depth;
+    ti->is_tagged = 0;
     ti->struct_name_ptr = 0;
     ti->struct_name_len = 0;
     ti->struct_def = 0;
@@ -31,6 +32,7 @@ func typeinfo_make_struct(ptr_depth: u64, struct_name_ptr: u64, struct_name_len:
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = TYPE_STRUCT;
     ti->ptr_depth = ptr_depth;
+    ti->is_tagged = 0;
     ti->struct_name_ptr = struct_name_ptr;
     ti->struct_name_len = struct_name_len;
     ti->struct_def = struct_def;
@@ -45,6 +47,7 @@ func typeinfo_make_array(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u6
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = TYPE_ARRAY;
     ti->ptr_depth = ptr_depth;
+    ti->is_tagged = 0;
     ti->struct_name_ptr = elem_struct_name_ptr;
     ti->struct_name_len = elem_struct_name_len;
     ti->struct_def = elem_struct_def;
@@ -59,6 +62,7 @@ func typeinfo_make_slice(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u6
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = TYPE_SLICE;
     ti->ptr_depth = ptr_depth;
+    ti->is_tagged = 0;
     ti->struct_name_ptr = elem_struct_name_ptr;
     ti->struct_name_len = elem_struct_name_len;
     ti->struct_def = elem_struct_def;
@@ -130,13 +134,16 @@ func get_field_desc(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -
     return 0;
 }
 
-func check_type_compat(from_base: u64, from_depth: u64, to_base: u64, to_depth: u64) -> u64 {
+func check_type_compat(from_base: u64, from_depth: u64, from_tagged: u64, to_base: u64, to_depth: u64, to_tagged: u64) -> u64 {
     if (from_base == TYPE_ARRAY || to_base == TYPE_ARRAY || from_base == TYPE_SLICE || to_base == TYPE_SLICE) {
         if (from_base == to_base && from_depth == to_depth) { return 0; }
         return 1;
     }
     if (from_base == to_base) {
-        if (from_depth == to_depth) { return 0; }
+        if (from_depth == to_depth) {
+            if (from_depth > 0 && from_tagged != to_tagged) { return 1; }
+            return 0;
+        }
     }
     if (from_depth > 0) {
         if (to_depth > 0) { return 1; }
@@ -270,14 +277,23 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 if (str_eq(fn->name_ptr, fn->name_len, name_ptr, name_len)) {
                     if (fn->ret_type == TYPE_STRUCT) {
                         var struct_def: u64 = get_struct_def(fn->ret_struct_name_ptr, fn->ret_struct_name_len);
-                        return typeinfo_make_struct(fn->ret_ptr_depth, fn->ret_struct_name_ptr, fn->ret_struct_name_len, struct_def);
+                        var result_struct: u64 = typeinfo_make_struct(fn->ret_ptr_depth, fn->ret_struct_name_ptr, fn->ret_struct_name_len, struct_def);
+                        var rs: *TypeInfo = (*TypeInfo)result_struct;
+                        rs->is_tagged = fn->ret_is_tagged;
+                        return result_struct;
                     }
                     if (fn->ret_type == TYPE_SLICE) {
                         // Slice return type: element type info is not stored on AstFunc.
                         // Preserve slice shape (base kind + pointer depth) for codegen.
-                        return typeinfo_make(fn->ret_type, fn->ret_ptr_depth);
+                        var result_slice: u64 = typeinfo_make(fn->ret_type, fn->ret_ptr_depth);
+                        var rsl: *TypeInfo = (*TypeInfo)result_slice;
+                        rsl->is_tagged = fn->ret_is_tagged;
+                        return result_slice;
                     }
-                    return typeinfo_make(fn->ret_type, fn->ret_ptr_depth);
+                    var result_basic: u64 = typeinfo_make(fn->ret_type, fn->ret_ptr_depth);
+                    var rb: *TypeInfo = (*TypeInfo)result_basic;
+                    rb->is_tagged = fn->ret_is_tagged;
+                    return result_basic;
                 }
             }
         }
@@ -322,10 +338,16 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var cast_node: *AstCast = (*AstCast)node;
         if (cast_node->target_type == TYPE_STRUCT) {
             var struct_def: u64 = get_struct_def(cast_node->struct_name_ptr, cast_node->struct_name_len);
-            return typeinfo_make_struct(cast_node->target_ptr_depth, cast_node->struct_name_ptr, cast_node->struct_name_len, struct_def);
+            var result_struct: u64 = typeinfo_make_struct(cast_node->target_ptr_depth, cast_node->struct_name_ptr, cast_node->struct_name_len, struct_def);
+            var rs: *TypeInfo = (*TypeInfo)result_struct;
+            rs->is_tagged = cast_node->target_is_tagged;
+            return result_struct;
         }
 
-        return typeinfo_make(cast_node->target_type, cast_node->target_ptr_depth);
+        var result_basic: u64 = typeinfo_make(cast_node->target_type, cast_node->target_ptr_depth);
+        var rb: *TypeInfo = (*TypeInfo)result_basic;
+        rb->is_tagged = cast_node->target_is_tagged;
+        return result_basic;
     }
     
     if (kind == AST_ADDR_OF) {
@@ -337,6 +359,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             var res_ti: *TypeInfo = (*TypeInfo)result;
             res_ti->type_kind = op_ti->type_kind;
             res_ti->ptr_depth = op_ti->ptr_depth + 1;
+            res_ti->is_tagged = 0;
             res_ti->struct_def = op_ti->struct_def;
             res_ti->struct_name_ptr = op_ti->struct_name_ptr;
             res_ti->struct_name_len = op_ti->struct_name_len;
@@ -358,6 +381,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var res_ti: *TypeInfo = (*TypeInfo)result;
                 res_ti->type_kind = op_ti->type_kind;
                 res_ti->ptr_depth = depth - 1;
+                res_ti->is_tagged = 0;
                 res_ti->struct_def = op_ti->struct_def;
                 res_ti->struct_name_ptr = op_ti->struct_name_ptr;
                 res_ti->struct_name_len = op_ti->struct_name_len;
@@ -455,7 +479,10 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                             }
                         }
                     }
-                    return typeinfo_make_struct(field_ptr_depth, field->struct_name_ptr, field->struct_name_len, field_struct_def);
+                    var result_struct: u64 = typeinfo_make_struct(field_ptr_depth, field->struct_name_ptr, field->struct_name_len, field_struct_def);
+                    var rs: *TypeInfo = (*TypeInfo)result_struct;
+                    rs->is_tagged = field->is_tagged;
+                    return result_struct;
                 }
                 if (field_type == TYPE_ARRAY) {
                     var elem_struct_def: u64 = 0;
@@ -471,7 +498,10 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                     }
                     return typeinfo_make_slice(field_ptr_depth, field->elem_type_kind, field->elem_ptr_depth, field->struct_name_ptr, field->struct_name_len, elem_struct_def2);
                 }
-                return typeinfo_make(field_type, field_ptr_depth);
+                var result_field: u64 = typeinfo_make(field_type, field_ptr_depth);
+                var rf: *TypeInfo = (*TypeInfo)result_field;
+                rf->is_tagged = field->is_tagged;
+                return result_field;
             }
         }
         
@@ -507,6 +537,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                     var res_ti: *TypeInfo = (*TypeInfo)result;
                     res_ti->type_kind = left_ti->type_kind;
                     res_ti->ptr_depth = l_depth;
+                    res_ti->is_tagged = left_ti->is_tagged;
                     res_ti->struct_def = left_ti->struct_def;
                     res_ti->struct_name_ptr = 0;
                     res_ti->struct_name_len = 0;
@@ -526,6 +557,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                     var res_ti: *TypeInfo = (*TypeInfo)result;
                     res_ti->type_kind = right_ti->type_kind;
                     res_ti->ptr_depth = r_depth;
+                    res_ti->is_tagged = right_ti->is_tagged;
                     res_ti->struct_def = right_ti->struct_def;
                     res_ti->struct_name_ptr = 0;
                     res_ti->struct_name_len = 0;

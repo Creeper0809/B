@@ -28,6 +28,7 @@ struct FuncParam {
     name_len: u64;
     type_kind: u64;
     ptr_depth: u64;
+    is_tagged: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
     elem_type_kind: u64;
@@ -75,6 +76,7 @@ func cg_func(node: u64) -> u64 {
         var ti: *TypeInfo = (*TypeInfo)type_info;
         ti->type_kind = p->type_kind;
         ti->ptr_depth = p->ptr_depth;
+        ti->is_tagged = p->is_tagged;
         ti->struct_name_ptr = p->struct_name_ptr;
         ti->struct_name_len = p->struct_name_len;
         ti->struct_def = 0;

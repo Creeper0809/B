@@ -196,6 +196,7 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
     var name_len: u64 = decl->name_len;
     var type_kind: u64 = decl->type_kind;
     var ptr_depth: u64 = decl->ptr_depth;
+    var is_tagged: u64 = decl->is_tagged;
     var init: u64 = decl->init_expr;
     var struct_name_ptr: u64 = decl->struct_name_ptr;
     var struct_name_len: u64 = decl->struct_name_len;
@@ -215,6 +216,9 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
     }
     
     var offset: u64 = symtab_add(symtab, name_ptr, name_len, type_kind, ptr_depth, size);
+    var type_info0: u64 = symtab_get_type(symtab, name_ptr, name_len);
+    var ti0: *TypeInfo = (*TypeInfo)type_info0;
+    ti0->is_tagged = is_tagged;
     
     // If base type is struct, find struct_def and store pointer in type_info
     if (type_kind == TYPE_STRUCT) {
@@ -285,7 +289,8 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
                 var it_info: *TypeInfo = (*TypeInfo)init_type;
                 var it_base: u64 = it_info->type_kind;
                 var it_depth: u64 = it_info->ptr_depth;
-                check_type_compat(it_base, it_depth, type_kind, ptr_depth);
+                var it_tagged: u64 = it_info->is_tagged;
+                check_type_compat(it_base, it_depth, it_tagged, type_kind, ptr_depth, decl->is_tagged);
             }
         }
         

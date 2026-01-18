@@ -14,6 +14,13 @@ import ast;
 // Expression Codegen
 // ============================================
 
+func emit_tagged_mask() -> u64 {
+    emit("    mov rbx, ", 13);
+    emit_u64(281474976710655);
+    emit_nl();
+    emit("    and rax, rbx\n", 17);
+}
+
 func cg_index_addr(node: u64, symtab: u64) -> u64 {
     var idx: *AstIndex = (*AstIndex)node;
     var base: u64 = idx->base;
@@ -22,12 +29,14 @@ func cg_index_addr(node: u64, symtab: u64) -> u64 {
     var elem_size: u64 = 1;
     var use_array_addr: u64 = 0;
     var use_slice_ptr: u64 = 0;
+    var use_tagged_ptr: u64 = 0;
 
     var base_type: u64 = get_expr_type_with_symtab(base, symtab);
     if (base_type != 0) {
         var bt: *TypeInfo = (*TypeInfo)base_type;
         if (bt->ptr_depth > 0) {
             elem_size = get_pointee_size(bt->type_kind, bt->ptr_depth);
+            if (bt->is_tagged == 1) { use_tagged_ptr = 1; }
         } else if (bt->type_kind == TYPE_ARRAY) {
             elem_size = sizeof_type(bt->elem_type_kind, bt->elem_ptr_depth, bt->struct_name_ptr, bt->struct_name_len);
             use_array_addr = 1;
@@ -44,6 +53,9 @@ func cg_index_addr(node: u64, symtab: u64) -> u64 {
         emit("    mov rax, [rax]\n", 19);
     } else {
         cg_expr(base);
+        if (use_tagged_ptr == 1) {
+            emit_tagged_mask();
+        }
     }
 
     emit("    push rax\n", 13);
@@ -207,6 +219,9 @@ func cg_expr(node: u64) -> u64 {
         var type_info: *TypeInfo = (*TypeInfo)op_type;
         var base_type: u64 = type_info->type_kind;
         var ptr_depth: u64 = type_info->ptr_depth;
+        if (ptr_depth > 0 && type_info->is_tagged == 1) {
+            emit_tagged_mask();
+        }
         
         if (ptr_depth == 1) {
             if (base_type == TYPE_U8) {
@@ -230,6 +245,13 @@ func cg_expr(node: u64) -> u64 {
         var deref8: *AstDeref8 = (*AstDeref8)node;
         var operand: u64 = deref8->operand;
         cg_expr(operand);
+        var op_type2: u64 = get_expr_type_with_symtab(operand, symtab);
+        if (op_type2 != 0) {
+            var ti2: *TypeInfo = (*TypeInfo)op_type2;
+            if (ti2->ptr_depth > 0 && ti2->is_tagged == 1) {
+                emit_tagged_mask();
+            }
+        }
         emit("    movzx rax, byte [rax]\n", 26);
         return;
     }
@@ -369,7 +391,6 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         
         // Evaluate pointer expression to get pointer value
         cg_expr(ptr_expr);
-        emit("    push rax\n", 13);
         
         // Get pointer type to find struct_def
         var ptr_type: u64 = get_expr_type_with_symtab(ptr_expr, symtab);
@@ -381,6 +402,10 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         var ti: *TypeInfo = (*TypeInfo)ptr_type;
         var base_type: u64 = ti->type_kind;
         var ptr_depth: u64 = ti->ptr_depth;
+        if (ptr_depth > 0 && ti->is_tagged == 1) {
+            emit_tagged_mask();
+        }
+        emit("    push rax\n", 13);
         
         if (ptr_depth == 0 || base_type != TYPE_STRUCT) {
             emit("    ; ERROR: Arrow operator requires pointer to struct\n", 59);
@@ -691,6 +716,13 @@ func cg_lvalue(node: u64) -> u64 {
         var deref: *AstDeref = (*AstDeref)node;
         var operand: u64 = deref->operand;
         cg_expr(operand);
+        var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
+        if (op_type != 0) {
+            var ti: *TypeInfo = (*TypeInfo)op_type;
+            if (ti->ptr_depth > 0 && ti->is_tagged == 1) {
+                emit_tagged_mask();
+            }
+        }
         return;
     }
     
@@ -698,6 +730,13 @@ func cg_lvalue(node: u64) -> u64 {
         var deref8: *AstDeref8 = (*AstDeref8)node;
         var operand: u64 = deref8->operand;
         cg_expr(operand);
+        var op_type2: u64 = get_expr_type_with_symtab(operand, symtab);
+        if (op_type2 != 0) {
+            var ti2: *TypeInfo = (*TypeInfo)op_type2;
+            if (ti2->ptr_depth > 0 && ti2->is_tagged == 1) {
+                emit_tagged_mask();
+            }
+        }
         return;
     }
 
@@ -730,7 +769,6 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         
         // Evaluate pointer expression to get pointer value
         cg_expr(ptr_expr);
-        emit("    push rax\n", 13);
         
         // Get pointer type to find struct_def
         var ptr_type: u64 = get_expr_type_with_symtab(ptr_expr, symtab);
@@ -742,6 +780,10 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         var ti: *TypeInfo = (*TypeInfo)ptr_type;
         var base_type: u64 = ti->type_kind;
         var ptr_depth: u64 = ti->ptr_depth;
+        if (ptr_depth > 0 && ti->is_tagged == 1) {
+            emit_tagged_mask();
+        }
+        emit("    push rax\n", 13);
         
         if (ptr_depth == 0 || base_type != TYPE_STRUCT) {
             emit("    ; ERROR: Arrow operator requires pointer to struct\n", 59);

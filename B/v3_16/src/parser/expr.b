@@ -101,8 +101,8 @@ func parse_primary(p: u64) -> u64 {
         var ty: u64 = parse_type_ex(p);
         var type_kind: u64 = *(*u64)ty;
         var ptr_depth: u64 = *(*u64)(ty + 8);
-        var struct_name_ptr: u64 = *(*u64)(ty + 16);
-        var struct_name_len: u64 = *(*u64)(ty + 24);
+        var struct_name_ptr: u64 = *(*u64)(ty + 24);
+        var struct_name_len: u64 = *(*u64)(ty + 32);
         
         parse_consume(p, TOKEN_RPAREN);
         
@@ -138,18 +138,19 @@ func parse_primary(p: u64) -> u64 {
         if (next_k == TOKEN_STAR || next_k == TOKEN_U8 || next_k == TOKEN_U16 || 
             next_k == TOKEN_U32 || next_k == TOKEN_U64 || next_k == TOKEN_I64) {
             // Use parse_type_ex to get struct name directly
-            // TypeInfo layout: [type_kind:8][ptr_depth:8][struct_name_ptr:8][struct_name_len:8]
+            // TypeInfo layout: [type_kind:8][ptr_depth:8][is_tagged:8][struct_name_ptr:8][struct_name_len:8]
             var ty: u64 = parse_type_ex(p);
             var type_kind: u64 = *(*u64)ty;
             var ptr_depth: u64 = *(*u64)(ty + 8);
-            var struct_name_ptr: u64 = *(*u64)(ty + 16);
-            var struct_name_len: u64 = *(*u64)(ty + 24);
+            var is_tagged: u64 = *(*u64)(ty + 16);
+            var struct_name_ptr: u64 = *(*u64)(ty + 24);
+            var struct_name_len: u64 = *(*u64)(ty + 32);
             
             parse_consume(p, TOKEN_RPAREN);
             var operand: u64 = parse_unary(p);
             
             pop_trace();
-            return ast_cast_ex(operand, type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+            return ast_cast_ex(operand, type_kind, ptr_depth, is_tagged, struct_name_ptr, struct_name_len);
         }
         
         var expr: u64 = parse_expr(p);

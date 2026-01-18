@@ -42,6 +42,7 @@ const TOKEN_U32 = 42;
 const TOKEN_U64 = 43;
 const TOKEN_I64 = 44;
 const TOKEN_CHAR = 48;
+const TOKEN_TAGGED = 49;
 
 // Delimiters
 const TOKEN_LPAREN = 100;
@@ -153,11 +154,12 @@ struct Parser {
     cur: u64;
 }
 
-// Type information (64 bytes)
-const SIZEOF_TYPEINFO = 64;
+// Type information (72 bytes)
+const SIZEOF_TYPEINFO = 72;
 struct TypeInfo {
     type_kind: u64;
     ptr_depth: u64;
+    is_tagged: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
     struct_def: u64;
@@ -166,8 +168,8 @@ struct TypeInfo {
     array_len: u64;
 }
 
-// Struct field descriptor (80 bytes)
-const SIZEOF_FIELD_DESC = 80;
+// Struct field descriptor (88 bytes)
+const SIZEOF_FIELD_DESC = 88;
 struct FieldDesc {
     name_ptr: u64;
     name_len: u64;
@@ -175,6 +177,7 @@ struct FieldDesc {
     struct_name_ptr: u64;
     struct_name_len: u64;
     ptr_depth: u64;
+    is_tagged: u64;
     offset: u64;
     elem_type_kind: u64;
     elem_ptr_depth: u64;
@@ -242,13 +245,14 @@ struct Lexer {
 // Parser Data Structures
 // ============================================
 
-// Function parameter (72 bytes)
-const SIZEOF_PARAM = 72;
+// Function parameter (80 bytes)
+const SIZEOF_PARAM = 80;
 struct Param {
     name_ptr: u64;
     name_len: u64;
     type_kind: u64;
     ptr_depth: u64;
+    is_tagged: u64;
     struct_name_ptr: u64;
     struct_name_len: u64;
     elem_type_kind: u64;

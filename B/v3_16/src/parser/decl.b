@@ -125,6 +125,7 @@ func parse_param(p: u64) -> u64 {
     
     var type_kind: u64 = 0;
     var ptr_depth: u64 = 0;
+    var is_tagged: u64 = 0;
     var struct_name_ptr: u64 = 0;
     var struct_name_len: u64 = 0;
     var elem_type_kind: u64 = 0;
@@ -135,6 +136,7 @@ func parse_param(p: u64) -> u64 {
         var ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
         type_kind = ty->type_kind;
         ptr_depth = ty->ptr_depth;
+        is_tagged = ty->is_tagged;
         struct_name_ptr = ty->struct_name_ptr;
         struct_name_len = ty->struct_name_len;
         elem_type_kind = ty->elem_type_kind;
@@ -144,6 +146,7 @@ func parse_param(p: u64) -> u64 {
             // Array parameter decays to pointer to first element
             type_kind = elem_type_kind;
             ptr_depth = elem_ptr_depth + 1;
+            is_tagged = 0;
         }
     }
     
@@ -152,6 +155,7 @@ func parse_param(p: u64) -> u64 {
     param->name_len = ((*Token)name_tok)->len;
     param->type_kind = type_kind;
     param->ptr_depth = ptr_depth;
+    param->is_tagged = is_tagged;
     param->struct_name_ptr = struct_name_ptr;
     param->struct_name_len = struct_name_len;
     param->elem_type_kind = elem_type_kind;
@@ -186,6 +190,7 @@ func parse_func_decl(p: u64) -> u64 {
     
     var ret_type: u64 = TYPE_VOID;
     var ret_ptr_depth: u64 = 0;
+    var ret_is_tagged: u64 = 0;
     var ret_struct_name_ptr: u64 = 0;
     var ret_struct_name_len: u64 = 0;
     
@@ -193,12 +198,14 @@ func parse_func_decl(p: u64) -> u64 {
         var ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
         ret_type = ty->type_kind;
         ret_ptr_depth = ty->ptr_depth;
+        ret_is_tagged = ty->is_tagged;
         ret_struct_name_ptr = ty->struct_name_ptr;
         ret_struct_name_len = ty->struct_name_len;
         if (ret_type == TYPE_ARRAY) {
             // Array return decays to pointer to first element
             ret_type = ty->elem_type_kind;
             ret_ptr_depth = ty->elem_ptr_depth + 1;
+            ret_is_tagged = 0;
             ret_struct_name_ptr = ty->struct_name_ptr;
             ret_struct_name_len = ty->struct_name_len;
         }
@@ -207,7 +214,7 @@ func parse_func_decl(p: u64) -> u64 {
     var body: u64 = parse_block(p);
     
     pop_trace();
-    return ast_func_ex(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, params, ret_type, ret_ptr_depth, ret_struct_name_ptr, ret_struct_name_len, body);
+    return ast_func_ex(((*Token)name_tok)->ptr, ((*Token)name_tok)->len, params, ret_type, ret_ptr_depth, ret_is_tagged, ret_struct_name_ptr, ret_struct_name_len, body);
 }
 
 // ============================================
@@ -246,6 +253,7 @@ func parse_struct_def(p: u64) -> u64 {
         field_desc->struct_name_ptr = field_type->struct_name_ptr;
         field_desc->struct_name_len = field_type->struct_name_len;
         field_desc->ptr_depth = field_type->ptr_depth;
+        field_desc->is_tagged = field_type->is_tagged;
         field_desc->elem_type_kind = field_type->elem_type_kind;
         field_desc->elem_ptr_depth = field_type->elem_ptr_depth;
         field_desc->array_len = field_type->array_len;
