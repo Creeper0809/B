@@ -263,6 +263,15 @@ func ssa_inst_set_op(inst: *SSAInstruction, op: u64) -> u64 {
     return 0;
 }
 
+func ssa_inst_set_prev(inst: *SSAInstruction, prev: *SSAInstruction) -> u64 {
+    var p: *tagged(InstMeta) u8 = inst->prev;
+    var op: u16 = p.op;
+    p = (*tagged(InstMeta) u8)prev;
+    p.op = op;
+    inst->prev = p;
+    return 0;
+}
+
 func ssa_phi_arg_new(val: u64, block_id: u64) -> u64 {
     var a_ptr: u64 = heap_alloc(SIZEOF_SSA_PHI_ARG);
     var a: *SSAPhiArg = (*SSAPhiArg)a_ptr;

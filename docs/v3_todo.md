@@ -81,6 +81,7 @@
 - [x] SSA Dominance Frontier 계산 추가 + 테스트(119_ssa_df_basic) 추가
 - [x] SSA mem2reg Phi 삽입 + Rename 스택 구현 + 테스트(120_ssa_mem2reg_basic) 추가
 - [x] SSA 단락 평가(AND/OR) 변환 + 테스트(121_ssa_short_circuit) 추가
+- [x] -O1 플래그 파싱 + SSA O1 최적화 패스(상수 폴딩/NOP 제거) 추가 + 테스트(122_ssa_opt_o1_fold) 추가
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증

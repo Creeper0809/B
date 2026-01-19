@@ -14,6 +14,9 @@ import ast;
 import compiler;
 import ssa;
 import ssa_builder;
+import ssa_mem2reg;
+import ssa_opt_o1;
+import opt;
 import emitter.symtab;
 import emitter.typeinfo;
 import emitter.emitter;
@@ -145,7 +148,11 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     var program: *AstProgram = (*AstProgram)prog;
 
     // SSA CFG scaffold (no codegen impact yet)
-    ssa_builder_build_program(prog);
+    var ssa_ctx_ptr: u64 = ssa_builder_build_program(prog);
+    if (opt_get_level() >= 1) {
+        ssa_mem2reg_run((*SSAContext)ssa_ctx_ptr);
+        ssa_opt_o1_run((*SSAContext)ssa_ctx_ptr);
+    }
 
     // Initialize emitter state
     emitter_init();
