@@ -316,6 +316,43 @@ func builder_store_by_size(ctx: *BuilderCtx, addr_reg: u64, val_reg: u64, size: 
     return 0;
 }
 
+func builder_append_slice_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
+    var k: u64 = ast_kind(arg);
+    if (k == AST_SLICE) {
+        var s: *AstSlice = (*AstSlice)arg;
+        var ptr_reg: u64 = build_expr(ctx, s->ptr_expr);
+        var len_reg: u64 = build_expr(ctx, s->len_expr);
+        vec_push(arg_regs, len_reg);
+        vec_push(arg_regs, ptr_reg);
+        return 0;
+    }
+
+    var addr_reg: u64 = builder_lvalue_addr(ctx, arg);
+    if (addr_reg == 0) { return 0; }
+    var ptr_reg2: u64 = builder_load_by_size(ctx, addr_reg, 8);
+    var off_reg: u64 = build_const(ctx, 8);
+    var addr2: u64 = builder_new_reg(ctx);
+    var add_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr2, ssa_operand_reg(addr_reg), ssa_operand_reg(off_reg));
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr);
+    var len_reg2: u64 = builder_load_by_size(ctx, addr2, 8);
+    vec_push(arg_regs, len_reg2);
+    vec_push(arg_regs, ptr_reg2);
+    return 0;
+}
+
+func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
+    var ti_ptr: u64 = get_expr_type_with_symtab(arg, ctx->symtab);
+    if (ti_ptr != 0) {
+        var ti: *TypeInfo = (*TypeInfo)ti_ptr;
+        if (ti->type_kind == TYPE_SLICE && ti->ptr_depth == 0) {
+            return builder_append_slice_arg(ctx, arg_regs, arg);
+        }
+    }
+    var reg: u64 = build_expr(ctx, arg);
+    vec_push(arg_regs, reg);
+    return 0;
+}
+
 func builder_type_size_from_expr(ctx: *BuilderCtx, node: u64) -> u64 {
     var ti_ptr: u64 = get_expr_type_with_symtab(node, ctx->symtab);
     if (ti_ptr == 0) { return 8; }
@@ -659,19 +696,19 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
         var args: u64 = call->args_vec;
         var nargs: u64 = 0;
         if (args != 0) { nargs = vec_len(args); }
-        var arg_regs: u64 = vec_new(nargs);
+        var arg_regs: u64 = vec_new(nargs * 2);
         var i: u64 = nargs;
         while (i > 0) {
             i = i - 1;
             var arg: u64 = vec_get(args, i);
-            var reg: u64 = build_expr(ctx, arg);
-            vec_push(arg_regs, reg);
+            builder_append_call_arg(ctx, arg_regs, arg);
         }
+        var total_regs: u64 = vec_len(arg_regs);
         var info: u64 = heap_alloc(32);
         *(info) = resolved_ptr;
         *(info + 8) = resolved_len;
         *(info + 16) = arg_regs;
-        *(info + 24) = nargs;
+        *(info + 24) = total_regs;
         var dst: u64 = builder_new_reg(ctx);
         var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL, dst, ssa_operand_const(info), 0);
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
