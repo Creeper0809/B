@@ -23,6 +23,30 @@ const SSA_OP_NOP = 0;
 const SSA_OP_ENTRY = 1;
 const SSA_OP_PHI = 2;
 
+// Basic arithmetic
+const SSA_OP_CONST = 10;
+const SSA_OP_ADD = 11;
+const SSA_OP_SUB = 12;
+const SSA_OP_MUL = 13;
+const SSA_OP_DIV = 14;
+
+// Comparison ops
+const SSA_OP_EQ = 15;
+const SSA_OP_NE = 16;
+const SSA_OP_LT = 17;
+const SSA_OP_GT = 18;
+const SSA_OP_LE = 19;
+const SSA_OP_GE = 20;
+
+// Memory ops (mem2reg 이전 단계)
+const SSA_OP_LOAD = 25;
+const SSA_OP_STORE = 26;
+
+// Control flow
+const SSA_OP_JMP = 30;
+const SSA_OP_BR = 31;
+const SSA_OP_RET = 32;
+
 const SSA_OPR_VALUE_MASK = 9223372036854775807;
 
 // ============================================

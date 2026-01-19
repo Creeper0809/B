@@ -13,6 +13,7 @@ import std.vec;
 import ast;
 import compiler;
 import ssa;
+import ssa_builder;
 import emitter.symtab;
 import emitter.typeinfo;
 import emitter.emitter;
@@ -143,8 +144,8 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
 
     var program: *AstProgram = (*AstProgram)prog;
 
-    // SSA scaffold (no codegen impact yet)
-    ssa_build_program(prog);
+    // SSA CFG scaffold (no codegen impact yet)
+    ssa_builder_build_program(prog);
 
     // Initialize emitter state
     emitter_init();

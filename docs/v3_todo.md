@@ -73,6 +73,10 @@
 - [x] SSA Phi 인자 리스트(SSAPhiArg) 추가 + 테스트(113_ssa_phi_args) 추가
 - [x] SSAInstruction prev 포인터 태깅(Opcode 저장) 적용 + 크기 48B로 축소
 - [x] Phi 전용 리스트 push front(SSA phi_head) 추가 + 테스트(114_ssa_phi_append) 추가
+- [x] SSA CFG 빌더(If/While) 스캐폴드 추가 + 테스트(115_ssa_cfg_smoke) 추가
+- [x] SSA 명령어 생성 단계(LOAD/STORE/BR/JMP/RET) 추가 + 테스트(116_ssa_inst_gen) 추가
+- [x] SSA 비교 연산 opcode + while BR 보강 + 테스트(117_ssa_cmp_while) 추가
+- [x] SSA 테스트 116 기대값 보정 (exit=0)
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증
