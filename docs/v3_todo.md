@@ -91,6 +91,9 @@
 - [x] SSA → x86 코드젠(지원 함수 제한) + 테스트(129_ssa_codegen_basic) 추가
 - [x] SSA 파라미터 로딩(SSA_OP_PARAM) + 코드젠/빌더 확장 + 테스트(130_ssa_codegen_param_basic) 추가
 - [x] SSA unary/sizeof 지원 + 테스트(131_ssa_builder_unary_sizeof) 추가
+- [x] IR 모드 플래그(-3addr/-ssa) 파싱 + opt API + 테스트(132_opt_ir_mode) 추가
+- [x] IR 모드 덤프(SSA/3addr) + ssa_dump 모듈 + 테스트(133_ssa_dump_basic) 추가
+- [x] IR 모드 최적화 경로 적용(덤프 아님) + 테스트(134_ir_mode_codegen_smoke) 추가
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증

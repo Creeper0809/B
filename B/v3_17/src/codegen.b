@@ -156,9 +156,15 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     typeinfo_set_funcs(sigs);
     var ssa_ctx_ptr: u64 = ssa_builder_build_program(prog);
     var ssa_ctx: *SSAContext = (*SSAContext)ssa_ctx_ptr;
-    if (opt_get_level() >= 1) {
+    var ir_mode: u64 = opt_get_ir_mode();
+    var use_ir: u64 = 0;
+    if (ir_mode != IR_NONE) { use_ir = 1; }
+
+    if (use_ir != 0 || opt_get_level() >= 1) {
         ssa_mem2reg_run((*SSAContext)ssa_ctx_ptr);
-        ssa_opt_o1_run((*SSAContext)ssa_ctx_ptr);
+        if (opt_get_level() >= 1) {
+            ssa_opt_o1_run((*SSAContext)ssa_ctx_ptr);
+        }
         ssa_destroy_run((*SSAContext)ssa_ctx_ptr);
         ssa_regalloc_run((*SSAContext)ssa_ctx_ptr, 6);
         ssa_regalloc_apply_run((*SSAContext)ssa_ctx_ptr);
@@ -206,7 +212,7 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     
     for(var i : u64 = 0; i < vec_len(program->funcs_vec);i++){
         var fn_ptr: u64 = vec_get(program->funcs_vec, i);
-        if (opt_get_level() >= 1) {
+        if (use_ir != 0 || opt_get_level() >= 1) {
             var ssa_fn_ptr: u64 = *(*u64)(ssa_ctx->funcs_data + i * 8);
             if (ssa_codegen_is_supported_func(fn_ptr, program->globals_vec) != 0) {
                 ssa_codegen_emit_func(fn_ptr, ssa_fn_ptr);

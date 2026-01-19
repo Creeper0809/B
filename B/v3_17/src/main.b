@@ -8,7 +8,7 @@ import opt;
 
 func main(argc: u64, argv: u64) -> u64 {
     if (argc < 2) {
-        emit("Usage: v3_17 [-O1] <source.b>\n", 33);
+        emit("Usage: v3_17 [-O0|-O1] [-3addr|-ssa] <source.b>\n", 55);
         return 1;
     }
 
@@ -28,13 +28,23 @@ func main(argc: u64, argv: u64) -> u64 {
             i = i + 1;
             continue;
         }
+        if (str_eq(arg, arg_len, "-3addr", 6)) {
+            opt_set_ir_mode(IR_3ADDR);
+            i = i + 1;
+            continue;
+        }
+        if (str_eq(arg, arg_len, "-ssa", 4)) {
+            opt_set_ir_mode(IR_SSA);
+            i = i + 1;
+            continue;
+        }
 
         filename = arg;
         i = i + 1;
     }
 
     if (filename == 0) {
-        emit("Usage: v3_17 [-O1] <source.b>\n", 33);
+        emit("Usage: v3_17 [-O0|-O1] [-3addr|-ssa] <source.b>\n", 55);
         return 1;
     }
 
