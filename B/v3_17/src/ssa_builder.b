@@ -9,6 +9,7 @@ import std.hashmap;
 import types;
 import ast;
 import ssa;
+import emitter.typeinfo;
 
 // ============================================
 // Builder Context
@@ -226,6 +227,36 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
         var inst_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, op, reg_id2, ssa_operand_reg(lhs_reg), ssa_operand_reg(rhs_reg));
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr2);
         return reg_id2;
+    }
+
+    if (kind == AST_UNARY) {
+        var un: *AstUnary = (*AstUnary)node;
+        var op: u64 = un->op;
+        var val_reg: u64 = build_expr(ctx, un->operand);
+
+        if (op == TOKEN_MINUS) {
+            var zero_reg: u64 = build_const(ctx, 0);
+            var dst: u64 = builder_new_reg(ctx);
+            var inst_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_SUB, dst, ssa_operand_reg(zero_reg), ssa_operand_reg(val_reg));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr3);
+            return dst;
+        }
+
+        if (op == TOKEN_BANG) {
+            var zero_reg2: u64 = build_const(ctx, 0);
+            var dst2: u64 = builder_new_reg(ctx);
+            var inst_ptr4: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_EQ, dst2, ssa_operand_reg(val_reg), ssa_operand_reg(zero_reg2));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr4);
+            return dst2;
+        }
+
+        return val_reg;
+    }
+
+    if (kind == AST_SIZEOF) {
+        var sz: *AstSizeof = (*AstSizeof)node;
+        var size_val: u64 = sizeof_type(sz->type_kind, sz->ptr_depth, sz->struct_name_ptr, sz->struct_name_len);
+        return build_const(ctx, size_val);
     }
 
     return build_const(ctx, 0);

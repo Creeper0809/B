@@ -152,6 +152,8 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     var program: *AstProgram = (*AstProgram)prog;
 
     // SSA CFG scaffold (no codegen impact yet)
+    typeinfo_set_structs(program->structs_vec);
+    typeinfo_set_funcs(sigs);
     var ssa_ctx_ptr: u64 = ssa_builder_build_program(prog);
     var ssa_ctx: *SSAContext = (*SSAContext)ssa_ctx_ptr;
     if (opt_get_level() >= 1) {

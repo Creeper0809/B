@@ -58,6 +58,14 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return 1;
     }
 
+    if (kind == AST_UNARY) {
+        var un: *AstUnary = (*AstUnary)node;
+        if (un->op != TOKEN_MINUS && un->op != TOKEN_BANG) { return 0; }
+        return _ssa_codegen_expr_supported(un->operand, globals);
+    }
+
+    if (kind == AST_SIZEOF) { return 1; }
+
     return 0;
 }
 
