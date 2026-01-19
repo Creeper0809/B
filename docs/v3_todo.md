@@ -108,6 +108,7 @@
 - [x] SSA 메서드 호출(AST_METHOD_CALL) 지원 + 테스트 41~43
 - [x] SSA mem2reg 호출 인자 리네임 보강 (CALL arg rewrite)
 - [x] SSA 구조체 리터럴 초기화/대입 지원 + 테스트 44~46
+- [x] SSA 슬라이스 초기화/대입 지원 + 테스트 47~49
 - [x] IR 모드 플래그(-3addr/-ssa) 파싱 + opt API + 테스트(132_opt_ir_mode) 추가
 - [x] IR 모드 덤프(SSA/3addr) + ssa_dump 모듈 + 테스트(133_ssa_dump_basic) 추가
 - [x] IR 모드 최적화 경로 적용(덤프 아님) + 테스트(134_ir_mode_codegen_smoke) 추가

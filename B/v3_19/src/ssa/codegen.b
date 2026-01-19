@@ -245,6 +245,9 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
     if (kind == AST_VAR_DECL) {
         var vd: *AstVarDecl = (*AstVarDecl)node;
         if (vd->init_expr == 0) { return 1; }
+        if (vd->type_kind == TYPE_SLICE && vd->ptr_depth == 0) {
+            if (ast_kind(vd->init_expr) == AST_CALL) { return 0; }
+        }
         if (ast_kind(vd->init_expr) == AST_STRUCT_LITERAL) {
             return _ssa_codegen_struct_literal_supported(vd->init_expr, globals);
         }

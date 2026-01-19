@@ -425,6 +425,19 @@ func builder_struct_literal_init(ctx: *BuilderCtx, struct_def: u64, values: u64,
     return 0;
 }
 
+func builder_store_slice_regs(ctx: *BuilderCtx, base_addr: u64, slice_info: u64) -> u64 {
+    if (base_addr == 0 || slice_info == 0) { return 0; }
+    var ptr_reg: u64 = *(slice_info);
+    var len_reg: u64 = *(slice_info + 8);
+    builder_store_by_size(ctx, base_addr, ptr_reg, 8);
+    var off_reg: u64 = build_const(ctx, 8);
+    var addr2: u64 = builder_new_reg(ctx);
+    var add_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr2, ssa_operand_reg(base_addr), ssa_operand_reg(off_reg));
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr);
+    builder_store_by_size(ctx, addr2, len_reg, 8);
+    return 0;
+}
+
 func builder_build_method_name(struct_ptr: u64, struct_len: u64, method_ptr: u64, method_len: u64) -> u64 {
     var full_len: u64 = struct_len + 1 + method_len;
     var full_ptr: u64 = heap_alloc(full_len);
@@ -1179,6 +1192,13 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
         builder_symtab_add_local(ctx, vd);
         if (vd->init_expr != 0) {
             var init_kind: u64 = ast_kind(vd->init_expr);
+            if (vd->type_kind == TYPE_SLICE && vd->ptr_depth == 0) {
+                var offset_slice: u64 = symtab_find(ctx->symtab, vd->name_ptr, vd->name_len);
+                var base_addr: u64 = builder_new_lea_local(ctx, offset_slice);
+                var slice_info: u64 = builder_slice_regs(ctx, vd->init_expr);
+                builder_store_slice_regs(ctx, base_addr, slice_info);
+                return 0;
+            }
             if (init_kind == AST_STRUCT_LITERAL) {
                 var offset: u64 = symtab_find(ctx->symtab, vd->name_ptr, vd->name_len);
                 var base_addr: u64 = builder_new_lea_local(ctx, offset);
@@ -1219,6 +1239,21 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                 var lit2: *AstStructLiteral = (*AstStructLiteral)asn->value;
                 builder_struct_literal_init(ctx, lit2->struct_def, lit2->values_vec, base_addr2);
                 return 0;
+            }
+            var tgt_type: u64 = symtab_get_type(ctx->symtab, idn->name_ptr, idn->name_len);
+            if (tgt_type != 0) {
+                var ti: *TypeInfo = (*TypeInfo)tgt_type;
+                if (ti->type_kind == TYPE_SLICE && ti->ptr_depth == 0) {
+                    var base_addr3: u64 = 0;
+                    if (offset2 != 0) {
+                        base_addr3 = builder_new_lea_local(ctx, offset2);
+                    } else {
+                        base_addr3 = builder_lvalue_addr(ctx, asn->target);
+                    }
+                    var slice_info2: u64 = builder_slice_regs(ctx, asn->value);
+                    builder_store_slice_regs(ctx, base_addr3, slice_info2);
+                    return 0;
+                }
             }
             var val_reg3: u64 = build_expr(ctx, asn->value);
             if (offset2 != 0) {
