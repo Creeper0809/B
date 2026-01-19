@@ -87,11 +87,12 @@ bash ${TEST_SCRIPT} bin/${VERSION}_stage1 2>&1 | tail -15
 echo ""
 echo "[6/6] 실행 바이너리 생성 중..."
 rm -f out.s out.o a.out
+BASE_NAME=$(basename "${SRC_FILE}" .b)
 ./bin/${VERSION}_stage1 ${SRC_FILE} >/dev/null
-if [ -f "a.out" ]; then
-    mv a.out build/${VERSION}.out
+if [ -f "${BASE_NAME}.out" ]; then
+    mv "${BASE_NAME}.out" build/${VERSION}.out
 fi
-rm -f out.s out.o
+rm -f "${BASE_NAME}.s" "${BASE_NAME}.o"
 
 echo ""
 echo "========================================="

@@ -99,6 +99,19 @@
 - [x] v3_18 driver stdout 리다이렉트(dup2) + 테스트(136_os_dup2_basic) 추가
 - [x] v3_19 기본 실행/IR/ASM 출력 모드 전환 + 스크립트 갱신 + 테스트(137_output_mode_flags) 추가
 - [x] v3_19 build_and_test .out 생성 + 테스트(138_output_mode_default) 추가
+- [x] v3_19 기본 출력 파일명 <파일명>.out + 결과 출력 + 테스트(139_path_basename_noext) 추가
+- [x] v3_19 실행 결과 출력 + 테스트(140_os_execute_true) 추가
+- [x] v3_19 stdout 복구(dup2)로 실행/메시지 출력 복원 + 테스트(141_os_dup2_restore) 추가
+- [x] v3_19 test/b 불필요 expected/skip 파일 정리
+- [x] v3_19 test/b 유사 테스트 통합(continue/recursion/std import)
+- [x] v3_19 산술 테스트 통합(기본/비트/비교/우선순위/복합)
+- [x] v3_19 struct 테스트 통합(접근/리터럴/복사/리턴) + 기존 파일 삭제/번호 재배치
+- [x] v3_19 포인터/문자열/제어흐름/스위치+enum/컬렉션 테스트 통합
+- [x] v3_19 통합 대상 개별 테스트 파일 정리(삭제)
+- [x] v3_19 impl 테스트 통합(76_impl_basic) + 개별 impl 테스트 제외
+- [x] v3_19 산술 테스트에 compound/inc 편입(98 제거)
+- [x] v3_19 자료형 테스트 통합(배열/슬라이스/태그드/비트필드) + 101~107 정리
+- [x] v3_19 test/b 번호 재배열(01~31 정렬)
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증
