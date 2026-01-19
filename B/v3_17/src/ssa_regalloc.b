@@ -415,3 +415,76 @@ func ssa_regalloc_run(ctx: *SSAContext, k: u64) -> u64 {
     }
     return 0;
 }
+
+func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
+    if (fn == 0) { return 0; }
+    if (fn->reg_map_data == 0) { return 0; }
+
+    var map: u64 = fn->reg_map_data;
+    var map_len: u64 = fn->reg_map_len;
+
+    var blocks: u64 = fn->blocks_data;
+    var n: u64 = fn->blocks_len;
+    var i: u64 = 0;
+    while (i < n) {
+        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+        var b: *SSABlock = (*SSABlock)b_ptr;
+
+        var phi: *SSAInstruction = b->phi_head;
+        while (phi != 0) {
+            if (phi->dest < map_len) {
+                var p: u64 = *(*u64)(map + phi->dest * 8);
+                if (p != 0) { phi->dest = p; }
+            }
+            var arg: *SSAPhiArg = (*SSAPhiArg)phi->src1;
+            while (arg != 0) {
+                if (arg->val < map_len) {
+                    var p2: u64 = *(*u64)(map + arg->val * 8);
+                    if (p2 != 0) { arg->val = p2; }
+                }
+                arg = arg->next;
+            }
+            phi = phi->next;
+        }
+
+        var cur: *SSAInstruction = b->inst_head;
+        while (cur != 0) {
+            if (cur->dest < map_len) {
+                var pd: u64 = *(*u64)(map + cur->dest * 8);
+                if (pd != 0) { cur->dest = pd; }
+            }
+            if (!ssa_operand_is_const(cur->src1)) {
+                var r1: u64 = ssa_operand_value(cur->src1);
+                if (r1 < map_len) {
+                    var p1: u64 = *(*u64)(map + r1 * 8);
+                    if (p1 != 0) { cur->src1 = ssa_operand_reg(p1); }
+                }
+            }
+            if (!ssa_operand_is_const(cur->src2)) {
+                var r2: u64 = ssa_operand_value(cur->src2);
+                if (r2 < map_len) {
+                    var p2: u64 = *(*u64)(map + r2 * 8);
+                    if (p2 != 0) { cur->src2 = ssa_operand_reg(p2); }
+                }
+            }
+            cur = cur->next;
+        }
+
+        i = i + 1;
+    }
+
+    return 0;
+}
+
+func ssa_regalloc_apply_run(ctx: *SSAContext) -> u64 {
+    if (ctx == 0) { return 0; }
+    var funcs: u64 = ctx->funcs_data;
+    var n: u64 = ctx->funcs_len;
+    var i: u64 = 0;
+    while (i < n) {
+        var f_ptr: u64 = *(*u64)(funcs + i * 8);
+        ssa_regalloc_apply_fn((*SSAFunction)f_ptr);
+        i = i + 1;
+    }
+    return 0;
+}
