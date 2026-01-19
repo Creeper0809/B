@@ -81,24 +81,23 @@ struct SSAContext {
 }
 
 // ============================================
-// Block/Func List Helpers
+// Pointer List Helpers
 // ============================================
 
-func block_list_init(data_ptr: *u64, len_ptr: *u64, cap_ptr: *u64) -> u64 {
-    *(*u64)(data_ptr) = 0;
-    *(*u64)(len_ptr) = 0;
-    *(*u64)(cap_ptr) = 0;
-    return 0;
-}
+// _ssa_ptr_list_push - 구조체 내의 동적 포인터 목록에 포인터를 추가하는 헬퍼 함수입니다.
+// 이 함수는 구조체 멤버의 오프셋을 사용하여 제네릭이 없는 언어에서 코드 중복을 줄입니다.
+func _ssa_ptr_list_push(base_ptr: u64, data_offset: u64, len_offset: u64, cap_offset: u64, item: u64, initial_cap: u64) -> u64 {
+    var data_ptr: *u64 = (*u64)(base_ptr + data_offset);
+    var len_ptr: *u64 = (*u64)(base_ptr + len_offset);
+    var cap_ptr: *u64 = (*u64)(base_ptr + cap_offset);
 
-func block_list_push(data_ptr: *u64, len_ptr: *u64, cap_ptr: *u64, block: *SSABlock) -> u64 {
-    var len: u64 = *(*u64)(len_ptr);
-    var cap: u64 = *(*u64)(cap_ptr);
-    var data: u64 = *(*u64)(data_ptr);
+    var len: u64 = *len_ptr;
+    var cap: u64 = *cap_ptr;
+    var data: u64 = *data_ptr;
 
     if (len >= cap) {
         var new_cap: u64 = cap * 2;
-        if (new_cap == 0) { new_cap = 8; }
+        if (new_cap == 0) { new_cap = initial_cap; }
 
         var new_data: u64 = heap_alloc(new_cap * 8);
         if (len > 0) {
@@ -108,113 +107,30 @@ func block_list_push(data_ptr: *u64, len_ptr: *u64, cap_ptr: *u64, block: *SSABl
                 i = i + 1;
             }
         }
+        // TODO: 이전 'data' 블록을 해제해야 할 수 있습니다 (메모리 누수 가능성).
         data = new_data;
         cap = new_cap;
     }
 
-    *(*u64)(data + len * 8) = block;
+    *(*u64)(data + len * 8) = item;
     len = len + 1;
 
-    *(*u64)(data_ptr) = data;
-    *(*u64)(len_ptr) = len;
-    *(*u64)(cap_ptr) = cap;
+    *data_ptr = data;
+    *len_ptr = len;
+    *cap_ptr = cap;
     return 0;
 }
 
-func func_list_init(data_ptr: *u64, len_ptr: *u64, cap_ptr: *u64) -> u64 {
-    *(*u64)(data_ptr) = 0;
-    *(*u64)(len_ptr) = 0;
-    *(*u64)(cap_ptr) = 0;
-    return 0;
-}
-
-func func_list_push(data_ptr: *u64, len_ptr: *u64, cap_ptr: *u64, fn: *SSAFunction) -> u64 {
-    var len: u64 = *(*u64)(len_ptr);
-    var cap: u64 = *(*u64)(cap_ptr);
-    var data: u64 = *(*u64)(data_ptr);
-
-    if (len >= cap) {
-        var new_cap: u64 = cap * 2;
-        if (new_cap == 0) { new_cap = 8; }
-
-        var new_data: u64 = heap_alloc(new_cap * 8);
-        if (len > 0) {
-            var i: u64 = 0;
-            while (i < len) {
-                *(*u64)(new_data + i * 8) = *(*u64)(data + i * 8);
-                i = i + 1;
-            }
-        }
-        data = new_data;
-        cap = new_cap;
-    }
-
-    *(*u64)(data + len * 8) = fn;
-    len = len + 1;
-
-    *(*u64)(data_ptr) = data;
-    *(*u64)(len_ptr) = len;
-    *(*u64)(cap_ptr) = cap;
-    return 0;
-}
 func ssa_block_list_push(fn: *SSAFunction, block: *SSABlock) -> u64 {
-    var len: u64 = fn->blocks_len;
-    var cap: u64 = fn->blocks_cap;
-    var data: u64 = fn->blocks_data;
-
-    if (len >= cap) {
-        var new_cap: u64 = cap * 2;
-        if (new_cap == 0) { new_cap = 8; }
-
-        var new_data: u64 = heap_alloc(new_cap * 8);
-        if (len > 0) {
-            var i: u64 = 0;
-            while (i < len) {
-                *(*u64)(new_data + i * 8) = *(*u64)(data + i * 8);
-                i = i + 1;
-            }
-        }
-        data = new_data;
-        cap = new_cap;
-    }
-
-    *(*u64)(data + len * 8) = block;
-    len = len + 1;
-
-    fn->blocks_data = data;
-    fn->blocks_len = len;
-    fn->blocks_cap = cap;
-    return 0;
+    // SSAFunction: id, name_ptr, name_len, blocks_data, blocks_len, blocks_cap, entry
+    // Offsets: blocks_data=24, blocks_len=32, blocks_cap=40
+    return _ssa_ptr_list_push((u64)fn, 24, 32, 40, (u64)block, 8);
 }
 
 func ssa_func_list_push(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
-    var len: u64 = ctx->funcs_len;
-    var cap: u64 = ctx->funcs_cap;
-    var data: u64 = ctx->funcs_data;
-
-    if (len >= cap) {
-        var new_cap: u64 = cap * 2;
-        if (new_cap == 0) { new_cap = 8; }
-
-        var new_data: u64 = heap_alloc(new_cap * 8);
-        if (len > 0) {
-            var i: u64 = 0;
-            while (i < len) {
-                *(*u64)(new_data + i * 8) = *(*u64)(data + i * 8);
-                i = i + 1;
-            }
-        }
-        data = new_data;
-        cap = new_cap;
-    }
-
-    *(*u64)(data + len * 8) = fn;
-    len = len + 1;
-
-    ctx->funcs_data = data;
-    ctx->funcs_len = len;
-    ctx->funcs_cap = cap;
-    return 0;
+    // SSAContext: funcs_data, funcs_len, funcs_cap, next_block_id, next_inst_id
+    // Offsets: funcs_data=0, funcs_len=8, funcs_cap=16
+    return _ssa_ptr_list_push((u64)ctx, 0, 8, 16, (u64)fn, 8);
 }
 
 // ============================================
@@ -280,6 +196,28 @@ func ssa_inst_append(block: *SSABlock, inst: *SSAInstruction) -> u64 {
     }
     block->inst_tail->next = inst;
     block->inst_tail = inst;
+    return 0;
+}
+
+func ssa_phi_append(block: *SSABlock, phi: *SSAInstruction) -> u64 {
+    var next_phi: *SSAInstruction = block->phi_head;
+    phi->next = next_phi;
+
+    if (next_phi != 0) {
+        var next_p: *tagged(InstMeta) u8 = next_phi->prev;
+        var next_op: u16 = next_p.op;
+        next_p = (*tagged(InstMeta) u8)phi;
+        next_p.op = next_op;
+        next_phi->prev = next_p;
+    }
+
+    var p: *tagged(InstMeta) u8 = phi->prev;
+    var op: u16 = p.op;
+    p = (*tagged(InstMeta) u8)0;
+    p.op = op;
+    phi->prev = p;
+
+    block->phi_head = phi;
     return 0;
 }
 
@@ -350,61 +288,15 @@ func ssa_operand_value(opr: u64) -> u64 {
 }
 
 func ssa_block_add_pred(block: *SSABlock, pred: *SSABlock) -> u64 {
-    var len: u64 = block->preds_len;
-    var cap: u64 = block->preds_cap;
-    var data: u64 = block->preds_data;
-
-    if (len >= cap) {
-        var new_cap: u64 = cap * 2;
-        if (new_cap == 0) { new_cap = 4; }
-        var new_data: u64 = heap_alloc(new_cap * 8);
-        if (len > 0) {
-            var i: u64 = 0;
-            while (i < len) {
-                *(*u64)(new_data + i * 8) = *(*u64)(data + i * 8);
-                i = i + 1;
-            }
-        }
-        data = new_data;
-        cap = new_cap;
-    }
-
-    *(*u64)(data + len * 8) = pred;
-    len = len + 1;
-
-    block->preds_data = data;
-    block->preds_len = len;
-    block->preds_cap = cap;
-    return 0;
+    // SSABlock: id, phi_head, inst_head, inst_tail, preds_data, preds_len, preds_cap, succs_data, ...
+    // Offsets: preds_data=32, preds_len=40, preds_cap=48
+    return _ssa_ptr_list_push((u64)block, 32, 40, 48, (u64)pred, 4);
 }
 
 func ssa_block_add_succ(block: *SSABlock, succ: *SSABlock) -> u64 {
-    var len: u64 = block->succs_len;
-    var cap: u64 = block->succs_cap;
-    var data: u64 = block->succs_data;
-
-    if (len >= cap) {
-        var new_cap: u64 = cap * 2;
-        if (new_cap == 0) { new_cap = 4; }
-        var new_data: u64 = heap_alloc(new_cap * 8);
-        if (len > 0) {
-            var i: u64 = 0;
-            while (i < len) {
-                *(*u64)(new_data + i * 8) = *(*u64)(data + i * 8);
-                i = i + 1;
-            }
-        }
-        data = new_data;
-        cap = new_cap;
-    }
-
-    *(*u64)(data + len * 8) = succ;
-    len = len + 1;
-
-    block->succs_data = data;
-    block->succs_len = len;
-    block->succs_cap = cap;
-    return 0;
+    // SSABlock: ..., succs_data, succs_len, succs_cap, dom_parent
+    // Offsets: succs_data=56, succs_len=64, succs_cap=72
+    return _ssa_ptr_list_push((u64)block, 56, 64, 72, (u64)succ, 4);
 }
 
 func ssa_add_edge(src: *SSABlock, dst: *SSABlock) -> u64 {
