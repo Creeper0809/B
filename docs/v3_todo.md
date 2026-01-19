@@ -77,6 +77,7 @@
 - [x] SSA 명령어 생성 단계(LOAD/STORE/BR/JMP/RET) 추가 + 테스트(116_ssa_inst_gen) 추가
 - [x] SSA 비교 연산 opcode + while BR 보강 + 테스트(117_ssa_cmp_while) 추가
 - [x] SSA 테스트 116 기대값 보정 (exit=0)
+- [x] SSA mem2reg 스캐폴드(Immediate Dominator 계산) 추가 + 테스트(118_ssa_dom_basic) 추가
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증
