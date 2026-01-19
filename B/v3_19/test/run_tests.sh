@@ -75,8 +75,12 @@ for TEST_FILE in $TEST_FILES; do
     OUT_FILE="$RESULTS_DIR/${TEST_NAME}.out"
     ERR_FILE="$RESULTS_DIR/${TEST_NAME}.err"
     
-    # Compile
-    if ! $COMPILER -asm "$TEST_FILE" 2>/dev/null > "$ASM_FILE"; then
+    # Compile (optional SSA mode)
+    IR_FLAG=""
+    if grep -q -m1 -E '^// Mode: ssa' "$TEST_FILE"; then
+        IR_FLAG="-ssa"
+    fi
+    if ! $COMPILER $IR_FLAG -asm "$TEST_FILE" 2>/dev/null > "$ASM_FILE"; then
         echo -e "${RED}FAIL (compile)${NC}"
         echo "Compilation failed" > "$ERR_FILE"
         FAILED=$((FAILED + 1))

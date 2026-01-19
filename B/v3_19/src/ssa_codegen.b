@@ -69,6 +69,24 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
     return 0;
 }
 
+func _ssa_codegen_stmt_or_expr_supported(node: u64, globals: u64) -> u64 {
+    if (node == 0) { return 1; }
+    var kind: u64 = ast_kind(node);
+    if (kind == AST_VAR_DECL || kind == AST_CONST_DECL || kind == AST_ASSIGN || kind == AST_EXPR_STMT) {
+        return _ssa_codegen_stmt_supported(node, globals);
+    }
+    return _ssa_codegen_expr_supported(node, globals);
+}
+
+func _ssa_codegen_case_supported(node: u64, globals: u64) -> u64 {
+    if (node == 0) { return 0; }
+    var c: *AstCase = (*AstCase)node;
+    if (c->is_default == 0) {
+        if (_ssa_codegen_expr_supported(c->value, globals) == 0) { return 0; }
+    }
+    return _ssa_codegen_stmt_supported(c->body, globals);
+}
+
 func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
     if (node == 0) { return 1; }
     var kind: u64 = ast_kind(node);
@@ -97,6 +115,29 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         var w: *AstWhile = (*AstWhile)node;
         if (_ssa_codegen_expr_supported(w->cond, globals) == 0) { return 0; }
         if (_ssa_codegen_stmt_supported(w->body, globals) == 0) { return 0; }
+        return 1;
+    }
+
+    if (kind == AST_FOR) {
+        var f: *AstFor = (*AstFor)node;
+        if (_ssa_codegen_stmt_or_expr_supported(f->init, globals) == 0) { return 0; }
+        if (_ssa_codegen_expr_supported(f->cond, globals) == 0) { return 0; }
+        if (_ssa_codegen_stmt_or_expr_supported(f->update, globals) == 0) { return 0; }
+        if (_ssa_codegen_stmt_supported(f->body, globals) == 0) { return 0; }
+        return 1;
+    }
+
+    if (kind == AST_SWITCH) {
+        var sw: *AstSwitch = (*AstSwitch)node;
+        if (_ssa_codegen_expr_supported(sw->expr, globals) == 0) { return 0; }
+        var cases: u64 = sw->cases_vec;
+        var n: u64 = 0;
+        if (cases != 0) { n = vec_len(cases); }
+        var i: u64 = 0;
+        while (i < n) {
+            if (_ssa_codegen_case_supported(vec_get(cases, i), globals) == 0) { return 0; }
+            i = i + 1;
+        }
         return 1;
     }
 

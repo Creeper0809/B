@@ -91,6 +91,8 @@
 - [x] SSA → x86 코드젠(지원 함수 제한) + 테스트(129_ssa_codegen_basic) 추가
 - [x] SSA 파라미터 로딩(SSA_OP_PARAM) + 코드젠/빌더 확장 + 테스트(130_ssa_codegen_param_basic) 추가
 - [x] SSA unary/sizeof 지원 + 테스트(131_ssa_builder_unary_sizeof) 추가
+- [x] SSA CFG 빌더 for/switch 지원 + SSA 코드젠 지원 판정 확장
+- [x] SSA 모드 테스트 추가: 32_ssa_for_switch
 - [x] IR 모드 플래그(-3addr/-ssa) 파싱 + opt API + 테스트(132_opt_ir_mode) 추가
 - [x] IR 모드 덤프(SSA/3addr) + ssa_dump 모듈 + 테스트(133_ssa_dump_basic) 추가
 - [x] IR 모드 최적화 경로 적용(덤프 아님) + 테스트(134_ir_mode_codegen_smoke) 추가

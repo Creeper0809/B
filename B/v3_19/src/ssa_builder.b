@@ -125,6 +125,36 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
     return 0;
 }
 
+// ============================================
+// Builder Helpers
+// ============================================
+
+func builder_block_is_terminated(block: *SSABlock) -> u64 {
+    if (block == 0) { return 1; }
+    var tail: *SSAInstruction = block->inst_tail;
+    if (tail == 0) { return 0; }
+    var op: u64 = ssa_inst_get_op(tail);
+    if (op == SSA_OP_JMP || op == SSA_OP_BR || op == SSA_OP_RET) { return 1; }
+    return 0;
+}
+
+func builder_block_is_reachable(block: *SSABlock) -> u64 {
+    if (block == 0) { return 0; }
+    if (block->preds_len > 0) { return 1; }
+    return 0;
+}
+
+func builder_stmt_or_expr(ctx: *BuilderCtx, node: u64) -> u64 {
+    if (node == 0) { return 0; }
+    var k: u64 = ast_kind(node);
+    if (k == AST_VAR_DECL || k == AST_CONST_DECL || k == AST_ASSIGN || k == AST_EXPR_STMT) {
+        build_stmt(ctx, node);
+        return 0;
+    }
+    build_expr(ctx, node);
+    return 0;
+}
+
 func builder_binop_to_ssa_op(op: u64) -> u64 {
     if (op == TOKEN_PLUS) { return SSA_OP_ADD; }
     if (op == TOKEN_MINUS) { return SSA_OP_SUB; }
@@ -278,6 +308,143 @@ func build_block(ctx: *BuilderCtx, block_node: u64) -> u64 {
     return 0;
 }
 
+func build_for(ctx: *BuilderCtx, node: u64) -> u64 {
+    var f: *AstFor = (*AstFor)node;
+
+    if (f->init != 0) {
+        builder_stmt_or_expr(ctx, f->init);
+    }
+
+    var cond_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+    var body_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+    var update_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+    var exit_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+
+    var jmp_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(cond_bb->id), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr);
+    ssa_add_edge(ctx->cur_block, cond_bb);
+
+    builder_set_block(ctx, cond_bb);
+    var cond_reg: u64 = 0;
+    if (f->cond != 0) {
+        cond_reg = build_expr(ctx, f->cond);
+    } else {
+        cond_reg = build_const(ctx, 1);
+    }
+    var br_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_BR, ssa_operand_const(exit_bb->id), ssa_operand_reg(cond_reg), ssa_operand_const(body_bb->id));
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)br_ptr);
+    ssa_add_edge(ctx->cur_block, body_bb);
+    ssa_add_edge(ctx->cur_block, exit_bb);
+
+    builder_push_loop(ctx, exit_bb, update_bb);
+    builder_set_block(ctx, body_bb);
+    build_block(ctx, f->body);
+    if (builder_block_is_reachable(ctx->cur_block) != 0 && builder_block_is_terminated(ctx->cur_block) == 0) {
+        var jmp_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(update_bb->id), 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr2);
+        ssa_add_edge(ctx->cur_block, update_bb);
+    }
+    builder_pop_loop(ctx);
+
+    builder_set_block(ctx, update_bb);
+    if (f->update != 0) {
+        builder_stmt_or_expr(ctx, f->update);
+    }
+    if (builder_block_is_reachable(ctx->cur_block) != 0 && builder_block_is_terminated(ctx->cur_block) == 0) {
+        var jmp_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(cond_bb->id), 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr3);
+        ssa_add_edge(ctx->cur_block, cond_bb);
+    }
+
+    builder_set_block(ctx, exit_bb);
+    return 0;
+}
+
+func build_switch(ctx: *BuilderCtx, node: u64) -> u64 {
+    var sw: *AstSwitch = (*AstSwitch)node;
+    var cases: u64 = sw->cases_vec;
+    var count: u64 = 0;
+    if (cases != 0) { count = vec_len(cases); }
+
+    var exit_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+    if (count == 0) {
+        var jmp_ptr0: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(exit_bb->id), 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr0);
+        ssa_add_edge(ctx->cur_block, exit_bb);
+        builder_set_block(ctx, exit_bb);
+        return 0;
+    }
+
+    var expr_reg: u64 = build_expr(ctx, sw->expr);
+
+    var case_blocks: u64 = vec_new(count);
+    var case_nodes: u64 = vec_new(count);
+    var default_bb: *SSABlock = exit_bb;
+
+    var i: u64 = 0;
+    while (i < count) {
+        var c_ptr: u64 = vec_get(cases, i);
+        var c: *AstCase = (*AstCase)c_ptr;
+        var case_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+        vec_push(case_blocks, (u64)case_bb);
+        vec_push(case_nodes, c_ptr);
+        if (c->is_default != 0) {
+            default_bb = case_bb;
+        }
+        i = i + 1;
+    }
+
+    i = 0;
+    while (i < count) {
+        var c_ptr2: u64 = vec_get(case_nodes, i);
+        var c2: *AstCase = (*AstCase)c_ptr2;
+        if (c2->is_default == 0) {
+            var case_bb2: *SSABlock = (*SSABlock)vec_get(case_blocks, i);
+            var val_reg: u64 = build_expr(ctx, c2->value);
+            var cmp_reg: u64 = builder_new_reg(ctx);
+            var cmp_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_EQ, cmp_reg, ssa_operand_reg(expr_reg), ssa_operand_reg(val_reg));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)cmp_ptr);
+
+            var next_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+            var br_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_BR, ssa_operand_const(next_bb->id), ssa_operand_reg(cmp_reg), ssa_operand_const(case_bb2->id));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)br_ptr);
+            ssa_add_edge(ctx->cur_block, case_bb2);
+            ssa_add_edge(ctx->cur_block, next_bb);
+            builder_set_block(ctx, next_bb);
+        }
+        i = i + 1;
+    }
+
+    var jmp_ptr1: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(default_bb->id), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr1);
+    ssa_add_edge(ctx->cur_block, default_bb);
+
+    builder_push_loop(ctx, exit_bb, 0);
+    i = 0;
+    while (i < count) {
+        var case_bb3: *SSABlock = (*SSABlock)vec_get(case_blocks, i);
+        var c_ptr3: u64 = vec_get(case_nodes, i);
+        var c3: *AstCase = (*AstCase)c_ptr3;
+        builder_set_block(ctx, case_bb3);
+        build_block(ctx, c3->body);
+
+        if (builder_block_is_reachable(ctx->cur_block) != 0 && builder_block_is_terminated(ctx->cur_block) == 0) {
+            var next_bb2: *SSABlock = exit_bb;
+            if (i + 1 < count) {
+                next_bb2 = (*SSABlock)vec_get(case_blocks, i + 1);
+            }
+            var jmp_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(next_bb2->id), 0);
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr2);
+            ssa_add_edge(ctx->cur_block, next_bb2);
+        }
+        i = i + 1;
+    }
+    builder_pop_loop(ctx);
+
+    builder_set_block(ctx, exit_bb);
+    return 0;
+}
+
 func build_if(ctx: *BuilderCtx, node: u64) -> u64 {
     var ifn: *AstIf = (*AstIf)node;
     var has_else: u64 = 0;
@@ -361,6 +528,16 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
 
     if (kind == AST_WHILE) {
         build_while(ctx, node);
+        return 0;
+    }
+
+    if (kind == AST_FOR) {
+        build_for(ctx, node);
+        return 0;
+    }
+
+    if (kind == AST_SWITCH) {
+        build_switch(ctx, node);
         return 0;
     }
 
