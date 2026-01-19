@@ -15,7 +15,7 @@ import ast;
 
 const SIZEOF_SSA_INST = 48;   // 6 * u64 (op tagged in prev)
 const SIZEOF_SSA_BLOCK = 112;  // 14 * u64
-const SIZEOF_SSA_FUNC = 56;   // 7 * u64
+const SIZEOF_SSA_FUNC = 72;   // 9 * u64
 const SIZEOF_SSA_CTX = 40;    // 5 * u64
 const SIZEOF_SSA_PHI_ARG = 24; // 3 * u64
 
@@ -100,6 +100,8 @@ struct SSAFunction {
     blocks_len: u64;
     blocks_cap: u64;
     entry: *SSABlock;
+    reg_map_data: u64; // *u64 (virtual reg -> phys reg)
+    reg_map_len: u64;
 }
 
 struct SSAContext {
@@ -402,6 +404,8 @@ func ssa_new_function(ctx: *SSAContext, name_ptr: u64, name_len: u64) -> u64 {
     f->blocks_len = 0;
     f->blocks_cap = 0;
     f->entry = (*SSABlock)ssa_new_block(ctx, f);
+    f->reg_map_data = 0;
+    f->reg_map_len = 0;
     ssa_func_list_push(ctx, f);
     return f_ptr;
 }

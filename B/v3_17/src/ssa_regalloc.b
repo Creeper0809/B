@@ -9,6 +9,13 @@ import ssa;
 
 const SSA_REGALLOC_DEBUG = 0;
 
+const SSA_PHYS_RAX = 1;
+const SSA_PHYS_RBX = 2;
+const SSA_PHYS_RCX = 3;
+const SSA_PHYS_RDX = 4;
+const SSA_PHYS_R8 = 5;
+const SSA_PHYS_R9 = 6;
+
 func _ssa_all_ones() -> u64 {
     var v: u64 = 0;
     v = v - 1;
@@ -358,4 +365,53 @@ func ssa_regalloc_color_fn(fn: *SSAFunction, k: u64) -> u64 {
     }
 
     return colors;
+}
+
+func _ssa_regalloc_color_to_phys(color: u64) -> u64 {
+    if (color == 1) { return SSA_PHYS_RAX; }
+    if (color == 2) { return SSA_PHYS_RBX; }
+    if (color == 3) { return SSA_PHYS_RCX; }
+    if (color == 4) { return SSA_PHYS_RDX; }
+    if (color == 5) { return SSA_PHYS_R8; }
+    if (color == 6) { return SSA_PHYS_R9; }
+    return 0;
+}
+
+func ssa_regalloc_map_fn(fn: *SSAFunction, k: u64) -> u64 {
+    var max_reg: u64 = _ssa_reg_max(fn);
+    if (max_reg == 0) { return 0; }
+
+    var colors: u64 = ssa_regalloc_color_fn(fn, k);
+    if (colors == 0) { return 0; }
+
+    var map: u64 = heap_alloc((max_reg + 1) * 8);
+    var i: u64 = 0;
+    while (i <= max_reg) {
+        *(*u64)(map + i * 8) = 0;
+        i = i + 1;
+    }
+
+    var r: u64 = 1;
+    while (r <= max_reg) {
+        var c: u64 = *(*u64)(colors + r * 8);
+        *(*u64)(map + r * 8) = _ssa_regalloc_color_to_phys(c);
+        r = r + 1;
+    }
+
+    fn->reg_map_data = map;
+    fn->reg_map_len = max_reg + 1;
+    return map;
+}
+
+func ssa_regalloc_run(ctx: *SSAContext, k: u64) -> u64 {
+    if (ctx == 0) { return 0; }
+    var funcs: u64 = ctx->funcs_data;
+    var n: u64 = ctx->funcs_len;
+    var i: u64 = 0;
+    while (i < n) {
+        var f_ptr: u64 = *(*u64)(funcs + i * 8);
+        ssa_regalloc_map_fn((*SSAFunction)f_ptr, k);
+        i = i + 1;
+    }
+    return 0;
 }

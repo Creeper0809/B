@@ -85,6 +85,7 @@
 - [x] SSA 파괴(Phi 제거 → COPY 삽입) 추가 + 테스트(123_ssa_destroy_basic) 추가
 - [x] SSA 파괴 임계 엣지 분리 + 테스트(124_ssa_destroy_critical) 추가
 - [x] SSA 그래프 컬러링 레지스터 할당 스캐폴드 + 테스트(125_ssa_regalloc_basic) 추가
+- [x] 그래프 컬러링 결과 → 물리 레지스터 매핑 + 테스트(126_ssa_regalloc_map) 추가
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증
