@@ -4,12 +4,18 @@
 // (SSA Rename은 다음 단계)
 
 import std.io;
+import std.util;
 import std.vec;
 import std.hashmap;
 import types;
 import ast;
 import ssa;
 import emitter.typeinfo;
+import emitter.symtab;
+import compiler;
+import ssa_codegen;
+
+const SSA_BUILDER_DEBUG = 0;
 
 // ============================================
 // Builder Context
@@ -22,12 +28,16 @@ struct BuilderCtx {
     break_stack: u64;    // vec of *SSABlock
     continue_stack: u64; // vec of *SSABlock
     var_map: u64;         // hashmap: name -> var_id
+    symtab: u64;           // symtab for type/offset lookup
     next_reg: u64;
     next_var_id: u64;
 }
 
 func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
-    var p: u64 = heap_alloc(64);
+    push_trace("builder_ctx_new", "ssa_builder.b", __LINE__);
+    pop_trace();
+    // BuilderCtx = 9 * 8 bytes = 72 bytes
+    var p: u64 = heap_alloc(72);
     var ctx: *BuilderCtx = (*BuilderCtx)p;
     ctx->ssa_ctx = ssa_ctx;
     ctx->cur_func = 0;
@@ -35,6 +45,7 @@ func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
     ctx->break_stack = vec_new(8);
     ctx->continue_stack = vec_new(8);
     ctx->var_map = 0;
+    ctx->symtab = 0;
     ctx->next_reg = 1;
     ctx->next_var_id = 1;
     return p;
@@ -72,11 +83,137 @@ func builder_top_continue(ctx: *BuilderCtx) -> u64 {
 }
 
 func builder_reset_func(ctx: *BuilderCtx) -> u64 {
+    push_trace("builder_reset_func", "ssa_builder.b", __LINE__);
+    pop_trace();
     ctx->var_map = hashmap_new(16);
+    ctx->symtab = symtab_new();
     ctx->next_reg = 1;
     ctx->next_var_id = 1;
     *(*u64)(ctx->break_stack + 8) = 0;
     *(*u64)(ctx->continue_stack + 8) = 0;
+    return 0;
+}
+
+// ============================================
+// Symtab Helpers
+// ============================================
+
+func builder_symtab_add_param(ctx: *BuilderCtx, p: *Param, offset: u64) -> u64 {
+    var symtab_ptr: u64 = ctx->symtab;
+    var names: u64 = *(symtab_ptr);
+    var offsets: u64 = *(symtab_ptr + 8);
+    var types: u64 = *(symtab_ptr + 16);
+    var count: u64 = *(symtab_ptr + 24);
+
+    var name_info: u64 = heap_alloc(16);
+    *(name_info) = p->name_ptr;
+    *(name_info + 8) = p->name_len;
+    vec_push(names, name_info);
+    vec_push(offsets, offset);
+
+    var type_info: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var ti: *TypeInfo = (*TypeInfo)type_info;
+    ti->type_kind = p->type_kind;
+    ti->ptr_depth = p->ptr_depth;
+    ti->is_tagged = p->is_tagged;
+    ti->struct_name_ptr = p->struct_name_ptr;
+    ti->struct_name_len = p->struct_name_len;
+    ti->tag_layout_ptr = p->tag_layout_ptr;
+    ti->tag_layout_len = p->tag_layout_len;
+    ti->struct_def = 0;
+    ti->elem_type_kind = p->elem_type_kind;
+    ti->elem_ptr_depth = p->elem_ptr_depth;
+    ti->array_len = p->array_len;
+
+    var g_structs_vec: u64 = typeinfo_get_structs();
+    if (p->type_kind == TYPE_STRUCT && g_structs_vec != 0 && p->struct_name_ptr != 0) {
+        var num_structs: u64 = vec_len(g_structs_vec);
+        for (var si: u64 = 0; si < num_structs; si++) {
+            var sd_ptr: u64 = vec_get(g_structs_vec, si);
+            var sd: *AstStructDef = (*AstStructDef)sd_ptr;
+            if (sd->name_len == p->struct_name_len && str_eq(sd->name_ptr, sd->name_len, p->struct_name_ptr, p->struct_name_len) != 0) {
+                ti->struct_def = sd_ptr;
+                break;
+            }
+        }
+    }
+    if (p->elem_type_kind == TYPE_STRUCT && g_structs_vec != 0 && p->struct_name_ptr != 0) {
+        var num_structs2: u64 = vec_len(g_structs_vec);
+        for (var sj: u64 = 0; sj < num_structs2; sj++) {
+            var sd_ptr2: u64 = vec_get(g_structs_vec, sj);
+            var sd2: *AstStructDef = (*AstStructDef)sd_ptr2;
+            if (sd2->name_len == p->struct_name_len && str_eq(sd2->name_ptr, sd2->name_len, p->struct_name_ptr, p->struct_name_len) != 0) {
+                ti->struct_def = sd_ptr2;
+                break;
+            }
+        }
+    }
+
+    vec_push(types, type_info);
+    *(symtab_ptr + 24) = count + 1;
+    return 0;
+}
+
+func builder_symtab_add_local(ctx: *BuilderCtx, decl: *AstVarDecl) -> u64 {
+    var name_ptr: u64 = decl->name_ptr;
+    var name_len: u64 = decl->name_len;
+    var type_kind: u64 = decl->type_kind;
+    var ptr_depth: u64 = decl->ptr_depth;
+    var struct_name_ptr: u64 = decl->struct_name_ptr;
+    var struct_name_len: u64 = decl->struct_name_len;
+    var elem_type_kind: u64 = decl->elem_type_kind;
+    var elem_ptr_depth: u64 = decl->elem_ptr_depth;
+    var array_len: u64 = decl->array_len;
+
+    var size: u64 = 0;
+    if (type_kind == TYPE_ARRAY) {
+        var elem_size: u64 = sizeof_type(elem_type_kind, elem_ptr_depth, struct_name_ptr, struct_name_len);
+        size = elem_size * array_len;
+    } else if (type_kind == TYPE_SLICE) {
+        size = 16;
+    } else {
+        size = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+    }
+
+    symtab_add(ctx->symtab, name_ptr, name_len, type_kind, ptr_depth, size);
+
+    var type_info: u64 = symtab_get_type(ctx->symtab, name_ptr, name_len);
+    var ti: *TypeInfo = (*TypeInfo)type_info;
+    ti->is_tagged = decl->is_tagged;
+    ti->struct_name_ptr = struct_name_ptr;
+    ti->struct_name_len = struct_name_len;
+    ti->tag_layout_ptr = decl->tag_layout_ptr;
+    ti->tag_layout_len = decl->tag_layout_len;
+    ti->elem_type_kind = elem_type_kind;
+    ti->elem_ptr_depth = elem_ptr_depth;
+    ti->array_len = array_len;
+
+    var g_structs_vec: u64 = typeinfo_get_structs();
+    if (type_kind == TYPE_STRUCT && g_structs_vec != 0 && struct_name_ptr != 0) {
+        var num_structs: u64 = vec_len(g_structs_vec);
+        for (var si: u64 = 0; si < num_structs; si++) {
+            var sd_ptr: u64 = vec_get(g_structs_vec, si);
+            var sd: *AstStructDef = (*AstStructDef)sd_ptr;
+            if (sd->name_len == struct_name_len && str_eq(sd->name_ptr, sd->name_len, struct_name_ptr, struct_name_len) != 0) {
+                ti->struct_def = sd_ptr;
+                break;
+            }
+        }
+    }
+    if (type_kind == TYPE_ARRAY || type_kind == TYPE_SLICE) {
+        if (elem_type_kind == TYPE_STRUCT && g_structs_vec != 0 && struct_name_ptr != 0) {
+            var num_structs2: u64 = vec_len(g_structs_vec);
+            for (var sj: u64 = 0; sj < num_structs2; sj++) {
+                var sd_ptr2: u64 = vec_get(g_structs_vec, sj);
+                var sd2: *AstStructDef = (*AstStructDef)sd_ptr2;
+                if (sd2->name_len == struct_name_len && str_eq(sd2->name_ptr, sd2->name_len, struct_name_ptr, struct_name_len) != 0) {
+                    ti->struct_def = sd_ptr2;
+                    break;
+                }
+            }
+        }
+    }
+
     return 0;
 }
 
@@ -106,12 +243,15 @@ func builder_get_var_id(ctx: *BuilderCtx, name_ptr: u64, name_len: u64) -> u64 {
 }
 
 func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
+    push_trace("builder_add_params", "ssa_builder.b", __LINE__);
+    pop_trace();
     if (fn == 0) { return 0; }
     var params: u64 = fn->params_vec;
     if (params == 0) { return 0; }
 
     var n: u64 = vec_len(params);
     var i: u64 = 0;
+    var arg_offset: u64 = 0;
     while (i < n) {
         var p: *Param = (*Param)vec_get(params, i);
         var var_id: u64 = builder_get_var_id(ctx, p->name_ptr, p->name_len);
@@ -120,8 +260,163 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
         var st_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id), ssa_operand_reg(reg_id));
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr);
+
+        if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
+            builder_symtab_add_param(ctx, p, 16 + arg_offset);
+            arg_offset = arg_offset + 16;
+        } else {
+            builder_symtab_add_param(ctx, p, 16 + arg_offset);
+            arg_offset = arg_offset + 8;
+        }
         i = i + 1;
     }
+    return 0;
+}
+
+// ============================================
+// Address/Memory Helpers
+// ============================================
+
+func builder_new_lea_local(ctx: *BuilderCtx, offset: u64) -> u64 {
+    var reg_id: u64 = builder_new_reg(ctx);
+    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_LOCAL, reg_id, ssa_operand_const(offset), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+    return reg_id;
+}
+
+func builder_new_lea_global(ctx: *BuilderCtx, name_ptr: u64, name_len: u64) -> u64 {
+    var info: u64 = heap_alloc(16);
+    *(info) = name_ptr;
+    *(info + 8) = name_len;
+    var reg_id: u64 = builder_new_reg(ctx);
+    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_GLOBAL, reg_id, ssa_operand_const(info), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+    return reg_id;
+}
+
+func builder_load_by_size(ctx: *BuilderCtx, addr_reg: u64, size: u64) -> u64 {
+    var reg_id: u64 = builder_new_reg(ctx);
+    var op: u64 = SSA_OP_LOAD64;
+    if (size == 1) { op = SSA_OP_LOAD8; }
+    else if (size == 2) { op = SSA_OP_LOAD16; }
+    else if (size == 4) { op = SSA_OP_LOAD32; }
+    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, op, reg_id, ssa_operand_reg(addr_reg), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+    return reg_id;
+}
+
+func builder_store_by_size(ctx: *BuilderCtx, addr_reg: u64, val_reg: u64, size: u64) -> u64 {
+    var op: u64 = SSA_OP_STORE64;
+    if (size == 1) { op = SSA_OP_STORE8; }
+    else if (size == 2) { op = SSA_OP_STORE16; }
+    else if (size == 4) { op = SSA_OP_STORE32; }
+    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, op, 0, ssa_operand_reg(addr_reg), ssa_operand_reg(val_reg));
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+    return 0;
+}
+
+func builder_type_size_from_expr(ctx: *BuilderCtx, node: u64) -> u64 {
+    var ti_ptr: u64 = get_expr_type_with_symtab(node, ctx->symtab);
+    if (ti_ptr == 0) { return 8; }
+    var ti: *TypeInfo = (*TypeInfo)ti_ptr;
+    return sizeof_type(ti->type_kind, ti->ptr_depth, ti->struct_name_ptr, ti->struct_name_len);
+}
+
+func builder_lvalue_addr(ctx: *BuilderCtx, node: u64) -> u64 {
+    var k: u64 = ast_kind(node);
+
+    if (k == AST_IDENT) {
+        var idn: *AstIdent = (*AstIdent)node;
+        var offset: u64 = symtab_find(ctx->symtab, idn->name_ptr, idn->name_len);
+        if (offset != 0) {
+            return builder_new_lea_local(ctx, offset);
+        }
+        var resolved_ptr: u64 = idn->name_ptr;
+        var resolved_len: u64 = idn->name_len;
+        var resolved: u64 = resolve_name(idn->name_ptr, idn->name_len);
+        if (resolved != 0) {
+            resolved_ptr = *(resolved);
+            resolved_len = *(resolved + 8);
+        }
+        return builder_new_lea_global(ctx, resolved_ptr, resolved_len);
+    }
+
+    if (k == AST_MEMBER_ACCESS) {
+        var m: *AstMemberAccess = (*AstMemberAccess)node;
+        var obj: u64 = m->object;
+        var ti_ptr: u64 = get_expr_type_with_symtab(obj, ctx->symtab);
+        if (ti_ptr == 0) { return 0; }
+        var ti: *TypeInfo = (*TypeInfo)ti_ptr;
+        var base_addr: u64 = 0;
+        if (ti->ptr_depth > 0) {
+            base_addr = build_expr(ctx, obj);
+        } else {
+            base_addr = builder_lvalue_addr(ctx, obj);
+        }
+        var struct_def: u64 = ti->struct_def;
+        if (struct_def == 0) { return base_addr; }
+        var field_offset: u64 = get_field_offset(struct_def, m->member_ptr, m->member_len);
+        if (field_offset == 0) { return base_addr; }
+        var off_reg: u64 = build_const(ctx, field_offset);
+        var out_reg: u64 = builder_new_reg(ctx);
+        var add_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, out_reg, ssa_operand_reg(base_addr), ssa_operand_reg(off_reg));
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr);
+        return out_reg;
+    }
+
+    if (k == AST_INDEX) {
+        var idx: *AstIndex = (*AstIndex)node;
+        var base: u64 = idx->base;
+        var base_type_ptr: u64 = get_expr_type_with_symtab(base, ctx->symtab);
+        if (base_type_ptr == 0) { return 0; }
+        var bt: *TypeInfo = (*TypeInfo)base_type_ptr;
+        var elem_size: u64 = get_pointee_size(bt->type_kind, bt->ptr_depth);
+        if (bt->ptr_depth == 1 && bt->type_kind == TYPE_STRUCT) {
+            elem_size = sizeof_type(bt->type_kind, 0, bt->struct_name_ptr, bt->struct_name_len);
+        }
+        if (bt->type_kind == TYPE_ARRAY && bt->ptr_depth == 0) {
+            elem_size = sizeof_type(bt->elem_type_kind, bt->elem_ptr_depth, bt->struct_name_ptr, bt->struct_name_len);
+            var base_addr: u64 = builder_lvalue_addr(ctx, base);
+            var idx_reg: u64 = build_expr(ctx, idx->index);
+            if (elem_size > 1) {
+                var size_reg: u64 = build_const(ctx, elem_size);
+                var mul_reg: u64 = builder_new_reg(ctx);
+                var mul_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_MUL, mul_reg, ssa_operand_reg(idx_reg), ssa_operand_reg(size_reg));
+                ssa_inst_append(ctx->cur_block, (*SSAInstruction)mul_ptr);
+                idx_reg = mul_reg;
+            }
+            var out_reg2: u64 = builder_new_reg(ctx);
+            var add_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, out_reg2, ssa_operand_reg(base_addr), ssa_operand_reg(idx_reg));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr2);
+            return out_reg2;
+        }
+
+        var base_ptr: u64 = build_expr(ctx, base);
+        if (bt->type_kind == TYPE_SLICE && bt->ptr_depth == 0) {
+            var addr_reg: u64 = builder_lvalue_addr(ctx, base);
+            base_ptr = builder_load_by_size(ctx, addr_reg, 8);
+            elem_size = sizeof_type(bt->elem_type_kind, bt->elem_ptr_depth, bt->struct_name_ptr, bt->struct_name_len);
+        }
+
+        var idx_reg2: u64 = build_expr(ctx, idx->index);
+        if (elem_size > 1) {
+            var size_reg2: u64 = build_const(ctx, elem_size);
+            var mul_reg2: u64 = builder_new_reg(ctx);
+            var mul_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_MUL, mul_reg2, ssa_operand_reg(idx_reg2), ssa_operand_reg(size_reg2));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)mul_ptr2);
+            idx_reg2 = mul_reg2;
+        }
+        var out_reg3: u64 = builder_new_reg(ctx);
+        var add_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, out_reg3, ssa_operand_reg(base_ptr), ssa_operand_reg(idx_reg2));
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr3);
+        return out_reg3;
+    }
+
+    if (k == AST_DEREF || k == AST_DEREF8) {
+        var un: *AstDeref = (*AstDeref)node;
+        return build_expr(ctx, un->operand);
+    }
+
     return 0;
 }
 
@@ -231,12 +526,25 @@ func build_short_circuit(ctx: *BuilderCtx, op: u64, left: u64, right: u64) -> u6
 }
 
 func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
+    push_trace("build_expr", "ssa_builder.b", __LINE__);
+    pop_trace();
     if (node == 0) { return 0; }
     var kind: u64 = ast_kind(node);
 
     if (kind == AST_LITERAL) {
         var lit: *AstLiteral = (*AstLiteral)node;
         return build_const(ctx, lit->value);
+    }
+
+    if (kind == AST_STRING) {
+        var s: *AstString = (*AstString)node;
+        var info: u64 = heap_alloc(16);
+        *(info) = s->str_ptr;
+        *(info + 8) = s->str_len;
+        var reg_id: u64 = builder_new_reg(ctx);
+        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_STR, reg_id, ssa_operand_const(info), 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+        return reg_id;
     }
 
     if (kind == AST_IDENT) {
@@ -289,6 +597,41 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
         return val_reg;
     }
 
+    if (kind == AST_ADDR_OF) {
+        var a: *AstAddrOf = (*AstAddrOf)node;
+        return builder_lvalue_addr(ctx, a->operand);
+    }
+
+    if (kind == AST_DEREF8) {
+        var d8: *AstDeref8 = (*AstDeref8)node;
+        var addr_reg: u64 = build_expr(ctx, d8->operand);
+        return builder_load_by_size(ctx, addr_reg, 1);
+    }
+
+    if (kind == AST_DEREF) {
+        var d: *AstDeref = (*AstDeref)node;
+        var addr_reg2: u64 = build_expr(ctx, d->operand);
+        var size2: u64 = builder_type_size_from_expr(ctx, node);
+        return builder_load_by_size(ctx, addr_reg2, size2);
+    }
+
+    if (kind == AST_INDEX) {
+        var addr_reg3: u64 = builder_lvalue_addr(ctx, node);
+        var size3: u64 = builder_type_size_from_expr(ctx, node);
+        return builder_load_by_size(ctx, addr_reg3, size3);
+    }
+
+    if (kind == AST_MEMBER_ACCESS) {
+        var addr_reg4: u64 = builder_lvalue_addr(ctx, node);
+        var size4: u64 = builder_type_size_from_expr(ctx, node);
+        return builder_load_by_size(ctx, addr_reg4, size4);
+    }
+
+    if (kind == AST_CAST) {
+        var cast: *AstCast = (*AstCast)node;
+        return build_expr(ctx, cast->expr);
+    }
+
     if (kind == AST_SIZEOF) {
         var sz: *AstSizeof = (*AstSizeof)node;
         var size_val: u64 = sizeof_type(sz->type_kind, sz->ptr_depth, sz->struct_name_ptr, sz->struct_name_len);
@@ -303,6 +646,8 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
 // ============================================
 
 func build_block(ctx: *BuilderCtx, block_node: u64) -> u64 {
+    push_trace("build_block", "ssa_builder.b", __LINE__);
+    pop_trace();
     if (block_node == 0) { return 0; }
     var blk: *AstBlock = (*AstBlock)block_node;
     var stmts: u64 = blk->stmts_vec;
@@ -315,6 +660,8 @@ func build_block(ctx: *BuilderCtx, block_node: u64) -> u64 {
 }
 
 func build_for(ctx: *BuilderCtx, node: u64) -> u64 {
+    push_trace("build_for", "ssa_builder.b", __LINE__);
+    pop_trace();
     var f: *AstFor = (*AstFor)node;
 
     if (f->init != 0) {
@@ -367,6 +714,8 @@ func build_for(ctx: *BuilderCtx, node: u64) -> u64 {
 }
 
 func build_switch(ctx: *BuilderCtx, node: u64) -> u64 {
+    push_trace("build_switch", "ssa_builder.b", __LINE__);
+    pop_trace();
     var sw: *AstSwitch = (*AstSwitch)node;
     var cases: u64 = sw->cases_vec;
     var count: u64 = 0;
@@ -452,11 +801,21 @@ func build_switch(ctx: *BuilderCtx, node: u64) -> u64 {
 }
 
 func build_if(ctx: *BuilderCtx, node: u64) -> u64 {
+    push_trace("build_if", "ssa_builder.b", __LINE__);
+    pop_trace();
     var ifn: *AstIf = (*AstIf)node;
     var has_else: u64 = 0;
     if (ifn->else_block != 0) { has_else = 1; }
 
+    if (SSA_BUILDER_DEBUG != 0) {
+        println("[DEBUG] build_if: cond", 25);
+    }
+
     var cond_reg: u64 = build_expr(ctx, ifn->cond);
+
+    if (SSA_BUILDER_DEBUG != 0) {
+        println("[DEBUG] build_if: blocks", 27);
+    }
 
     var then_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
     var merge_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
@@ -472,6 +831,9 @@ func build_if(ctx: *BuilderCtx, node: u64) -> u64 {
     ssa_add_edge(ctx->cur_block, else_bb);
 
     builder_set_block(ctx, then_bb);
+    if (SSA_BUILDER_DEBUG != 0) {
+        println("[DEBUG] build_if: then", 25);
+    }
     build_block(ctx, ifn->then_block);
     var jmp_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(merge_bb->id), 0);
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr);
@@ -479,6 +841,9 @@ func build_if(ctx: *BuilderCtx, node: u64) -> u64 {
 
     if (has_else == 1) {
         builder_set_block(ctx, else_bb);
+        if (SSA_BUILDER_DEBUG != 0) {
+            println("[DEBUG] build_if: else", 25);
+        }
         build_block(ctx, ifn->else_block);
         var jmp_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(merge_bb->id), 0);
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr2);
@@ -490,6 +855,8 @@ func build_if(ctx: *BuilderCtx, node: u64) -> u64 {
 }
 
 func build_while(ctx: *BuilderCtx, node: u64) -> u64 {
+    push_trace("build_while", "ssa_builder.b", __LINE__);
+    pop_trace();
     var w: *AstWhile = (*AstWhile)node;
 
     var cond_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
@@ -520,7 +887,14 @@ func build_while(ctx: *BuilderCtx, node: u64) -> u64 {
 }
 
 func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
+    push_trace("build_stmt", "ssa_builder.b", __LINE__);
+    pop_trace();
     var kind: u64 = ast_kind(node);
+    if (SSA_BUILDER_DEBUG != 0) {
+        emit("[DEBUG] build_stmt kind=", 27);
+        print_u64(kind);
+        emit("\n", 1);
+    }
 
     if (kind == AST_BLOCK) {
         build_block(ctx, node);
@@ -556,6 +930,7 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
     if (kind == AST_VAR_DECL) {
         var vd: *AstVarDecl = (*AstVarDecl)node;
         var var_id: u64 = builder_get_var_id(ctx, vd->name_ptr, vd->name_len);
+        builder_symtab_add_local(ctx, vd);
         if (vd->init_expr != 0) {
             var val_reg: u64 = build_expr(ctx, vd->init_expr);
             var st_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id), ssa_operand_reg(val_reg));
@@ -582,6 +957,18 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
             var val_reg3: u64 = build_expr(ctx, asn->value);
             var st_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id3), ssa_operand_reg(val_reg3));
             ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr3);
+            return 0;
+        }
+        if (target_kind == AST_DEREF || target_kind == AST_DEREF8 || target_kind == AST_INDEX || target_kind == AST_MEMBER_ACCESS) {
+            var addr_reg: u64 = builder_lvalue_addr(ctx, asn->target);
+            var val_reg4: u64 = build_expr(ctx, asn->value);
+            var size4: u64 = 8;
+            if (target_kind == AST_DEREF8) {
+                size4 = 1;
+            } else {
+                size4 = builder_type_size_from_expr(ctx, asn->target);
+            }
+            builder_store_by_size(ctx, addr_reg, val_reg4, size4);
         }
         return 0;
     }
@@ -627,7 +1014,14 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
 // ============================================
 
 func ssa_builder_build_func(ctx: *BuilderCtx, fn_ptr: u64) -> u64 {
+    push_trace("ssa_builder_build_func", "ssa_builder.b", __LINE__);
+    pop_trace();
     var fn: *AstFunc = (*AstFunc)fn_ptr;
+    if (SSA_BUILDER_DEBUG != 0) {
+        emit("[DEBUG] ssa_builder_build_func: ", 36);
+        emit(fn->name_ptr, fn->name_len);
+        emit("\n", 1);
+    }
     var ssa_fn_ptr: u64 = ssa_new_function(ctx->ssa_ctx, fn->name_ptr, fn->name_len);
     ctx->cur_func = (*SSAFunction)ssa_fn_ptr;
     ctx->cur_block = ctx->cur_func->entry;
@@ -638,6 +1032,8 @@ func ssa_builder_build_func(ctx: *BuilderCtx, fn_ptr: u64) -> u64 {
 }
 
 func ssa_builder_build_program(prog: u64) -> u64 {
+    push_trace("ssa_builder_build_program", "ssa_builder.b", __LINE__);
+    pop_trace();
     var program: *AstProgram = (*AstProgram)prog;
     var funcs: u64 = program->funcs_vec;
     var count: u64 = vec_len(funcs);
@@ -649,7 +1045,14 @@ func ssa_builder_build_program(prog: u64) -> u64 {
     var i: u64 = 0;
     while (i < count) {
         var fn_ptr: u64 = vec_get(funcs, i);
-        ssa_builder_build_func(bctx, fn_ptr);
+        var fn: *AstFunc = (*AstFunc)fn_ptr;
+        if (str_has_prefix(fn->name_ptr, fn->name_len, "std_", 4) != 0) {
+            ssa_new_function(bctx->ssa_ctx, fn->name_ptr, fn->name_len);
+        } else if (ssa_codegen_is_supported_func(fn_ptr, program->globals_vec) == 0) {
+            ssa_new_function(bctx->ssa_ctx, fn->name_ptr, fn->name_len);
+        } else {
+            ssa_builder_build_func(bctx, fn_ptr);
+        }
         i = i + 1;
     }
 

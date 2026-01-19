@@ -52,6 +52,11 @@ func emitln(s: u64) {
 }
 
 func emit(s: u64, len: u64) {
+    var i: u64 = 0;
+    while (i < len) {
+        if (*(*u8)(s + i) == 0) { len = i; break; }
+        i = i + 1;
+    }
     var fd2: u64 = io_get_output_fd();
     os_sys_write(fd2, s, len);
 }

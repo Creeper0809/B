@@ -89,6 +89,10 @@ func typeinfo_set_structs(structs: u64) -> u64 {
     g_structs_vec = structs;
 }
 
+func typeinfo_get_structs() -> u64 {
+    return g_structs_vec;
+}
+
 func typeinfo_set_funcs(funcs: u64) -> u64 {
     g_funcs_vec = funcs;
 }

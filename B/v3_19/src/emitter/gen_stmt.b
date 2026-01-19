@@ -1250,12 +1250,3 @@ func cg_asm_stmt(node: u64) -> u64 {
     emit_nl();
 }
 
-// ============================================
-// Helper to get structs (from typeinfo module)
-// ============================================
-
-func typeinfo_get_structs() -> u64 {
-    // This is a bit of a workaround - in a cleaner design,
-    // we'd pass this around or use a proper global accessor
-    return 0;  // Will be set by codegen.b
-}

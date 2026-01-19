@@ -34,10 +34,14 @@ func _ssa_codegen_is_global(globals: u64, name_ptr: u64, name_len: u64) -> u64 {
 }
 
 func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
+    push_trace("_ssa_codegen_expr_supported", "ssa_codegen.b", __LINE__);
+    pop_trace();
     if (node == 0) { return 1; }
     var kind: u64 = ast_kind(node);
 
     if (kind == AST_LITERAL) { return 1; }
+
+    if (kind == AST_STRING) { return 1; }
 
     if (kind == AST_IDENT) {
         var idn: *AstIdent = (*AstIdent)node;
@@ -66,6 +70,33 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return _ssa_codegen_expr_supported(un->operand, globals);
     }
 
+    if (kind == AST_ADDR_OF) {
+        var a: *AstAddrOf = (*AstAddrOf)node;
+        return _ssa_codegen_expr_supported(a->operand, globals);
+    }
+
+    if (kind == AST_DEREF || kind == AST_DEREF8) {
+        var d: *AstDeref = (*AstDeref)node;
+        return _ssa_codegen_expr_supported(d->operand, globals);
+    }
+
+    if (kind == AST_INDEX) {
+        var idx: *AstIndex = (*AstIndex)node;
+        if (_ssa_codegen_expr_supported(idx->base, globals) == 0) { return 0; }
+        if (_ssa_codegen_expr_supported(idx->index, globals) == 0) { return 0; }
+        return 1;
+    }
+
+    if (kind == AST_MEMBER_ACCESS) {
+        var m: *AstMemberAccess = (*AstMemberAccess)node;
+        return _ssa_codegen_expr_supported(m->object, globals);
+    }
+
+    if (kind == AST_CAST) {
+        var c: *AstCast = (*AstCast)node;
+        return _ssa_codegen_expr_supported(c->expr, globals);
+    }
+
     if (kind == AST_SIZEOF) { return 1; }
 
     return 0;
@@ -90,6 +121,8 @@ func _ssa_codegen_case_supported(node: u64, globals: u64) -> u64 {
 }
 
 func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
+    push_trace("_ssa_codegen_stmt_supported", "ssa_codegen.b", __LINE__);
+    pop_trace();
     if (node == 0) { return 1; }
     var kind: u64 = ast_kind(node);
 
@@ -161,10 +194,17 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_ASSIGN) {
         var asn: *AstAssign = (*AstAssign)node;
-        if (ast_kind(asn->target) != AST_IDENT) { return 0; }
-        var idn2: *AstIdent = (*AstIdent)asn->target;
-        if (_ssa_codegen_is_global(globals, idn2->name_ptr, idn2->name_len) != 0) { return 0; }
-        return _ssa_codegen_expr_supported(asn->value, globals);
+        var tk: u64 = ast_kind(asn->target);
+        if (tk == AST_IDENT) {
+            var idn2: *AstIdent = (*AstIdent)asn->target;
+            if (_ssa_codegen_is_global(globals, idn2->name_ptr, idn2->name_len) != 0) { return 0; }
+            return _ssa_codegen_expr_supported(asn->value, globals);
+        }
+        if (tk == AST_DEREF || tk == AST_DEREF8 || tk == AST_INDEX || tk == AST_MEMBER_ACCESS) {
+            if (_ssa_codegen_expr_supported(asn->target, globals) == 0) { return 0; }
+            return _ssa_codegen_expr_supported(asn->value, globals);
+        }
+        return 0;
     }
 
     if (kind == AST_RETURN) {
@@ -178,6 +218,8 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
 }
 
 func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
+    push_trace("ssa_codegen_is_supported_func", "ssa_codegen.b", __LINE__);
+    pop_trace();
     if (fn_ptr == 0) { return 0; }
     var fn: *AstFunc = (*AstFunc)fn_ptr;
 
@@ -252,10 +294,100 @@ func _ssa_emit_label_ref(fn_id: u64, block_id: u64) -> u64 {
 }
 
 // ============================================
+// 메모리 주소/로드/스토어
+// ============================================
+
+func _ssa_emit_lea_local(dest: u64, offset: u64) -> u64 {
+    emit("    lea ", 8);
+    _ssa_emit_reg_name(dest);
+    emit(", [rbp", 7);
+    var off: i64 = (i64)offset;
+    if (off < 0) { emit_i64(off); }
+    else { emit("+", 1); emit_u64(offset); }
+    emit("]\n", 2);
+    return 0;
+}
+
+func _ssa_emit_lea_global(dest: u64, name_ptr: u64, name_len: u64) -> u64 {
+    emit("    lea ", 8);
+    _ssa_emit_reg_name(dest);
+    emit(", [rel _gvar_", 13);
+    emit(name_ptr, name_len);
+    emit("]\n", 2);
+    return 0;
+}
+
+func _ssa_emit_load(op: u64, dest: u64, addr_opr: u64) -> u64 {
+    if (op == SSA_OP_LOAD8) {
+        emit("    movzx ", 10);
+        _ssa_emit_reg_name(dest);
+        emit(", byte [", 9);
+        _ssa_emit_reg_name(ssa_operand_value(addr_opr));
+        emit("]\n", 2);
+        return 0;
+    }
+    if (op == SSA_OP_LOAD16) {
+        emit("    movzx ", 10);
+        _ssa_emit_reg_name(dest);
+        emit(", word [", 9);
+        _ssa_emit_reg_name(ssa_operand_value(addr_opr));
+        emit("]\n", 2);
+        return 0;
+    }
+    if (op == SSA_OP_LOAD32) {
+        emit("    mov ", 8);
+        _ssa_emit_reg_name(dest);
+        emit(", dword [", 11);
+        _ssa_emit_reg_name(ssa_operand_value(addr_opr));
+        emit("]\n", 2);
+        return 0;
+    }
+    emit("    mov ", 8);
+    _ssa_emit_reg_name(dest);
+    emit(", [", 4);
+    _ssa_emit_reg_name(ssa_operand_value(addr_opr));
+    emit("]\n", 2);
+    return 0;
+}
+
+func _ssa_emit_store(op: u64, addr_opr: u64, val_opr: u64) -> u64 {
+    if (op == SSA_OP_STORE8) {
+        emit("    mov byte [", 15);
+    } else if (op == SSA_OP_STORE16) {
+        emit("    mov word [", 15);
+    } else if (op == SSA_OP_STORE32) {
+        emit("    mov dword [", 16);
+    } else {
+        emit("    mov [", 9);
+    }
+    _ssa_emit_reg_name(ssa_operand_value(addr_opr));
+    emit("], ", 3);
+    _ssa_emit_opr(val_opr);
+    emit_nl();
+    return 0;
+}
+
+// ============================================
 // 산술/비교 코드 생성
 // ============================================
 
 func _ssa_emit_binop(op: u64, dest: u64, src1: u64, src2: u64) -> u64 {
+    if (op == SSA_OP_ADD || op == SSA_OP_MUL || op == SSA_OP_AND || op == SSA_OP_OR || op == SSA_OP_XOR) {
+        if (!ssa_operand_is_const(src2) && ssa_operand_value(src2) == dest) {
+            if (op == SSA_OP_ADD) { emit("    add ", 8); }
+            else if (op == SSA_OP_MUL) { emit("    imul ", 9); }
+            else if (op == SSA_OP_AND) { emit("    and ", 8); }
+            else if (op == SSA_OP_OR) { emit("    or ", 7); }
+            else { emit("    xor ", 8); }
+
+            _ssa_emit_reg_name(dest);
+            emit(", ", 2);
+            _ssa_emit_opr(src1);
+            emit_nl();
+            return 0;
+        }
+    }
+
     _ssa_emit_mov_reg_opr(dest, src1);
 
     if (op == SSA_OP_ADD) { emit("    add ", 8); }
@@ -276,6 +408,17 @@ func _ssa_emit_shift(op: u64, dest: u64, src1: u64, src2: u64) -> u64 {
     var save_rcx: u64 = 0;
     var save_rax: u64 = 0;
 
+
+    if (ssa_operand_is_const(src2) != 0) {
+        _ssa_emit_mov_reg_opr(dest, src1);
+        if (op == SSA_OP_SHL) { emit("    shl ", 8); }
+        else { emit("    shr ", 8); }
+        _ssa_emit_reg_name(dest);
+        emit(", ", 2);
+        _ssa_emit_imm(ssa_operand_value(src2));
+        emit_nl();
+        return 0;
+    }
     if (ssa_operand_is_const(src2) != 0) {
         _ssa_emit_mov_reg_opr(dest, src1);
         if (op == SSA_OP_SHL) { emit("    shl ", 8); }
@@ -504,6 +647,8 @@ func _ssa_emit_ret(inst: *SSAInstruction) -> u64 {
 // ============================================
 
 func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
+    push_trace("_ssa_emit_inst", "ssa_codegen.b", __LINE__);
+    pop_trace();
     var op: u64 = ssa_inst_get_op(inst);
 
     if (op == SSA_OP_NOP || op == SSA_OP_ENTRY || op == SSA_OP_PHI) { return 0; }
@@ -518,6 +663,33 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
         return 0;
     }
 
+    if (op == SSA_OP_LEA_STR) {
+        var info_ptr: u64 = ssa_operand_value(inst->src1);
+        var str_ptr: u64 = *(info_ptr);
+        var str_len: u64 = *(info_ptr + 8);
+        var label_id: u64 = string_get_label(str_ptr, str_len);
+        emit("    lea ", 8);
+        _ssa_emit_reg_name(inst->dest);
+        emit(", [rel _str", 12);
+        emit_u64(label_id);
+        emit("]\n", 2);
+        return 0;
+    }
+
+    if (op == SSA_OP_LEA_LOCAL) {
+        var offset: u64 = ssa_operand_value(inst->src1);
+        _ssa_emit_lea_local(inst->dest, offset);
+        return 0;
+    }
+
+    if (op == SSA_OP_LEA_GLOBAL) {
+        var info_ptr2: u64 = ssa_operand_value(inst->src1);
+        var name_ptr: u64 = *(info_ptr2);
+        var name_len: u64 = *(info_ptr2 + 8);
+        _ssa_emit_lea_global(inst->dest, name_ptr, name_len);
+        return 0;
+    }
+
     if (op == SSA_OP_PARAM) {
         var idx: u64 = ssa_operand_value(inst->src1);
         var offset: u64 = 16 + idx * 8;
@@ -526,6 +698,16 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
         emit(", [rbp+", 7);
         emit_u64(offset);
         emit("]\n", 2);
+        return 0;
+    }
+
+    if (op == SSA_OP_LOAD8 || op == SSA_OP_LOAD16 || op == SSA_OP_LOAD32 || op == SSA_OP_LOAD64) {
+        _ssa_emit_load(op, inst->dest, inst->src1);
+        return 0;
+    }
+
+    if (op == SSA_OP_STORE8 || op == SSA_OP_STORE16 || op == SSA_OP_STORE32 || op == SSA_OP_STORE64) {
+        _ssa_emit_store(op, inst->src1, inst->src2);
         return 0;
     }
 
@@ -586,6 +768,8 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 // ============================================
 
 func ssa_codegen_emit_func(fn_ptr: u64, ssa_fn_ptr: u64) -> u64 {
+    push_trace("ssa_codegen_emit_func", "ssa_codegen.b", __LINE__);
+    pop_trace();
     if (fn_ptr == 0 || ssa_fn_ptr == 0) { return 0; }
     var fn: *AstFunc = (*AstFunc)fn_ptr;
     var ssa_fn: *SSAFunction = (*SSAFunction)ssa_fn_ptr;

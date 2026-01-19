@@ -4,12 +4,14 @@
 // 각 pred에서 idom[b]까지 거슬러 올라가며 runner의 DF에 b를 추가.
 
 import std.io;
+import std.util;
 import ssa;
 
 const MEM2REG_DF_DEBUG = 0;
 
 func ssa_mem2reg_compute_df(fn: *SSAFunction) -> u64 {
-    if (fn == 0) { return 0; }
+    push_trace("ssa_mem2reg_compute_df", "ssa_mem2reg_df.b", __LINE__);
+    if (fn == 0) { pop_trace(); return 0; }
 
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
@@ -46,12 +48,13 @@ func ssa_mem2reg_compute_df(fn: *SSAFunction) -> u64 {
     if (MEM2REG_DF_DEBUG != 0) {
         println("[DEBUG] ssa_mem2reg_compute_df: done", 41);
     }
-
+    pop_trace();
     return 0;
 }
 
 func ssa_mem2reg_run_df(ctx: *SSAContext) -> u64 {
-    if (ctx == 0) { return 0; }
+    push_trace("ssa_mem2reg_run_df", "ssa_mem2reg_df.b", __LINE__);
+    if (ctx == 0) { pop_trace(); return 0; }
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
     var i: u64 = 0;
@@ -60,5 +63,6 @@ func ssa_mem2reg_run_df(ctx: *SSAContext) -> u64 {
         ssa_mem2reg_compute_df((*SSAFunction)f_ptr);
         i = i + 1;
     }
+    pop_trace();
     return 0;
 }

@@ -6,6 +6,7 @@
 // - SSAContext: 전체 SSA 그래프 컨텍스트
 
 import std.io;
+import std.util;
 import std.vec;
 import ast;
 
@@ -58,6 +59,21 @@ const SSA_OP_RET = 32;
 
 // SSA destruction helper
 const SSA_OP_COPY = 40;
+
+// Address helpers
+const SSA_OP_LEA_STR = 50;
+const SSA_OP_LEA_LOCAL = 51;
+const SSA_OP_LEA_GLOBAL = 52;
+
+// Memory ops (explicit address)
+const SSA_OP_LOAD8 = 60;
+const SSA_OP_LOAD16 = 61;
+const SSA_OP_LOAD32 = 62;
+const SSA_OP_LOAD64 = 63;
+const SSA_OP_STORE8 = 64;
+const SSA_OP_STORE16 = 65;
+const SSA_OP_STORE32 = 66;
+const SSA_OP_STORE64 = 67;
 
 const SSA_OPR_VALUE_MASK = 9223372036854775807;
 
@@ -128,6 +144,8 @@ struct SSAContext {
 // _ssa_ptr_list_push - 구조체 내의 동적 포인터 목록에 포인터를 추가하는 헬퍼 함수입니다.
 // 이 함수는 구조체 멤버의 오프셋을 사용하여 제네릭이 없는 언어에서 코드 중복을 줄입니다.
 func _ssa_ptr_list_push(base_ptr: u64, data_offset: u64, len_offset: u64, cap_offset: u64, item: u64, initial_cap: u64) -> u64 {
+    push_trace("_ssa_ptr_list_push", "ssa.b", __LINE__);
+    pop_trace();
     var data_ptr: *u64 = (*u64)(base_ptr + data_offset);
     var len_ptr: *u64 = (*u64)(base_ptr + len_offset);
     var cap_ptr: *u64 = (*u64)(base_ptr + cap_offset);
@@ -163,12 +181,16 @@ func _ssa_ptr_list_push(base_ptr: u64, data_offset: u64, len_offset: u64, cap_of
 }
 
 func ssa_block_list_push(fn: *SSAFunction, block: *SSABlock) -> u64 {
+    push_trace("ssa_block_list_push", "ssa.b", __LINE__);
+    pop_trace();
     // SSAFunction: id, name_ptr, name_len, blocks_data, blocks_len, blocks_cap, entry
     // Offsets: blocks_data=24, blocks_len=32, blocks_cap=40
     return _ssa_ptr_list_push((u64)fn, 24, 32, 40, (u64)block, 8);
 }
 
 func ssa_func_list_push(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
+    push_trace("ssa_func_list_push", "ssa.b", __LINE__);
+    pop_trace();
     // SSAContext: funcs_data, funcs_len, funcs_cap, next_block_id, next_inst_id
     // Offsets: funcs_data=0, funcs_len=8, funcs_cap=16
     return _ssa_ptr_list_push((u64)ctx, 0, 8, 16, (u64)fn, 8);
@@ -179,6 +201,8 @@ func ssa_func_list_push(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
 // ============================================
 
 func ssa_context_new() -> u64 {
+    push_trace("ssa_context_new", "ssa.b", __LINE__);
+    pop_trace();
     var ctx: u64 = heap_alloc(SIZEOF_SSA_CTX);
     var c: *SSAContext = (*SSAContext)ctx;
     c->funcs_data = 0;
@@ -190,6 +214,8 @@ func ssa_context_new() -> u64 {
 }
 
 func ssa_new_block(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
+    push_trace("ssa_new_block", "ssa.b", __LINE__);
+    pop_trace();
     var b_ptr: u64 = heap_alloc(SIZEOF_SSA_BLOCK);
     var b: *SSABlock = (*SSABlock)b_ptr;
     b->id = ctx->next_block_id;
@@ -212,6 +238,8 @@ func ssa_new_block(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
 }
 
 func ssa_new_inst(ctx: *SSAContext, op: u64, dest: u64, src1: u64, src2: u64) -> u64 {
+    push_trace("ssa_new_inst", "ssa.b", __LINE__);
+    pop_trace();
     var i_ptr: u64 = heap_alloc(SIZEOF_SSA_INST);
     var inst: *SSAInstruction = (*SSAInstruction)i_ptr;
     var p: *tagged(InstMeta) u8 = (*tagged(InstMeta) u8)0;
@@ -227,6 +255,8 @@ func ssa_new_inst(ctx: *SSAContext, op: u64, dest: u64, src1: u64, src2: u64) ->
 }
 
 func ssa_inst_append(block: *SSABlock, inst: *SSAInstruction) -> u64 {
+    push_trace("ssa_inst_append", "ssa.b", __LINE__);
+    pop_trace();
     var p: *tagged(InstMeta) u8 = inst->prev;
     var current_op: u16 = p.op;
     p = (*tagged(InstMeta) u8)block->inst_tail;
@@ -243,7 +273,41 @@ func ssa_inst_append(block: *SSABlock, inst: *SSAInstruction) -> u64 {
     return 0;
 }
 
+func ssa_inst_insert_before_terminator(block: *SSABlock, inst: *SSAInstruction) -> u64 {
+    push_trace("ssa_inst_insert_before_terminator", "ssa.b", __LINE__);
+    pop_trace();
+    if (block == 0 || inst == 0) { return 0; }
+
+    var tail: *SSAInstruction = block->inst_tail;
+    if (tail == 0) { return ssa_inst_append(block, inst); }
+
+    var op: u64 = ssa_inst_get_op(tail);
+    if (op != SSA_OP_JMP && op != SSA_OP_BR && op != SSA_OP_RET) {
+        return ssa_inst_append(block, inst);
+    }
+
+    var prev: *SSAInstruction = 0;
+    var cur: *SSAInstruction = block->inst_head;
+    while (cur != 0 && cur != tail) {
+        prev = cur;
+        cur = cur->next;
+    }
+    if (cur == 0) { return ssa_inst_append(block, inst); }
+
+    inst->next = tail;
+    ssa_inst_set_prev(inst, prev);
+    if (prev != 0) {
+        prev->next = inst;
+    } else {
+        block->inst_head = inst;
+    }
+    ssa_inst_set_prev(tail, inst);
+    return 0;
+}
+
 func ssa_phi_append(block: *SSABlock, phi: *SSAInstruction) -> u64 {
+    push_trace("ssa_phi_append", "ssa.b", __LINE__);
+    pop_trace();
     var next_phi: *SSAInstruction = block->phi_head;
     phi->next = next_phi;
 
@@ -266,11 +330,15 @@ func ssa_phi_append(block: *SSABlock, phi: *SSAInstruction) -> u64 {
 }
 
 func ssa_inst_get_op(inst: *SSAInstruction) -> u64 {
+    push_trace("ssa_inst_get_op", "ssa.b", __LINE__);
+    pop_trace();
     var p: *tagged(InstMeta) u8 = inst->prev;
     return (u64)p.op;
 }
 
 func ssa_inst_set_op(inst: *SSAInstruction, op: u64) -> u64 {
+    push_trace("ssa_inst_set_op", "ssa.b", __LINE__);
+    pop_trace();
     var p: *tagged(InstMeta) u8 = inst->prev;
     p.op = (u16)op;
     inst->prev = p;
@@ -278,6 +346,8 @@ func ssa_inst_set_op(inst: *SSAInstruction, op: u64) -> u64 {
 }
 
 func ssa_inst_set_prev(inst: *SSAInstruction, prev: *SSAInstruction) -> u64 {
+    push_trace("ssa_inst_set_prev", "ssa.b", __LINE__);
+    pop_trace();
     var p: *tagged(InstMeta) u8 = inst->prev;
     var op: u16 = p.op;
     p = (*tagged(InstMeta) u8)prev;
@@ -287,6 +357,8 @@ func ssa_inst_set_prev(inst: *SSAInstruction, prev: *SSAInstruction) -> u64 {
 }
 
 func ssa_phi_arg_new(val: u64, block_id: u64) -> u64 {
+    push_trace("ssa_phi_arg_new", "ssa.b", __LINE__);
+    pop_trace();
     var a_ptr: u64 = heap_alloc(SIZEOF_SSA_PHI_ARG);
     var a: *SSAPhiArg = (*SSAPhiArg)a_ptr;
     a->val = val;
@@ -296,6 +368,8 @@ func ssa_phi_arg_new(val: u64, block_id: u64) -> u64 {
 }
 
 func ssa_phi_arg_append(head: *SSAPhiArg, val: u64, block_id: u64) -> u64 {
+    push_trace("ssa_phi_arg_append", "ssa.b", __LINE__);
+    pop_trace();
     var node_ptr: u64 = ssa_phi_arg_new(val, block_id);
     if (head == 0) { return node_ptr; }
 
@@ -308,11 +382,15 @@ func ssa_phi_arg_append(head: *SSAPhiArg, val: u64, block_id: u64) -> u64 {
 }
 
 func ssa_phi_new(ctx: *SSAContext, dest: u64, args_head: *SSAPhiArg) -> u64 {
+    push_trace("ssa_phi_new", "ssa.b", __LINE__);
+    pop_trace();
     var inst_ptr: u64 = ssa_new_inst(ctx, SSA_OP_PHI, dest, (u64)args_head, 0);
     return inst_ptr;
 }
 
 func ssa_phi_add_arg(inst: *SSAInstruction, val: u64, block_id: u64) -> u64 {
+    push_trace("ssa_phi_add_arg", "ssa.b", __LINE__);
+    pop_trace();
     if (ssa_inst_get_op(inst) != SSA_OP_PHI) { return 0; }
     var head: *SSAPhiArg = (*SSAPhiArg)inst->src1;
     var new_head_ptr: u64 = ssa_phi_arg_append(head, val, block_id);
@@ -321,38 +399,52 @@ func ssa_phi_add_arg(inst: *SSAInstruction, val: u64, block_id: u64) -> u64 {
 }
 
 func ssa_operand_const(val: u64) -> u64 {
+    push_trace("ssa_operand_const", "ssa.b", __LINE__);
+    pop_trace();
     var mask: u64 = 1;
     mask = mask << 63;
     return val | mask;
 }
 
 func ssa_operand_reg(id: u64) -> u64 {
+    push_trace("ssa_operand_reg", "ssa.b", __LINE__);
+    pop_trace();
     return id & SSA_OPR_VALUE_MASK;
 }
 
 func ssa_operand_is_const(opr: u64) -> u64 {
+    push_trace("ssa_operand_is_const", "ssa.b", __LINE__);
+    pop_trace();
     var mask: u64 = 1;
     mask = mask << 63;
     return (opr & mask) != 0;
 }
 
 func ssa_operand_value(opr: u64) -> u64 {
+    push_trace("ssa_operand_value", "ssa.b", __LINE__);
+    pop_trace();
     return opr & SSA_OPR_VALUE_MASK;
 }
 
 func ssa_block_add_pred(block: *SSABlock, pred: *SSABlock) -> u64 {
+    push_trace("ssa_block_add_pred", "ssa.b", __LINE__);
+    pop_trace();
     // SSABlock: id, phi_head, inst_head, inst_tail, preds_data, preds_len, preds_cap, succs_data, ...
     // Offsets: preds_data=32, preds_len=40, preds_cap=48
     return _ssa_ptr_list_push((u64)block, 32, 40, 48, (u64)pred, 4);
 }
 
 func ssa_block_add_succ(block: *SSABlock, succ: *SSABlock) -> u64 {
+    push_trace("ssa_block_add_succ", "ssa.b", __LINE__);
+    pop_trace();
     // SSABlock: ..., succs_data, succs_len, succs_cap, dom_parent
     // Offsets: succs_data=56, succs_len=64, succs_cap=72
     return _ssa_ptr_list_push((u64)block, 56, 64, 72, (u64)succ, 4);
 }
 
 func ssa_block_add_df(block: *SSABlock, target: *SSABlock) -> u64 {
+    push_trace("ssa_block_add_df", "ssa.b", __LINE__);
+    pop_trace();
     var data: u64 = block->df_data;
     var len: u64 = block->df_len;
     var i: u64 = 0;
@@ -368,6 +460,8 @@ func ssa_block_add_df(block: *SSABlock, target: *SSABlock) -> u64 {
 }
 
 func ssa_block_replace_succ(block: *SSABlock, old_succ: *SSABlock, new_succ: *SSABlock) -> u64 {
+    push_trace("ssa_block_replace_succ", "ssa.b", __LINE__);
+    pop_trace();
     var data: u64 = block->succs_data;
     var len: u64 = block->succs_len;
     var i: u64 = 0;
@@ -383,6 +477,8 @@ func ssa_block_replace_succ(block: *SSABlock, old_succ: *SSABlock, new_succ: *SS
 }
 
 func ssa_block_replace_pred(block: *SSABlock, old_pred: *SSABlock, new_pred: *SSABlock) -> u64 {
+    push_trace("ssa_block_replace_pred", "ssa.b", __LINE__);
+    pop_trace();
     var data: u64 = block->preds_data;
     var len: u64 = block->preds_len;
     var i: u64 = 0;
@@ -398,12 +494,16 @@ func ssa_block_replace_pred(block: *SSABlock, old_pred: *SSABlock, new_pred: *SS
 }
 
 func ssa_add_edge(src: *SSABlock, dst: *SSABlock) -> u64 {
+    push_trace("ssa_add_edge", "ssa.b", __LINE__);
+    pop_trace();
     ssa_block_add_succ(src, dst);
     ssa_block_add_pred(dst, src);
     return 0;
 }
 
 func ssa_new_function(ctx: *SSAContext, name_ptr: u64, name_len: u64) -> u64 {
+    push_trace("ssa_new_function", "ssa.b", __LINE__);
+    pop_trace();
     var f_ptr: u64 = heap_alloc(SIZEOF_SSA_FUNC);
     var f: *SSAFunction = (*SSAFunction)f_ptr;
     f->id = ctx->funcs_len;
@@ -424,6 +524,8 @@ func ssa_new_function(ctx: *SSAContext, name_ptr: u64, name_len: u64) -> u64 {
 // ============================================
 
 func ssa_build_func(ctx: *SSAContext, fn_ptr: u64) -> u64 {
+    push_trace("ssa_build_func", "ssa.b", __LINE__);
+    pop_trace();
     var fn: *AstFunc = (*AstFunc)fn_ptr;
     var ssa_fn_ptr: u64 = ssa_new_function(ctx, fn->name_ptr, fn->name_len);
     var ssa_fn: *SSAFunction = (*SSAFunction)ssa_fn_ptr;
@@ -436,6 +538,8 @@ func ssa_build_func(ctx: *SSAContext, fn_ptr: u64) -> u64 {
 }
 
 func ssa_build_program(prog: u64) -> u64 {
+    push_trace("ssa_build_program", "ssa.b", __LINE__);
+    pop_trace();
     var program: *AstProgram = (*AstProgram)prog;
     var funcs: u64 = program->funcs_vec;
     var count: u64 = vec_len(funcs);

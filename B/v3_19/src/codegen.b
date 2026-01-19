@@ -28,6 +28,8 @@ import emitter.emitter;
 import emitter.gen_expr;
 import emitter.gen_stmt;
 
+const CODEGEN_DEBUG = 0;
+
 // ============================================
 // Function Codegen
 // ============================================
@@ -152,24 +154,42 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
 
     var program: *AstProgram = (*AstProgram)prog;
 
-    // SSA CFG scaffold (no codegen impact yet)
+    // SSA CFG scaffold (no codegen impact unless SSA/opt enabled)
     typeinfo_set_structs(program->structs_vec);
     typeinfo_set_funcs(sigs);
-    var ssa_ctx_ptr: u64 = ssa_builder_build_program(prog);
-    var ssa_ctx: *SSAContext = (*SSAContext)ssa_ctx_ptr;
+    var ssa_ctx_ptr: u64 = 0;
+    var ssa_ctx: *SSAContext = 0;
     var ir_mode: u64 = opt_get_ir_mode();
     var use_ir: u64 = 0;
     if (ir_mode != IR_NONE) { use_ir = 1; }
+    var use_ssa: u64 = 0;
+    if (use_ir != 0 || opt_get_level() >= 1) { use_ssa = 1; }
 
-    if (use_ir != 0 || opt_get_level() >= 1) {
+    if (use_ssa != 0) {
+        ssa_ctx_ptr = ssa_builder_build_program(prog);
+        ssa_ctx = (*SSAContext)ssa_ctx_ptr;
         ssa_mem2reg_run((*SSAContext)ssa_ctx_ptr);
+        if (CODEGEN_DEBUG != 0) {
+            println("[DEBUG] codegen: mem2reg", 25);
+        }
         if (opt_get_level() >= 1) {
             ssa_opt_o1_run((*SSAContext)ssa_ctx_ptr);
+            if (CODEGEN_DEBUG != 0) {
+                println("[DEBUG] codegen: opt_o1", 25);
+            }
         }
         ssa_destroy_run((*SSAContext)ssa_ctx_ptr);
+        if (CODEGEN_DEBUG != 0) {
+            println("[DEBUG] codegen: destroy", 25);
+        }
         ssa_regalloc_run((*SSAContext)ssa_ctx_ptr, 6);
-        ssa_regalloc_apply_run((*SSAContext)ssa_ctx_ptr);
+        if (CODEGEN_DEBUG != 0) {
+            println("[DEBUG] codegen: regalloc", 26);
+        }
         ssa_lower_phys_run((*SSAContext)ssa_ctx_ptr);
+        if (CODEGEN_DEBUG != 0) {
+            println("[DEBUG] codegen: lower_phys", 27);
+        }
     }
 
     // Initialize emitter state
@@ -213,7 +233,7 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     
     for(var i : u64 = 0; i < vec_len(program->funcs_vec);i++){
         var fn_ptr: u64 = vec_get(program->funcs_vec, i);
-        if (use_ir != 0 || opt_get_level() >= 1) {
+        if (use_ssa != 0) {
             var ssa_fn_ptr: u64 = *(*u64)(ssa_ctx->funcs_data + i * 8);
             if (ssa_codegen_is_supported_func(fn_ptr, program->globals_vec) != 0) {
                 ssa_codegen_emit_func(fn_ptr, ssa_fn_ptr);

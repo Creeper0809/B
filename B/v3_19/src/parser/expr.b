@@ -112,16 +112,14 @@ func parse_primary(p: u64) -> u64 {
     
     if (k == TOKEN_AMPERSAND) {
         parse_adv(p);
-        var tok: u64 = parse_peek(p);
-        if (parse_peek_kind(p) != TOKEN_IDENTIFIER) {
-            emit_stderr("[ERROR] Expected identifier after &\n", 37);
+        var operand: u64 = parse_unary(p);
+        if (operand == 0) {
+            emit_stderr("[ERROR] Expected expression after &\n", 37);
             pop_trace();
             return 0;
         }
-        parse_adv(p);
-        var ident: u64 = ast_ident(((*Token)tok)->ptr, ((*Token)tok)->len);
         pop_trace();
-        return ast_addr_of(ident);
+        return ast_addr_of(operand);
     }
     
     if (k == TOKEN_STAR) {

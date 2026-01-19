@@ -94,6 +94,11 @@
 - [x] SSA CFG 빌더 for/switch 지원 + SSA 코드젠 지원 판정 확장
 - [x] SSA 모드 테스트 추가: 32_ssa_for_switch
 - [x] SSA bitwise/shift/mod 연산 지원 + 테스트 33_ssa_bitwise_shift_mod
+- [x] SSA string literal 주소 로딩 지원 + 테스트 34_ssa_string_literal
+- [x] SSA 주소/메모리(주소, 역참조, 인덱스, 멤버 접근) 지원 + 테스트 35_ssa_addr_deref_index_member
+- [x] SSA 전 경로 스택 트레이스 추가 (빌더/IR/패스)
+- [x] SSA BuilderCtx heap_alloc 크기 수정 + 회귀 테스트 36_ssa_builder_ctx_alloc
+- [x] SSA destroy COPY 터미네이터 전 삽입 + 테스트 37_ssa_destroy_copy_before_term
 - [x] IR 모드 플래그(-3addr/-ssa) 파싱 + opt API + 테스트(132_opt_ir_mode) 추가
 - [x] IR 모드 덤프(SSA/3addr) + ssa_dump 모듈 + 테스트(133_ssa_dump_basic) 추가
 - [x] IR 모드 최적화 경로 적용(덤프 아님) + 테스트(134_ir_mode_codegen_smoke) 추가

@@ -1,31 +1,36 @@
 // ssa_opt_o1.b - SSA O1 optimizations (v3_17)
 
 import std.io;
+import std.util;
 import ssa;
 
 const SSA_O1_DEBUG = 0;
 
 func _ssa_opt_is_foldable(op: u64) -> u64 {
-    if (op == SSA_OP_ADD) { return 1; }
-    if (op == SSA_OP_SUB) { return 1; }
-    if (op == SSA_OP_MUL) { return 1; }
-    if (op == SSA_OP_DIV) { return 1; }
-    if (op == SSA_OP_MOD) { return 1; }
-    if (op == SSA_OP_AND) { return 1; }
-    if (op == SSA_OP_OR) { return 1; }
-    if (op == SSA_OP_XOR) { return 1; }
-    if (op == SSA_OP_SHL) { return 1; }
-    if (op == SSA_OP_SHR) { return 1; }
-    if (op == SSA_OP_EQ) { return 1; }
-    if (op == SSA_OP_NE) { return 1; }
-    if (op == SSA_OP_LT) { return 1; }
-    if (op == SSA_OP_GT) { return 1; }
-    if (op == SSA_OP_LE) { return 1; }
-    if (op == SSA_OP_GE) { return 1; }
+    push_trace("_ssa_opt_is_foldable", "ssa_opt_o1.b", __LINE__);
+    if (op == SSA_OP_ADD) { pop_trace(); return 1; }
+    if (op == SSA_OP_SUB) { pop_trace(); return 1; }
+    if (op == SSA_OP_MUL) { pop_trace(); return 1; }
+    if (op == SSA_OP_DIV) { pop_trace(); return 1; }
+    if (op == SSA_OP_MOD) { pop_trace(); return 1; }
+    if (op == SSA_OP_AND) { pop_trace(); return 1; }
+    if (op == SSA_OP_OR) { pop_trace(); return 1; }
+    if (op == SSA_OP_XOR) { pop_trace(); return 1; }
+    if (op == SSA_OP_SHL) { pop_trace(); return 1; }
+    if (op == SSA_OP_SHR) { pop_trace(); return 1; }
+    if (op == SSA_OP_EQ) { pop_trace(); return 1; }
+    if (op == SSA_OP_NE) { pop_trace(); return 1; }
+    if (op == SSA_OP_LT) { pop_trace(); return 1; }
+    if (op == SSA_OP_GT) { pop_trace(); return 1; }
+    if (op == SSA_OP_LE) { pop_trace(); return 1; }
+    if (op == SSA_OP_GE) { pop_trace(); return 1; }
+    pop_trace();
     return 0;
 }
 
 func _ssa_opt_fold_inst(inst: *SSAInstruction) -> u64 {
+    push_trace("_ssa_opt_fold_inst", "ssa_opt_o1.b", __LINE__);
+    pop_trace();
     var op: u64 = ssa_inst_get_op(inst);
     if (_ssa_opt_is_foldable(op) == 0) { return 0; }
 
@@ -67,6 +72,7 @@ func _ssa_opt_fold_inst(inst: *SSAInstruction) -> u64 {
 }
 
 func _ssa_opt_remove_nops(block: *SSABlock) -> u64 {
+    push_trace("_ssa_opt_remove_nops", "ssa_opt_o1.b", __LINE__);
     var cur: *SSAInstruction = block->inst_head;
     while (cur != 0) {
         var next: *SSAInstruction = cur->next;
@@ -93,10 +99,13 @@ func _ssa_opt_remove_nops(block: *SSABlock) -> u64 {
         cur = next;
     }
 
+    pop_trace();
     return 0;
 }
 
 func ssa_opt_o1_run(ctx: *SSAContext) -> u64 {
+    push_trace("ssa_opt_o1_run", "ssa_opt_o1.b", __LINE__);
+    pop_trace();
     if (ctx == 0) { return 0; }
 
     var funcs: u64 = ctx->funcs_data;

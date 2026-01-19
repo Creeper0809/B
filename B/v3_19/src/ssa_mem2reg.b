@@ -6,6 +6,7 @@
 // 3) Rename 스택 기반 Load/Store 제거
 
 import std.io;
+import std.util;
 import std.vec;
 import ssa;
 import ssa_mem2reg_df;
@@ -13,12 +14,16 @@ import ssa_mem2reg_df;
 const MEM2REG_DEBUG = 0;
 
 func _ssa_dom_undef() -> u64 {
+    push_trace("_ssa_dom_undef", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var v: u64 = 0;
     v = v - 1;
     return v;
 }
 
 func _ssa_zero_u64(buf: u64, count: u64) -> u64 {
+    push_trace("_ssa_zero_u64", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var i: u64 = 0;
     while (i < count) {
         *(*u64)(buf + i * 8) = 0;
@@ -28,19 +33,27 @@ func _ssa_zero_u64(buf: u64, count: u64) -> u64 {
 }
 
 func _ssa_dom_get(idom: u64, id: u64) -> u64 {
+    push_trace("_ssa_dom_get", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     return *(*u64)(idom + id * 8);
 }
 
 func _ssa_dom_set(idom: u64, id: u64, val: u64) -> u64 {
+    push_trace("_ssa_dom_set", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     *(*u64)(idom + id * 8) = val;
     return 0;
 }
 
 func _ssa_dom_is_set(idom: u64, id: u64) -> u64 {
+    push_trace("_ssa_dom_is_set", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     return _ssa_dom_get(idom, id) != _ssa_dom_undef();
 }
 
 func _ssa_dom_depth(idom: u64, id: u64, max_steps: u64) -> u64 {
+    push_trace("_ssa_dom_depth", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var depth: u64 = 0;
     var cur: u64 = id;
     var steps: u64 = 0;
@@ -61,6 +74,8 @@ func _ssa_dom_depth(idom: u64, id: u64, max_steps: u64) -> u64 {
 }
 
 func _ssa_dom_intersect(idom: u64, b1: u64, b2: u64, max_steps: u64) -> u64 {
+    push_trace("_ssa_dom_intersect", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var n1: u64 = b1;
     var n2: u64 = b2;
     var steps: u64 = 0;
@@ -87,6 +102,8 @@ func _ssa_dom_intersect(idom: u64, b1: u64, b2: u64, max_steps: u64) -> u64 {
 }
 
 func _ssa_dom_build_block_map(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
+    push_trace("_ssa_dom_build_block_map", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var total: u64 = ctx->next_block_id;
     var map: u64 = heap_alloc(total * 8);
     _ssa_zero_u64(map, total);
@@ -104,6 +121,8 @@ func _ssa_dom_build_block_map(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
 }
 
 func _ssa_mem2reg_max_var(fn: *SSAFunction) -> u64 {
+    push_trace("_ssa_mem2reg_max_var", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var max_id: u64 = 0;
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
@@ -128,6 +147,8 @@ func _ssa_mem2reg_max_var(fn: *SSAFunction) -> u64 {
 }
 
 func _ssa_mem2reg_max_reg(fn: *SSAFunction) -> u64 {
+    push_trace("_ssa_mem2reg_max_reg", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var max_id: u64 = 0;
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
@@ -154,6 +175,8 @@ func _ssa_mem2reg_max_reg(fn: *SSAFunction) -> u64 {
 }
 
 func _ssa_mem2reg_max_block_id(fn: *SSAFunction) -> u64 {
+    push_trace("_ssa_mem2reg_max_block_id", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var max_id: u64 = 0;
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
@@ -168,6 +191,8 @@ func _ssa_mem2reg_max_block_id(fn: *SSAFunction) -> u64 {
 }
 
 func _ssa_mem2reg_def_blocks(fn: *SSAFunction, var_id: u64) -> u64 {
+    push_trace("_ssa_mem2reg_def_blocks", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var defs: u64 = vec_new(4);
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
@@ -195,6 +220,8 @@ func _ssa_mem2reg_def_blocks(fn: *SSAFunction, var_id: u64) -> u64 {
 }
 
 func _ssa_mem2reg_insert_phi(ctx: *SSAContext, fn: *SSAFunction, max_var: u64, next_reg_ptr: *u64) -> u64 {
+    push_trace("_ssa_mem2reg_insert_phi", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     if (max_var == 0) { return 0; }
 
     var total_blocks: u64 = ctx->next_block_id;
@@ -251,12 +278,16 @@ func _ssa_mem2reg_insert_phi(ctx: *SSAContext, fn: *SSAFunction, max_var: u64, n
 }
 
 func _ssa_mem2reg_stack_top(stack: u64) -> u64 {
+    push_trace("_ssa_mem2reg_stack_top", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var len: u64 = vec_len(stack);
     if (len == 0) { return 0; }
     return vec_get(stack, len - 1);
 }
 
 func _ssa_mem2reg_rewrite_opr(map_val: u64, map_set: u64, map_cap: u64, opr: u64) -> u64 {
+    push_trace("_ssa_mem2reg_rewrite_opr", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     if (ssa_operand_is_const(opr)) { return opr; }
     var reg: u64 = ssa_operand_value(opr);
     if (reg >= map_cap) { return opr; }
@@ -266,6 +297,8 @@ func _ssa_mem2reg_rewrite_opr(map_val: u64, map_set: u64, map_cap: u64, opr: u64
 }
 
 func _ssa_mem2reg_rename_block(fn: *SSAFunction, block: *SSABlock, max_var: u64, stack_arr: u64, reg_map_val: u64, reg_map_set: u64, reg_map_cap: u64, child_arr: u64) -> u64 {
+    push_trace("_ssa_mem2reg_rename_block", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     var pushed: u64 = vec_new(8);
 
     var phi: *SSAInstruction = block->phi_head;
@@ -357,6 +390,8 @@ func _ssa_mem2reg_rename_block(fn: *SSAFunction, block: *SSABlock, max_var: u64,
 }
 
 func _ssa_mem2reg_rename(fn: *SSAFunction, max_var: u64, max_reg: u64) -> u64 {
+    push_trace("_ssa_mem2reg_rename", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     if (max_var == 0) { return 0; }
 
     var stack_arr: u64 = heap_alloc((max_var + 1) * 8);
@@ -401,6 +436,8 @@ func _ssa_mem2reg_rename(fn: *SSAFunction, max_var: u64, max_reg: u64) -> u64 {
 }
 
 func ssa_mem2reg_compute_idom(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
+    push_trace("ssa_mem2reg_compute_idom", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     if (fn == 0) { return 0; }
 
     var total: u64 = ctx->next_block_id;
@@ -498,11 +535,12 @@ func ssa_mem2reg_compute_idom(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
     if (MEM2REG_DEBUG != 0) {
         println("[DEBUG] ssa_mem2reg_compute_idom: done", 40);
     }
-
     return 0;
 }
 
 func ssa_mem2reg_run(ctx: *SSAContext) -> u64 {
+    push_trace("ssa_mem2reg_run", "ssa_mem2reg.b", __LINE__);
+    pop_trace();
     if (ctx == 0) { return 0; }
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
@@ -510,15 +548,30 @@ func ssa_mem2reg_run(ctx: *SSAContext) -> u64 {
     while (i < n) {
         var f_ptr: u64 = *(*u64)(funcs + i * 8);
         var fn: *SSAFunction = (*SSAFunction)f_ptr;
+        if (MEM2REG_DEBUG != 0) {
+            println("[DEBUG] ssa_mem2reg_run: fn", 31);
+        }
         ssa_mem2reg_compute_idom(ctx, fn);
+        if (MEM2REG_DEBUG != 0) {
+            println("[DEBUG] ssa_mem2reg_run: idom", 38);
+        }
         ssa_mem2reg_compute_df(fn);
+        if (MEM2REG_DEBUG != 0) {
+            println("[DEBUG] ssa_mem2reg_run: df", 35);
+        }
 
         var max_var: u64 = _ssa_mem2reg_max_var(fn);
         var next_reg: u64 = _ssa_mem2reg_max_reg(fn) + 1;
         _ssa_mem2reg_insert_phi(ctx, fn, max_var, &next_reg);
+        if (MEM2REG_DEBUG != 0) {
+            println("[DEBUG] ssa_mem2reg_run: phi", 36);
+        }
 
         var max_reg2: u64 = next_reg;
         _ssa_mem2reg_rename(fn, max_var, max_reg2);
+        if (MEM2REG_DEBUG != 0) {
+            println("[DEBUG] ssa_mem2reg_run: rename", 39);
+        }
         i = i + 1;
     }
     return 0;

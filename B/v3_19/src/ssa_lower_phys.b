@@ -3,9 +3,11 @@
 // 현재 단계: COPY/LOAD/STORE 정리 및 단순 정규화.
 
 import ssa;
+import std.util;
 
 func ssa_lower_phys_run(ctx: *SSAContext) -> u64 {
-    if (ctx == 0) { return 0; }
+    push_trace("ssa_lower_phys_run", "ssa_lower_phys.b", __LINE__);
+    if (ctx == 0) { pop_trace(); return 0; }
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
     var i: u64 = 0;
@@ -44,5 +46,6 @@ func ssa_lower_phys_run(ctx: *SSAContext) -> u64 {
 
         i = i + 1;
     }
+    pop_trace();
     return 0;
 }

@@ -4,6 +4,7 @@
 // and assigns colors with a simple greedy algorithm.
 
 import std.io;
+import std.util;
 import std.vec;
 import ssa;
 
@@ -16,11 +17,14 @@ const SSA_PHYS_RDX = 4;
 const SSA_PHYS_R8 = 5;
 const SSA_PHYS_R9 = 6;
 
+var g_regalloc_ctx;
+
 func _ssa_all_ones() -> u64 {
     var v: u64 = 0;
     v = v - 1;
     return v;
 }
+
 
 func _ssa_bits_len(nbits: u64) -> u64 {
     var words: u64 = nbits / 64;
@@ -107,6 +111,7 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
     var i: u64 = 0;
     while (i < n) {
         var b_ptr: u64 = *(*u64)(blocks + i * 8);
+        if (b_ptr == 0) { i = i + 1; continue; }
         var b: *SSABlock = (*SSABlock)b_ptr;
 
         var phi: *SSAInstruction = b->phi_head;
@@ -122,7 +127,14 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
 
         var cur: *SSAInstruction = b->inst_head;
         while (cur != 0) {
-            if (cur->dest > max_id) { max_id = cur->dest; }
+            var op: u64 = ssa_inst_get_op(cur);
+            if (op != SSA_OP_BR && op != SSA_OP_JMP) {
+                if (cur->dest > max_id) { max_id = cur->dest; }
+            }
+            if (op == SSA_OP_PHI) {
+                cur = cur->next;
+                continue;
+            }
             if (!ssa_operand_is_const(cur->src1)) {
                 var r1: u64 = ssa_operand_value(cur->src1);
                 if (r1 > max_id) { max_id = r1; }
@@ -158,21 +170,31 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
                 continue;
             }
 
+            if (op == SSA_OP_PHI) {
+                if (cur->dest != 0 && cur->dest <= max_reg) {
+                    _ssa_bitset_set(def, cur->dest);
+                }
+                cur = cur->next;
+                continue;
+            }
+
             if (!ssa_operand_is_const(cur->src1)) {
                 var r1: u64 = ssa_operand_value(cur->src1);
-                if (_ssa_bitset_test(def, r1) == 0) {
+                if (r1 <= max_reg && _ssa_bitset_test(def, r1) == 0) {
                     _ssa_bitset_set(use, r1);
                 }
             }
             if (!ssa_operand_is_const(cur->src2)) {
                 var r2: u64 = ssa_operand_value(cur->src2);
-                if (_ssa_bitset_test(def, r2) == 0) {
+                if (r2 <= max_reg && _ssa_bitset_test(def, r2) == 0) {
                     _ssa_bitset_set(use, r2);
                 }
             }
 
             if (cur->dest != 0) {
-                _ssa_bitset_set(def, cur->dest);
+                if (op != SSA_OP_BR && op != SSA_OP_JMP && cur->dest <= max_reg) {
+                    _ssa_bitset_set(def, cur->dest);
+                }
             }
 
             cur = cur->next;
@@ -291,23 +313,27 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
 
             if (inst->dest != 0) {
                 var d: u64 = inst->dest;
-                var i2: u64 = 1;
-                while (i2 < nregs) {
-                    if (_ssa_bitset_test(live, i2) != 0 && i2 != d) {
-                        _ssa_bitset_set(*(*u64)(adj + d * 8), i2);
-                        _ssa_bitset_set(*(*u64)(adj + i2 * 8), d);
+                if (d < nregs && op != SSA_OP_BR && op != SSA_OP_JMP) {
+                    var i2: u64 = 1;
+                    while (i2 < nregs) {
+                        if (_ssa_bitset_test(live, i2) != 0 && i2 != d) {
+                            _ssa_bitset_set(*(*u64)(adj + d * 8), i2);
+                            _ssa_bitset_set(*(*u64)(adj + i2 * 8), d);
+                        }
+                        i2 = i2 + 1;
                     }
-                    i2 = i2 + 1;
+                    _ssa_bitset_clear(live, d);
                 }
-                _ssa_bitset_clear(live, d);
             }
 
-            if (op != SSA_OP_NOP) {
+            if (op != SSA_OP_NOP && op != SSA_OP_PHI) {
                 if (!ssa_operand_is_const(inst->src1)) {
-                    _ssa_bitset_set(live, ssa_operand_value(inst->src1));
+                    var r1b: u64 = ssa_operand_value(inst->src1);
+                    if (r1b < nregs) { _ssa_bitset_set(live, r1b); }
                 }
                 if (!ssa_operand_is_const(inst->src2)) {
-                    _ssa_bitset_set(live, ssa_operand_value(inst->src2));
+                    var r2b: u64 = ssa_operand_value(inst->src2);
+                    if (r2b < nregs) { _ssa_bitset_set(live, r2b); }
                 }
             }
         }
@@ -404,31 +430,65 @@ func ssa_regalloc_map_fn(fn: *SSAFunction, k: u64) -> u64 {
 }
 
 func ssa_regalloc_run(ctx: *SSAContext, k: u64) -> u64 {
-    if (ctx == 0) { return 0; }
+    push_trace("ssa_regalloc_run", "ssa_regalloc.b", __LINE__);
+    if (ctx == 0) { pop_trace(); return 0; }
+    g_regalloc_ctx = (u64)ctx;
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
     var i: u64 = 0;
     while (i < n) {
         var f_ptr: u64 = *(*u64)(funcs + i * 8);
-        ssa_regalloc_map_fn((*SSAFunction)f_ptr, k);
+        if (SSA_REGALLOC_DEBUG != 0) {
+            println("[DEBUG] ssa_regalloc_run", 26);
+        }
+        var fn: *SSAFunction = (*SSAFunction)f_ptr;
+        ssa_regalloc_map_fn(fn, k);
+        ssa_regalloc_apply_fn(fn);
         i = i + 1;
     }
+    pop_trace();
     return 0;
 }
 
 func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
-    if (fn == 0) { return 0; }
-    if (fn->reg_map_data == 0) { return 0; }
-
-    var map: u64 = fn->reg_map_data;
-    var map_len: u64 = fn->reg_map_len;
+    push_trace("ssa_regalloc_apply_fn", "ssa_regalloc.b", __LINE__);
+    if (fn == 0) { pop_trace(); return 0; }
+    if (fn->reg_map_data == 0) { pop_trace(); return 0; }
 
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
+    if (blocks == 0 || n == 0) { pop_trace(); return 0; }
+
+    var map: u64 = fn->reg_map_data;
+    var map_len: u64 = fn->reg_map_len;
+    if (SSA_REGALLOC_DEBUG != 0) {
+        println("[DEBUG] ssa_regalloc_apply_fn", 30);
+        print("  fn=", 5);
+        print_u64((u64)fn);
+        print(" blocks_len=", 12);
+        print_u64(n);
+        print(" map_len=", 9);
+        print_u64(map_len);
+        print_nl();
+    }
     var i: u64 = 0;
     while (i < n) {
         var b_ptr: u64 = *(*u64)(blocks + i * 8);
+        if (b_ptr == 0) { i = i + 1; continue; }
         var b: *SSABlock = (*SSABlock)b_ptr;
+        if (SSA_REGALLOC_DEBUG != 0) {
+            print("  block idx=", 12);
+            print_u64(i);
+            print(" ptr=", 5);
+            print_u64(b_ptr);
+            print(" id=", 4);
+            print_u64(b->id);
+            print(" phi=", 5);
+            print_u64((u64)b->phi_head);
+            print(" inst=", 6);
+            print_u64((u64)b->inst_head);
+            print_nl();
+        }
 
         var phi: *SSAInstruction = b->phi_head;
         while (phi != 0) {
@@ -449,9 +509,12 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
 
         var cur: *SSAInstruction = b->inst_head;
         while (cur != 0) {
-            if (cur->dest < map_len) {
-                var pd: u64 = *(*u64)(map + cur->dest * 8);
-                if (pd != 0) { cur->dest = pd; }
+            var op2: u64 = ssa_inst_get_op(cur);
+            if (op2 != SSA_OP_BR && op2 != SSA_OP_JMP) {
+                if (cur->dest < map_len) {
+                    var pd: u64 = *(*u64)(map + cur->dest * 8);
+                    if (pd != 0) { cur->dest = pd; }
+                }
             }
             if (!ssa_operand_is_const(cur->src1)) {
                 var r1: u64 = ssa_operand_value(cur->src1);
@@ -473,11 +536,19 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
         i = i + 1;
     }
 
+    pop_trace();
     return 0;
 }
 
 func ssa_regalloc_apply_run(ctx: *SSAContext) -> u64 {
-    if (ctx == 0) { return 0; }
+    push_trace("ssa_regalloc_apply_run", "ssa_regalloc.b", __LINE__);
+    if (ctx == 0 && g_regalloc_ctx != 0) {
+        ctx = (*SSAContext)g_regalloc_ctx;
+    }
+    if (ctx == 0) { pop_trace(); return 0; }
+    if (ctx->funcs_data == 0 && g_regalloc_ctx != 0) {
+        ctx = (*SSAContext)g_regalloc_ctx;
+    }
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
     var i: u64 = 0;
@@ -486,5 +557,6 @@ func ssa_regalloc_apply_run(ctx: *SSAContext) -> u64 {
         ssa_regalloc_apply_fn((*SSAFunction)f_ptr);
         i = i + 1;
     }
+    pop_trace();
     return 0;
 }
