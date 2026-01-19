@@ -104,6 +104,26 @@ func builder_get_var_id(ctx: *BuilderCtx, name_ptr: u64, name_len: u64) -> u64 {
     return new_id;
 }
 
+func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
+    if (fn == 0) { return 0; }
+    var params: u64 = fn->params_vec;
+    if (params == 0) { return 0; }
+
+    var n: u64 = vec_len(params);
+    var i: u64 = 0;
+    while (i < n) {
+        var p: *Param = (*Param)vec_get(params, i);
+        var var_id: u64 = builder_get_var_id(ctx, p->name_ptr, p->name_len);
+        var reg_id: u64 = builder_new_reg(ctx);
+        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_id, ssa_operand_const(i), 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+        var st_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id), ssa_operand_reg(reg_id));
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr);
+        i = i + 1;
+    }
+    return 0;
+}
+
 func builder_binop_to_ssa_op(op: u64) -> u64 {
     if (op == TOKEN_PLUS) { return SSA_OP_ADD; }
     if (op == TOKEN_MINUS) { return SSA_OP_SUB; }
@@ -398,6 +418,7 @@ func ssa_builder_build_func(ctx: *BuilderCtx, fn_ptr: u64) -> u64 {
     ctx->cur_func = (*SSAFunction)ssa_fn_ptr;
     ctx->cur_block = ctx->cur_func->entry;
     builder_reset_func(ctx);
+    builder_add_params(ctx, fn);
     build_block(ctx, fn->body);
     return 0;
 }

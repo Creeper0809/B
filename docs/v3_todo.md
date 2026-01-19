@@ -89,6 +89,7 @@
 - [x] 레지스터 매핑 SSA 적용(ops/phi 치환) + 테스트(127_ssa_regalloc_apply) 추가
 - [x] 물리 레지스터 lowering(복사/로드/스토어 정리) + 테스트(128_ssa_lower_phys_basic) 추가
 - [x] SSA → x86 코드젠(지원 함수 제한) + 테스트(129_ssa_codegen_basic) 추가
+- [x] SSA 파라미터 로딩(SSA_OP_PARAM) + 코드젠/빌더 확장 + 테스트(130_ssa_codegen_param_basic) 추가
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증

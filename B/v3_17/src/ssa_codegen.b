@@ -130,7 +130,16 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
     if (fn_ptr == 0) { return 0; }
     var fn: *AstFunc = (*AstFunc)fn_ptr;
 
-    if (fn->params_vec != 0 && vec_len(fn->params_vec) != 0) { return 0; }
+    var params: u64 = fn->params_vec;
+    if (params != 0) {
+        var pn: u64 = vec_len(params);
+        var pi: u64 = 0;
+        while (pi < pn) {
+            var p: *Param = (*Param)vec_get(params, pi);
+            if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) { return 0; }
+            pi = pi + 1;
+        }
+    }
     if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) { return 0; }
     return _ssa_codegen_stmt_supported(fn->body, globals);
 }
@@ -366,6 +375,17 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_COPY) {
         _ssa_emit_mov_reg_opr(inst->dest, inst->src1);
+        return 0;
+    }
+
+    if (op == SSA_OP_PARAM) {
+        var idx: u64 = ssa_operand_value(inst->src1);
+        var offset: u64 = 16 + idx * 8;
+        emit("    mov ", 8);
+        _ssa_emit_reg_name(inst->dest);
+        emit(", [rbp+", 7);
+        emit_u64(offset);
+        emit("]\n", 2);
         return 0;
     }
 

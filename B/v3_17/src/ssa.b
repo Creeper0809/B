@@ -41,6 +41,7 @@ const SSA_OP_GE = 20;
 // Memory ops (mem2reg 이전 단계)
 const SSA_OP_LOAD = 25;
 const SSA_OP_STORE = 26;
+const SSA_OP_PARAM = 27;
 
 // Control flow
 const SSA_OP_JMP = 30;
