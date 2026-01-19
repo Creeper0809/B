@@ -99,6 +99,8 @@
 - [x] SSA 전 경로 스택 트레이스 추가 (빌더/IR/패스)
 - [x] SSA BuilderCtx heap_alloc 크기 수정 + 회귀 테스트 36_ssa_builder_ctx_alloc
 - [x] SSA destroy COPY 터미네이터 전 삽입 + 테스트 37_ssa_destroy_copy_before_term
+- [x] SSA 모듈 src/ssa 폴더로 정리 (import 경로 갱신)
+- [x] SSA 진입점 ssa.b 통합 + ssa 모듈 파일명 정리(datastruct/core 등)
 - [x] IR 모드 플래그(-3addr/-ssa) 파싱 + opt API + 테스트(132_opt_ir_mode) 추가
 - [x] IR 모드 덤프(SSA/3addr) + ssa_dump 모듈 + 테스트(133_ssa_dump_basic) 추가
 - [x] IR 모드 최적화 경로 적용(덤프 아님) + 테스트(134_ir_mode_codegen_smoke) 추가

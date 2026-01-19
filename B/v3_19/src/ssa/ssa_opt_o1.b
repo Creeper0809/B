@@ -2,7 +2,8 @@
 
 import std.io;
 import std.util;
-import ssa;
+import ssa.ssa;
+import ssa.ssa_core;
 
 const SSA_O1_DEBUG = 0;
 

@@ -6,7 +6,8 @@
 import std.io;
 import std.util;
 import std.vec;
-import ssa;
+import ssa.ssa;
+import ssa.ssa_core;
 
 const SSA_REGALLOC_DEBUG = 0;
 

@@ -8,8 +8,9 @@
 import std.io;
 import std.util;
 import std.vec;
-import ssa;
-import ssa_mem2reg_df;
+import ssa.datastruct;
+import ssa.core;
+import ssa.mem2reg_df;
 
 const MEM2REG_DEBUG = 0;
 

@@ -9,11 +9,12 @@ import std.vec;
 import std.hashmap;
 import types;
 import ast;
-import ssa;
+import ssa.ssa;
+import ssa.ssa_core;
 import emitter.typeinfo;
 import emitter.symtab;
 import compiler;
-import ssa_codegen;
+import ssa.ssa_codegen;
 
 const SSA_BUILDER_DEBUG = 0;
 
@@ -1009,52 +1010,3 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
     return 0;
 }
 
-// ============================================
-// Entry Points
-// ============================================
-
-func ssa_builder_build_func(ctx: *BuilderCtx, fn_ptr: u64) -> u64 {
-    push_trace("ssa_builder_build_func", "ssa_builder.b", __LINE__);
-    pop_trace();
-    var fn: *AstFunc = (*AstFunc)fn_ptr;
-    if (SSA_BUILDER_DEBUG != 0) {
-        emit("[DEBUG] ssa_builder_build_func: ", 36);
-        emit(fn->name_ptr, fn->name_len);
-        emit("\n", 1);
-    }
-    var ssa_fn_ptr: u64 = ssa_new_function(ctx->ssa_ctx, fn->name_ptr, fn->name_len);
-    ctx->cur_func = (*SSAFunction)ssa_fn_ptr;
-    ctx->cur_block = ctx->cur_func->entry;
-    builder_reset_func(ctx);
-    builder_add_params(ctx, fn);
-    build_block(ctx, fn->body);
-    return 0;
-}
-
-func ssa_builder_build_program(prog: u64) -> u64 {
-    push_trace("ssa_builder_build_program", "ssa_builder.b", __LINE__);
-    pop_trace();
-    var program: *AstProgram = (*AstProgram)prog;
-    var funcs: u64 = program->funcs_vec;
-    var count: u64 = vec_len(funcs);
-
-    var ssa_ctx_ptr: u64 = ssa_context_new();
-    var bctx_ptr: u64 = builder_ctx_new((*SSAContext)ssa_ctx_ptr);
-    var bctx: *BuilderCtx = (*BuilderCtx)bctx_ptr;
-
-    var i: u64 = 0;
-    while (i < count) {
-        var fn_ptr: u64 = vec_get(funcs, i);
-        var fn: *AstFunc = (*AstFunc)fn_ptr;
-        if (str_has_prefix(fn->name_ptr, fn->name_len, "std_", 4) != 0) {
-            ssa_new_function(bctx->ssa_ctx, fn->name_ptr, fn->name_len);
-        } else if (ssa_codegen_is_supported_func(fn_ptr, program->globals_vec) == 0) {
-            ssa_new_function(bctx->ssa_ctx, fn->name_ptr, fn->name_len);
-        } else {
-            ssa_builder_build_func(bctx, fn_ptr);
-        }
-        i = i + 1;
-    }
-
-    return ssa_ctx_ptr;
-}

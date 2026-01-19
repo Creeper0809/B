@@ -4,7 +4,8 @@
 
 import std.vec;
 import std.util;
-import ssa;
+import ssa.ssa;
+import ssa.ssa_core;
 
 func _ssa_destroy_find_pred(block: *SSABlock, pred_id: u64) -> u64 {
     push_trace("_ssa_destroy_find_pred", "ssa_destroy.b", __LINE__);

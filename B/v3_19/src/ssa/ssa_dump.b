@@ -2,7 +2,8 @@
 
 import std.io;
 import std.util;
-import ssa;
+import ssa.ssa;
+import ssa.ssa_core;
 
 func _ssa_dump_op_name(op: u64) -> u64 {
     push_trace("_ssa_dump_op_name", "ssa_dump.b", __LINE__);

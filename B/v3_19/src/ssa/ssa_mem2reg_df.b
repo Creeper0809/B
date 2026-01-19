@@ -5,7 +5,8 @@
 
 import std.io;
 import std.util;
-import ssa;
+import ssa.ssa;
+import ssa.ssa_core;
 
 const MEM2REG_DF_DEBUG = 0;
 

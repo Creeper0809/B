@@ -2,7 +2,8 @@
 //
 // 현재 단계: COPY/LOAD/STORE 정리 및 단순 정규화.
 
-import ssa;
+import ssa.datastruct;
+import ssa.core;
 import std.util;
 
 func ssa_lower_phys_run(ctx: *SSAContext) -> u64 {
