@@ -125,6 +125,54 @@ func build_const(ctx: *BuilderCtx, val: u64) -> u64 {
     return reg_id;
 }
 
+func build_bool_from_reg(ctx: *BuilderCtx, reg: u64) -> u64 {
+    var zero_reg: u64 = build_const(ctx, 0);
+    var dst: u64 = builder_new_reg(ctx);
+    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_NE, dst, ssa_operand_reg(reg), ssa_operand_reg(zero_reg));
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+    return dst;
+}
+
+func build_short_circuit(ctx: *BuilderCtx, op: u64, left: u64, right: u64) -> u64 {
+    var entry_bb: *SSABlock = ctx->cur_block;
+    var left_reg: u64 = build_expr(ctx, left);
+
+    var right_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+    var merge_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+
+    var entry_val: u64 = 0;
+    if (op == TOKEN_ANDAND) {
+        entry_val = build_const(ctx, 0);
+        var br_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_BR, ssa_operand_const(merge_bb->id), ssa_operand_reg(left_reg), ssa_operand_const(right_bb->id));
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)br_ptr);
+        ssa_add_edge(ctx->cur_block, right_bb);
+        ssa_add_edge(ctx->cur_block, merge_bb);
+    } else {
+        entry_val = build_const(ctx, 1);
+        var br_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_BR, ssa_operand_const(right_bb->id), ssa_operand_reg(left_reg), ssa_operand_const(merge_bb->id));
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)br_ptr2);
+        ssa_add_edge(ctx->cur_block, merge_bb);
+        ssa_add_edge(ctx->cur_block, right_bb);
+    }
+
+    builder_set_block(ctx, right_bb);
+    var right_reg: u64 = build_expr(ctx, right);
+    var right_bool: u64 = build_bool_from_reg(ctx, right_reg);
+    var jmp_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(merge_bb->id), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptr);
+    ssa_add_edge(ctx->cur_block, merge_bb);
+
+    builder_set_block(ctx, merge_bb);
+    var head_ptr: u64 = ssa_phi_arg_new(entry_val, entry_bb->id);
+    var head: *SSAPhiArg = (*SSAPhiArg)head_ptr;
+    var head2: u64 = ssa_phi_arg_append(head, right_bool, right_bb->id);
+    head = (*SSAPhiArg)head2;
+    var dest: u64 = builder_new_reg(ctx);
+    var phi_ptr: u64 = ssa_phi_new(ctx->ssa_ctx, dest, head);
+    ssa_phi_append(merge_bb, (*SSAInstruction)phi_ptr);
+    return dest;
+}
+
 func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
     if (node == 0) { return 0; }
     var kind: u64 = ast_kind(node);
@@ -145,6 +193,9 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
 
     if (kind == AST_BINARY) {
         var bin: *AstBinary = (*AstBinary)node;
+        if (bin->op == TOKEN_ANDAND || bin->op == TOKEN_OROR) {
+            return build_short_circuit(ctx, bin->op, bin->left, bin->right);
+        }
         var lhs_reg: u64 = build_expr(ctx, bin->left);
         var rhs_reg: u64 = build_expr(ctx, bin->right);
         var op: u64 = builder_binop_to_ssa_op(bin->op);
