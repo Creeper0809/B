@@ -97,6 +97,8 @@
 - [x] v3_18로 std.os 분리/driver 기능 이관 (v3_17 롤백 후 재작업)
 - [x] v3_18 setup_paths 경로 탐색 보정(src/test 모두 지원)
 - [x] v3_18 driver stdout 리다이렉트(dup2) + 테스트(136_os_dup2_basic) 추가
+- [x] v3_19 기본 실행/IR/ASM 출력 모드 전환 + 스크립트 갱신 + 테스트(137_output_mode_flags) 추가
+- [x] v3_19 build_and_test .out 생성 + 테스트(138_output_mode_default) 추가
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증
