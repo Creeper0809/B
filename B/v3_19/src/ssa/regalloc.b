@@ -132,6 +132,18 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
             if (op != SSA_OP_BR && op != SSA_OP_JMP) {
                 if (cur->dest > max_id) { max_id = cur->dest; }
             }
+            if (op == SSA_OP_CALL) {
+                var info_ptr: u64 = ssa_operand_value(cur->src1);
+                var args_vec: u64 = *(info_ptr + 16);
+                var nargs: u64 = *(info_ptr + 24);
+                if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+                var ai: u64 = 0;
+                while (ai < nargs) {
+                    var r: u64 = vec_get(args_vec, ai);
+                    if (r > max_id) { max_id = r; }
+                    ai = ai + 1;
+                }
+            }
             if (op == SSA_OP_PHI) {
                 cur = cur->next;
                 continue;
@@ -177,6 +189,21 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
                 }
                 cur = cur->next;
                 continue;
+            }
+
+            if (op == SSA_OP_CALL) {
+                var info_ptr2: u64 = ssa_operand_value(cur->src1);
+                var args_vec2: u64 = *(info_ptr2 + 16);
+                var nargs2: u64 = *(info_ptr2 + 24);
+                if (nargs2 == 0 && args_vec2 != 0) { nargs2 = vec_len(args_vec2); }
+                var ai2: u64 = 0;
+                while (ai2 < nargs2) {
+                    var r3: u64 = vec_get(args_vec2, ai2);
+                    if (r3 <= max_reg && _ssa_bitset_test(def, r3) == 0) {
+                        _ssa_bitset_set(use, r3);
+                    }
+                    ai2 = ai2 + 1;
+                }
             }
 
             if (!ssa_operand_is_const(cur->src1)) {
@@ -328,6 +355,18 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
             }
 
             if (op != SSA_OP_NOP && op != SSA_OP_PHI) {
+                if (op == SSA_OP_CALL) {
+                    var info_ptr: u64 = ssa_operand_value(inst->src1);
+                    var args_vec: u64 = *(info_ptr + 16);
+                    var nargs: u64 = *(info_ptr + 24);
+                    if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+                    var ai: u64 = 0;
+                    while (ai < nargs) {
+                        var r0: u64 = vec_get(args_vec, ai);
+                        if (r0 < nregs) { _ssa_bitset_set(live, r0); }
+                        ai = ai + 1;
+                    }
+                }
                 if (!ssa_operand_is_const(inst->src1)) {
                     var r1b: u64 = ssa_operand_value(inst->src1);
                     if (r1b < nregs) { _ssa_bitset_set(live, r1b); }
@@ -515,6 +554,21 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
                 if (cur->dest < map_len) {
                     var pd: u64 = *(*u64)(map + cur->dest * 8);
                     if (pd != 0) { cur->dest = pd; }
+                }
+            }
+            if (op2 == SSA_OP_CALL) {
+                var info_ptr: u64 = ssa_operand_value(cur->src1);
+                var args_vec: u64 = *(info_ptr + 16);
+                var nargs: u64 = *(info_ptr + 24);
+                if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+                var ai: u64 = 0;
+                while (ai < nargs) {
+                    var r: u64 = vec_get(args_vec, ai);
+                    if (r < map_len) {
+                        var pr: u64 = *(*u64)(map + r * 8);
+                        if (pr != 0) { vec_set(args_vec, ai, pr); }
+                    }
+                    ai = ai + 1;
                 }
             }
             if (!ssa_operand_is_const(cur->src1)) {

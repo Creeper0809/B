@@ -100,6 +100,21 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_SIZEOF) { return 1; }
 
+    if (kind == AST_CALL) {
+        var call: *AstCall = (*AstCall)node;
+        var args: u64 = call->args_vec;
+        var n: u64 = 0;
+        if (args != 0) { n = vec_len(args); }
+        var i: u64 = 0;
+        while (i < n) {
+            var arg: u64 = vec_get(args, i);
+            if (ast_kind(arg) == AST_SLICE) { return 0; }
+            if (_ssa_codegen_expr_supported(arg, globals) == 0) { return 0; }
+            i = i + 1;
+        }
+        return 1;
+    }
+
     return 0;
 }
 
@@ -273,6 +288,75 @@ func _ssa_emit_mov_reg_opr(dest: u64, opr: u64) -> u64 {
     emit(", ", 2);
     _ssa_emit_opr(opr);
     emit_nl();
+    return 0;
+}
+
+func _ssa_emit_push_reg(phys: u64) -> u64 {
+    emit("    push ", 9);
+    _ssa_emit_reg_name(phys);
+    emit_nl();
+    return 0;
+}
+
+func _ssa_emit_pop_reg(phys: u64) -> u64 {
+    emit("    pop ", 8);
+    _ssa_emit_reg_name(phys);
+    emit_nl();
+    return 0;
+}
+
+func _ssa_emit_restore_reg(dest: u64, phys: u64) -> u64 {
+    if (dest != 0 && dest == phys) {
+        emit("    add rsp, 8\n", 15);
+        return 0;
+    }
+    _ssa_emit_pop_reg(phys);
+    return 0;
+}
+
+func _ssa_emit_call(dest: u64, info_ptr: u64) -> u64 {
+    var name_ptr: u64 = *(info_ptr);
+    var name_len: u64 = *(info_ptr + 8);
+    var args_vec: u64 = *(info_ptr + 16);
+    var nargs: u64 = *(info_ptr + 24);
+    if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+
+    _ssa_emit_push_reg(SSA_PHYS_RAX);
+    _ssa_emit_push_reg(SSA_PHYS_RBX);
+    _ssa_emit_push_reg(SSA_PHYS_RCX);
+    _ssa_emit_push_reg(SSA_PHYS_RDX);
+    _ssa_emit_push_reg(SSA_PHYS_R8);
+    _ssa_emit_push_reg(SSA_PHYS_R9);
+
+    var i: u64 = 0;
+    while (i < nargs) {
+        var reg: u64 = vec_get(args_vec, i);
+        emit("    push ", 9);
+        _ssa_emit_reg_name(reg);
+        emit_nl();
+        i = i + 1;
+    }
+
+    emit("    call ", 9);
+    emit(name_ptr, name_len);
+    emit_nl();
+
+    if (nargs > 0) {
+        emit("    add rsp, ", 13);
+        emit_u64(nargs * 8);
+        emit_nl();
+    }
+
+    if (dest != 0 && dest != SSA_PHYS_RAX) {
+        _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
+    }
+
+    _ssa_emit_restore_reg(dest, SSA_PHYS_R9);
+    _ssa_emit_restore_reg(dest, SSA_PHYS_R8);
+    _ssa_emit_restore_reg(dest, SSA_PHYS_RDX);
+    _ssa_emit_restore_reg(dest, SSA_PHYS_RCX);
+    _ssa_emit_restore_reg(dest, SSA_PHYS_RBX);
+    _ssa_emit_restore_reg(dest, SSA_PHYS_RAX);
     return 0;
 }
 
@@ -699,6 +783,12 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
         emit(", [rbp+", 7);
         emit_u64(offset);
         emit("]\n", 2);
+        return 0;
+    }
+
+    if (op == SSA_OP_CALL) {
+        var info_ptr3: u64 = ssa_operand_value(inst->src1);
+        _ssa_emit_call(inst->dest, info_ptr3);
         return 0;
     }
 

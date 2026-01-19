@@ -2,6 +2,7 @@
 
 import std.io;
 import std.util;
+import std.vec;
 import ssa.datastruct;
 import ssa.core;
 
@@ -30,6 +31,7 @@ func _ssa_dump_op_name(op: u64) -> u64 {
     if (op == SSA_OP_LOAD) { emit("load", 4); pop_trace(); return 0; }
     if (op == SSA_OP_STORE) { emit("store", 5); pop_trace(); return 0; }
     if (op == SSA_OP_PARAM) { emit("param", 5); pop_trace(); return 0; }
+    if (op == SSA_OP_CALL) { emit("call", 4); pop_trace(); return 0; }
     if (op == SSA_OP_JMP) { emit("jmp", 3); pop_trace(); return 0; }
     if (op == SSA_OP_BR) { emit("br", 2); pop_trace(); return 0; }
     if (op == SSA_OP_RET) { emit("ret", 3); pop_trace(); return 0; }
@@ -95,6 +97,30 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
         emit(" : b", 4);
         emit_u64(ssa_operand_value(inst->dest));
         emit_nl();
+        pop_trace();
+        return 0;
+    }
+
+    if (op == SSA_OP_CALL) {
+        var info_ptr: u64 = ssa_operand_value(inst->src1);
+        var name_ptr: u64 = *(info_ptr);
+        var name_len: u64 = *(info_ptr + 8);
+        var args_vec: u64 = *(info_ptr + 16);
+        var nargs: u64 = *(info_ptr + 24);
+        if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+        emit("  r", 3);
+        emit_u64(inst->dest);
+        emit(" = call ", 8);
+        emit(name_ptr, name_len);
+        emit("(", 1);
+        var i: u64 = 0;
+        while (i < nargs) {
+            if (i > 0) { emit(", ", 2); }
+            emit("r", 1);
+            emit_u64(vec_get(args_vec, i));
+            i = i + 1;
+        }
+        emit(")\n", 2);
         pop_trace();
         return 0;
     }

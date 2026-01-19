@@ -46,6 +46,7 @@ const SSA_OP_SHR = 38;
 const SSA_OP_LOAD = 25;
 const SSA_OP_STORE = 26;
 const SSA_OP_PARAM = 27;
+const SSA_OP_CALL = 28;
 
 // Control flow
 const SSA_OP_JMP = 30;
@@ -110,6 +111,14 @@ struct SSABlock {
     df_len: u64;
     df_cap: u64;
     dom_parent: *SSABlock;
+}
+
+// SSA Call Info
+struct SSACallInfo {
+    name_ptr: u64;
+    name_len: u64;
+    args_vec: u64; // vec<u64> of arg regs (push order)
+    nargs: u64;
 }
 
 struct SSAFunction {

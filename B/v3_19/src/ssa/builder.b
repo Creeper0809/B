@@ -645,6 +645,39 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
         return build_const(ctx, size_val);
     }
 
+    if (kind == AST_CALL) {
+        var call: *AstCall = (*AstCall)node;
+        var name_ptr: u64 = call->name_ptr;
+        var name_len: u64 = call->name_len;
+        var resolved_ptr: u64 = name_ptr;
+        var resolved_len: u64 = name_len;
+        var resolved: u64 = resolve_name(name_ptr, name_len);
+        if (resolved != 0) {
+            resolved_ptr = *(resolved);
+            resolved_len = *(resolved + 8);
+        }
+        var args: u64 = call->args_vec;
+        var nargs: u64 = 0;
+        if (args != 0) { nargs = vec_len(args); }
+        var arg_regs: u64 = vec_new(nargs);
+        var i: u64 = nargs;
+        while (i > 0) {
+            i = i - 1;
+            var arg: u64 = vec_get(args, i);
+            var reg: u64 = build_expr(ctx, arg);
+            vec_push(arg_regs, reg);
+        }
+        var info: u64 = heap_alloc(32);
+        *(info) = resolved_ptr;
+        *(info + 8) = resolved_len;
+        *(info + 16) = arg_regs;
+        *(info + 24) = nargs;
+        var dst: u64 = builder_new_reg(ctx);
+        var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL, dst, ssa_operand_const(info), 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
+        return dst;
+    }
+
     return build_const(ctx, 0);
 }
 
