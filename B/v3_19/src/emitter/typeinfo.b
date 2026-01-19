@@ -350,6 +350,71 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         }
         return typeinfo_make(TYPE_I64, 0);
     }
+
+    if (kind == AST_METHOD_CALL) {
+        if (g_funcs_vec != 0) {
+            var mc: *AstMethodCall = (*AstMethodCall)node;
+            var receiver: u64 = mc->receiver;
+            var recv_type_ptr: u64 = get_expr_type_with_symtab(receiver, symtab);
+            if (recv_type_ptr == 0) { return typeinfo_make(TYPE_I64, 0); }
+            var recv_ti: *TypeInfo = (*TypeInfo)recv_type_ptr;
+            if (recv_ti->type_kind != TYPE_STRUCT) { return typeinfo_make(TYPE_I64, 0); }
+
+            var struct_ptr: u64 = recv_ti->struct_name_ptr;
+            var struct_len: u64 = recv_ti->struct_name_len;
+            var full_len: u64 = struct_len + 1 + mc->method_len;
+            var full_ptr: u64 = heap_alloc(full_len);
+            var i2: u64 = 0;
+            while (i2 < struct_len) {
+                *(*u8)(full_ptr + i2) = *(*u8)(struct_ptr + i2);
+                i2 = i2 + 1;
+            }
+            *(*u8)(full_ptr + struct_len) = 95;
+            var j2: u64 = 0;
+            while (j2 < mc->method_len) {
+                *(*u8)(full_ptr + struct_len + 1 + j2) = *(*u8)(mc->method_ptr + j2);
+                j2 = j2 + 1;
+            }
+
+            var resolved_ptr2: u64 = full_ptr;
+            var resolved_len2: u64 = full_len;
+            var resolved2: u64 = resolve_name(full_ptr, full_len);
+            if (resolved2 != 0) {
+                resolved_ptr2 = *(resolved2);
+                resolved_len2 = *(resolved2 + 8);
+            }
+
+            var num_funcs2: u64 = vec_len(g_funcs_vec);
+            for (var k2: u64 = 0; k2 < num_funcs2; k2++) {
+                var fn_ptr2: u64 = vec_get(g_funcs_vec, k2);
+                var fn2: *AstFunc = (*AstFunc)fn_ptr2;
+                if (str_eq(fn2->name_ptr, fn2->name_len, resolved_ptr2, resolved_len2)) {
+                    if (fn2->ret_type == TYPE_STRUCT) {
+                        var struct_def2: u64 = get_struct_def(fn2->ret_struct_name_ptr, fn2->ret_struct_name_len);
+                        var result_struct2: u64 = typeinfo_make_struct(fn2->ret_ptr_depth, fn2->ret_struct_name_ptr, fn2->ret_struct_name_len, struct_def2);
+                        var rs2: *TypeInfo = (*TypeInfo)result_struct2;
+                        rs2->is_tagged = fn2->ret_is_tagged;
+                        return result_struct2;
+                    }
+                    if (fn2->ret_type == TYPE_SLICE) {
+                        var result_slice2: u64 = typeinfo_make(fn2->ret_type, fn2->ret_ptr_depth);
+                        var rsl2: *TypeInfo = (*TypeInfo)result_slice2;
+                        rsl2->is_tagged = fn2->ret_is_tagged;
+                        return result_slice2;
+                    }
+                    var result_basic2: u64 = typeinfo_make(fn2->ret_type, fn2->ret_ptr_depth);
+                    var rb2: *TypeInfo = (*TypeInfo)result_basic2;
+                    rb2->is_tagged = fn2->ret_is_tagged;
+                    rb2->struct_name_ptr = fn2->ret_struct_name_ptr;
+                    rb2->struct_name_len = fn2->ret_struct_name_len;
+                    rb2->tag_layout_ptr = fn2->ret_tag_layout_ptr;
+                    rb2->tag_layout_len = fn2->ret_tag_layout_len;
+                    return result_basic2;
+                }
+            }
+        }
+        return typeinfo_make(TYPE_I64, 0);
+    }
     
     if (kind == AST_IDENT) {
         var name_ptr: u64 = *(node + 8);

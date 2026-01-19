@@ -320,6 +320,22 @@ func _ssa_mem2reg_rename_block(fn: *SSAFunction, block: *SSABlock, max_var: u64,
         cur->src1 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src1);
         cur->src2 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src2);
 
+        if (op == SSA_OP_CALL) {
+            var info_ptr: u64 = ssa_operand_value(cur->src1);
+            var args_vec: u64 = *(info_ptr + 16);
+            var nargs: u64 = *(info_ptr + 24);
+            if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+            var ai: u64 = 0;
+            while (ai < nargs) {
+                var r: u64 = vec_get(args_vec, ai);
+                if (r < reg_map_cap && *(*u64)(reg_map_set + r * 8) != 0) {
+                    var nr: u64 = *(*u64)(reg_map_val + r * 8);
+                    if (nr != 0) { vec_set(args_vec, ai, nr); }
+                }
+                ai = ai + 1;
+            }
+        }
+
         if (op == SSA_OP_LOAD) {
             var var_id2: u64 = ssa_operand_value(cur->src1);
             if (var_id2 <= max_var) {

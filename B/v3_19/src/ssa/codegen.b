@@ -120,6 +120,27 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return 1;
     }
 
+    if (kind == AST_METHOD_CALL) {
+        var mc: *AstMethodCall = (*AstMethodCall)node;
+        if (_ssa_codegen_expr_supported(mc->receiver, globals) == 0) { return 0; }
+        var args: u64 = mc->args_vec;
+        var n: u64 = 0;
+        if (args != 0) { n = vec_len(args); }
+        var i: u64 = 0;
+        while (i < n) {
+            var arg: u64 = vec_get(args, i);
+            if (ast_kind(arg) == AST_SLICE) {
+                var s: *AstSlice = (*AstSlice)arg;
+                if (_ssa_codegen_expr_supported(s->ptr_expr, globals) == 0) { return 0; }
+                if (_ssa_codegen_expr_supported(s->len_expr, globals) == 0) { return 0; }
+            } else {
+                if (_ssa_codegen_expr_supported(arg, globals) == 0) { return 0; }
+            }
+            i = i + 1;
+        }
+        return 1;
+    }
+
     return 0;
 }
 
