@@ -14,7 +14,7 @@ import ast;
 // ============================================
 
 const SIZEOF_SSA_INST = 48;   // 6 * u64 (op tagged in prev)
-const SIZEOF_SSA_BLOCK = 88;  // 11 * u64
+const SIZEOF_SSA_BLOCK = 112;  // 14 * u64
 const SIZEOF_SSA_FUNC = 56;   // 7 * u64
 const SIZEOF_SSA_CTX = 40;    // 5 * u64
 const SIZEOF_SSA_PHI_ARG = 24; // 3 * u64
@@ -83,6 +83,9 @@ struct SSABlock {
     succs_data: u64;
     succs_len: u64;
     succs_cap: u64;
+    df_data: u64;
+    df_len: u64;
+    df_cap: u64;
     dom_parent: *SSABlock;
 }
 
@@ -186,6 +189,9 @@ func ssa_new_block(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
     b->succs_data = 0;
     b->succs_len = 0;
     b->succs_cap = 0;
+    b->df_data = 0;
+    b->df_len = 0;
+    b->df_cap = 0;
     b->dom_parent = 0;
     ssa_block_list_push(fn, b);
     return b_ptr;
@@ -321,6 +327,21 @@ func ssa_block_add_succ(block: *SSABlock, succ: *SSABlock) -> u64 {
     // SSABlock: ..., succs_data, succs_len, succs_cap, dom_parent
     // Offsets: succs_data=56, succs_len=64, succs_cap=72
     return _ssa_ptr_list_push((u64)block, 56, 64, 72, (u64)succ, 4);
+}
+
+func ssa_block_add_df(block: *SSABlock, target: *SSABlock) -> u64 {
+    var data: u64 = block->df_data;
+    var len: u64 = block->df_len;
+    var i: u64 = 0;
+    while (i < len) {
+        var cur: u64 = *(*u64)(data + i * 8);
+        if (cur == (u64)target) { return 0; }
+        i = i + 1;
+    }
+
+    // SSABlock: ..., df_data, df_len, df_cap, dom_parent
+    // Offsets: df_data=80, df_len=88, df_cap=96
+    return _ssa_ptr_list_push((u64)block, 80, 88, 96, (u64)target, 4);
 }
 
 func ssa_add_edge(src: *SSABlock, dst: *SSABlock) -> u64 {
