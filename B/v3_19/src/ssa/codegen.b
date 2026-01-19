@@ -144,6 +144,25 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
     return 0;
 }
 
+func _ssa_codegen_struct_literal_supported(init: u64, globals: u64) -> u64 {
+    if (init == 0) { return 1; }
+    var lit: *AstStructLiteral = (*AstStructLiteral)init;
+    var values: u64 = lit->values_vec;
+    if (values == 0) { return 1; }
+    var n: u64 = vec_len(values);
+    for (var i: u64 = 0; i < n; i++) {
+        var v: u64 = vec_get(values, i);
+        if (ast_kind(v) == AST_SLICE) {
+            var s: *AstSlice = (*AstSlice)v;
+            if (_ssa_codegen_expr_supported(s->ptr_expr, globals) == 0) { return 0; }
+            if (_ssa_codegen_expr_supported(s->len_expr, globals) == 0) { return 0; }
+        } else {
+            if (_ssa_codegen_expr_supported(v, globals) == 0) { return 0; }
+        }
+    }
+    return 1;
+}
+
 func _ssa_codegen_stmt_or_expr_supported(node: u64, globals: u64) -> u64 {
     if (node == 0) { return 1; }
     var kind: u64 = ast_kind(node);
@@ -226,6 +245,9 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
     if (kind == AST_VAR_DECL) {
         var vd: *AstVarDecl = (*AstVarDecl)node;
         if (vd->init_expr == 0) { return 1; }
+        if (ast_kind(vd->init_expr) == AST_STRUCT_LITERAL) {
+            return _ssa_codegen_struct_literal_supported(vd->init_expr, globals);
+        }
         return _ssa_codegen_expr_supported(vd->init_expr, globals);
     }
 
@@ -240,6 +262,9 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         if (tk == AST_IDENT) {
             var idn2: *AstIdent = (*AstIdent)asn->target;
             if (_ssa_codegen_is_global(globals, idn2->name_ptr, idn2->name_len) != 0) { return 0; }
+            if (ast_kind(asn->value) == AST_STRUCT_LITERAL) {
+                return _ssa_codegen_struct_literal_supported(asn->value, globals);
+            }
             return _ssa_codegen_expr_supported(asn->value, globals);
         }
         if (tk == AST_DEREF || tk == AST_DEREF8 || tk == AST_INDEX || tk == AST_MEMBER_ACCESS) {
