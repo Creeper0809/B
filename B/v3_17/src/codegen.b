@@ -18,6 +18,7 @@ import ssa_mem2reg;
 import ssa_opt_o1;
 import ssa_destroy;
 import ssa_regalloc;
+import ssa_lower_phys;
 import opt;
 import emitter.symtab;
 import emitter.typeinfo;
@@ -157,6 +158,7 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
         ssa_destroy_run((*SSAContext)ssa_ctx_ptr);
         ssa_regalloc_run((*SSAContext)ssa_ctx_ptr, 6);
         ssa_regalloc_apply_run((*SSAContext)ssa_ctx_ptr);
+        ssa_lower_phys_run((*SSAContext)ssa_ctx_ptr);
     }
 
     // Initialize emitter state

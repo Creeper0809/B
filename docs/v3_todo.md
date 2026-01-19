@@ -87,6 +87,7 @@
 - [x] SSA 그래프 컬러링 레지스터 할당 스캐폴드 + 테스트(125_ssa_regalloc_basic) 추가
 - [x] 그래프 컬러링 결과 → 물리 레지스터 매핑 + 테스트(126_ssa_regalloc_map) 추가
 - [x] 레지스터 매핑 SSA 적용(ops/phi 치환) + 테스트(127_ssa_regalloc_apply) 추가
+- [x] 물리 레지스터 lowering(복사/로드/스토어 정리) + 테스트(128_ssa_lower_phys_basic) 추가
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증
