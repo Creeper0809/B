@@ -160,6 +160,12 @@ func builder_binop_to_ssa_op(op: u64) -> u64 {
     if (op == TOKEN_MINUS) { return SSA_OP_SUB; }
     if (op == TOKEN_STAR) { return SSA_OP_MUL; }
     if (op == TOKEN_SLASH) { return SSA_OP_DIV; }
+    if (op == TOKEN_PERCENT) { return SSA_OP_MOD; }
+    if (op == TOKEN_AMPERSAND) { return SSA_OP_AND; }
+    if (op == TOKEN_PIPE) { return SSA_OP_OR; }
+    if (op == TOKEN_CARET) { return SSA_OP_XOR; }
+    if (op == TOKEN_LSHIFT) { return SSA_OP_SHL; }
+    if (op == TOKEN_RSHIFT) { return SSA_OP_SHR; }
     if (op == TOKEN_EQEQ) { return SSA_OP_EQ; }
     if (op == TOKEN_BANGEQ) { return SSA_OP_NE; }
     if (op == TOKEN_LT) { return SSA_OP_LT; }

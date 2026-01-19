@@ -38,6 +38,14 @@ const SSA_OP_GT = 18;
 const SSA_OP_LE = 19;
 const SSA_OP_GE = 20;
 
+// Bitwise/shift/mod ops
+const SSA_OP_MOD = 33;
+const SSA_OP_AND = 34;
+const SSA_OP_OR = 35;
+const SSA_OP_XOR = 36;
+const SSA_OP_SHL = 37;
+const SSA_OP_SHR = 38;
+
 // Memory ops (mem2reg 이전 단계)
 const SSA_OP_LOAD = 25;
 const SSA_OP_STORE = 26;

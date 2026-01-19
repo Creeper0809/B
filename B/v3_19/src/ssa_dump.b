@@ -19,6 +19,12 @@ func _ssa_dump_op_name(op: u64) -> u64 {
     if (op == SSA_OP_GT) { emit("gt", 2); return 0; }
     if (op == SSA_OP_LE) { emit("le", 2); return 0; }
     if (op == SSA_OP_GE) { emit("ge", 2); return 0; }
+    if (op == SSA_OP_MOD) { emit("mod", 3); return 0; }
+    if (op == SSA_OP_AND) { emit("and", 3); return 0; }
+    if (op == SSA_OP_OR) { emit("or", 2); return 0; }
+    if (op == SSA_OP_XOR) { emit("xor", 3); return 0; }
+    if (op == SSA_OP_SHL) { emit("shl", 3); return 0; }
+    if (op == SSA_OP_SHR) { emit("shr", 3); return 0; }
     if (op == SSA_OP_LOAD) { emit("load", 4); return 0; }
     if (op == SSA_OP_STORE) { emit("store", 5); return 0; }
     if (op == SSA_OP_PARAM) { emit("param", 5); return 0; }

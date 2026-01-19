@@ -10,6 +10,12 @@ func _ssa_opt_is_foldable(op: u64) -> u64 {
     if (op == SSA_OP_SUB) { return 1; }
     if (op == SSA_OP_MUL) { return 1; }
     if (op == SSA_OP_DIV) { return 1; }
+    if (op == SSA_OP_MOD) { return 1; }
+    if (op == SSA_OP_AND) { return 1; }
+    if (op == SSA_OP_OR) { return 1; }
+    if (op == SSA_OP_XOR) { return 1; }
+    if (op == SSA_OP_SHL) { return 1; }
+    if (op == SSA_OP_SHR) { return 1; }
     if (op == SSA_OP_EQ) { return 1; }
     if (op == SSA_OP_NE) { return 1; }
     if (op == SSA_OP_LT) { return 1; }
@@ -37,6 +43,15 @@ func _ssa_opt_fold_inst(inst: *SSAInstruction) -> u64 {
         if (b == 0) { return 0; }
         res = a / b;
     }
+    else if (op == SSA_OP_MOD) {
+        if (b == 0) { return 0; }
+        res = a % b;
+    }
+    else if (op == SSA_OP_AND) { res = a & b; }
+    else if (op == SSA_OP_OR) { res = a | b; }
+    else if (op == SSA_OP_XOR) { res = a ^ b; }
+    else if (op == SSA_OP_SHL) { res = a << b; }
+    else if (op == SSA_OP_SHR) { res = a >> b; }
     else if (op == SSA_OP_EQ) { res = (a == b); }
     else if (op == SSA_OP_NE) { res = (a != b); }
     else if (op == SSA_OP_LT) { res = (a < b); }

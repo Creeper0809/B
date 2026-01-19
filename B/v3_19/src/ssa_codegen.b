@@ -49,6 +49,8 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         var bin: *AstBinary = (*AstBinary)node;
         var op: u64 = bin->op;
         if (op != TOKEN_PLUS && op != TOKEN_MINUS && op != TOKEN_STAR && op != TOKEN_SLASH &&
+            op != TOKEN_PERCENT && op != TOKEN_CARET && op != TOKEN_AMPERSAND && op != TOKEN_PIPE &&
+            op != TOKEN_LSHIFT && op != TOKEN_RSHIFT &&
             op != TOKEN_EQEQ && op != TOKEN_BANGEQ && op != TOKEN_LT && op != TOKEN_GT &&
             op != TOKEN_LTEQ && op != TOKEN_GTEQ && op != TOKEN_ANDAND && op != TOKEN_OROR) {
             return 0;
@@ -258,12 +260,101 @@ func _ssa_emit_binop(op: u64, dest: u64, src1: u64, src2: u64) -> u64 {
 
     if (op == SSA_OP_ADD) { emit("    add ", 8); }
     else if (op == SSA_OP_SUB) { emit("    sub ", 8); }
-    else { emit("    imul ", 9); }
+    else if (op == SSA_OP_MUL) { emit("    imul ", 9); }
+    else if (op == SSA_OP_AND) { emit("    and ", 8); }
+    else if (op == SSA_OP_OR) { emit("    or ", 7); }
+    else { emit("    xor ", 8); }
 
     _ssa_emit_reg_name(dest);
     emit(", ", 2);
     _ssa_emit_opr(src2);
     emit_nl();
+    return 0;
+}
+
+func _ssa_emit_shift(op: u64, dest: u64, src1: u64, src2: u64) -> u64 {
+    var save_rcx: u64 = 0;
+    var save_rax: u64 = 0;
+
+    if (ssa_operand_is_const(src2) != 0) {
+        _ssa_emit_mov_reg_opr(dest, src1);
+        if (op == SSA_OP_SHL) { emit("    shl ", 8); }
+        else { emit("    shr ", 8); }
+        _ssa_emit_reg_name(dest);
+        emit(", ", 2);
+        _ssa_emit_opr(src2);
+        emit_nl();
+        return 0;
+    }
+
+    if (dest == SSA_PHYS_RCX) {
+        emit("    push rax\n", 14);
+        save_rax = 1;
+        _ssa_emit_mov_reg_opr(SSA_PHYS_RAX, src1);
+        emit("    mov rcx, ", 13);
+        _ssa_emit_reg_name(ssa_operand_value(src2));
+        emit_nl();
+        if (op == SSA_OP_SHL) { emit("    shl rax, cl\n", 16); }
+        else { emit("    shr rax, cl\n", 16); }
+        emit("    mov rcx, rax\n", 18);
+        if (save_rax != 0) { emit("    pop rax\n", 13); }
+        return 0;
+    }
+
+    emit("    push rcx\n", 14);
+    save_rcx = 1;
+    _ssa_emit_mov_reg_opr(dest, src1);
+    emit("    mov rcx, ", 13);
+    _ssa_emit_reg_name(ssa_operand_value(src2));
+    emit_nl();
+    if (op == SSA_OP_SHL) { emit("    shl ", 8); }
+    else { emit("    shr ", 8); }
+    _ssa_emit_reg_name(dest);
+    emit(", cl\n", 5);
+    if (save_rcx != 0) { emit("    pop rcx\n", 13); }
+    return 0;
+}
+
+func _ssa_emit_mod(dest: u64, src1: u64, src2: u64) -> u64 {
+    var save_rax: u64 = 0;
+    var save_rdx: u64 = 0;
+    var save_rcx: u64 = 0;
+
+    if (dest != SSA_PHYS_RAX) {
+        emit("    push rax\n", 14);
+        save_rax = 1;
+    }
+    if (dest != SSA_PHYS_RDX) {
+        emit("    push rdx\n", 14);
+        save_rdx = 1;
+    }
+
+    _ssa_emit_mov_reg_opr(SSA_PHYS_RAX, src1);
+    emit("    cqo\n", 8);
+
+    if (ssa_operand_is_const(src2) != 0) {
+        if (dest != SSA_PHYS_RCX) {
+            emit("    push rcx\n", 14);
+            save_rcx = 1;
+        }
+        _ssa_emit_mov_reg_opr(SSA_PHYS_RCX, src2);
+        emit("    idiv rcx\n", 14);
+    } else {
+        emit("    idiv ", 9);
+        _ssa_emit_reg_name(ssa_operand_value(src2));
+        emit_nl();
+    }
+
+    if (dest != SSA_PHYS_RDX) {
+        emit("    mov ", 8);
+        _ssa_emit_reg_name(dest);
+        emit(", rdx\n", 6);
+    }
+
+    if (save_rcx != 0) { emit("    pop rcx\n", 13); }
+    if (save_rdx != 0) { emit("    pop rdx\n", 13); }
+    if (save_rax != 0) { emit("    pop rax\n", 13); }
+
     return 0;
 }
 
@@ -438,13 +529,23 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
         return 0;
     }
 
-    if (op == SSA_OP_ADD || op == SSA_OP_SUB || op == SSA_OP_MUL) {
+    if (op == SSA_OP_ADD || op == SSA_OP_SUB || op == SSA_OP_MUL || op == SSA_OP_AND || op == SSA_OP_OR || op == SSA_OP_XOR) {
         _ssa_emit_binop(op, inst->dest, inst->src1, inst->src2);
         return 0;
     }
 
     if (op == SSA_OP_DIV) {
         _ssa_emit_div(inst->dest, inst->src1, inst->src2);
+        return 0;
+    }
+
+    if (op == SSA_OP_MOD) {
+        _ssa_emit_mod(inst->dest, inst->src1, inst->src2);
+        return 0;
+    }
+
+    if (op == SSA_OP_SHL || op == SSA_OP_SHR) {
+        _ssa_emit_shift(op, inst->dest, inst->src1, inst->src2);
         return 0;
     }
 
