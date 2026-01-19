@@ -70,6 +70,8 @@
 - [x] SSA 스모크 테스트(111_ssa_smoke) 추가 및 v3_17 전체 테스트 PASS
 - [x] SSABlock CFG(preds/succs) 확장 + phi_head 추가
 - [x] SSA operand 비트 태깅 + ssa_add_edge API + 테스트(112_ssa_edges) 추가
+- [x] SSA Phi 인자 리스트(SSAPhiArg) 추가 + 테스트(113_ssa_phi_args) 추가
+- [x] SSAInstruction prev 포인터 태깅(Opcode 저장) 적용 + 크기 48B로 축소
 - ✅ **부동소수점 타입 (Phase 6.6)**: f32/f64 타입, SSE2 코드 생성, 비교 연산 bool 반환
   - 테스트 50 (float_basic): 기본 f64 변수 선언 및 출력
   - 테스트 51 (float_comparison): 부동소수점 비교 연산자 (==, !=, <, >, <=, >=) bool 반환 검증

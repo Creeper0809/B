@@ -13,13 +13,15 @@ import ast;
 // Constants
 // ============================================
 
-const SIZEOF_SSA_INST = 56;   // 7 * u64
+const SIZEOF_SSA_INST = 48;   // 6 * u64 (op tagged in prev)
 const SIZEOF_SSA_BLOCK = 88;  // 11 * u64
 const SIZEOF_SSA_FUNC = 56;   // 7 * u64
 const SIZEOF_SSA_CTX = 40;    // 5 * u64
+const SIZEOF_SSA_PHI_ARG = 24; // 3 * u64
 
 const SSA_OP_NOP = 0;
 const SSA_OP_ENTRY = 1;
+const SSA_OP_PHI = 2;
 
 const SSA_OPR_VALUE_MASK = 9223372036854775807;
 
@@ -27,14 +29,23 @@ const SSA_OPR_VALUE_MASK = 9223372036854775807;
 // SSA Core Types
 // ============================================
 
+packed struct InstMeta {
+    op: u16;
+}
+
 struct SSAInstruction {
-    prev: *SSAInstruction;
+    prev: *tagged(InstMeta) u8;
     next: *SSAInstruction;
     id: u64;
-    op: u64;
     dest: u64; // virtual register id
-    src1: u64; // tagged operand (const/reg)
+    src1: u64; // tagged operand (const/reg) or phi args head
     src2: u64; // tagged operand (const/reg)
+}
+
+struct SSAPhiArg {
+    val: u64;        // incoming value (virtual register id)
+    block_id: u64;   // predecessor block id
+    next: *SSAPhiArg;
 }
 
 struct SSABlock {
@@ -243,11 +254,12 @@ func ssa_new_block(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
 func ssa_new_inst(ctx: *SSAContext, op: u64, dest: u64, src1: u64, src2: u64) -> u64 {
     var i_ptr: u64 = heap_alloc(SIZEOF_SSA_INST);
     var inst: *SSAInstruction = (*SSAInstruction)i_ptr;
-    inst->prev = 0;
+    var p: *tagged(InstMeta) u8 = (*tagged(InstMeta) u8)0;
+    p.op = (u16)op;
+    inst->prev = p;
     inst->next = 0;
     inst->id = ctx->next_inst_id;
     ctx->next_inst_id = ctx->next_inst_id + 1;
-    inst->op = op;
     inst->dest = dest;
     inst->src1 = src1;
     inst->src2 = src2;
@@ -255,7 +267,11 @@ func ssa_new_inst(ctx: *SSAContext, op: u64, dest: u64, src1: u64, src2: u64) ->
 }
 
 func ssa_inst_append(block: *SSABlock, inst: *SSAInstruction) -> u64 {
-    inst->prev = block->inst_tail;
+    var p: *tagged(InstMeta) u8 = inst->prev;
+    var current_op: u16 = p.op;
+    p = (*tagged(InstMeta) u8)block->inst_tail;
+    p.op = current_op;
+    inst->prev = p;
     inst->next = 0;
     if (block->inst_head == 0) {
         block->inst_head = inst;
@@ -264,6 +280,52 @@ func ssa_inst_append(block: *SSABlock, inst: *SSAInstruction) -> u64 {
     }
     block->inst_tail->next = inst;
     block->inst_tail = inst;
+    return 0;
+}
+
+func ssa_inst_get_op(inst: *SSAInstruction) -> u64 {
+    var p: *tagged(InstMeta) u8 = inst->prev;
+    return (u64)p.op;
+}
+
+func ssa_inst_set_op(inst: *SSAInstruction, op: u64) -> u64 {
+    var p: *tagged(InstMeta) u8 = inst->prev;
+    p.op = (u16)op;
+    inst->prev = p;
+    return 0;
+}
+
+func ssa_phi_arg_new(val: u64, block_id: u64) -> u64 {
+    var a_ptr: u64 = heap_alloc(SIZEOF_SSA_PHI_ARG);
+    var a: *SSAPhiArg = (*SSAPhiArg)a_ptr;
+    a->val = val;
+    a->block_id = block_id;
+    a->next = 0;
+    return a_ptr;
+}
+
+func ssa_phi_arg_append(head: *SSAPhiArg, val: u64, block_id: u64) -> u64 {
+    var node_ptr: u64 = ssa_phi_arg_new(val, block_id);
+    if (head == 0) { return node_ptr; }
+
+    var cur: *SSAPhiArg = head;
+    while (cur->next != 0) {
+        cur = cur->next;
+    }
+    cur->next = (*SSAPhiArg)node_ptr;
+    return (u64)head;
+}
+
+func ssa_phi_new(ctx: *SSAContext, dest: u64, args_head: *SSAPhiArg) -> u64 {
+    var inst_ptr: u64 = ssa_new_inst(ctx, SSA_OP_PHI, dest, (u64)args_head, 0);
+    return inst_ptr;
+}
+
+func ssa_phi_add_arg(inst: *SSAInstruction, val: u64, block_id: u64) -> u64 {
+    if (ssa_inst_get_op(inst) != SSA_OP_PHI) { return 0; }
+    var head: *SSAPhiArg = (*SSAPhiArg)inst->src1;
+    var new_head_ptr: u64 = ssa_phi_arg_append(head, val, block_id);
+    inst->src1 = new_head_ptr;
     return 0;
 }
 
