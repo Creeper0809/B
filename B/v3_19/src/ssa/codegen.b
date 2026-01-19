@@ -120,6 +120,27 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return 1;
     }
 
+    if (kind == AST_CALL_PTR) {
+        var cp: *AstCallPtr = (*AstCallPtr)node;
+        if (_ssa_codegen_expr_supported(cp->callee, globals) == 0) { return 0; }
+        var args2: u64 = cp->args_vec;
+        var n2: u64 = 0;
+        if (args2 != 0) { n2 = vec_len(args2); }
+        var i2: u64 = 0;
+        while (i2 < n2) {
+            var arg2: u64 = vec_get(args2, i2);
+            if (ast_kind(arg2) == AST_SLICE) {
+                var s2: *AstSlice = (*AstSlice)arg2;
+                if (_ssa_codegen_expr_supported(s2->ptr_expr, globals) == 0) { return 0; }
+                if (_ssa_codegen_expr_supported(s2->len_expr, globals) == 0) { return 0; }
+            } else {
+                if (_ssa_codegen_expr_supported(arg2, globals) == 0) { return 0; }
+            }
+            i2 = i2 + 1;
+        }
+        return 1;
+    }
+
     if (kind == AST_METHOD_CALL) {
         var mc: *AstMethodCall = (*AstMethodCall)node;
         if (_ssa_codegen_expr_supported(mc->receiver, globals) == 0) { return 0; }
@@ -141,6 +162,10 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return 1;
     }
 
+    if (kind == AST_STRUCT_LITERAL) {
+        return _ssa_codegen_struct_literal_supported(node, globals);
+    }
+
     return 0;
 }
 
@@ -152,7 +177,9 @@ func _ssa_codegen_struct_literal_supported(init: u64, globals: u64) -> u64 {
     var n: u64 = vec_len(values);
     for (var i: u64 = 0; i < n; i++) {
         var v: u64 = vec_get(values, i);
-        if (ast_kind(v) == AST_SLICE) {
+        if (ast_kind(v) == AST_STRUCT_LITERAL) {
+            if (_ssa_codegen_struct_literal_supported(v, globals) == 0) { return 0; }
+        } else if (ast_kind(v) == AST_SLICE) {
             var s: *AstSlice = (*AstSlice)v;
             if (_ssa_codegen_expr_supported(s->ptr_expr, globals) == 0) { return 0; }
             if (_ssa_codegen_expr_supported(s->len_expr, globals) == 0) { return 0; }
@@ -373,12 +400,21 @@ func _ssa_emit_call(dest: u64, info_ptr: u64) -> u64 {
     var name_len: u64 = *(info_ptr + 8);
     var args_vec: u64 = *(info_ptr + 16);
     var nargs: u64 = *(info_ptr + 24);
+    var ret_type: u64 = *(info_ptr + 32);
+    var ret_ptr_depth: u64 = *(info_ptr + 40);
     if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
 
-    _ssa_emit_push_reg(SSA_PHYS_RAX);
+    var keep_rax: u64 = 0;
+    var keep_rdx: u64 = 0;
+    if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
+        keep_rax = 1;
+        keep_rdx = 1;
+    }
+
+    if (keep_rax == 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
     _ssa_emit_push_reg(SSA_PHYS_RBX);
     _ssa_emit_push_reg(SSA_PHYS_RCX);
-    _ssa_emit_push_reg(SSA_PHYS_RDX);
+    if (keep_rdx == 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
     _ssa_emit_push_reg(SSA_PHYS_R8);
     _ssa_emit_push_reg(SSA_PHYS_R9);
 
@@ -407,10 +443,64 @@ func _ssa_emit_call(dest: u64, info_ptr: u64) -> u64 {
 
     _ssa_emit_restore_reg(dest, SSA_PHYS_R9);
     _ssa_emit_restore_reg(dest, SSA_PHYS_R8);
-    _ssa_emit_restore_reg(dest, SSA_PHYS_RDX);
+    if (keep_rdx == 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RDX); }
     _ssa_emit_restore_reg(dest, SSA_PHYS_RCX);
     _ssa_emit_restore_reg(dest, SSA_PHYS_RBX);
-    _ssa_emit_restore_reg(dest, SSA_PHYS_RAX);
+    if (keep_rax == 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RAX); }
+    return 0;
+}
+
+func _ssa_emit_call_ptr(dest: u64, info_ptr: u64) -> u64 {
+    var callee_reg: u64 = *(info_ptr);
+    var args_vec: u64 = *(info_ptr + 8);
+    var nargs: u64 = *(info_ptr + 16);
+    var ret_type: u64 = *(info_ptr + 24);
+    var ret_ptr_depth: u64 = *(info_ptr + 32);
+    if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+
+    var keep_rax: u64 = 0;
+    var keep_rdx: u64 = 0;
+    if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
+        keep_rax = 1;
+        keep_rdx = 1;
+    }
+
+    if (keep_rax == 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
+    _ssa_emit_push_reg(SSA_PHYS_RBX);
+    _ssa_emit_push_reg(SSA_PHYS_RCX);
+    if (keep_rdx == 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
+    _ssa_emit_push_reg(SSA_PHYS_R8);
+    _ssa_emit_push_reg(SSA_PHYS_R9);
+
+    var i: u64 = 0;
+    while (i < nargs) {
+        var reg: u64 = vec_get(args_vec, i);
+        emit("    push ", 9);
+        _ssa_emit_reg_name(reg);
+        emit_nl();
+        i = i + 1;
+    }
+
+    emit("    call ", 9);
+    _ssa_emit_reg_name(callee_reg);
+    emit_nl();
+
+    if (nargs > 0) {
+        emit("    add rsp, ", 13);
+        emit_u64(nargs * 8);
+        emit_nl();
+    }
+
+    if (dest != 0 && dest != SSA_PHYS_RAX) {
+        _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
+    }
+
+    _ssa_emit_restore_reg(dest, SSA_PHYS_R9);
+    _ssa_emit_restore_reg(dest, SSA_PHYS_R8);
+    if (keep_rdx == 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RDX); }
+    _ssa_emit_restore_reg(dest, SSA_PHYS_RCX);
+    _ssa_emit_restore_reg(dest, SSA_PHYS_RBX);
+    if (keep_rax == 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RAX); }
     return 0;
 }
 
@@ -451,6 +541,15 @@ func _ssa_emit_lea_global(dest: u64, name_ptr: u64, name_len: u64) -> u64 {
     emit("    lea ", 8);
     _ssa_emit_reg_name(dest);
     emit(", [rel _gvar_", 13);
+    emit(name_ptr, name_len);
+    emit("]\n", 2);
+    return 0;
+}
+
+func _ssa_emit_lea_func(dest: u64, name_ptr: u64, name_len: u64) -> u64 {
+    emit("    lea ", 8);
+    _ssa_emit_reg_name(dest);
+    emit(", [rel ", 7);
     emit(name_ptr, name_len);
     emit("]\n", 2);
     return 0;
@@ -829,6 +928,14 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
         return 0;
     }
 
+    if (op == SSA_OP_LEA_FUNC) {
+        var info_ptr2b: u64 = ssa_operand_value(inst->src1);
+        var name_ptr2: u64 = *(info_ptr2b);
+        var name_len2: u64 = *(info_ptr2b + 8);
+        _ssa_emit_lea_func(inst->dest, name_ptr2, name_len2);
+        return 0;
+    }
+
     if (op == SSA_OP_PARAM) {
         var idx: u64 = ssa_operand_value(inst->src1);
         var offset: u64 = 16 + idx * 8;
@@ -843,6 +950,12 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
     if (op == SSA_OP_CALL) {
         var info_ptr3: u64 = ssa_operand_value(inst->src1);
         _ssa_emit_call(inst->dest, info_ptr3);
+        return 0;
+    }
+
+    if (op == SSA_OP_CALL_PTR) {
+        var info_ptr3b: u64 = ssa_operand_value(inst->src1);
+        _ssa_emit_call_ptr(inst->dest, info_ptr3b);
         return 0;
     }
 

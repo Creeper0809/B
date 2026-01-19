@@ -32,6 +32,7 @@ func _ssa_dump_op_name(op: u64) -> u64 {
     if (op == SSA_OP_STORE) { emit("store", 5); pop_trace(); return 0; }
     if (op == SSA_OP_PARAM) { emit("param", 5); pop_trace(); return 0; }
     if (op == SSA_OP_CALL) { emit("call", 4); pop_trace(); return 0; }
+    if (op == SSA_OP_CALL_PTR) { emit("call_ptr", 8); pop_trace(); return 0; }
     if (op == SSA_OP_JMP) { emit("jmp", 3); pop_trace(); return 0; }
     if (op == SSA_OP_BR) { emit("br", 2); pop_trace(); return 0; }
     if (op == SSA_OP_RET) { emit("ret", 3); pop_trace(); return 0; }
@@ -39,6 +40,7 @@ func _ssa_dump_op_name(op: u64) -> u64 {
     if (op == SSA_OP_LEA_STR) { emit("lea_str", 7); pop_trace(); return 0; }
     if (op == SSA_OP_LEA_LOCAL) { emit("lea_local", 9); pop_trace(); return 0; }
     if (op == SSA_OP_LEA_GLOBAL) { emit("lea_global", 10); pop_trace(); return 0; }
+    if (op == SSA_OP_LEA_FUNC) { emit("lea_func", 8); pop_trace(); return 0; }
     if (op == SSA_OP_LOAD8) { emit("load8", 5); pop_trace(); return 0; }
     if (op == SSA_OP_LOAD16) { emit("load16", 6); pop_trace(); return 0; }
     if (op == SSA_OP_LOAD32) { emit("load32", 6); pop_trace(); return 0; }
@@ -47,6 +49,7 @@ func _ssa_dump_op_name(op: u64) -> u64 {
     if (op == SSA_OP_STORE16) { emit("store16", 7); pop_trace(); return 0; }
     if (op == SSA_OP_STORE32) { emit("store32", 7); pop_trace(); return 0; }
     if (op == SSA_OP_STORE64) { emit("store64", 7); pop_trace(); return 0; }
+    if (op == SSA_OP_STORE_SLICE) { emit("store_slice", 11); pop_trace(); return 0; }
     emit("op", 2);
     pop_trace();
     return 0;
@@ -101,6 +104,29 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
         return 0;
     }
 
+    if (op == SSA_OP_CALL_PTR) {
+        var info_ptr2: u64 = ssa_operand_value(inst->src1);
+        var callee_reg: u64 = *(info_ptr2);
+        var args_vec2: u64 = *(info_ptr2 + 8);
+        var nargs2: u64 = *(info_ptr2 + 16);
+        if (nargs2 == 0 && args_vec2 != 0) { nargs2 = vec_len(args_vec2); }
+        emit("  r", 3);
+        emit_u64(inst->dest);
+        emit(" = call_ptr r", 13);
+        emit_u64(callee_reg);
+        emit("(", 1);
+        var i2: u64 = 0;
+        while (i2 < nargs2) {
+            if (i2 > 0) { emit(", ", 2); }
+            emit("r", 1);
+            emit_u64(vec_get(args_vec2, i2));
+            i2 = i2 + 1;
+        }
+        emit(")\n", 2);
+        pop_trace();
+        return 0;
+    }
+
     if (op == SSA_OP_CALL) {
         var info_ptr: u64 = ssa_operand_value(inst->src1);
         var name_ptr: u64 = *(info_ptr);
@@ -145,6 +171,14 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
             emit(", ", 2);
             _ssa_dump_operand(inst->src2);
         }
+        emit_nl();
+        pop_trace();
+        return 0;
+    }
+
+    if (op == SSA_OP_STORE_SLICE) {
+        emit(" ", 1);
+        _ssa_dump_operand(inst->src1);
         emit_nl();
         pop_trace();
         return 0;

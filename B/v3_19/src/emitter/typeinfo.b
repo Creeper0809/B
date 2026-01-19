@@ -351,6 +351,67 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         return typeinfo_make(TYPE_I64, 0);
     }
 
+    if (kind == AST_CALL_PTR) {
+        if (g_funcs_vec != 0) {
+            var cp: *AstCallPtr = (*AstCallPtr)node;
+            var callee: u64 = cp->callee;
+            var name_ptr2: u64 = 0;
+            var name_len2: u64 = 0;
+            var ck: u64 = ast_kind(callee);
+            if (ck == AST_IDENT) {
+                var idn: *AstIdent = (*AstIdent)callee;
+                name_ptr2 = idn->name_ptr;
+                name_len2 = idn->name_len;
+            } else if (ck == AST_ADDR_OF) {
+                var a: *AstAddrOf = (*AstAddrOf)callee;
+                if (ast_kind(a->operand) == AST_IDENT) {
+                    var idn2: *AstIdent = (*AstIdent)a->operand;
+                    name_ptr2 = idn2->name_ptr;
+                    name_len2 = idn2->name_len;
+                }
+            }
+
+            if (name_ptr2 != 0) {
+                var resolved_ptr2: u64 = name_ptr2;
+                var resolved_len2: u64 = name_len2;
+                var resolved2: u64 = resolve_name(name_ptr2, name_len2);
+                if (resolved2 != 0) {
+                    resolved_ptr2 = *(resolved2);
+                    resolved_len2 = *(resolved2 + 8);
+                }
+                var num_funcs2: u64 = vec_len(g_funcs_vec);
+                for (var j: u64 = 0; j < num_funcs2; j++) {
+                    var fn_ptr2: u64 = vec_get(g_funcs_vec, j);
+                    var fn2: *AstFunc = (*AstFunc)fn_ptr2;
+                    if (str_eq(fn2->name_ptr, fn2->name_len, resolved_ptr2, resolved_len2)) {
+                        if (fn2->ret_type == TYPE_STRUCT) {
+                            var struct_def2: u64 = get_struct_def(fn2->ret_struct_name_ptr, fn2->ret_struct_name_len);
+                            var result_struct2: u64 = typeinfo_make_struct(fn2->ret_ptr_depth, fn2->ret_struct_name_ptr, fn2->ret_struct_name_len, struct_def2);
+                            var rs2: *TypeInfo = (*TypeInfo)result_struct2;
+                            rs2->is_tagged = fn2->ret_is_tagged;
+                            return result_struct2;
+                        }
+                        if (fn2->ret_type == TYPE_SLICE) {
+                            var result_slice2: u64 = typeinfo_make(fn2->ret_type, fn2->ret_ptr_depth);
+                            var rsl2: *TypeInfo = (*TypeInfo)result_slice2;
+                            rsl2->is_tagged = fn2->ret_is_tagged;
+                            return result_slice2;
+                        }
+                        var result_basic2: u64 = typeinfo_make(fn2->ret_type, fn2->ret_ptr_depth);
+                        var rb2: *TypeInfo = (*TypeInfo)result_basic2;
+                        rb2->is_tagged = fn2->ret_is_tagged;
+                        rb2->struct_name_ptr = fn2->ret_struct_name_ptr;
+                        rb2->struct_name_len = fn2->ret_struct_name_len;
+                        rb2->tag_layout_ptr = fn2->ret_tag_layout_ptr;
+                        rb2->tag_layout_len = fn2->ret_tag_layout_len;
+                        return result_basic2;
+                    }
+                }
+            }
+        }
+        return typeinfo_make(TYPE_I64, 0);
+    }
+
     if (kind == AST_METHOD_CALL) {
         if (g_funcs_vec != 0) {
             var mc: *AstMethodCall = (*AstMethodCall)node;

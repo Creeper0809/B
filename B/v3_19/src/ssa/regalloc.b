@@ -144,6 +144,20 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
                     ai = ai + 1;
                 }
             }
+            if (op == SSA_OP_CALL_PTR) {
+                var info_ptrp: u64 = ssa_operand_value(cur->src1);
+                var callee_reg: u64 = *(info_ptrp);
+                if (callee_reg > max_id) { max_id = callee_reg; }
+                var args_vecp: u64 = *(info_ptrp + 8);
+                var nargsp: u64 = *(info_ptrp + 16);
+                if (nargsp == 0 && args_vecp != 0) { nargsp = vec_len(args_vecp); }
+                var aip: u64 = 0;
+                while (aip < nargsp) {
+                    var rp: u64 = vec_get(args_vecp, aip);
+                    if (rp > max_id) { max_id = rp; }
+                    aip = aip + 1;
+                }
+            }
             if (op == SSA_OP_PHI) {
                 cur = cur->next;
                 continue;
@@ -203,6 +217,24 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
                         _ssa_bitset_set(use, r3);
                     }
                     ai2 = ai2 + 1;
+                }
+            }
+            if (op == SSA_OP_CALL_PTR) {
+                var info_ptr2p: u64 = ssa_operand_value(cur->src1);
+                var callee_reg: u64 = *(info_ptr2p);
+                if (callee_reg <= max_reg && _ssa_bitset_test(def, callee_reg) == 0) {
+                    _ssa_bitset_set(use, callee_reg);
+                }
+                var args_vec2p: u64 = *(info_ptr2p + 8);
+                var nargs2p: u64 = *(info_ptr2p + 16);
+                if (nargs2p == 0 && args_vec2p != 0) { nargs2p = vec_len(args_vec2p); }
+                var ai2p: u64 = 0;
+                while (ai2p < nargs2p) {
+                    var r3p: u64 = vec_get(args_vec2p, ai2p);
+                    if (r3p <= max_reg && _ssa_bitset_test(def, r3p) == 0) {
+                        _ssa_bitset_set(use, r3p);
+                    }
+                    ai2p = ai2p + 1;
                 }
             }
 
@@ -376,6 +408,28 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
                     ai = ai + 1;
                 }
             }
+            if (op == SSA_OP_CALL_PTR) {
+                var info_ptrp: u64 = ssa_operand_value(inst->src1);
+                var args_vecp: u64 = *(info_ptrp + 8);
+                var nargsp: u64 = *(info_ptrp + 16);
+                if (nargsp == 0 && args_vecp != 0) { nargsp = vec_len(args_vecp); }
+                var aip: u64 = 0;
+                while (aip < nargsp) {
+                    var r1p: u64 = vec_get(args_vecp, aip);
+                    if (r1p < nregs) {
+                        var ajp: u64 = aip + 1;
+                        while (ajp < nargsp) {
+                            var r2p: u64 = vec_get(args_vecp, ajp);
+                            if (r2p < nregs && r2p != r1p) {
+                                _ssa_bitset_set(*(*u64)(adj + r1p * 8), r2p);
+                                _ssa_bitset_set(*(*u64)(adj + r2p * 8), r1p);
+                            }
+                            ajp = ajp + 1;
+                        }
+                    }
+                    aip = aip + 1;
+                }
+            }
 
             if (op != SSA_OP_NOP && op != SSA_OP_PHI) {
                 if (op == SSA_OP_CALL) {
@@ -388,6 +442,20 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
                         var r0: u64 = vec_get(args_vec, ai);
                         if (r0 < nregs) { _ssa_bitset_set(live, r0); }
                         ai = ai + 1;
+                    }
+                }
+                if (op == SSA_OP_CALL_PTR) {
+                    var info_ptrp2: u64 = ssa_operand_value(inst->src1);
+                    var callee_reg: u64 = *(info_ptrp2);
+                    if (callee_reg < nregs) { _ssa_bitset_set(live, callee_reg); }
+                    var args_vecp2: u64 = *(info_ptrp2 + 8);
+                    var nargsp2: u64 = *(info_ptrp2 + 16);
+                    if (nargsp2 == 0 && args_vecp2 != 0) { nargsp2 = vec_len(args_vecp2); }
+                    var aip2: u64 = 0;
+                    while (aip2 < nargsp2) {
+                        var r0p: u64 = vec_get(args_vecp2, aip2);
+                        if (r0p < nregs) { _ssa_bitset_set(live, r0p); }
+                        aip2 = aip2 + 1;
                     }
                 }
                 if (!ssa_operand_is_const(inst->src1)) {
@@ -592,6 +660,26 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
                         if (pr != 0) { vec_set(args_vec, ai, pr); }
                     }
                     ai = ai + 1;
+                }
+            }
+            if (op2 == SSA_OP_CALL_PTR) {
+                var info_ptrp: u64 = ssa_operand_value(cur->src1);
+                var callee_reg: u64 = *(info_ptrp);
+                if (callee_reg < map_len) {
+                    var pcallee: u64 = *(*u64)(map + callee_reg * 8);
+                    if (pcallee != 0) { *(info_ptrp) = pcallee; }
+                }
+                var args_vecp: u64 = *(info_ptrp + 8);
+                var nargsp: u64 = *(info_ptrp + 16);
+                if (nargsp == 0 && args_vecp != 0) { nargsp = vec_len(args_vecp); }
+                var aip: u64 = 0;
+                while (aip < nargsp) {
+                    var r: u64 = vec_get(args_vecp, aip);
+                    if (r < map_len) {
+                        var pr: u64 = *(*u64)(map + r * 8);
+                        if (pr != 0) { vec_set(args_vecp, aip, pr); }
+                    }
+                    aip = aip + 1;
                 }
             }
             if (!ssa_operand_is_const(cur->src1)) {

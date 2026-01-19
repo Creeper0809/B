@@ -195,24 +195,29 @@ func parse_primary(p: u64) -> u64 {
         if (parse_peek_kind(p) == TOKEN_LBRACE) {
             var name_ptr: u64 = ((*Token)tok)->ptr;
             var name_len: u64 = ((*Token)tok)->len;
-            
-            // Look up struct type
-            if (is_struct_type(name_ptr, name_len) != 0) {
-                var struct_def: u64 = get_struct_def(name_ptr, name_len);
-                parse_adv(p);  // consume '{'
-                
-                var values: u64 = vec_new(8);
-                if (parse_peek_kind(p) != TOKEN_RBRACE) {
-                    vec_push(values, parse_expr(p));
-                    while (parse_match(p, TOKEN_COMMA)) {
-                        vec_push(values, parse_expr(p));
-                    }
+            var struct_def: u64 = get_struct_def(name_ptr, name_len);
+            if (struct_def == 0) {
+                var resolved: u64 = resolve_name(name_ptr, name_len);
+                if (resolved != 0) {
+                    var resolved_ptr: u64 = *(resolved);
+                    var resolved_len: u64 = *(resolved + 8);
+                    struct_def = get_struct_def(resolved_ptr, resolved_len);
                 }
-                parse_consume(p, TOKEN_RBRACE);
-                
-                pop_trace();
-                return ast_struct_literal(struct_def, values);
             }
+
+            parse_adv(p);  // consume '{'
+
+            var values: u64 = vec_new(8);
+            if (parse_peek_kind(p) != TOKEN_RBRACE) {
+                vec_push(values, parse_expr(p));
+                while (parse_match(p, TOKEN_COMMA)) {
+                    vec_push(values, parse_expr(p));
+                }
+            }
+            parse_consume(p, TOKEN_RBRACE);
+
+            pop_trace();
+            return ast_struct_literal(struct_def, values);
         }
         
         // Check for static method call: StructName.method(...)
@@ -306,6 +311,20 @@ func parse_postfix_from(p: u64, left: u64) -> u64 {
             var idx: u64 = parse_expr(p);
             parse_consume(p, TOKEN_RBRACKET);
             left = ast_index(left, idx);
+        } else if (k == TOKEN_LPAREN) {
+            parse_adv(p);
+            var args: u64 = vec_new(4);
+
+            if (parse_peek_kind(p) != TOKEN_RPAREN) {
+                vec_push(args, parse_expr(p));
+                while (parse_peek_kind(p) == TOKEN_COMMA) {
+                    parse_adv(p);
+                    vec_push(args, parse_expr(p));
+                }
+            }
+
+            parse_consume(p, TOKEN_RPAREN);
+            left = ast_call_ptr(left, args);
         } else if (k == TOKEN_DOT) {
             parse_adv(p);
             var field_tok: u64 = parse_peek(p);

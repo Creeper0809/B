@@ -47,6 +47,7 @@ const SSA_OP_LOAD = 25;
 const SSA_OP_STORE = 26;
 const SSA_OP_PARAM = 27;
 const SSA_OP_CALL = 28;
+const SSA_OP_CALL_PTR = 29;
 
 // Control flow
 const SSA_OP_JMP = 30;
@@ -60,6 +61,7 @@ const SSA_OP_COPY = 40;
 const SSA_OP_LEA_STR = 50;
 const SSA_OP_LEA_LOCAL = 51;
 const SSA_OP_LEA_GLOBAL = 52;
+const SSA_OP_LEA_FUNC = 53;
 
 // Memory ops (explicit address)
 const SSA_OP_LOAD8 = 60;
@@ -70,6 +72,7 @@ const SSA_OP_STORE8 = 64;
 const SSA_OP_STORE16 = 65;
 const SSA_OP_STORE32 = 66;
 const SSA_OP_STORE64 = 67;
+const SSA_OP_STORE_SLICE = 68;
 
 const SSA_OPR_VALUE_MASK = 9223372036854775807;
 
@@ -119,6 +122,16 @@ struct SSACallInfo {
     name_len: u64;
     args_vec: u64; // vec<u64> of arg regs (push order)
     nargs: u64;
+    ret_type: u64;
+    ret_ptr_depth: u64;
+}
+
+struct SSACallPtrInfo {
+    callee_reg: u64;
+    args_vec: u64; // vec<u64> of arg regs (push order)
+    nargs: u64;
+    ret_type: u64;
+    ret_ptr_depth: u64;
 }
 
 struct SSAFunction {

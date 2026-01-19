@@ -56,6 +56,14 @@ struct AstCall {
     args_vec: u64;
 }
 
+// AST Function pointer call node layout (24 bytes)
+const SIZEOF_AST_CALL_PTR = 24;
+struct AstCallPtr {
+    kind: u64;
+    callee: u64;
+    args_vec: u64;
+}
+
 // AST_LITERAL: [kind, value]
 func ast_literal(val: u64) -> u64 {
     var n: *AstLiteral = (*AstLiteral)(heap_alloc(SIZEOF_AST_LITERAL));
@@ -684,6 +692,15 @@ func ast_method_call(receiver: u64, method_ptr: u64, method_len: u64, args: u64)
     n->receiver = receiver;
     n->method_ptr = method_ptr;
     n->method_len = method_len;
+    n->args_vec = args;
+    return (u64)n;
+}
+
+// AST_CALL_PTR: [kind, callee, args_vec]
+func ast_call_ptr(callee: u64, args: u64) -> u64 {
+    var n: *AstCallPtr = (*AstCallPtr)(heap_alloc(SIZEOF_AST_CALL_PTR));
+    n->kind = AST_CALL_PTR;
+    n->callee = callee;
     n->args_vec = args;
     return (u64)n;
 }

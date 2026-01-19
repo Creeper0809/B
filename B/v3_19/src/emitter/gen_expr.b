@@ -273,11 +273,44 @@ func cg_expr(node: u64) -> u64 {
         var name_ptr: u64 = ident->name_ptr;
         var name_len: u64 = ident->name_len;
         var offset: u64 = symtab_find(symtab, name_ptr, name_len);
-        
-        emit("    lea rax, [rbp", 17);
-        if (offset < 0) { emit_i64(offset); }
-        else { emit("+", 1); emit_u64(offset); }
-        emit("]\n", 2);
+
+        if (offset != 0) {
+            emit("    lea rax, [rbp", 17);
+            if (offset < 0) { emit_i64(offset); }
+            else { emit("+", 1); emit_u64(offset); }
+            emit("]\n", 2);
+            return;
+        }
+
+        if (compiler_func_exists(name_ptr, name_len) != 0) {
+            var resolved_ptr: u64 = name_ptr;
+            var resolved_len: u64 = name_len;
+            var resolved: u64 = resolve_name(name_ptr, name_len);
+            if (resolved != 0) {
+                resolved_ptr = *(resolved);
+                resolved_len = *(resolved + 8);
+            }
+            emit("    lea rax, [rel ", 19);
+            emit(resolved_ptr, resolved_len);
+            emit("]\n", 2);
+            return;
+        }
+
+        if (compiler_global_exists(name_ptr, name_len) != 0) {
+            var resolved_ptr2: u64 = name_ptr;
+            var resolved_len2: u64 = name_len;
+            var resolved2: u64 = resolve_name(name_ptr, name_len);
+            if (resolved2 != 0) {
+                resolved_ptr2 = *(resolved2);
+                resolved_len2 = *(resolved2 + 8);
+            }
+            emit("    lea rax, [rel _gvar_", 22);
+            emit(resolved_ptr2, resolved_len2);
+            emit("]\n", 2);
+            return;
+        }
+        emit("    lea rax, [rbp]", 18);
+        emit_nl();
         return;
     }
     

@@ -434,6 +434,34 @@ func resolve_prelude_alias(name_ptr: u64, name_len: u64) -> u64 {
     return hashmap_get(g_prelude_aliases, name_ptr, name_len);
 }
 
+func compiler_func_exists(name_ptr: u64, name_len: u64) -> u64 {
+    if (g_all_funcs == 0) { return 0; }
+    var resolved_ptr: u64 = name_ptr;
+    var resolved_len: u64 = name_len;
+    var resolved: u64 = resolve_name(name_ptr, name_len);
+    if (resolved != 0) {
+        resolved_ptr = *(resolved);
+        resolved_len = *(resolved + 8);
+    }
+    var n: u64 = vec_len(g_all_funcs);
+    for (var i: u64 = 0; i < n; i++) {
+        var fn_ptr: u64 = vec_get(g_all_funcs, i);
+        var fn: *AstFunc = (*AstFunc)fn_ptr;
+        if (str_eq(fn->name_ptr, fn->name_len, resolved_ptr, resolved_len)) { return 1; }
+    }
+    return 0;
+}
+
+func compiler_global_exists(name_ptr: u64, name_len: u64) -> u64 {
+    if (g_all_globals == 0) { return 0; }
+    var n: u64 = vec_len(g_all_globals);
+    for (var i: u64 = 0; i < n; i++) {
+        var ginfo: *GlobalInfo = (*GlobalInfo)vec_get(g_all_globals, i);
+        if (str_eq(ginfo->name_ptr, ginfo->name_len, name_ptr, name_len)) { return 1; }
+    }
+    return 0;
+}
+
 func resolve_name(name_ptr: u64, name_len: u64) -> u64 {
     if (g_current_module_ptr != 0 && g_current_module_len != 0) {
         var alias: u64 = resolve_import_alias(g_current_module_ptr, g_current_module_len, name_ptr, name_len);

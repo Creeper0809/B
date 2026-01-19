@@ -335,6 +335,26 @@ func _ssa_mem2reg_rename_block(fn: *SSAFunction, block: *SSABlock, max_var: u64,
                 ai = ai + 1;
             }
         }
+        if (op == SSA_OP_CALL_PTR) {
+            var info_ptrp: u64 = ssa_operand_value(cur->src1);
+            var callee_reg: u64 = *(info_ptrp);
+            if (callee_reg < reg_map_cap && *(*u64)(reg_map_set + callee_reg * 8) != 0) {
+                var ncallee: u64 = *(*u64)(reg_map_val + callee_reg * 8);
+                if (ncallee != 0) { *(info_ptrp) = ncallee; }
+            }
+            var args_vecp: u64 = *(info_ptrp + 8);
+            var nargsp: u64 = *(info_ptrp + 16);
+            if (nargsp == 0 && args_vecp != 0) { nargsp = vec_len(args_vecp); }
+            var aip: u64 = 0;
+            while (aip < nargsp) {
+                var r: u64 = vec_get(args_vecp, aip);
+                if (r < reg_map_cap && *(*u64)(reg_map_set + r * 8) != 0) {
+                    var nr: u64 = *(*u64)(reg_map_val + r * 8);
+                    if (nr != 0) { vec_set(args_vecp, aip, nr); }
+                }
+                aip = aip + 1;
+            }
+        }
 
         if (op == SSA_OP_LOAD) {
             var var_id2: u64 = ssa_operand_value(cur->src1);
