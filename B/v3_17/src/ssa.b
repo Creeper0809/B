@@ -47,6 +47,9 @@ const SSA_OP_JMP = 30;
 const SSA_OP_BR = 31;
 const SSA_OP_RET = 32;
 
+// SSA destruction helper
+const SSA_OP_COPY = 40;
+
 const SSA_OPR_VALUE_MASK = 9223372036854775807;
 
 // ============================================

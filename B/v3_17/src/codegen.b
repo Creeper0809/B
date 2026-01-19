@@ -16,6 +16,7 @@ import ssa;
 import ssa_builder;
 import ssa_mem2reg;
 import ssa_opt_o1;
+import ssa_destroy;
 import opt;
 import emitter.symtab;
 import emitter.typeinfo;
@@ -152,6 +153,7 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     if (opt_get_level() >= 1) {
         ssa_mem2reg_run((*SSAContext)ssa_ctx_ptr);
         ssa_opt_o1_run((*SSAContext)ssa_ctx_ptr);
+        ssa_destroy_run((*SSAContext)ssa_ctx_ptr);
     }
 
     // Initialize emitter state
