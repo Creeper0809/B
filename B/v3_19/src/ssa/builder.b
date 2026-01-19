@@ -550,11 +550,17 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
 
     if (kind == AST_IDENT) {
         var idn: *AstIdent = (*AstIdent)node;
-        var var_id: u64 = builder_get_var_id(ctx, idn->name_ptr, idn->name_len);
-        var reg_id: u64 = builder_new_reg(ctx);
-        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LOAD, reg_id, ssa_operand_const(var_id), 0);
-        ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
-        return reg_id;
+        var offset: u64 = symtab_find(ctx->symtab, idn->name_ptr, idn->name_len);
+        if (offset != 0) {
+            var var_id: u64 = builder_get_var_id(ctx, idn->name_ptr, idn->name_len);
+            var reg_id: u64 = builder_new_reg(ctx);
+            var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LOAD, reg_id, ssa_operand_const(var_id), 0);
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+            return reg_id;
+        }
+        var addr_reg: u64 = builder_lvalue_addr(ctx, node);
+        var size: u64 = builder_type_size_from_expr(ctx, node);
+        return builder_load_by_size(ctx, addr_reg, size);
     }
 
     if (kind == AST_BINARY) {
@@ -954,10 +960,17 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
         var target_kind: u64 = ast_kind(asn->target);
         if (target_kind == AST_IDENT) {
             var idn: *AstIdent = (*AstIdent)asn->target;
-            var var_id3: u64 = builder_get_var_id(ctx, idn->name_ptr, idn->name_len);
+            var offset2: u64 = symtab_find(ctx->symtab, idn->name_ptr, idn->name_len);
             var val_reg3: u64 = build_expr(ctx, asn->value);
-            var st_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id3), ssa_operand_reg(val_reg3));
-            ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr3);
+            if (offset2 != 0) {
+                var var_id3: u64 = builder_get_var_id(ctx, idn->name_ptr, idn->name_len);
+                var st_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id3), ssa_operand_reg(val_reg3));
+                ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr3);
+                return 0;
+            }
+            var addr_reg2: u64 = builder_lvalue_addr(ctx, asn->target);
+            var size4: u64 = builder_type_size_from_expr(ctx, asn->target);
+            builder_store_by_size(ctx, addr_reg2, val_reg3, size4);
             return 0;
         }
         if (target_kind == AST_DEREF || target_kind == AST_DEREF8 || target_kind == AST_INDEX || target_kind == AST_MEMBER_ACCESS) {

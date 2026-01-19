@@ -101,6 +101,8 @@
 - [x] SSA destroy COPY 터미네이터 전 삽입 + 테스트 37_ssa_destroy_copy_before_term
 - [x] SSA 모듈 src/ssa 폴더로 정리 (import 경로 갱신)
 - [x] SSA 진입점 ssa.b 통합 + ssa 모듈 파일명 정리(datastruct/core 등)
+- [x] SSA 코드젠 전역 변수 로드/스토어 지원 + 테스트 38_ssa_global_access
+- [x] SSA 빌더 모듈 컨텍스트 설정(전역 맹글링 정합) + 테스트 38 보강
 - [x] IR 모드 플래그(-3addr/-ssa) 파싱 + opt API + 테스트(132_opt_ir_mode) 추가
 - [x] IR 모드 덤프(SSA/3addr) + ssa_dump 모듈 + 테스트(133_ssa_dump_basic) 추가
 - [x] IR 모드 최적화 경로 적용(덤프 아님) + 테스트(134_ir_mode_codegen_smoke) 추가

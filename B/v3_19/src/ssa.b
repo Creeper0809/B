@@ -17,7 +17,7 @@ import ssa.codegen;
 
 func ssa_build_func(ctx: *SSAContext, fn_ptr: u64) -> u64 {
     push_trace("ssa_build_func", "ssa.b", __LINE__);
-    pop_trace();
+
     var fn: *AstFunc = (*AstFunc)fn_ptr;
     var ssa_fn_ptr: u64 = ssa_new_function(ctx, fn->name_ptr, fn->name_len);
     var ssa_fn: *SSAFunction = (*SSAFunction)ssa_fn_ptr;
@@ -26,12 +26,14 @@ func ssa_build_func(ctx: *SSAContext, fn_ptr: u64) -> u64 {
     // Entry marker (placeholder)
     var inst_ptr: u64 = ssa_new_inst(ctx, SSA_OP_ENTRY, 0, 0, 0);
     ssa_inst_append(entry, (*SSAInstruction)inst_ptr);
+    
+    pop_trace();
     return 0;
 }
 
 func ssa_build_program(prog: u64) -> u64 {
     push_trace("ssa_build_program", "ssa.b", __LINE__);
-    pop_trace();
+
     var program: *AstProgram = (*AstProgram)prog;
     var funcs: u64 = program->funcs_vec;
     var count: u64 = vec_len(funcs);
@@ -45,6 +47,7 @@ func ssa_build_program(prog: u64) -> u64 {
         ssa_build_func(ctx, fn_ptr);
         i = i + 1;
     }
+    pop_trace();
     return ctx_ptr;
 }
 
@@ -54,8 +57,8 @@ func ssa_build_program(prog: u64) -> u64 {
 
 func ssa_builder_build_func(ctx: *BuilderCtx, fn_ptr: u64) -> u64 {
     push_trace("ssa_builder_build_func", "ssa.b", __LINE__);
-    pop_trace();
     var fn: *AstFunc = (*AstFunc)fn_ptr;
+    set_current_module_for_func(fn->name_ptr, fn->name_len);
     if (SSA_BUILDER_DEBUG != 0) {
         emit("[DEBUG] ssa_builder_build_func: ", 36);
         emit(fn->name_ptr, fn->name_len);
@@ -67,12 +70,13 @@ func ssa_builder_build_func(ctx: *BuilderCtx, fn_ptr: u64) -> u64 {
     builder_reset_func(ctx);
     builder_add_params(ctx, fn);
     build_block(ctx, fn->body);
+    pop_trace();
     return 0;
 }
 
 func ssa_builder_build_program(prog: u64) -> u64 {
     push_trace("ssa_builder_build_program", "ssa.b", __LINE__);
-    pop_trace();
+
     var program: *AstProgram = (*AstProgram)prog;
     var funcs: u64 = program->funcs_vec;
     var count: u64 = vec_len(funcs);
@@ -94,5 +98,6 @@ func ssa_builder_build_program(prog: u64) -> u64 {
         }
         i = i + 1;
     }
+    pop_trace();
     return ssa_ctx_ptr;
 }

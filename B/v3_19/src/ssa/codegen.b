@@ -46,7 +46,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_IDENT) {
         var idn: *AstIdent = (*AstIdent)node;
-        if (_ssa_codegen_is_global(globals, idn->name_ptr, idn->name_len) != 0) { return 0; }
+        if (_ssa_codegen_is_global(globals, idn->name_ptr, idn->name_len) != 0) { return 1; }
         return 1;
     }
 
