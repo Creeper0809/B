@@ -14,12 +14,14 @@ import ast;
 // ============================================
 
 const SIZEOF_SSA_INST = 56;   // 7 * u64
-const SIZEOF_SSA_BLOCK = 32;  // 4 * u64
+const SIZEOF_SSA_BLOCK = 88;  // 11 * u64
 const SIZEOF_SSA_FUNC = 56;   // 7 * u64
 const SIZEOF_SSA_CTX = 40;    // 5 * u64
 
 const SSA_OP_NOP = 0;
 const SSA_OP_ENTRY = 1;
+
+const SSA_OPR_VALUE_MASK = 9223372036854775807;
 
 // ============================================
 // SSA Core Types
@@ -30,16 +32,23 @@ struct SSAInstruction {
     next: *SSAInstruction;
     id: u64;
     op: u64;
-    dest: u64;
-    src1: u64;
-    src2: u64;
+    dest: u64; // virtual register id
+    src1: u64; // tagged operand (const/reg)
+    src2: u64; // tagged operand (const/reg)
 }
 
 struct SSABlock {
     id: u64;
+    phi_head: *SSAInstruction;
     inst_head: *SSAInstruction;
     inst_tail: *SSAInstruction;
-    next_block: *SSABlock;
+    preds_data: u64;
+    preds_len: u64;
+    preds_cap: u64;
+    succs_data: u64;
+    succs_len: u64;
+    succs_cap: u64;
+    dom_parent: *SSABlock;
 }
 
 struct SSAFunction {
@@ -217,9 +226,16 @@ func ssa_new_block(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
     var b: *SSABlock = (*SSABlock)b_ptr;
     b->id = ctx->next_block_id;
     ctx->next_block_id = ctx->next_block_id + 1;
+    b->phi_head = 0;
     b->inst_head = 0;
     b->inst_tail = 0;
-    b->next_block = 0;
+    b->preds_data = 0;
+    b->preds_len = 0;
+    b->preds_cap = 0;
+    b->succs_data = 0;
+    b->succs_len = 0;
+    b->succs_cap = 0;
+    b->dom_parent = 0;
     ssa_block_list_push(fn, b);
     return b_ptr;
 }
@@ -248,6 +264,90 @@ func ssa_inst_append(block: *SSABlock, inst: *SSAInstruction) -> u64 {
     }
     block->inst_tail->next = inst;
     block->inst_tail = inst;
+    return 0;
+}
+
+func ssa_operand_const(val: u64) -> u64 {
+    var mask: u64 = 1;
+    mask = mask << 63;
+    return val | mask;
+}
+
+func ssa_operand_reg(id: u64) -> u64 {
+    return id & SSA_OPR_VALUE_MASK;
+}
+
+func ssa_operand_is_const(opr: u64) -> u64 {
+    var mask: u64 = 1;
+    mask = mask << 63;
+    return (opr & mask) != 0;
+}
+
+func ssa_operand_value(opr: u64) -> u64 {
+    return opr & SSA_OPR_VALUE_MASK;
+}
+
+func ssa_block_add_pred(block: *SSABlock, pred: *SSABlock) -> u64 {
+    var len: u64 = block->preds_len;
+    var cap: u64 = block->preds_cap;
+    var data: u64 = block->preds_data;
+
+    if (len >= cap) {
+        var new_cap: u64 = cap * 2;
+        if (new_cap == 0) { new_cap = 4; }
+        var new_data: u64 = heap_alloc(new_cap * 8);
+        if (len > 0) {
+            var i: u64 = 0;
+            while (i < len) {
+                *(*u64)(new_data + i * 8) = *(*u64)(data + i * 8);
+                i = i + 1;
+            }
+        }
+        data = new_data;
+        cap = new_cap;
+    }
+
+    *(*u64)(data + len * 8) = pred;
+    len = len + 1;
+
+    block->preds_data = data;
+    block->preds_len = len;
+    block->preds_cap = cap;
+    return 0;
+}
+
+func ssa_block_add_succ(block: *SSABlock, succ: *SSABlock) -> u64 {
+    var len: u64 = block->succs_len;
+    var cap: u64 = block->succs_cap;
+    var data: u64 = block->succs_data;
+
+    if (len >= cap) {
+        var new_cap: u64 = cap * 2;
+        if (new_cap == 0) { new_cap = 4; }
+        var new_data: u64 = heap_alloc(new_cap * 8);
+        if (len > 0) {
+            var i: u64 = 0;
+            while (i < len) {
+                *(*u64)(new_data + i * 8) = *(*u64)(data + i * 8);
+                i = i + 1;
+            }
+        }
+        data = new_data;
+        cap = new_cap;
+    }
+
+    *(*u64)(data + len * 8) = succ;
+    len = len + 1;
+
+    block->succs_data = data;
+    block->succs_len = len;
+    block->succs_cap = cap;
+    return 0;
+}
+
+func ssa_add_edge(src: *SSABlock, dst: *SSABlock) -> u64 {
+    ssa_block_add_succ(src, dst);
+    ssa_block_add_pred(dst, src);
     return 0;
 }
 
