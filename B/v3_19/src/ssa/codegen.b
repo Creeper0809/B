@@ -154,12 +154,41 @@ func _ssa_inst_use_def_mask(inst: *SSAInstruction, use_out: u64, def_out: u64) -
         return 0;
     }
 
+    if (op == SSA_OP_ASM) {
+        *(use_out) = 0;
+        *(def_out) = 0;
+        return 0;
+    }
+
     use_mask = _ssa_operand_use_mask(inst->src1) | _ssa_operand_use_mask(inst->src2);
     if (inst->dest != 0) {
         def_mask = _ssa_phys_mask(inst->dest);
     }
     *(use_out) = use_mask;
     *(def_out) = def_mask;
+    return 0;
+}
+
+func _ssa_emit_asm(text_vec: u64) -> u64 {
+    if (text_vec == 0) { return 0; }
+    var asm_len: u64 = vec_len(text_vec);
+    var i: u64 = 0;
+    var at_line_start: u64 = 1;
+    while (i < asm_len) {
+        var ch: u64 = vec_get(text_vec, i);
+        if (ch == 10) {
+            emit_nl();
+            at_line_start = 1;
+        } else {
+            if (at_line_start == 1) {
+                emit("    ", 4);
+                at_line_start = 0;
+            }
+            emit_char(ch);
+        }
+        i = i + 1;
+    }
+    emit_nl();
     return 0;
 }
 
@@ -529,6 +558,8 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         }
         return 1;
     }
+
+    if (kind == AST_ASM) { return 1; }
 
     if (kind == AST_EXPR_STMT) {
         var es: *AstExprStmt = (*AstExprStmt)node;
@@ -1248,6 +1279,12 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
     if (op == SSA_OP_CALL_PTR) {
         var info_ptr3b: u64 = ssa_operand_value(inst->src1);
         _ssa_emit_call_ptr(inst->dest, info_ptr3b, _ssa_live_map_get(g_live_mask_map, (u64)inst));
+        return 0;
+    }
+
+    if (op == SSA_OP_ASM) {
+        var text_vec: u64 = ssa_operand_value(inst->src1);
+        _ssa_emit_asm(text_vec);
         return 0;
     }
 

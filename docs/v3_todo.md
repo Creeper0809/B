@@ -88,6 +88,7 @@
 - [x] SSA 코드젠 호출 시 라이브 레지스터만 저장(콜러 세이브 최적화) + 테스트 56_o1_call_save_smoke
 - [x] SSA 호출 레지스터 liveness 버그 수정(succ 포인터/prev 제거) + 전체 테스트 PASS
 - [x] O1 함수 단위 DCE(직접 호출 기반) + 테스트 57_import_single_symbol_dce
+- [x] SSA 인라인 ASM 지원(SSA_OP_ASM) + 테스트 58_ssa_inline_asm_smoke
 - [x] SSA 파괴(Phi 제거 → COPY 삽입) 추가 + 테스트(123_ssa_destroy_basic) 추가
 - [x] SSA 파괴 임계 엣지 분리 + 테스트(124_ssa_destroy_critical) 추가
 - [x] SSA 그래프 컬러링 레지스터 할당 스캐폴드 + 테스트(125_ssa_regalloc_basic) 추가

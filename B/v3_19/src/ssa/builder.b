@@ -1317,6 +1317,13 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
         return 0;
     }
 
+    if (kind == AST_ASM) {
+        var a: *AstAsm = (*AstAsm)node;
+        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ASM, 0, ssa_operand_const(a->text_vec), 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+        return 0;
+    }
+
     if (kind == AST_EXPR_STMT) {
         var es: *AstExprStmt = (*AstExprStmt)node;
         var expr_kind: u64 = ast_kind(es->expr);

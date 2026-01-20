@@ -50,6 +50,7 @@ func _ssa_dump_op_name(op: u64) -> u64 {
     if (op == SSA_OP_STORE32) { emit("store32", 7); pop_trace(); return 0; }
     if (op == SSA_OP_STORE64) { emit("store64", 7); pop_trace(); return 0; }
     if (op == SSA_OP_STORE_SLICE) { emit("store_slice", 11); pop_trace(); return 0; }
+    if (op == SSA_OP_ASM) { emit("asm", 3); pop_trace(); return 0; }
     emit("op", 2);
     pop_trace();
     return 0;
