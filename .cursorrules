@@ -1,12 +1,3 @@
-수정 요청하신 대로 **3-address code(3addr)** 부분을 **AST generation(ast gen)**으로 변경하여 전체 내용을 다시 정리했습니다.
-
-아래 내용을 `.cursorrules` 파일에 덮어쓰시면 됩니다.
-
-```markdown
----
-applyTo: "**"
----
-
 # Project Context & Persona
 - **Project**: B Language (Basm v4) Self-Hosting Compiler
 - **Role**: Expert System Programmer specialized in compiler design & low-level optimization.
@@ -88,7 +79,5 @@ When generating code, always verify:
 1. Is the logic flat? (Are there guard clauses?)
 2. Are there debug prints for the flow?
 3. Is the memory usage explicit?
-
-```
 
 ```

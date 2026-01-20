@@ -11,7 +11,7 @@ import opt;
 
 func main(argc: u64, argv: u64) -> u64 {
     if (argc < 2) {
-        emit("Usage: v3_19 [-O0|-O1] [-3addr|-ssa] [-ir|-asm] <source.b>\n", 66);
+        emit("Usage: v3_19 [-O0|-O1] [-dump-ir|-dump-ssa|-asm] <source.b>\n", 60);
         return 1;
     }
 
@@ -31,17 +31,14 @@ func main(argc: u64, argv: u64) -> u64 {
             i = i + 1;
             continue;
         }
-        if (str_eq(arg, arg_len, "-3addr", 6)) {
+        if (str_eq(arg, arg_len, "-dump-ir", 8)) {
             opt_set_ir_mode(IR_3ADDR);
+            opt_set_output_mode(OUT_IR);
             i = i + 1;
             continue;
         }
-        if (str_eq(arg, arg_len, "-ssa", 4)) {
+        if (str_eq(arg, arg_len, "-dump-ssa", 9)) {
             opt_set_ir_mode(IR_SSA);
-            i = i + 1;
-            continue;
-        }
-        if (str_eq(arg, arg_len, "-ir", 3)) {
             opt_set_output_mode(OUT_IR);
             i = i + 1;
             continue;
@@ -57,7 +54,7 @@ func main(argc: u64, argv: u64) -> u64 {
     }
 
     if (filename == 0) {
-        emit("Usage: v3_19 [-O0|-O1] [-3addr|-ssa] [-ir|-asm] <source.b>\n", 66);
+        emit("Usage: v3_19 [-O0|-O1] [-dump-ir|-dump-ssa|-asm] <source.b>\n", 60);
         return 1;
     }
 

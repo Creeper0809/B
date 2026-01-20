@@ -584,6 +584,7 @@ func cg_program_with_sigs_ir(prog: u64, sigs: u64) -> u64 {
         if (opt_level >= 1) {
             ssa_opt_o1_run((*SSAContext)ssa_ctx_ptr3);
         }
+        ssa_destroy_run((*SSAContext)ssa_ctx_ptr3);
         ssa_dump_ctx((*SSAContext)ssa_ctx_ptr3, 0);
     } else {
         var ssa_ctx_ptr: u64 = ssa_builder_build_program(prog);

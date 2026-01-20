@@ -27,6 +27,7 @@ fi
 
 COMPILER="./bin/${VERSION}_stage1"
 TEST_DIR="B/${VERSION}/test/b"
+IR_TEST_DIR="B/${VERSION}/test/ir"
 BUILD_DIR="build/${VERSION}_tests"
 RESULTS_DIR="build/test_results"
 
@@ -75,16 +76,14 @@ for TEST_FILE in $TEST_FILES; do
     OUT_FILE="$RESULTS_DIR/${TEST_NAME}.out"
     ERR_FILE="$RESULTS_DIR/${TEST_NAME}.err"
     
-    # Compile (optional SSA mode)
-    IR_FLAG=""
-    if grep -q -m1 -E '^// Mode: ssa' "$TEST_FILE"; then
-        IR_FLAG="-ssa"
-    fi
     OPT_FLAG=""
     if grep -q -m1 -E '^// Opt: O1' "$TEST_FILE"; then
         OPT_FLAG="-O1"
     fi
-    if ! $COMPILER $OPT_FLAG $IR_FLAG -asm "$TEST_FILE" 2>/dev/null > "$ASM_FILE"; then
+    if [ -z "$OPT_FLAG" ] && grep -q -m1 -E '^// Mode: ssa' "$TEST_FILE"; then
+        OPT_FLAG="-O1"
+    fi
+    if ! $COMPILER $OPT_FLAG -asm "$TEST_FILE" 2>/dev/null > "$ASM_FILE"; then
         echo -e "${RED}FAIL (compile)${NC}"
         echo "Compilation failed" > "$ERR_FILE"
         FAILED=$((FAILED + 1))
@@ -118,6 +117,50 @@ for TEST_FILE in $TEST_FILES; do
         echo -e "${RED}FAIL${NC} (exit=$EXIT_CODE, expect=$EXPECTED)"
         FAILED=$((FAILED + 1))
     fi
+done
+
+IR_TEST_FILES=$(ls $IR_TEST_DIR/*.b 2>/dev/null | sort -V)
+if [ -n "$IR_TEST_FILES" ]; then
+    echo ""
+    echo "========================================"
+    echo "IR Dump Tests"
+    echo "========================================"
+    echo ""
+fi
+
+for TEST_FILE in $IR_TEST_FILES; do
+    TOTAL=$((TOTAL + 1))
+    TEST_NAME=$(basename "$TEST_FILE" .b)
+
+    echo -n "[$TOTAL] IR $TEST_NAME... "
+
+    SSA_OUT="$RESULTS_DIR/${TEST_NAME}.ssa.ir"
+    ADDR_OUT="$RESULTS_DIR/${TEST_NAME}.3addr.ir"
+    ERR_FILE="$RESULTS_DIR/${TEST_NAME}.ir.err"
+
+    if ! $COMPILER -dump-ssa "$TEST_FILE" > "$SSA_OUT" 2>"$ERR_FILE"; then
+        echo -e "${RED}FAIL${NC} (ssa dump)"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    if ! grep -q "phi" "$SSA_OUT"; then
+        echo -e "${RED}FAIL${NC} (ssa missing phi)"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    if ! $COMPILER -dump-ir "$TEST_FILE" > "$ADDR_OUT" 2>>"$ERR_FILE"; then
+        echo -e "${RED}FAIL${NC} (3addr dump)"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+    if grep -q "phi" "$ADDR_OUT"; then
+        echo -e "${RED}FAIL${NC} (3addr has phi)"
+        FAILED=$((FAILED + 1))
+        continue
+    fi
+
+    echo -e "${GREEN}PASS${NC}"
+    PASSED=$((PASSED + 1))
 done
 
 echo ""
