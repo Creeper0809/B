@@ -1324,6 +1324,32 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
         return 0;
     }
 
+    if (kind == AST_BREAK) {
+        var break_bb: u64 = builder_top_break(ctx);
+        if (break_bb != 0) {
+            var br_bb: *SSABlock = (*SSABlock)break_bb;
+            var jmp_ptrb: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(br_bb->id), 0);
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptrb);
+            ssa_add_edge(ctx->cur_block, br_bb);
+        }
+        var dead_bb: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+        builder_set_block(ctx, dead_bb);
+        return 0;
+    }
+
+    if (kind == AST_CONTINUE) {
+        var cont_bb: u64 = builder_top_continue(ctx);
+        if (cont_bb != 0) {
+            var ct_bb: *SSABlock = (*SSABlock)cont_bb;
+            var jmp_ptrc: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_JMP, 0, ssa_operand_const(ct_bb->id), 0);
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)jmp_ptrc);
+            ssa_add_edge(ctx->cur_block, ct_bb);
+        }
+        var dead_bb2: *SSABlock = (*SSABlock)ssa_new_block(ctx->ssa_ctx, ctx->cur_func);
+        builder_set_block(ctx, dead_bb2);
+        return 0;
+    }
+
     if (kind == AST_EXPR_STMT) {
         var es: *AstExprStmt = (*AstExprStmt)node;
         var expr_kind: u64 = ast_kind(es->expr);
