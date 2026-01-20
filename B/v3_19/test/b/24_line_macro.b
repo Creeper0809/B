@@ -2,6 +2,7 @@
 
 import std.io;
 import std.emit;
+import std.util;
 
 func main(argc, argv) {
     emit("Line 6: ", 8);

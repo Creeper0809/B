@@ -7,6 +7,7 @@
 import std.io;
 import std.vec;
 import std.util;
+import std.str;
 import types;
 import ast;
 import ssa.datastruct;

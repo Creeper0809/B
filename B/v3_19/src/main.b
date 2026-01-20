@@ -4,6 +4,7 @@ import std.io;
 import std.str;
 import std.os;
 import std.path;
+import std.util;
 import compiler;
 import codegen;
 import opt;
@@ -68,12 +69,6 @@ func main(argc: u64, argv: u64) -> u64 {
 
     init_compiler_globals();
 
-    // Implicit standard library prelude (std/* available without explicit import)
-    if (!load_std_prelude()) {
-        pop_trace();
-        return 1;
-    }
-    
     if (!load_module(filename, filename_len)) {
         pop_trace();
         return 1;

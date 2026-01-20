@@ -5,6 +5,7 @@ import std.str;
 import std.path;
 import std.vec;
 import std.hashmap;
+import std.util;
 import types;
 import lexer;
 import ast;
@@ -462,14 +463,63 @@ func compiler_global_exists(name_ptr: u64, name_len: u64) -> u64 {
     return 0;
 }
 
+func prelude_try_symbol(module_path: u64, module_len: u64, name_ptr: u64, name_len: u64) -> u64 {
+    var mod_id: u64 = module_id_from_import(module_path, module_len);
+    if (mod_id == 0) { return 0; }
+    var mod_ptr: u64 = *(mod_id);
+    var mod_len: u64 = *(mod_id + 8);
+    var exports: u64 = module_exports_get(mod_ptr, mod_len);
+    if (exports == 0) { return 0; }
+
+    var n: u64 = vec_len(exports);
+    for (var i: u64 = 0; i < n; i++) {
+        var e: u64 = vec_get(exports, i);
+        var sym_ptr: u64 = *(e);
+        var sym_len: u64 = *(e + 8);
+        if (str_eq(sym_ptr, sym_len, name_ptr, name_len) != 0) {
+            var mangled_ptr: u64 = *(e + 16);
+            var mangled_len: u64 = *(e + 24);
+            add_prelude_alias(name_ptr, name_len, mangled_ptr, mangled_len);
+            var info: u64 = heap_alloc(16);
+            *(info) = mangled_ptr;
+            *(info + 8) = mangled_len;
+            return info;
+        }
+    }
+    return 0;
+}
+
+func load_std_prelude_modules() -> u64 {
+    if (!load_module_by_name("std/io", 6)) { return 0; }
+    if (!load_module_by_name("std/str", 7)) { return 0; }
+    if (!load_module_by_name("std/char", 8)) { return 0; }
+    if (!load_module_by_name("std/util", 8)) { return 0; }
+    if (!load_module_by_name("std/vec", 7)) { return 0; }
+    if (!load_module_by_name("std/hashmap", 11)) { return 0; }
+    return 1;
+}
+
+func resolve_prelude_alias_lazy(name_ptr: u64, name_len: u64) -> u64 {
+    var info: u64 = prelude_try_symbol("std/io", 6, name_ptr, name_len);
+    if (info != 0) { return info; }
+    info = prelude_try_symbol("std/str", 7, name_ptr, name_len);
+    if (info != 0) { return info; }
+    info = prelude_try_symbol("std/char", 8, name_ptr, name_len);
+    if (info != 0) { return info; }
+    info = prelude_try_symbol("std/util", 8, name_ptr, name_len);
+    if (info != 0) { return info; }
+    info = prelude_try_symbol("std/vec", 7, name_ptr, name_len);
+    if (info != 0) { return info; }
+    info = prelude_try_symbol("std/hashmap", 11, name_ptr, name_len);
+    if (info != 0) { return info; }
+    return 0;
+}
+
 func resolve_name(name_ptr: u64, name_len: u64) -> u64 {
     if (g_current_module_ptr != 0 && g_current_module_len != 0) {
         var alias: u64 = resolve_import_alias(g_current_module_ptr, g_current_module_len, name_ptr, name_len);
         if (alias != 0) { return alias; }
     }
-
-    var prelude: u64 = resolve_prelude_alias(name_ptr, name_len);
-    if (prelude != 0) { return prelude; }
 
     if (g_current_module_ptr != 0 && g_current_module_len != 0) {
         var exports: u64 = module_exports_get(g_current_module_ptr, g_current_module_len);
@@ -488,6 +538,7 @@ func resolve_name(name_ptr: u64, name_len: u64) -> u64 {
             }
         }
     }
+
     return 0;
 }
 

@@ -1,6 +1,7 @@
 // Test 09: Const Variables
 import std.io;
 import std.emit;
+import std.util;
 
 const MAX_SIZE = 100;
 const MIN_SIZE = 10;

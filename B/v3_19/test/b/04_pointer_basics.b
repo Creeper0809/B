@@ -1,6 +1,8 @@
 // Test 04: Pointer Suite (basics/arithmetic/var-init)
 // Expect exit code: 0
 
+import std.io;
+
 func main(argc, argv) {
     var x;
     var ptr;

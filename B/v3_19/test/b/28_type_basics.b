@@ -1,6 +1,8 @@
 // Expect exit code: 0
 // Covers: array/char/slice/array param/return/tagged pointer/packed bitfields
 
+import std.io;
+
 struct Holder {
     arr: [3]i64;
     s: []i64;

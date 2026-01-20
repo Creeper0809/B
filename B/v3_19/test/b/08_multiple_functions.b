@@ -2,6 +2,7 @@
 import std.io;
 import std.emit;
 import std.str;
+import std.util;
 
 func add(a, b) {
     return a + b;

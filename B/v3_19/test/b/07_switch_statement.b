@@ -1,6 +1,8 @@
 // Test 07: Switch/Enum Suite
 // Expect exit code: 0
 
+import std.str;
+
 enum Color {
     Red,
     Green,

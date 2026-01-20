@@ -1,6 +1,7 @@
 // hashmap.b - Hash map implementation for v3.8
 
 import std.io;
+import std.str;
 
 // HashMap structure: [entries_ptr, capacity, count]
 // Entry: [key_ptr, key_len, value, hash, used] = 40 bytes

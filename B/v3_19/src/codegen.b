@@ -8,6 +8,8 @@
 // - gen_stmt.b: Statement code generation
 
 import std.io;
+import std.util;
+import std.str;
 import types;
 import std.vec;
 import ast;
@@ -259,14 +261,13 @@ func cg_program_with_sigs_ir(prog: u64, sigs: u64) -> u64 {
     typeinfo_set_structs(program->structs_vec);
     typeinfo_set_funcs(sigs);
 
-    var ssa_ctx_ptr: u64 = ssa_builder_build_program(prog);
-    ssa_mem2reg_run((*SSAContext)ssa_ctx_ptr);
-
     var ir_mode: u64 = opt_get_ir_mode();
     if (ir_mode == IR_3ADDR) {
-        ssa_destroy_run((*SSAContext)ssa_ctx_ptr);
-        ssa_dump_ctx((*SSAContext)ssa_ctx_ptr, 0);
+        var ssa_ctx_ptr3: u64 = ssa_builder_build_program(prog);
+        ssa_dump_ctx((*SSAContext)ssa_ctx_ptr3, 0);
     } else {
+        var ssa_ctx_ptr: u64 = ssa_builder_build_program(prog);
+        ssa_mem2reg_run((*SSAContext)ssa_ctx_ptr);
         ssa_dump_ctx((*SSAContext)ssa_ctx_ptr, 1);
     }
 

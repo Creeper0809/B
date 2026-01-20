@@ -2,8 +2,10 @@
 
 import std.io;
 import std.str;
+import std.util;
 import types;
 import std.vec;
+import std.char;
 
 // ============================================
 // ASCII Character Constants

@@ -1,6 +1,7 @@
 // Test 05: Byte/String Operations
 // Expect exit code: 0
 
+import std.io;
 import std.str;
 
 func main(argc, argv) {

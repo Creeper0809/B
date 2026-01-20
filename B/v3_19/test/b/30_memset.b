@@ -2,6 +2,7 @@
 // Expect exit code: 42
 
 import std.mem;
+import std.io;
 
 func main() -> i64 {
     var buf = heap_alloc(16);

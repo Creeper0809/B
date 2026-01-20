@@ -7,6 +7,7 @@
 
 import std.io;
 import std.vec;
+import std.util;
 import lexer;
 import compiler;
 

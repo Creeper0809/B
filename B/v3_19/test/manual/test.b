@@ -1,0 +1,8 @@
+import std.io;
+
+func main() -> i64{
+    var a : u64 = 10;
+    var b : u64 = a + 10 + 20;
+    print_u64(b);
+    return 0;
+}

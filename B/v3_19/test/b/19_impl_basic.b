@@ -1,6 +1,8 @@
 // Test 19: Impl Suite (basic/multiple/chaining/return/recursive/mixed/stress/complex)
 // Expect exit code: 0
 
+import std.io;
+
 struct PointBasic {
     x: i64;
     y: i64;

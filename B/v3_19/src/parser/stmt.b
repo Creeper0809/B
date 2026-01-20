@@ -9,6 +9,7 @@
 
 import std.io;
 import std.vec;
+import std.util;
 import types;
 import lexer;
 import ast;

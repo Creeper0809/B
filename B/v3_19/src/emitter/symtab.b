@@ -9,6 +9,7 @@
 
 import std.io;
 import std.vec;
+import std.str;
 import types;
 
 // ============================================
