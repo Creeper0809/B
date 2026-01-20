@@ -143,6 +143,11 @@ func _ssa_opt_collect_uses(fn: *SSAFunction) -> u64 {
                     _ssa_opt_use_inc(uses, vec_get(arg_regs, i));
                     i = i + 1;
                 }
+                if (op == SSA_OP_CALL_SLICE_STORE) {
+                    if (cur->src2 != 0 && ssa_operand_is_const(cur->src2) == 0) {
+                        _ssa_opt_use_inc(uses, ssa_operand_value(cur->src2));
+                    }
+                }
             } else if (op == SSA_OP_CALL_PTR) {
                 var info2: u64 = ssa_operand_value(cur->src1);
                 var callee_reg: u64 = *(info2);
