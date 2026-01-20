@@ -3,7 +3,8 @@
 // Expect exit code: 0
 
 func make_slice(p: *u8, n: i64) -> []u8 {
-    return slice(p, n);
+    var s: []u8 = slice(p, n);
+    return s;
 }
 
 func main(argc, argv) {

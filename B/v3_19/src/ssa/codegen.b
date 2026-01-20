@@ -120,6 +120,13 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return 1;
     }
 
+    if (kind == AST_SLICE) {
+        var s3: *AstSlice = (*AstSlice)node;
+        if (_ssa_codegen_expr_supported(s3->ptr_expr, globals) == 0) { return 0; }
+        if (_ssa_codegen_expr_supported(s3->len_expr, globals) == 0) { return 0; }
+        return 1;
+    }
+
     if (kind == AST_CALL_PTR) {
         var cp: *AstCallPtr = (*AstCallPtr)node;
         if (_ssa_codegen_expr_supported(cp->callee, globals) == 0) { return 0; }
@@ -326,7 +333,10 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
         var pi: u64 = 0;
         while (pi < pn) {
             var p: *Param = (*Param)vec_get(params, pi);
-            if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) { return 0; }
+            if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
+                pi = pi + 1;
+                continue;
+            }
             pi = pi + 1;
         }
     }
@@ -869,6 +879,19 @@ func _ssa_emit_ret(inst: *SSAInstruction) -> u64 {
             if (r != SSA_PHYS_RAX) {
                 emit("    mov rax, ", 13);
                 _ssa_emit_reg_name(r);
+                emit_nl();
+            }
+        }
+    }
+
+    if (inst->src2 != 0) {
+        if (ssa_operand_is_const(inst->src2) != 0) {
+            _ssa_emit_mov_reg_opr(SSA_PHYS_RDX, inst->src2);
+        } else {
+            var r2: u64 = ssa_operand_value(inst->src2);
+            if (r2 != SSA_PHYS_RDX) {
+                emit("    mov rdx, ", 13);
+                _ssa_emit_reg_name(r2);
                 emit_nl();
             }
         }

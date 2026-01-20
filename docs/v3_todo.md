@@ -105,6 +105,7 @@
 - [x] SSA 빌더 모듈 컨텍스트 설정(전역 맹글링 정합) + 테스트 38 보강
 - [x] SSA AST_CALL 지원(호출/레지스터 매핑/간섭 보강) + 테스트 39_ssa_call_basic
 - [x] SSA 슬라이스 인자 호출 지원(AST_SLICE in call) + 테스트 40_ssa_slice_call
+- [x] SSA 슬라이스 파라미터 로딩(ABI 슬롯 2개) 지원
 - [x] SSA 메서드 호출(AST_METHOD_CALL) 지원 + 테스트 41~43
 - [x] SSA mem2reg 호출 인자 리네임 보강 (CALL arg rewrite)
 - [x] SSA 구조체 리터럴 초기화/대입 지원 + 테스트 44~46
@@ -112,6 +113,7 @@
 - [x] SSA 함수 포인터 호출/함수 주소 로딩(LEA_FUNC) 지원 + 테스트 50
 - [x] SSA 슬라이스 반환 호출 보존(rax/rdx) + 테스트 51
 - [x] SSA 중첩 구조체 리터럴 필드 초기화 지원 + 테스트 52
+- [x] SSA 슬라이스 반환(RET ptr/len) 지원 + 테스트 51 보강
 - [x] IR 모드 플래그(-3addr/-ssa) 파싱 + opt API + 테스트(132_opt_ir_mode) 추가
 - [x] IR 모드 덤프(SSA/3addr) + ssa_dump 모듈 + 테스트(133_ssa_dump_basic) 추가
 - [x] IR 모드 최적화 경로 적용(덤프 아님) + 테스트(134_ir_mode_codegen_smoke) 추가

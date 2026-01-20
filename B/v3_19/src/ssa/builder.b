@@ -252,23 +252,28 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
 
     var n: u64 = vec_len(params);
     var i: u64 = 0;
+    var param_idx: u64 = 0;
     var arg_offset: u64 = 0;
     while (i < n) {
         var p: *Param = (*Param)vec_get(params, i);
+        if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
+            builder_symtab_add_param(ctx, p, 16 + arg_offset);
+            arg_offset = arg_offset + 16;
+            param_idx = param_idx + 2;
+            i = i + 1;
+            continue;
+        }
+
         var var_id: u64 = builder_get_var_id(ctx, p->name_ptr, p->name_len);
         var reg_id: u64 = builder_new_reg(ctx);
-        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_id, ssa_operand_const(i), 0);
+        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_id, ssa_operand_const(param_idx), 0);
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
         var st_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id), ssa_operand_reg(reg_id));
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr);
 
-        if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
-            builder_symtab_add_param(ctx, p, 16 + arg_offset);
-            arg_offset = arg_offset + 16;
-        } else {
-            builder_symtab_add_param(ctx, p, 16 + arg_offset);
-            arg_offset = arg_offset + 8;
-        }
+        builder_symtab_add_param(ctx, p, 16 + arg_offset);
+        arg_offset = arg_offset + 8;
+        param_idx = param_idx + 1;
         i = i + 1;
     }
     return 0;
@@ -1429,6 +1434,18 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
         var ret: *AstReturn = (*AstReturn)node;
         var val_reg4: u64 = 0;
         if (ret->expr != 0) {
+            var ret_ti_ptr: u64 = get_expr_type_with_symtab(ret->expr, ctx->symtab);
+            if (ret_ti_ptr != 0) {
+                var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
+                if (ret_ti->type_kind == TYPE_SLICE && ret_ti->ptr_depth == 0) {
+                    var slice_info: u64 = builder_slice_regs(ctx, ret->expr);
+                    var ptr_reg: u64 = *(slice_info);
+                    var len_reg: u64 = *(slice_info + 8);
+                    var ret_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET, 0, ssa_operand_reg(ptr_reg), ssa_operand_reg(len_reg));
+                    ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr2);
+                    return 0;
+                }
+            }
             val_reg4 = build_expr(ctx, ret->expr);
         }
         var ret_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET, 0, ssa_operand_reg(val_reg4), 0);

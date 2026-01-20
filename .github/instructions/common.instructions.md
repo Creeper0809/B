@@ -8,7 +8,7 @@ applyTo: '**'
 - **Context Awareness**: Always check existing documentation and the current file structure before answering.
 
 # Coding Standards & Workflow (CRITICAL)
-
+when implements new feature : Make 3addr first and then ssa version later
 ## 1. Unit Testing (Mandatory)
 - **Rule**: For EVERY new feature or logic change, you MUST write or update unit tests.
 - **Location**: All tests must be placed in the `B/{version}/test` directory.
