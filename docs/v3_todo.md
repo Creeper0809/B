@@ -131,6 +131,9 @@
 - [x] IR 3addr 덤프를 SSA destroy 이후로 이동 + IR 테스트 추가(phi 제거 확인)
 - [x] CLI 플래그 단순화(-dump-ir/-dump-ssa/-asm) + nossa 제거
 - [x] SSA O1 DCE: call_slice_store 주소 레지스터 use 누락 수정 + O1 슬라이스 테스트 추가
+- [x] SSA tagged ptr 마스킹 + packed bitfield R/W 지원 + 테스트 65 추가
+- [x] SSA shift 코드젠: shift-amount reg == dest 회귀 수정
+- [x] setup_paths 경로 계산을 v3_19 레이아웃으로 보정 + 테스트 스크립트 경로 수정
 - [x] IR 모드 최적화 경로 적용(덤프 아님) + 테스트(134_ir_mode_codegen_smoke) 추가
 - [x] v3_18로 std.os 분리/driver 기능 이관 (v3_17 롤백 후 재작업)
 - [x] v3_18 setup_paths 경로 탐색 보정(src/test 모두 지원)

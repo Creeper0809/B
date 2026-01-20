@@ -1,0 +1,4 @@
+build/v3_19_tests/42_ssa_method_call_ptr.asm:61: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/42_ssa_method_call_ptr.asm:61: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/42_ssa_method_call_ptr.asm:66: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/42_ssa_method_call_ptr.asm:66: warning: byte data exceeds bounds [-w+number-overflow]

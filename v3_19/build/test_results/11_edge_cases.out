@@ -1,0 +1,21 @@
+Testing edge cases:
+
+1. Zero operations:
+0 + 10 = 10
+0 * 10 = 0
+10 - 10 = 0
+
+2. Negative numbers:
+-10 + (-5) = -15
+-10 - (-5) = -5
+-10 * (-5) = 50
+
+3. Large numbers:
+1000000 + 2000000 = 3000000
+
+4. Boundary conditions:
+1 > 0: true
+0 == 0: true
+
+5. String operations:
+String length: 4

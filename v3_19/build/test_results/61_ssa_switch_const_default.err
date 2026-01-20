@@ -1,0 +1,8 @@
+build/v3_19_tests/61_ssa_switch_const_default.asm:40: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/61_ssa_switch_const_default.asm:40: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/61_ssa_switch_const_default.asm:45: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/61_ssa_switch_const_default.asm:45: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/61_ssa_switch_const_default.asm:50: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/61_ssa_switch_const_default.asm:50: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/61_ssa_switch_const_default.asm:84: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/61_ssa_switch_const_default.asm:84: warning: byte data exceeds bounds [-w+number-overflow]

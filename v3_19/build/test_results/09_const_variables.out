@@ -1,0 +1,5 @@
+Testing constants:
+MAX_SIZE = 100
+MIN_SIZE = 10
+DEFAULT_VALUE = 42
+MAX_SIZE - MIN_SIZE = 90

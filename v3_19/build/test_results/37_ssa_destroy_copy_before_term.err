@@ -1,0 +1,4 @@
+build/v3_19_tests/37_ssa_destroy_copy_before_term.asm:28: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/37_ssa_destroy_copy_before_term.asm:28: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/37_ssa_destroy_copy_before_term.asm:38: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/37_ssa_destroy_copy_before_term.asm:38: warning: byte data exceeds bounds [-w+number-overflow]

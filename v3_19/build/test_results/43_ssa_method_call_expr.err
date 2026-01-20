@@ -1,0 +1,4 @@
+build/v3_19_tests/43_ssa_method_call_expr.asm:58: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/43_ssa_method_call_expr.asm:58: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/43_ssa_method_call_expr.asm:64: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/43_ssa_method_call_expr.asm:64: warning: byte data exceeds bounds [-w+number-overflow]

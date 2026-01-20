@@ -1,0 +1,6 @@
+build/v3_19_tests/46_ssa_struct_literal_exprs.asm:22: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/46_ssa_struct_literal_exprs.asm:22: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/46_ssa_struct_literal_exprs.asm:33: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/46_ssa_struct_literal_exprs.asm:33: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/46_ssa_struct_literal_exprs.asm:35: warning: byte data exceeds bounds [-w+number-overflow]
+build/v3_19_tests/46_ssa_struct_literal_exprs.asm:35: warning: byte data exceeds bounds [-w+number-overflow]
