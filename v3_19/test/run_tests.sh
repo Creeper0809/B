@@ -65,8 +65,13 @@ for TEST_FILE in $TEST_FILES; do
     
     echo -n "[$TOTAL] Testing $TEST_NAME... "
 
-    EXPECTED=$(grep -m1 -E '^// Expect exit code:' "$TEST_FILE" | sed -E 's/.*: *([0-9]+).*/\1/' || true)
-    if [ -z "${EXPECTED}" ]; then
+    # Parse test directives from the test file using awk for cleaner extraction.
+    EXPECTED=$(grep -m1 -E '^// Expect exit code:' "$TEST_FILE" | awk -F': ' '{print $2}' | tr -d ' ' || echo "0")
+    MODE=$(grep -m1 -E '^// Mode:' "$TEST_FILE" | awk -F': ' '{print $2}' | tr -d ' ' || echo "nossa")
+    OPT=$(grep -m1 -E '^// Opt:' "$TEST_FILE" | awk -F': ' '{print $2}' | tr -d ' ' || echo "O0")
+    
+    # Fallback to 0 if EXPECTED is empty after parsing.
+    if [ -z "$EXPECTED" ]; then
         EXPECTED=0
     fi
     
@@ -76,12 +81,14 @@ for TEST_FILE in $TEST_FILES; do
     OUT_FILE="$RESULTS_DIR/${TEST_NAME}.out"
     ERR_FILE="$RESULTS_DIR/${TEST_NAME}.err"
     
+    # Set compiler flags based on parsed directives.
     IR_FLAG=""
-    if grep -q -m1 -E '^// Mode: ssa' "$TEST_FILE"; then
+    if [ "$MODE" = "ssa" ]; then
         IR_FLAG="-dump-ssa"
     fi
+    
     OPT_FLAG=""
-    if grep -q -m1 -E '^// Opt: O1' "$TEST_FILE"; then
+    if [ "$OPT" = "O1" ]; then
         OPT_FLAG="-O1"
     fi
     if ! $COMPILER $OPT_FLAG $IR_FLAG -asm "$TEST_FILE" 2>/dev/null > "$ASM_FILE"; then
