@@ -19,6 +19,264 @@ import compiler;
 
 const SSA_CODEGEN_DEBUG = 0;
 
+var g_live_mask_map;
+
+const SSA_LIVE_RAX = 1;
+const SSA_LIVE_RBX = 2;
+const SSA_LIVE_RCX = 4;
+const SSA_LIVE_RDX = 8;
+const SSA_LIVE_R8  = 16;
+const SSA_LIVE_R9  = 32;
+
+func _ssa_live_all_mask() -> u64 {
+    return SSA_LIVE_RAX | SSA_LIVE_RBX | SSA_LIVE_RCX | SSA_LIVE_RDX | SSA_LIVE_R8 | SSA_LIVE_R9;
+}
+
+func _ssa_phys_mask(phys: u64) -> u64 {
+    if (phys == SSA_PHYS_RAX) { return SSA_LIVE_RAX; }
+    if (phys == SSA_PHYS_RBX) { return SSA_LIVE_RBX; }
+    if (phys == SSA_PHYS_RCX) { return SSA_LIVE_RCX; }
+    if (phys == SSA_PHYS_RDX) { return SSA_LIVE_RDX; }
+    if (phys == SSA_PHYS_R8) { return SSA_LIVE_R8; }
+    if (phys == SSA_PHYS_R9) { return SSA_LIVE_R9; }
+    return 0;
+}
+
+func _ssa_operand_use_mask(opr: u64) -> u64 {
+    if (opr == 0) { return 0; }
+    if (ssa_operand_is_const(opr) != 0) { return 0; }
+    return _ssa_phys_mask(ssa_operand_value(opr));
+}
+
+func _ssa_block_index(blocks: u64, bcount: u64, id: u64) -> u64 {
+    var i: u64 = 0;
+    while (i < bcount) {
+        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+        var b: *SSABlock = (*SSABlock)b_ptr;
+        if (b->id == id) { return i + 1; }
+        i = i + 1;
+    }
+    return 0;
+}
+
+func _ssa_phi_use_mask(block: *SSABlock) -> u64 {
+    var mask: u64 = 0;
+    var phi: *SSAInstruction = block->phi_head;
+    while (phi != 0) {
+        var args: *SSAPhiArg = (*SSAPhiArg)phi->src1;
+        while (args != 0) {
+            mask = mask | _ssa_phys_mask(args->val);
+            args = args->next;
+        }
+        phi = phi->next;
+    }
+    return mask;
+}
+
+func _ssa_call_use_mask(info_ptr: u64) -> u64 {
+    var mask: u64 = 0;
+    var arg_regs: u64 = *(info_ptr + 16);
+    var total_regs: u64 = *(info_ptr + 24);
+    if (total_regs == 0 && arg_regs != 0) { total_regs = vec_len(arg_regs); }
+    var i: u64 = 0;
+    while (i < total_regs) {
+        mask = mask | _ssa_phys_mask(vec_get(arg_regs, i));
+        i = i + 1;
+    }
+    return mask;
+}
+
+func _ssa_call_ptr_use_mask(info_ptr: u64) -> u64 {
+    var mask: u64 = 0;
+    var callee_reg: u64 = *(info_ptr);
+    mask = mask | _ssa_phys_mask(callee_reg);
+    var arg_regs: u64 = *(info_ptr + 8);
+    var total_regs: u64 = *(info_ptr + 16);
+    if (total_regs == 0 && arg_regs != 0) { total_regs = vec_len(arg_regs); }
+    var i: u64 = 0;
+    while (i < total_regs) {
+        mask = mask | _ssa_phys_mask(vec_get(arg_regs, i));
+        i = i + 1;
+    }
+    return mask;
+}
+
+func _ssa_inst_use_def_mask(inst: *SSAInstruction, use_out: u64, def_out: u64) -> u64 {
+    var op: u64 = ssa_inst_get_op(inst);
+    var use_mask: u64 = 0;
+    var def_mask: u64 = 0;
+
+    if (op == SSA_OP_PHI) {
+        var args: *SSAPhiArg = (*SSAPhiArg)inst->src1;
+        while (args != 0) {
+            use_mask = use_mask | _ssa_phys_mask(args->val);
+            args = args->next;
+        }
+        def_mask = _ssa_phys_mask(inst->dest);
+        *(use_out) = use_mask;
+        *(def_out) = def_mask;
+        return 0;
+    }
+
+    if (op == SSA_OP_CALL) {
+        use_mask = _ssa_call_use_mask(ssa_operand_value(inst->src1));
+        if (inst->dest != 0) { def_mask = _ssa_phys_mask(inst->dest); }
+        *(use_out) = use_mask;
+        *(def_out) = def_mask;
+        return 0;
+    }
+
+    if (op == SSA_OP_CALL_PTR) {
+        use_mask = _ssa_call_ptr_use_mask(ssa_operand_value(inst->src1));
+        if (inst->dest != 0) { def_mask = _ssa_phys_mask(inst->dest); }
+        *(use_out) = use_mask;
+        *(def_out) = def_mask;
+        return 0;
+    }
+
+    if (op == SSA_OP_RET) {
+        use_mask = _ssa_operand_use_mask(inst->src1) | _ssa_operand_use_mask(inst->src2);
+        *(use_out) = use_mask;
+        *(def_out) = def_mask;
+        return 0;
+    }
+
+    if (op == SSA_OP_BR) {
+        use_mask = _ssa_operand_use_mask(inst->src1);
+        *(use_out) = use_mask;
+        *(def_out) = def_mask;
+        return 0;
+    }
+
+    if (op == SSA_OP_JMP) {
+        *(use_out) = 0;
+        *(def_out) = 0;
+        return 0;
+    }
+
+    use_mask = _ssa_operand_use_mask(inst->src1) | _ssa_operand_use_mask(inst->src2);
+    if (inst->dest != 0) {
+        def_mask = _ssa_phys_mask(inst->dest);
+    }
+    *(use_out) = use_mask;
+    *(def_out) = def_mask;
+    return 0;
+}
+
+func _ssa_live_map_put(map: u64, inst_ptr: u64, mask: u64) -> u64 {
+    vec_push(map, inst_ptr);
+    vec_push(map, mask);
+    return 0;
+}
+
+func _ssa_live_map_get(map: u64, inst_ptr: u64) -> u64 {
+    if (map == 0) { return 0; }
+    var n: u64 = vec_len(map);
+    var i: u64 = 0;
+    while (i + 1 < n) {
+        if (vec_get(map, i) == inst_ptr) { return vec_get(map, i + 1); }
+        i = i + 2;
+    }
+    return 0;
+}
+
+func _ssa_block_collect_insts(block: *SSABlock) -> u64 {
+    var v: u64 = vec_new(16);
+    var cur: *SSAInstruction = block->inst_head;
+    while (cur != 0) {
+        vec_push(v, (u64)cur);
+        cur = cur->next;
+    }
+    return v;
+}
+
+func _ssa_build_live_map(fn: *SSAFunction) -> u64 {
+    var blocks: u64 = fn->blocks_data;
+    var bcount: u64 = fn->blocks_len;
+
+    var live_in: u64 = vec_new(bcount + 1);
+    var live_out: u64 = vec_new(bcount + 1);
+    var phi_use: u64 = vec_new(bcount + 1);
+
+    var i: u64 = 0;
+    while (i < bcount) {
+        vec_push(live_in, 0);
+        vec_push(live_out, 0);
+        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+        var b: *SSABlock = (*SSABlock)b_ptr;
+        vec_push(phi_use, _ssa_phi_use_mask(b));
+        i = i + 1;
+    }
+
+    var changed: u64 = 1;
+    while (changed != 0) {
+        changed = 0;
+        var bi: i64 = (i64)bcount - 1;
+        while (bi >= 0) {
+            var b_ptr2: u64 = *(*u64)(blocks + (u64)bi * 8);
+            var b2: *SSABlock = (*SSABlock)b_ptr2;
+
+            var out_mask: u64 = 0;
+            var si: u64 = 0;
+            while (si < b2->succs_len) {
+                var succ_ptr: u64 = *(*u64)(b2->succs_data + si * 8);
+                var succ: *SSABlock = (*SSABlock)succ_ptr;
+                var sidx: u64 = _ssa_block_index(blocks, bcount, succ->id);
+                if (sidx != 0) {
+                    out_mask = out_mask | vec_get(live_in, sidx - 1);
+                    out_mask = out_mask | vec_get(phi_use, sidx - 1);
+                }
+                si = si + 1;
+            }
+
+            var live: u64 = out_mask;
+            var insts: u64 = _ssa_block_collect_insts(b2);
+            var idx: i64 = (i64)vec_len(insts) - 1;
+            while (idx >= 0) {
+                var cur: *SSAInstruction = (*SSAInstruction)vec_get(insts, (u64)idx);
+                var use_mask: u64 = 0;
+                var def_mask: u64 = 0;
+                _ssa_inst_use_def_mask(cur, &use_mask, &def_mask);
+                live = (live & (_ssa_live_all_mask() ^ def_mask)) | use_mask;
+                idx = idx - 1;
+            }
+
+            if (vec_get(live_out, (u64)bi) != out_mask) {
+                vec_set(live_out, (u64)bi, out_mask);
+                changed = 1;
+            }
+            if (vec_get(live_in, (u64)bi) != live) {
+                vec_set(live_in, (u64)bi, live);
+                changed = 1;
+            }
+
+            bi = bi - 1;
+        }
+    }
+
+    var map: u64 = vec_new(256);
+    var bi2: u64 = 0;
+    while (bi2 < bcount) {
+        var b_ptr3: u64 = *(*u64)(blocks + bi2 * 8);
+        var b3: *SSABlock = (*SSABlock)b_ptr3;
+        var live2: u64 = vec_get(live_out, bi2);
+        var insts2: u64 = _ssa_block_collect_insts(b3);
+        var idx2: i64 = (i64)vec_len(insts2) - 1;
+        while (idx2 >= 0) {
+            var cur2: *SSAInstruction = (*SSAInstruction)vec_get(insts2, (u64)idx2);
+            _ssa_live_map_put(map, (u64)cur2, live2);
+            var use_mask2: u64 = 0;
+            var def_mask2: u64 = 0;
+            _ssa_inst_use_def_mask(cur2, &use_mask2, &def_mask2);
+            live2 = (live2 & (_ssa_live_all_mask() ^ def_mask2)) | use_mask2;
+            idx2 = idx2 - 1;
+        }
+        bi2 = bi2 + 1;
+    }
+
+    return map;
+}
+
 // ============================================
 // 지원 여부 판정
 // ============================================
@@ -406,7 +664,7 @@ func _ssa_emit_restore_reg(dest: u64, phys: u64) -> u64 {
     return 0;
 }
 
-func _ssa_emit_call(dest: u64, info_ptr: u64) -> u64 {
+func _ssa_emit_call(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
     var name_ptr: u64 = *(info_ptr);
     var name_len: u64 = *(info_ptr + 8);
     var args_vec: u64 = *(info_ptr + 16);
@@ -422,12 +680,17 @@ func _ssa_emit_call(dest: u64, info_ptr: u64) -> u64 {
         keep_rdx = 1;
     }
 
-    if (keep_rax == 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
-    _ssa_emit_push_reg(SSA_PHYS_RBX);
-    _ssa_emit_push_reg(SSA_PHYS_RCX);
-    if (keep_rdx == 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
-    _ssa_emit_push_reg(SSA_PHYS_R8);
-    _ssa_emit_push_reg(SSA_PHYS_R9);
+    var all_mask: u64 = _ssa_live_all_mask();
+    var save_mask: u64 = live_mask & all_mask;
+    if (keep_rax != 0) { save_mask = save_mask & (all_mask ^ SSA_LIVE_RAX); }
+    if (keep_rdx != 0) { save_mask = save_mask & (all_mask ^ SSA_LIVE_RDX); }
+
+    if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
+    if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RBX); }
+    if ((save_mask & SSA_LIVE_RCX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RCX); }
+    if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
+    if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_push_reg(SSA_PHYS_R8); }
+    if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
 
     var i: u64 = 0;
     while (i < nargs) {
@@ -452,16 +715,16 @@ func _ssa_emit_call(dest: u64, info_ptr: u64) -> u64 {
         _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
     }
 
-    _ssa_emit_restore_reg(dest, SSA_PHYS_R9);
-    _ssa_emit_restore_reg(dest, SSA_PHYS_R8);
-    if (keep_rdx == 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RDX); }
-    _ssa_emit_restore_reg(dest, SSA_PHYS_RCX);
-    _ssa_emit_restore_reg(dest, SSA_PHYS_RBX);
-    if (keep_rax == 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RAX); }
+    if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R9); }
+    if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R8); }
+    if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RDX); }
+    if ((save_mask & SSA_LIVE_RCX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RCX); }
+    if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RBX); }
+    if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RAX); }
     return 0;
 }
 
-func _ssa_emit_call_ptr(dest: u64, info_ptr: u64) -> u64 {
+func _ssa_emit_call_ptr(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
     var callee_reg: u64 = *(info_ptr);
     var args_vec: u64 = *(info_ptr + 8);
     var nargs: u64 = *(info_ptr + 16);
@@ -476,12 +739,17 @@ func _ssa_emit_call_ptr(dest: u64, info_ptr: u64) -> u64 {
         keep_rdx = 1;
     }
 
-    if (keep_rax == 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
-    _ssa_emit_push_reg(SSA_PHYS_RBX);
-    _ssa_emit_push_reg(SSA_PHYS_RCX);
-    if (keep_rdx == 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
-    _ssa_emit_push_reg(SSA_PHYS_R8);
-    _ssa_emit_push_reg(SSA_PHYS_R9);
+    var all_mask2: u64 = _ssa_live_all_mask();
+    var save_mask: u64 = live_mask & all_mask2;
+    if (keep_rax != 0) { save_mask = save_mask & (all_mask2 ^ SSA_LIVE_RAX); }
+    if (keep_rdx != 0) { save_mask = save_mask & (all_mask2 ^ SSA_LIVE_RDX); }
+
+    if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
+    if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RBX); }
+    if ((save_mask & SSA_LIVE_RCX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RCX); }
+    if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
+    if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_push_reg(SSA_PHYS_R8); }
+    if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
 
     var i: u64 = 0;
     while (i < nargs) {
@@ -506,12 +774,12 @@ func _ssa_emit_call_ptr(dest: u64, info_ptr: u64) -> u64 {
         _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
     }
 
-    _ssa_emit_restore_reg(dest, SSA_PHYS_R9);
-    _ssa_emit_restore_reg(dest, SSA_PHYS_R8);
-    if (keep_rdx == 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RDX); }
-    _ssa_emit_restore_reg(dest, SSA_PHYS_RCX);
-    _ssa_emit_restore_reg(dest, SSA_PHYS_RBX);
-    if (keep_rax == 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RAX); }
+    if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R9); }
+    if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R8); }
+    if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RDX); }
+    if ((save_mask & SSA_LIVE_RCX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RCX); }
+    if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RBX); }
+    if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RAX); }
     return 0;
 }
 
@@ -973,13 +1241,13 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_CALL) {
         var info_ptr3: u64 = ssa_operand_value(inst->src1);
-        _ssa_emit_call(inst->dest, info_ptr3);
+        _ssa_emit_call(inst->dest, info_ptr3, _ssa_live_map_get(g_live_mask_map, (u64)inst));
         return 0;
     }
 
     if (op == SSA_OP_CALL_PTR) {
         var info_ptr3b: u64 = ssa_operand_value(inst->src1);
-        _ssa_emit_call_ptr(inst->dest, info_ptr3b);
+        _ssa_emit_call_ptr(inst->dest, info_ptr3b, _ssa_live_map_get(g_live_mask_map, (u64)inst));
         return 0;
     }
 
@@ -1068,6 +1336,8 @@ func ssa_codegen_emit_func(fn_ptr: u64, ssa_fn_ptr: u64) -> u64 {
     var g_symtab: u64 = emitter_get_symtab();
     symtab_clear(g_symtab);
 
+    g_live_mask_map = _ssa_build_live_map(ssa_fn);
+
     emit(fn->name_ptr, fn->name_len);
     emit(":\n", 2);
     emit("    push rbp\n", 14);
@@ -1101,6 +1371,8 @@ func ssa_codegen_emit_func(fn_ptr: u64, ssa_fn_ptr: u64) -> u64 {
     emit("    mov rsp, rbp\n", 20);
     emit("    pop rbp\n", 13);
     emit("    ret\n", 9);
+
+    g_live_mask_map = 0;
 
     if (SSA_CODEGEN_DEBUG != 0) {
         println("[DEBUG] ssa_codegen_emit_func: done", 35);
