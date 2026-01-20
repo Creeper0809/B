@@ -133,7 +133,7 @@ func _ssa_opt_collect_uses(fn: *SSAFunction) -> u64 {
         while (cur != 0) {
             var op: u64 = ssa_inst_get_op(cur);
 
-            if (op == SSA_OP_CALL) {
+            if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
                 var info: u64 = ssa_operand_value(cur->src1);
                 var arg_regs: u64 = *(info + 16);
                 var total_regs: u64 = *(info + 24);

@@ -134,6 +134,14 @@ func _ssa_inst_use_def_mask(inst: *SSAInstruction, use_out: u64, def_out: u64) -
         return 0;
     }
 
+    if (op == SSA_OP_CALL_SLICE_STORE) {
+        use_mask = _ssa_call_use_mask(ssa_operand_value(inst->src1));
+        use_mask = use_mask | _ssa_operand_use_mask(inst->src2);
+        *(use_out) = use_mask;
+        *(def_out) = def_mask;
+        return 0;
+    }
+
     if (op == SSA_OP_RET) {
         use_mask = _ssa_operand_use_mask(inst->src1) | _ssa_operand_use_mask(inst->src2);
         *(use_out) = use_mask;
@@ -189,6 +197,69 @@ func _ssa_emit_asm(text_vec: u64) -> u64 {
         i = i + 1;
     }
     emit_nl();
+    return 0;
+}
+
+func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) -> u64 {
+    var args_vec: u64 = *(info_ptr + 16);
+    var nargs: u64 = *(info_ptr + 24);
+    var ret_type: u64 = *(info_ptr + 32);
+    var ret_ptr_depth: u64 = *(info_ptr + 40);
+    if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+
+    var keep_rax: u64 = 0;
+    var keep_rdx: u64 = 0;
+    if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
+        keep_rax = 1;
+        keep_rdx = 1;
+    }
+
+    var all_mask: u64 = _ssa_live_all_mask();
+    var save_mask: u64 = live_mask & all_mask;
+    if (keep_rax != 0) { save_mask = save_mask & (all_mask ^ SSA_LIVE_RAX); }
+    if (keep_rdx != 0) { save_mask = save_mask & (all_mask ^ SSA_LIVE_RDX); }
+
+    if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
+    if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RBX); }
+    if ((save_mask & SSA_LIVE_RCX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RCX); }
+    if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
+    if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_push_reg(SSA_PHYS_R8); }
+    if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
+
+    _ssa_emit_push_reg(ssa_operand_value(addr_opr));
+
+    var i: u64 = 0;
+    while (i < nargs) {
+        var reg: u64 = vec_get(args_vec, i);
+        emit("    push ", 9);
+        _ssa_emit_reg_name(reg);
+        emit_nl();
+        i = i + 1;
+    }
+
+    emit("    call ", 9);
+    var name_ptr: u64 = *(info_ptr);
+    var name_len: u64 = *(info_ptr + 8);
+    emit(name_ptr, name_len);
+    emit_nl();
+
+    if (nargs > 0) {
+        emit("    add rsp, ", 13);
+        emit_u64(nargs * 8);
+        emit_nl();
+    }
+
+    emit("    mov rbx, [rsp]\n", 21);
+    emit("    mov [rbx], rax\n", 20);
+    emit("    mov [rbx+8], rdx\n", 24);
+    emit("    add rsp, 8\n", 17);
+
+    if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R9); }
+    if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R8); }
+    if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RDX); }
+    if ((save_mask & SSA_LIVE_RCX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RCX); }
+    if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RBX); }
+    if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RAX); }
     return 0;
 }
 
@@ -570,7 +641,7 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         var vd: *AstVarDecl = (*AstVarDecl)node;
         if (vd->init_expr == 0) { return 1; }
         if (vd->type_kind == TYPE_SLICE && vd->ptr_depth == 0) {
-            if (ast_kind(vd->init_expr) == AST_CALL) { return 0; }
+            if (ast_kind(vd->init_expr) == AST_CALL || ast_kind(vd->init_expr) == AST_CALL_PTR || ast_kind(vd->init_expr) == AST_METHOD_CALL) { return 1; }
         }
         if (ast_kind(vd->init_expr) == AST_STRUCT_LITERAL) {
             return _ssa_codegen_struct_literal_supported(vd->init_expr, globals);
@@ -588,7 +659,6 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         var tk: u64 = ast_kind(asn->target);
         if (tk == AST_IDENT) {
             var idn2: *AstIdent = (*AstIdent)asn->target;
-            if (_ssa_codegen_is_global(globals, idn2->name_ptr, idn2->name_len) != 0) { return 0; }
             if (ast_kind(asn->value) == AST_STRUCT_LITERAL) {
                 return _ssa_codegen_struct_literal_supported(asn->value, globals);
             }
@@ -647,6 +717,40 @@ func _ssa_emit_reg_name(phys: u64) -> u64 {
     if (phys == SSA_PHYS_R9) { emit("r9", 2); return 0; }
     emit("rax", 3);
     return 0;
+}
+
+func _ssa_emit_reg_name_size(phys: u64, size: u64) -> u64 {
+    if (size == 1) {
+        if (phys == SSA_PHYS_RAX) { emit("al", 2); return 0; }
+        if (phys == SSA_PHYS_RBX) { emit("bl", 2); return 0; }
+        if (phys == SSA_PHYS_RCX) { emit("cl", 2); return 0; }
+        if (phys == SSA_PHYS_RDX) { emit("dl", 2); return 0; }
+        if (phys == SSA_PHYS_R8) { emit("r8b", 3); return 0; }
+        if (phys == SSA_PHYS_R9) { emit("r9b", 3); return 0; }
+        emit("al", 2);
+        return 0;
+    }
+    if (size == 2) {
+        if (phys == SSA_PHYS_RAX) { emit("ax", 2); return 0; }
+        if (phys == SSA_PHYS_RBX) { emit("bx", 2); return 0; }
+        if (phys == SSA_PHYS_RCX) { emit("cx", 2); return 0; }
+        if (phys == SSA_PHYS_RDX) { emit("dx", 2); return 0; }
+        if (phys == SSA_PHYS_R8) { emit("r8w", 3); return 0; }
+        if (phys == SSA_PHYS_R9) { emit("r9w", 3); return 0; }
+        emit("ax", 2);
+        return 0;
+    }
+    if (size == 4) {
+        if (phys == SSA_PHYS_RAX) { emit("eax", 3); return 0; }
+        if (phys == SSA_PHYS_RBX) { emit("ebx", 3); return 0; }
+        if (phys == SSA_PHYS_RCX) { emit("ecx", 3); return 0; }
+        if (phys == SSA_PHYS_RDX) { emit("edx", 3); return 0; }
+        if (phys == SSA_PHYS_R8) { emit("r8d", 3); return 0; }
+        if (phys == SSA_PHYS_R9) { emit("r9d", 3); return 0; }
+        emit("eax", 3);
+        return 0;
+    }
+    return _ssa_emit_reg_name(phys);
 }
 
 func _ssa_emit_imm(val: u64) -> u64 {
@@ -910,7 +1014,18 @@ func _ssa_emit_store(op: u64, addr_opr: u64, val_opr: u64) -> u64 {
     }
     _ssa_emit_reg_name(ssa_operand_value(addr_opr));
     emit("], ", 3);
-    _ssa_emit_opr(val_opr);
+    if (op == SSA_OP_STORE8 || op == SSA_OP_STORE16 || op == SSA_OP_STORE32) {
+        if (ssa_operand_is_const(val_opr) != 0) {
+            _ssa_emit_opr(val_opr);
+        } else {
+            var size: u64 = 4;
+            if (op == SSA_OP_STORE8) { size = 1; }
+            else if (op == SSA_OP_STORE16) { size = 2; }
+            _ssa_emit_reg_name_size(ssa_operand_value(val_opr), size);
+        }
+    } else {
+        _ssa_emit_opr(val_opr);
+    }
     emit_nl();
     return 0;
 }
@@ -1279,6 +1394,12 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
     if (op == SSA_OP_CALL_PTR) {
         var info_ptr3b: u64 = ssa_operand_value(inst->src1);
         _ssa_emit_call_ptr(inst->dest, info_ptr3b, _ssa_live_map_get(g_live_mask_map, (u64)inst));
+        return 0;
+    }
+
+    if (op == SSA_OP_CALL_SLICE_STORE) {
+        var info_ptr4: u64 = ssa_operand_value(inst->src1);
+        _ssa_emit_call_slice_store(info_ptr4, inst->src2, _ssa_live_map_get(g_live_mask_map, (u64)inst));
         return 0;
     }
 

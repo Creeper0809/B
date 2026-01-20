@@ -132,7 +132,7 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
             if (op != SSA_OP_BR && op != SSA_OP_JMP) {
                 if (cur->dest > max_id) { max_id = cur->dest; }
             }
-            if (op == SSA_OP_CALL) {
+            if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
                 var info_ptr: u64 = ssa_operand_value(cur->src1);
                 var args_vec: u64 = *(info_ptr + 16);
                 var nargs: u64 = *(info_ptr + 24);
@@ -205,7 +205,7 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
                 continue;
             }
 
-            if (op == SSA_OP_CALL) {
+            if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
                 var info_ptr2: u64 = ssa_operand_value(cur->src1);
                 var args_vec2: u64 = *(info_ptr2 + 16);
                 var nargs2: u64 = *(info_ptr2 + 24);
@@ -386,7 +386,7 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
                 }
             }
 
-            if (op == SSA_OP_CALL) {
+            if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
                 var info_ptr: u64 = ssa_operand_value(inst->src1);
                 var args_vec: u64 = *(info_ptr + 16);
                 var nargs: u64 = *(info_ptr + 24);
@@ -432,7 +432,7 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
             }
 
             if (op != SSA_OP_NOP && op != SSA_OP_PHI) {
-                if (op == SSA_OP_CALL) {
+                if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
                     var info_ptr: u64 = ssa_operand_value(inst->src1);
                     var args_vec: u64 = *(info_ptr + 16);
                     var nargs: u64 = *(info_ptr + 24);
@@ -647,7 +647,7 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
                     if (pd != 0) { cur->dest = pd; }
                 }
             }
-            if (op2 == SSA_OP_CALL) {
+            if (op2 == SSA_OP_CALL || op2 == SSA_OP_CALL_SLICE_STORE) {
                 var info_ptr: u64 = ssa_operand_value(cur->src1);
                 var args_vec: u64 = *(info_ptr + 16);
                 var nargs: u64 = *(info_ptr + 24);
