@@ -666,6 +666,9 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         }
         if (tk == AST_DEREF || tk == AST_DEREF8 || tk == AST_INDEX || tk == AST_MEMBER_ACCESS) {
             if (_ssa_codegen_expr_supported(asn->target, globals) == 0) { return 0; }
+            if (ast_kind(asn->value) == AST_STRUCT_LITERAL) {
+                return _ssa_codegen_struct_literal_supported(asn->value, globals);
+            }
             return _ssa_codegen_expr_supported(asn->value, globals);
         }
         return 0;

@@ -542,6 +542,32 @@ func resolve_name(name_ptr: u64, name_len: u64) -> u64 {
     return 0;
 }
 
+// ============================================
+// Const Lookup (SSA/Codegen Shared)
+// ============================================
+
+func compiler_find_const(name_ptr: u64, name_len: u64) -> u64 {
+    var result: u64 = heap_alloc(16);
+    var res: *ConstResult = (*ConstResult)result;
+    res->found = 0;
+    res->value = 0;
+
+    if (g_all_consts == 0) { return result; }
+    var n: u64 = vec_len(g_all_consts);
+    var i: u64 = 0;
+    while (i < n) {
+        var c_ptr: u64 = vec_get(g_all_consts, i);
+        var c: *AstConstDecl = (*AstConstDecl)c_ptr;
+        if (str_eq(c->name_ptr, c->name_len, name_ptr, name_len)) {
+            res->found = 1;
+            res->value = c->value;
+            return result;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
 func import_all_from_module(importer_ptr: u64, importer_len: u64, module_ptr: u64, module_len: u64) -> u64 {
     var exports: u64 = module_exports_get(module_ptr, module_len);
     if (exports == 0) { return 0; }

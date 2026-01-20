@@ -91,6 +91,8 @@
 - [x] SSA 인라인 ASM 지원(SSA_OP_ASM) + 테스트 58_ssa_inline_asm_smoke
 - [x] SSA break/continue 지원(루프/스위치) + 기존 SSA 테스트 유지
 - [x] SSA regalloc CALL 인자 use/def 누락 버그 수정 + 테스트 60_ssa_method_call_ptr_liveness
+- [x] SSA const 선언/조회 경로 보강 + 테스트 61_ssa_switch_const_default
+- [x] SSA 복합 LHS 대입(구조체/슬라이스) 정리 + 테스트 62/63
 - [x] SSA 파괴(Phi 제거 → COPY 삽입) 추가 + 테스트(123_ssa_destroy_basic) 추가
 - [x] SSA 파괴 임계 엣지 분리 + 테스트(124_ssa_destroy_critical) 추가
 - [x] SSA 그래프 컬러링 레지스터 할당 스캐폴드 + 테스트(125_ssa_regalloc_basic) 추가

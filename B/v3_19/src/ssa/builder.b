@@ -30,6 +30,7 @@ struct BuilderCtx {
     break_stack: u64;    // vec of *SSABlock
     continue_stack: u64; // vec of *SSABlock
     var_map: u64;         // hashmap: name -> var_id
+    const_map: u64;       // hashmap: name -> const value
     symtab: u64;           // symtab for type/offset lookup
     next_reg: u64;
     next_var_id: u64;
@@ -38,8 +39,8 @@ struct BuilderCtx {
 func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
     push_trace("builder_ctx_new", "ssa_builder.b", __LINE__);
     pop_trace();
-    // BuilderCtx = 9 * 8 bytes = 72 bytes
-    var p: u64 = heap_alloc(72);
+    // BuilderCtx = 10 * 8 bytes = 80 bytes
+    var p: u64 = heap_alloc(80);
     var ctx: *BuilderCtx = (*BuilderCtx)p;
     ctx->ssa_ctx = ssa_ctx;
     ctx->cur_func = 0;
@@ -47,6 +48,7 @@ func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
     ctx->break_stack = vec_new(8);
     ctx->continue_stack = vec_new(8);
     ctx->var_map = 0;
+    ctx->const_map = 0;
     ctx->symtab = 0;
     ctx->next_reg = 1;
     ctx->next_var_id = 1;
@@ -88,6 +90,7 @@ func builder_reset_func(ctx: *BuilderCtx) -> u64 {
     push_trace("builder_reset_func", "ssa_builder.b", __LINE__);
     pop_trace();
     ctx->var_map = hashmap_new(16);
+    ctx->const_map = 0;
     ctx->symtab = symtab_new();
     ctx->next_reg = 1;
     ctx->next_var_id = 1;
@@ -242,6 +245,19 @@ func builder_get_var_id(ctx: *BuilderCtx, name_ptr: u64, name_len: u64) -> u64 {
     var new_id: u64 = builder_new_var_id(ctx);
     hashmap_put(ctx->var_map, name_ptr, name_len, new_id);
     return new_id;
+}
+
+func builder_set_const(ctx: *BuilderCtx, name_ptr: u64, name_len: u64, value: u64) -> u64 {
+    if (ctx->const_map == 0) {
+        ctx->const_map = hashmap_new(16);
+    }
+    hashmap_put(ctx->const_map, name_ptr, name_len, value + 1);
+    return 0;
+}
+
+func builder_get_const(ctx: *BuilderCtx, name_ptr: u64, name_len: u64) -> u64 {
+    if (ctx->const_map == 0) { return 0; }
+    return hashmap_get(ctx->const_map, name_ptr, name_len);
 }
 
 func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
@@ -482,6 +498,32 @@ func builder_store_slice_regs(ctx: *BuilderCtx, base_addr: u64, slice_info: u64)
     var add_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr2, ssa_operand_reg(base_addr), ssa_operand_reg(off_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr);
     builder_store_by_size(ctx, addr2, len_reg, 8);
+    return 0;
+}
+
+func builder_assign_struct_literal_to_addr(ctx: *BuilderCtx, lit: *AstStructLiteral, base_addr: u64) -> u64 {
+    if (lit == 0 || base_addr == 0) { return 0; }
+    builder_struct_literal_init(ctx, lit->struct_def, lit->values_vec, base_addr);
+    return 0;
+}
+
+func builder_assign_slice_to_addr(ctx: *BuilderCtx, value: u64, base_addr: u64) -> u64 {
+    if (base_addr == 0) { return 0; }
+    var value_kind: u64 = ast_kind(value);
+    if (value_kind == AST_CALL) {
+        builder_emit_call_slice_store(ctx, (*AstCall)value, base_addr);
+        return 0;
+    }
+    if (value_kind == AST_METHOD_CALL) {
+        builder_emit_method_call_slice_store(ctx, (*AstMethodCall)value, base_addr);
+        return 0;
+    }
+    if (value_kind == AST_CALL_PTR) {
+        builder_emit_call_ptr_slice_store(ctx, (*AstCallPtr)value, base_addr);
+        return 0;
+    }
+    var slice_info: u64 = builder_slice_regs(ctx, value);
+    builder_store_slice_regs(ctx, base_addr, slice_info);
     return 0;
 }
 
@@ -1077,6 +1119,22 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
             ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
             return reg_id;
         }
+        var const_encoded: u64 = builder_get_const(ctx, idn->name_ptr, idn->name_len);
+        if (const_encoded != 0) {
+            return build_const(ctx, const_encoded - 1);
+        }
+        var resolved_ptr: u64 = idn->name_ptr;
+        var resolved_len: u64 = idn->name_len;
+        var resolved: u64 = resolve_name(idn->name_ptr, idn->name_len);
+        if (resolved != 0) {
+            resolved_ptr = *(resolved);
+            resolved_len = *(resolved + 8);
+        }
+        var c_result: u64 = compiler_find_const(resolved_ptr, resolved_len);
+        var c: *ConstResult = (*ConstResult)c_result;
+        if (c->found != 0) {
+            return build_const(ctx, c->value);
+        }
         var addr_reg: u64 = builder_lvalue_addr(ctx, node);
         var size: u64 = builder_type_size_from_expr(ctx, node);
         return builder_load_by_size(ctx, addr_reg, size);
@@ -1580,82 +1638,60 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
 
     if (kind == AST_CONST_DECL) {
         var cd: *AstConstDecl = (*AstConstDecl)node;
-        var var_id2: u64 = builder_get_var_id(ctx, cd->name_ptr, cd->name_len);
-        var val_reg2: u64 = build_const(ctx, cd->value);
-        var st_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id2), ssa_operand_reg(val_reg2));
-        ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr2);
+        builder_set_const(ctx, cd->name_ptr, cd->name_len, cd->value);
         return 0;
     }
 
     if (kind == AST_ASSIGN) {
         var asn: *AstAssign = (*AstAssign)node;
         var target_kind: u64 = ast_kind(asn->target);
+        var target_addr: u64 = 0;
+        var target_offset: u64 = 0;
+
         if (target_kind == AST_IDENT) {
             var idn: *AstIdent = (*AstIdent)asn->target;
-            var offset2: u64 = symtab_find(ctx->symtab, idn->name_ptr, idn->name_len);
-            var value_kind: u64 = ast_kind(asn->value);
-            if (value_kind == AST_STRUCT_LITERAL) {
-                var base_addr2: u64 = 0;
-                if (offset2 != 0) {
-                    base_addr2 = builder_new_lea_local(ctx, offset2);
-                } else {
-                    base_addr2 = builder_lvalue_addr(ctx, asn->target);
-                }
-                var lit2: *AstStructLiteral = (*AstStructLiteral)asn->value;
-                builder_struct_literal_init(ctx, lit2->struct_def, lit2->values_vec, base_addr2);
-                return 0;
+            target_offset = symtab_find(ctx->symtab, idn->name_ptr, idn->name_len);
+            if (target_offset != 0) {
+                target_addr = builder_new_lea_local(ctx, target_offset);
+            } else {
+                target_addr = builder_lvalue_addr(ctx, asn->target);
             }
-            var tgt_type: u64 = symtab_get_type(ctx->symtab, idn->name_ptr, idn->name_len);
-            if (tgt_type != 0) {
-                var ti: *TypeInfo = (*TypeInfo)tgt_type;
-                if (ti->type_kind == TYPE_SLICE && ti->ptr_depth == 0) {
-                    var base_addr3: u64 = 0;
-                    if (offset2 != 0) {
-                        base_addr3 = builder_new_lea_local(ctx, offset2);
-                    } else {
-                        base_addr3 = builder_lvalue_addr(ctx, asn->target);
-                    }
-                    var value_kind2: u64 = ast_kind(asn->value);
-                    if (value_kind2 == AST_CALL) {
-                        builder_emit_call_slice_store(ctx, (*AstCall)asn->value, base_addr3);
-                        return 0;
-                    }
-                    if (value_kind2 == AST_METHOD_CALL) {
-                        builder_emit_method_call_slice_store(ctx, (*AstMethodCall)asn->value, base_addr3);
-                        return 0;
-                    }
-                    if (value_kind2 == AST_CALL_PTR) {
-                        builder_emit_call_ptr_slice_store(ctx, (*AstCallPtr)asn->value, base_addr3);
-                        return 0;
-                    }
-                    var slice_info2: u64 = builder_slice_regs(ctx, asn->value);
-                    builder_store_slice_regs(ctx, base_addr3, slice_info2);
-                    return 0;
-                }
-            }
-            var val_reg3: u64 = build_expr(ctx, asn->value);
-            if (offset2 != 0) {
-                var var_id3: u64 = builder_get_var_id(ctx, idn->name_ptr, idn->name_len);
-                var st_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id3), ssa_operand_reg(val_reg3));
-                ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr3);
-                return 0;
-            }
-            var addr_reg2: u64 = builder_lvalue_addr(ctx, asn->target);
-            var size4: u64 = builder_type_size_from_expr(ctx, asn->target);
-            builder_store_by_size(ctx, addr_reg2, val_reg3, size4);
+        } else if (target_kind == AST_DEREF || target_kind == AST_DEREF8 || target_kind == AST_INDEX || target_kind == AST_MEMBER_ACCESS) {
+            target_addr = builder_lvalue_addr(ctx, asn->target);
+        } else {
             return 0;
         }
-        if (target_kind == AST_DEREF || target_kind == AST_DEREF8 || target_kind == AST_INDEX || target_kind == AST_MEMBER_ACCESS) {
-            var addr_reg: u64 = builder_lvalue_addr(ctx, asn->target);
-            var val_reg4: u64 = build_expr(ctx, asn->value);
-            var size4: u64 = 8;
-            if (target_kind == AST_DEREF8) {
-                size4 = 1;
-            } else {
-                size4 = builder_type_size_from_expr(ctx, asn->target);
-            }
-            builder_store_by_size(ctx, addr_reg, val_reg4, size4);
+
+        if (ast_kind(asn->value) == AST_STRUCT_LITERAL) {
+            builder_assign_struct_literal_to_addr(ctx, (*AstStructLiteral)asn->value, target_addr);
+            return 0;
         }
+
+        var tgt_ti_ptr: u64 = get_expr_type_with_symtab(asn->target, ctx->symtab);
+        if (tgt_ti_ptr != 0) {
+            var ti: *TypeInfo = (*TypeInfo)tgt_ti_ptr;
+            if (ti->type_kind == TYPE_SLICE && ti->ptr_depth == 0) {
+                builder_assign_slice_to_addr(ctx, asn->value, target_addr);
+                return 0;
+            }
+        }
+
+        var val_reg3: u64 = build_expr(ctx, asn->value);
+        if (target_kind == AST_IDENT && target_offset != 0) {
+            var idn2: *AstIdent = (*AstIdent)asn->target;
+            var var_id3: u64 = builder_get_var_id(ctx, idn2->name_ptr, idn2->name_len);
+            var st_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id3), ssa_operand_reg(val_reg3));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr3);
+            return 0;
+        }
+
+        var size4: u64 = 8;
+        if (target_kind == AST_DEREF8) {
+            size4 = 1;
+        } else {
+            size4 = builder_type_size_from_expr(ctx, asn->target);
+        }
+        builder_store_by_size(ctx, target_addr, val_reg3, size4);
         return 0;
     }
 
