@@ -1,4 +1,4 @@
-import std.io;
+import print_u64 from std.io;
 
 func main() -> i64{
     var a : u64 = 10;

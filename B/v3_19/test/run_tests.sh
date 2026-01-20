@@ -80,7 +80,11 @@ for TEST_FILE in $TEST_FILES; do
     if grep -q -m1 -E '^// Mode: ssa' "$TEST_FILE"; then
         IR_FLAG="-ssa"
     fi
-    if ! $COMPILER $IR_FLAG -asm "$TEST_FILE" 2>/dev/null > "$ASM_FILE"; then
+    OPT_FLAG=""
+    if grep -q -m1 -E '^// Opt: O1' "$TEST_FILE"; then
+        OPT_FLAG="-O1"
+    fi
+    if ! $COMPILER $OPT_FLAG $IR_FLAG -asm "$TEST_FILE" 2>/dev/null > "$ASM_FILE"; then
         echo -e "${RED}FAIL (compile)${NC}"
         echo "Compilation failed" > "$ERR_FILE"
         FAILED=$((FAILED + 1))

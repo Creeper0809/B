@@ -82,6 +82,9 @@
 - [x] SSA mem2reg Phi 삽입 + Rename 스택 구현 + 테스트(120_ssa_mem2reg_basic) 추가
 - [x] SSA 단락 평가(AND/OR) 변환 + 테스트(121_ssa_short_circuit) 추가
 - [x] -O1 플래그 파싱 + SSA O1 최적화 패스(상수 폴딩/NOP 제거) 추가 + 테스트(122_ssa_opt_o1_fold) 추가
+- [x] SSA O1 상수 전파(레지스터/로컬) + 테스트 54_o1_const_prop
+- [x] IR 덤프(-ir)에서도 O1 최적화 적용
+- [x] SSA O1 DCE(순수 연산 제거) + 테스트 55_o1_dce_basic
 - [x] SSA 파괴(Phi 제거 → COPY 삽입) 추가 + 테스트(123_ssa_destroy_basic) 추가
 - [x] SSA 파괴 임계 엣지 분리 + 테스트(124_ssa_destroy_critical) 추가
 - [x] SSA 그래프 컬러링 레지스터 할당 스캐폴드 + 테스트(125_ssa_regalloc_basic) 추가

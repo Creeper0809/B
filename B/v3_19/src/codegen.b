@@ -262,12 +262,19 @@ func cg_program_with_sigs_ir(prog: u64, sigs: u64) -> u64 {
     typeinfo_set_funcs(sigs);
 
     var ir_mode: u64 = opt_get_ir_mode();
+    var opt_level: u64 = opt_get_level();
     if (ir_mode == IR_3ADDR) {
         var ssa_ctx_ptr3: u64 = ssa_builder_build_program(prog);
+        if (opt_level >= 1) {
+            ssa_opt_o1_run((*SSAContext)ssa_ctx_ptr3);
+        }
         ssa_dump_ctx((*SSAContext)ssa_ctx_ptr3, 0);
     } else {
         var ssa_ctx_ptr: u64 = ssa_builder_build_program(prog);
         ssa_mem2reg_run((*SSAContext)ssa_ctx_ptr);
+        if (opt_level >= 1) {
+            ssa_opt_o1_run((*SSAContext)ssa_ctx_ptr);
+        }
         ssa_dump_ctx((*SSAContext)ssa_ctx_ptr, 1);
     }
 
