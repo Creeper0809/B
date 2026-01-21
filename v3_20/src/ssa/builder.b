@@ -576,6 +576,8 @@ func builder_append_slice_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 
 
 func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
     var arg_kind: u64 = ast_kind(arg);
+
+    // Handle AST_CALL with struct return FIRST
     if (arg_kind == AST_CALL) {
         var call: *AstCall = (*AstCall)arg;
         var fn_ptr: u64 = compiler_get_func(call->name_ptr, call->name_len);
@@ -597,10 +599,14 @@ func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
                     vec_push(arg_regs, hi_reg);
                     return 0;
                 }
+                emit("[ERROR] SSA does not support struct return size > 16 in call args\n", 68);
+                panic("SSA build error");
                 return 0;
             }
+            // Non-struct return from call - fall through to generic handling
         }
     }
+
     var ti_ptr: u64 = get_expr_type_with_symtab(arg, ctx->symtab);
     if (ti_ptr != 0) {
         var ti: *TypeInfo = (*TypeInfo)ti_ptr;
@@ -1536,31 +1542,92 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
     if (kind == AST_MEMBER_ACCESS) {
         var m: *AstMemberAccess = (*AstMemberAccess)node;
         var obj: u64 = m->object;
+        var obj_kind: u64 = ast_kind(obj);
+
+        // Handle struct return from call directly
+        if (obj_kind == AST_CALL) {
+            var call: *AstCall = (*AstCall)obj;
+            var fn_ptr: u64 = compiler_get_func(call->name_ptr, call->name_len);
+            if (fn_ptr != 0) {
+                var fn: *AstFunc = (*AstFunc)fn_ptr;
+                if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
+                    var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+                    if (struct_size <= 16) {
+                        var struct_def: u64 = get_struct_def(fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+                        if (struct_def != 0) {
+                            var field_offset: u64 = get_field_offset(struct_def, m->member_ptr, m->member_len);
+                            var field_size: u64 = builder_type_size_from_expr(ctx, node);
+
+                            if (field_offset + field_size <= 8) {
+                                var lo_reg: u64 = builder_new_reg(ctx);
+                                builder_emit_call(ctx, call, lo_reg, 0);
+                                if (field_offset == 0) { return lo_reg; }
+                                var shift_amt: u64 = field_offset * 8;
+                                return builder_shift_right(ctx, lo_reg, shift_amt);
+                            } else if (field_offset >= 8 && field_offset + field_size <= 16) {
+                                var lo_reg2: u64 = builder_new_reg(ctx);
+                                var hi_reg: u64 = builder_new_reg(ctx);
+                                builder_emit_call(ctx, call, lo_reg2, hi_reg);
+                                if (field_offset == 8) { return hi_reg; }
+                                var shift_amt2: u64 = (field_offset - 8) * 8;
+                                return builder_shift_right(ctx, hi_reg, shift_amt2);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         var ti_ptr: u64 = get_expr_type_with_symtab(obj, ctx->symtab);
         if (ti_ptr != 0) {
             var ti: *TypeInfo = (*TypeInfo)ti_ptr;
-            var obj_kind: u64 = ast_kind(obj);
             if (ti->ptr_depth == 0 && ti->type_kind == TYPE_STRUCT) {
                 var struct_def: u64 = ti->struct_def;
                 if (struct_def == 0 && ti->struct_name_ptr != 0) {
                     struct_def = get_struct_def(ti->struct_name_ptr, ti->struct_name_len);
                 }
                 if (struct_def != 0 && (obj_kind == AST_CALL || obj_kind == AST_METHOD_CALL || obj_kind == AST_CALL_PTR)) {
+
                     var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, ti->struct_name_ptr, ti->struct_name_len);
                     if (struct_size <= 16) {
                         var field_offset: u64 = get_field_offset(struct_def, m->member_ptr, m->member_len);
-                        var lo_reg: u64 = builder_new_reg(ctx);
-                        var hi_reg: u64 = 0;
-                        if (struct_size > 8) { hi_reg = builder_new_reg(ctx); }
-                        if (obj_kind == AST_CALL) {
-                            builder_emit_call(ctx, (*AstCall)obj, lo_reg, hi_reg);
-                        } else if (obj_kind == AST_METHOD_CALL) {
-                            builder_emit_method_call(ctx, (*AstMethodCall)obj, lo_reg, hi_reg);
-                        } else {
-                            builder_emit_call_ptr(ctx, (*AstCallPtr)obj, lo_reg, hi_reg);
+                        var field_size: u64 = builder_type_size_from_expr(ctx, node);
+
+                        // Only handle simple cases: field fully within lo or hi register
+                        // Field spans both registers → fallback to memory
+                        if (field_offset + field_size <= 8) {
+                            // Field in lo register (rax)
+                            var lo_reg: u64 = builder_new_reg(ctx);
+                            if (obj_kind == AST_CALL) {
+                                builder_emit_call(ctx, (*AstCall)obj, lo_reg, 0);
+                            } else if (obj_kind == AST_METHOD_CALL) {
+                                builder_emit_method_call(ctx, (*AstMethodCall)obj, lo_reg, 0);
+                            } else {
+                                builder_emit_call_ptr(ctx, (*AstCallPtr)obj, lo_reg, 0);
+                            }
+                            if (field_offset == 0) { return lo_reg; }
+                            // Need to shift/extract if field not at offset 0
+                            var shift_amt: u64 = field_offset * 8;
+                            var shifted: u64 = builder_shift_right(ctx, lo_reg, shift_amt);
+                            return shifted;
+                        } else if (field_offset >= 8 && field_offset + field_size <= 16) {
+                            // Field in hi register (rdx)
+                            var lo_reg: u64 = builder_new_reg(ctx);
+                            var hi_reg: u64 = builder_new_reg(ctx);
+                            if (obj_kind == AST_CALL) {
+                                builder_emit_call(ctx, (*AstCall)obj, lo_reg, hi_reg);
+                            } else if (obj_kind == AST_METHOD_CALL) {
+                                builder_emit_method_call(ctx, (*AstMethodCall)obj, lo_reg, hi_reg);
+                            } else {
+                                builder_emit_call_ptr(ctx, (*AstCallPtr)obj, lo_reg, hi_reg);
+                            }
+                            if (field_offset == 8) { return hi_reg; }
+                            // Need to shift/extract if field not at offset 8
+                            var shift_amt2: u64 = (field_offset - 8) * 8;
+                            var shifted2: u64 = builder_shift_right(ctx, hi_reg, shift_amt2);
+                            return shifted2;
                         }
-                        if (field_offset < 8 || hi_reg == 0) { return lo_reg; }
-                        return hi_reg;
+                        // Field spans both registers - fallback to memory-based access
                     }
                 }
             }

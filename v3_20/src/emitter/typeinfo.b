@@ -324,6 +324,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var fn_ptr: u64 = vec_get(g_funcs_vec, i);
                 var fn: *AstFunc = (*AstFunc)fn_ptr;
                 if (str_eq(fn->name_ptr, fn->name_len, resolved_ptr, resolved_len)) {
+
                     if (fn->ret_type == TYPE_STRUCT) {
                         var struct_def: u64 = get_struct_def(fn->ret_struct_name_ptr, fn->ret_struct_name_len);
                         var result_struct: u64 = typeinfo_make_struct(fn->ret_ptr_depth, fn->ret_struct_name_ptr, fn->ret_struct_name_len, struct_def);

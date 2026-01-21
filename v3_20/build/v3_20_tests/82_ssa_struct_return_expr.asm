@@ -30,10 +30,14 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_1_1:
-    mov rax, [rax]
-    mov rbx, [rax]
+    call _82_ssa_struct_return_expr__get_vec
+    push rax
+    call _82_ssa_struct_return_expr__get_vec
+    mov rbx, rax
+    mov rcx, rdx
+    pop rax
     mov rax, rax
-    add rax, rbx
+    add rax, rcx
     mov rsp, rbp
     pop rbp
     ret
