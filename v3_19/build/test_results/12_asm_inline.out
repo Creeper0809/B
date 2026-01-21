@@ -1,4 +1,0 @@
-Testing inline assembly:
-get_value_asm() = 42
-add_asm(10, 32) = 42
-Results match!

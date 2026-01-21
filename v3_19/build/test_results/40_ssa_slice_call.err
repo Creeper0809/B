@@ -1,4 +1,0 @@
-build/v3_19_tests/40_ssa_slice_call.asm:18: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/40_ssa_slice_call.asm:18: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/40_ssa_slice_call.asm:37: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/40_ssa_slice_call.asm:37: warning: byte data exceeds bounds [-w+number-overflow]
