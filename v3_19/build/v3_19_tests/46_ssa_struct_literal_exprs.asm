@@ -19,7 +19,7 @@ main:
     mov rax, [rbp+24]
     mov rax, 3
     mov rbx, 4
-    lea rcx, [rbp+9223372036854775776]
+    lea rcx, [rbp-32]
     mov rdx, 2
     mov rax, rax
     imul rax, rdx
@@ -30,9 +30,9 @@ main:
     mov rbx, rbx
     add rbx, rcx
     mov [rax], rbx
-    lea rax, [rbp+9223372036854775776]
+    lea rax, [rbp-32]
     mov rax, [rax]
-    lea rbx, [rbp+9223372036854775776]
+    lea rbx, [rbp-32]
     mov rcx, 8
     mov rbx, rbx
     add rbx, rcx

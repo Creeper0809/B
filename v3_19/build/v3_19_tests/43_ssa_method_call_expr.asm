@@ -55,17 +55,15 @@ main:
     mov rax, [rbp+24]
     mov rax, 20
     mov rbx, 10
-    lea rcx, [rbp+9223372036854775792]
+    lea rcx, [rbp-16]
     push rax
     push rbx
     push rcx
     call _43_ssa_method_call_expr__Pair_init
     add rsp, 24
-    lea rax, [rbp+9223372036854775792]
-    push rax
+    lea rax, [rbp-16]
     push rax
     call _43_ssa_method_call_expr__Pair_sum
-    add rsp, 8
     add rsp, 8
     mov rbx, 30
     cmp rax, rbx

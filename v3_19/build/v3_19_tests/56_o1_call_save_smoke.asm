@@ -77,9 +77,7 @@ main:
 .Lssa_34_34:
     mov rax, 10
     push rax
-    push rax
     call _56_o1_call_save_smoke__foo
-    add rsp, 8
     add rsp, 8
     push rax
     call std_io__print_u64

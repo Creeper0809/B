@@ -312,7 +312,7 @@ _65_ssa_tagged_packed_bits__test_tagged_ptr_basic:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_33_33:
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rbx, 0
     mov rax, rax
     add rax, rbx
@@ -393,7 +393,7 @@ _65_ssa_tagged_packed_bits__test_tagged_layout_packed_struct:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_34_38:
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rbx, 0
     mov rax, rax
     add rax, rbx
@@ -489,7 +489,7 @@ _65_ssa_tagged_packed_bits__test_packed_bitfield_access:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_35_43:
-    lea rax, [rbp+9223372036854775806]
+    lea rax, [rbp-2]
     movzx rbx, word [rax]
     mov rcx, 3
     mov rdx, 15
@@ -507,7 +507,7 @@ _65_ssa_tagged_packed_bits__test_packed_bitfield_access:
     mov rbx, rbx
     or rbx, rcx
     mov word [rax], bx
-    lea rax, [rbp+9223372036854775806]
+    lea rax, [rbp-2]
     movzx rbx, word [rax]
     mov rcx, 4095
     mov rdx, 4095
@@ -538,7 +538,7 @@ _65_ssa_tagged_packed_bits__test_packed_bitfield_access:
     mov rbx, rbx
     or rbx, rcx
     mov word [rax], bx
-    lea rax, [rbp+9223372036854775806]
+    lea rax, [rbp-2]
     movzx rax, word [rax]
     mov rbx, 15
     mov rax, rax
@@ -557,7 +557,7 @@ _65_ssa_tagged_packed_bits__test_packed_bitfield_access:
     ret
     jmp .Lssa_35_45
 .Lssa_35_45:
-    lea rax, [rbp+9223372036854775806]
+    lea rax, [rbp-2]
     movzx rax, word [rax]
     mov rbx, 4
     push rcx
@@ -596,10 +596,8 @@ main:
     sub rsp, 1024
 .Lssa_36_48:
     mov rax, 0
-    lea rax, [rbp+9223372036854775800]
-    push rax
+    lea rax, [rbp-8]
     call _65_ssa_tagged_packed_bits__test_tagged_ptr_basic
-    add rsp, 8
     mov rbx, 0
     push rax
     cmp rax, rbx
@@ -615,10 +613,8 @@ main:
     ret
     jmp .Lssa_36_50
 .Lssa_36_50:
-    lea rax, [rbp+9223372036854775800]
-    push rax
+    lea rax, [rbp-8]
     call _65_ssa_tagged_packed_bits__test_tagged_layout_packed_struct
-    add rsp, 8
     mov rbx, 0
     push rax
     cmp rax, rbx
@@ -634,10 +630,8 @@ main:
     ret
     jmp .Lssa_36_52
 .Lssa_36_52:
-    lea rax, [rbp+9223372036854775800]
-    push rax
+    lea rax, [rbp-8]
     call _65_ssa_tagged_packed_bits__test_packed_bitfield_access
-    add rsp, 8
     mov rbx, 0
     push rax
     cmp rax, rbx

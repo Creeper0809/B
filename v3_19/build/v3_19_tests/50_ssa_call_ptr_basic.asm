@@ -36,12 +36,10 @@ main:
     lea rax, [rel _50_ssa_call_ptr_basic__add]
     mov rbx, 8
     mov rcx, 7
-    push rax
     push rbx
     push rcx
     call rax
     add rsp, 16
-    add rsp, 8
     mov rbx, 15
     cmp rax, rbx
     setne al
@@ -78,12 +76,10 @@ main:
     lea rax, [rel _50_ssa_call_ptr_basic__add]
     mov rbx, 2
     mov rcx, 1
-    push rax
     push rbx
     push rcx
     call rax
     add rsp, 16
-    add rsp, 8
     mov rbx, 3
     cmp rax, rbx
     setne al

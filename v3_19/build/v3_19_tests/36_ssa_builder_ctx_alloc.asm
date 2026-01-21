@@ -33,9 +33,7 @@ main:
 .Lssa_1_1:
     mov rax, [rbp+16]
     mov rax, [rbp+24]
-    push rax
     call _36_ssa_builder_ctx_alloc__foo
-    add rsp, 8
     mov rbx, 3
     cmp rax, rbx
     setne al

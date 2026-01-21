@@ -60,11 +60,9 @@ main:
     mov rax, 3
     mov rbx, 2
     push rax
-    push rax
     push rbx
     call _39_ssa_call_basic__add
     add rsp, 16
-    add rsp, 8
     mov rbx, 5
     cmp rax, rbx
     setne al
@@ -79,9 +77,7 @@ main:
     ret
     jmp .Lssa_2_4
 .Lssa_2_4:
-    push rax
     call _39_ssa_call_basic__inc
-    add rsp, 8
     mov rbx, 1
     cmp rax, rbx
     setne al
@@ -99,11 +95,9 @@ main:
     mov rax, 6
     mov rbx, 4
     push rax
-    push rax
     push rbx
     call _39_ssa_call_basic__add
     add rsp, 16
-    add rsp, 8
     mov rbx, 10
     cmp rax, rbx
     setne al

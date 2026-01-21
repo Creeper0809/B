@@ -1,8 +1,0 @@
-build/v3_19_tests/32_ssa_for_switch.asm:44: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/32_ssa_for_switch.asm:44: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/32_ssa_for_switch.asm:72: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/32_ssa_for_switch.asm:72: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/32_ssa_for_switch.asm:77: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/32_ssa_for_switch.asm:77: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/32_ssa_for_switch.asm:82: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/32_ssa_for_switch.asm:82: warning: byte data exceeds bounds [-w+number-overflow]

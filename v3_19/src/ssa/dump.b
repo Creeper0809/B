@@ -114,6 +114,10 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
         if (nargs2 == 0 && args_vec2 != 0) { nargs2 = vec_len(args_vec2); }
         emit("  r", 3);
         emit_u64(inst->dest);
+        if (inst->src2 != 0 && ssa_operand_is_const(inst->src2) == 0) {
+            emit(", r", 3);
+            emit_u64(ssa_operand_value(inst->src2));
+        }
         emit(" = call_ptr r", 13);
         emit_u64(callee_reg);
         emit("(", 1);
@@ -138,6 +142,10 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
         if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
         emit("  r", 3);
         emit_u64(inst->dest);
+        if (inst->src2 != 0 && ssa_operand_is_const(inst->src2) == 0) {
+            emit(", r", 3);
+            emit_u64(ssa_operand_value(inst->src2));
+        }
         emit(" = call ", 8);
         emit(name_ptr, name_len);
         emit("(", 1);

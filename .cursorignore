@@ -15,9 +15,11 @@ out/
 *.out
 *.asm
 *.s
-**/test/**/*.b
+**/test/b/*.b
+**/test/ir/*.b
+**/test/expected/*.txt
+**/test/manual/*.b
 **/build/
-!**/test/test_form.b
 
 # Logs and databases
 *.log
@@ -32,3 +34,5 @@ vendor/
 old/
 docs/
 pages/
+!docs/v3_19_todo.md
+!pages/devlog-2026-01-21.md

@@ -25,7 +25,7 @@ _37_ssa_destroy_copy_before_term__choose:
     jne .Lssa_0_1
     jmp .Lssa_0_3
 .Lssa_0_1:
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rax, 1
     mov rbx, rax
     jmp .Lssa_0_2
@@ -35,7 +35,7 @@ _37_ssa_destroy_copy_before_term__choose:
     pop rbp
     ret
 .Lssa_0_3:
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rax, 2
     mov rbx, rax
     jmp .Lssa_0_2
@@ -52,9 +52,7 @@ main:
     mov rax, [rbp+24]
     mov rax, 1
     push rax
-    push rax
     call _37_ssa_destroy_copy_before_term__choose
-    add rsp, 8
     add rsp, 8
     mov rbx, 1
     cmp rax, rbx
@@ -72,9 +70,7 @@ main:
 .Lssa_1_6:
     mov rax, 0
     push rax
-    push rax
     call _37_ssa_destroy_copy_before_term__choose
-    add rsp, 8
     add rsp, 8
     mov rbx, 2
     cmp rax, rbx

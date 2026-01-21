@@ -32,27 +32,27 @@ main:
 .Lssa_1_1:
     mov rax, [rbp+16]
     mov rax, [rbp+24]
-    lea rax, [rbp+9223372036854775805]
+    lea rax, [rbp-3]
     mov rbx, 0
     mov rax, rax
     add rax, rbx
     mov rbx, 11
     mov byte [rax], bl
-    lea rax, [rbp+9223372036854775805]
+    lea rax, [rbp-3]
     mov rbx, 1
     mov rax, rax
     add rax, rbx
     mov rbx, 22
     mov byte [rax], bl
-    lea rax, [rbp+9223372036854775805]
+    lea rax, [rbp-3]
     mov rbx, 2
     mov rax, rax
     add rax, rbx
     mov rbx, 33
     mov byte [rax], bl
-    lea rax, [rbp+9223372036854775789]
+    lea rax, [rbp-19]
     mov rbx, 3
-    lea rcx, [rbp+9223372036854775805]
+    lea rcx, [rbp-3]
     push rax
     push rbx
     push rcx
@@ -62,7 +62,7 @@ main:
     mov [rbx], rax
     mov [rbx+8], rdx
     add rsp, 8
-    lea rax, [rbp+9223372036854775789]
+    lea rax, [rbp-19]
     mov rax, [rax]
     mov rbx, 0
     mov rax, rax
@@ -82,7 +82,7 @@ main:
     ret
     jmp .Lssa_1_3
 .Lssa_1_3:
-    lea rax, [rbp+9223372036854775789]
+    lea rax, [rbp-19]
     mov rax, [rax]
     mov rbx, 2
     mov rax, rax

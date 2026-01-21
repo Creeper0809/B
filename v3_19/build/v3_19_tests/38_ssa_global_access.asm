@@ -65,9 +65,7 @@ main:
     mov [rax], rbx
     mov rax, 5
     push rax
-    push rax
     call _38_ssa_global_access__inc
-    add rsp, 8
     add rsp, 8
     mov rbx, 5
     cmp rax, rbx
@@ -85,9 +83,7 @@ main:
 .Lssa_2_4:
     mov rax, 3
     push rax
-    push rax
     call _38_ssa_global_access__inc
-    add rsp, 8
     add rsp, 8
     mov rbx, 8
     cmp rax, rbx
@@ -105,9 +101,7 @@ main:
 .Lssa_2_6:
     mov rax, 4
     push rax
-    push rax
     call _38_ssa_global_access__bump_h
-    add rsp, 8
     add rsp, 8
     mov rbx, 5
     cmp rax, rbx

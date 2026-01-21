@@ -1,4 +1,0 @@
-build/v3_19_tests/60_ssa_method_call_ptr_liveness.asm:61: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/60_ssa_method_call_ptr_liveness.asm:61: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/60_ssa_method_call_ptr_liveness.asm:66: warning: byte data exceeds bounds [-w+number-overflow]
-build/v3_19_tests/60_ssa_method_call_ptr_liveness.asm:66: warning: byte data exceeds bounds [-w+number-overflow]

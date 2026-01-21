@@ -318,7 +318,9 @@ func _ssa_mem2reg_rename_block(fn: *SSAFunction, block: *SSABlock, max_var: u64,
         var op: u64 = ssa_inst_get_op(cur);
 
         cur->src1 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src1);
-        cur->src2 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src2);
+        if (!((op == SSA_OP_CALL || op == SSA_OP_CALL_PTR) && cur->src2 != 0)) {
+            cur->src2 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src2);
+        }
 
         if (op == SSA_OP_CALL) {
             var info_ptr: u64 = ssa_operand_value(cur->src1);

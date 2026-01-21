@@ -10,6 +10,7 @@ import ssa.core;
 import compiler;
 import ssa.builder;
 import ssa.codegen;
+import emitter.emitter;
 
 // ============================================
 // SSA Build (Scaffold)
@@ -67,6 +68,9 @@ func ssa_builder_build_func(ctx: *BuilderCtx, fn_ptr: u64) -> u64 {
     var ssa_fn_ptr: u64 = ssa_new_function(ctx->ssa_ctx, fn->name_ptr, fn->name_len);
     ctx->cur_func = (*SSAFunction)ssa_fn_ptr;
     ctx->cur_block = ctx->cur_func->entry;
+    emitter_set_ret_type(fn->ret_type);
+    emitter_set_ret_ptr_depth(fn->ret_ptr_depth);
+    emitter_set_ret_struct_name(fn->ret_struct_name_ptr, fn->ret_struct_name_len);
     builder_reset_func(ctx);
     builder_add_params(ctx, fn);
     build_block(ctx, fn->body);

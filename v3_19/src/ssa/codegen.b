@@ -15,6 +15,7 @@ import ssa.core;
 import ssa.regalloc;
 import emitter.emitter;
 import emitter.symtab;
+import emitter.typeinfo;
 import compiler;
 
 const SSA_CODEGEN_DEBUG = 0;
@@ -121,6 +122,9 @@ func _ssa_inst_use_def_mask(inst: *SSAInstruction, use_out: u64, def_out: u64) -
     if (op == SSA_OP_CALL) {
         use_mask = _ssa_call_use_mask(ssa_operand_value(inst->src1));
         if (inst->dest != 0) { def_mask = _ssa_phys_mask(inst->dest); }
+        if (inst->src2 != 0 && ssa_operand_is_const(inst->src2) == 0) {
+            def_mask = def_mask | _ssa_phys_mask(ssa_operand_value(inst->src2));
+        }
         *(use_out) = use_mask;
         *(def_out) = def_mask;
         return 0;
@@ -129,6 +133,9 @@ func _ssa_inst_use_def_mask(inst: *SSAInstruction, use_out: u64, def_out: u64) -
     if (op == SSA_OP_CALL_PTR) {
         use_mask = _ssa_call_ptr_use_mask(ssa_operand_value(inst->src1));
         if (inst->dest != 0) { def_mask = _ssa_phys_mask(inst->dest); }
+        if (inst->src2 != 0 && ssa_operand_is_const(inst->src2) == 0) {
+            def_mask = def_mask | _ssa_phys_mask(ssa_operand_value(inst->src2));
+        }
         *(use_out) = use_mask;
         *(def_out) = def_mask;
         return 0;
@@ -703,7 +710,11 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
             pi = pi + 1;
         }
     }
-    if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) { return 0; }
+    if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
+        if (fn->ret_struct_name_ptr == 0 || fn->ret_struct_name_len == 0) { return 0; }
+        var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+        if (struct_size > 16) { return 0; }
+    }
     return _ssa_codegen_stmt_supported(fn->body, globals);
 }
 
@@ -802,7 +813,7 @@ func _ssa_emit_restore_reg(dest: u64, phys: u64) -> u64 {
     return 0;
 }
 
-func _ssa_emit_call(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
+func _ssa_emit_call(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
     var name_ptr: u64 = *(info_ptr);
     var name_len: u64 = *(info_ptr + 8);
     var args_vec: u64 = *(info_ptr + 16);
@@ -813,15 +824,27 @@ func _ssa_emit_call(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
 
     var keep_rax: u64 = 0;
     var keep_rdx: u64 = 0;
-    if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
+    if (dest == SSA_PHYS_RAX) {
         keep_rax = 1;
+    }
+    if (extra_dest == SSA_PHYS_RDX) {
         keep_rdx = 1;
+    }
+    if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
+        if (dest == SSA_PHYS_RAX) { keep_rax = 1; }
+        if (extra_dest == SSA_PHYS_RDX) { keep_rdx = 1; }
     }
 
     var all_mask: u64 = _ssa_live_all_mask();
     var save_mask: u64 = live_mask & all_mask;
     if (keep_rax != 0) { save_mask = save_mask & (all_mask ^ SSA_LIVE_RAX); }
     if (keep_rdx != 0) { save_mask = save_mask & (all_mask ^ SSA_LIVE_RDX); }
+    if (dest != 0) {
+        save_mask = save_mask & (all_mask ^ _ssa_phys_mask(dest));
+    }
+    if (extra_dest != 0) {
+        save_mask = save_mask & (all_mask ^ _ssa_phys_mask(extra_dest));
+    }
 
     if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
     if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RBX); }
@@ -853,6 +876,12 @@ func _ssa_emit_call(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
         _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
     }
 
+    if (extra_dest != 0 && extra_dest != SSA_PHYS_RDX) {
+        emit("    mov ", 8);
+        _ssa_emit_reg_name(extra_dest);
+        emit(", rdx\n", 7);
+    }
+
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R9); }
     if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R8); }
     if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RDX); }
@@ -862,7 +891,7 @@ func _ssa_emit_call(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
     return 0;
 }
 
-func _ssa_emit_call_ptr(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
+func _ssa_emit_call_ptr(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
     var callee_reg: u64 = *(info_ptr);
     var args_vec: u64 = *(info_ptr + 8);
     var nargs: u64 = *(info_ptr + 16);
@@ -872,15 +901,27 @@ func _ssa_emit_call_ptr(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
 
     var keep_rax: u64 = 0;
     var keep_rdx: u64 = 0;
-    if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
+    if (dest == SSA_PHYS_RAX) {
         keep_rax = 1;
+    }
+    if (extra_dest == SSA_PHYS_RDX) {
         keep_rdx = 1;
+    }
+    if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
+        if (dest == SSA_PHYS_RAX) { keep_rax = 1; }
+        if (extra_dest == SSA_PHYS_RDX) { keep_rdx = 1; }
     }
 
     var all_mask2: u64 = _ssa_live_all_mask();
     var save_mask: u64 = live_mask & all_mask2;
     if (keep_rax != 0) { save_mask = save_mask & (all_mask2 ^ SSA_LIVE_RAX); }
     if (keep_rdx != 0) { save_mask = save_mask & (all_mask2 ^ SSA_LIVE_RDX); }
+    if (dest != 0) {
+        save_mask = save_mask & (all_mask2 ^ _ssa_phys_mask(dest));
+    }
+    if (extra_dest != 0) {
+        save_mask = save_mask & (all_mask2 ^ _ssa_phys_mask(extra_dest));
+    }
 
     if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
     if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RBX); }
@@ -910,6 +951,12 @@ func _ssa_emit_call_ptr(dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
 
     if (dest != 0 && dest != SSA_PHYS_RAX) {
         _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
+    }
+
+    if (extra_dest != 0 && extra_dest != SSA_PHYS_RDX) {
+        emit("    mov ", 8);
+        _ssa_emit_reg_name(extra_dest);
+        emit(", rdx\n", 7);
     }
 
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R9); }
@@ -943,13 +990,12 @@ func _ssa_emit_label_ref(fn_id: u64, block_id: u64) -> u64 {
 // 메모리 주소/로드/스토어
 // ============================================
 
-func _ssa_emit_lea_local(dest: u64, offset: u64) -> u64 {
+func _ssa_emit_lea_local(dest: u64, offset: i64) -> u64 {
     emit("    lea ", 8);
     _ssa_emit_reg_name(dest);
     emit(", [rbp", 7);
-    var off: i64 = (i64)offset;
-    if (off < 0) { emit_i64(off); }
-    else { emit("+", 1); emit_u64(offset); }
+    if (offset < 0) { emit_i64(offset); }
+    else { emit("+", 1); emit_u64((u64)offset); }
     emit("]\n", 2);
     return 0;
 }
@@ -1284,6 +1330,23 @@ func _ssa_emit_jmp(fn_id: u64, inst: *SSAInstruction) -> u64 {
 }
 
 func _ssa_emit_ret(inst: *SSAInstruction) -> u64 {
+    var src2_in_rax: u64 = 0;
+    if (inst->src2 != 0 && ssa_operand_is_const(inst->src2) == 0) {
+        if (ssa_operand_value(inst->src2) == SSA_PHYS_RAX) { src2_in_rax = 1; }
+    }
+    var src1_moves_rax: u64 = 0;
+    if (inst->src1 == 0) {
+        src1_moves_rax = 1;
+    } else if (ssa_operand_is_const(inst->src1) != 0) {
+        src1_moves_rax = 1;
+    } else {
+        var r1: u64 = ssa_operand_value(inst->src1);
+        if (r1 != SSA_PHYS_RAX) { src1_moves_rax = 1; }
+    }
+    if (src2_in_rax != 0 && src1_moves_rax != 0) {
+        emit("    mov rdx, rax\n", 18);
+    }
+
     if (inst->src1 == 0) {
         emit("    xor eax, eax\n", 18);
     } else {
@@ -1299,7 +1362,7 @@ func _ssa_emit_ret(inst: *SSAInstruction) -> u64 {
         }
     }
 
-    if (inst->src2 != 0) {
+    if (inst->src2 != 0 && src2_in_rax == 0) {
         if (ssa_operand_is_const(inst->src2) != 0) {
             _ssa_emit_mov_reg_opr(SSA_PHYS_RDX, inst->src2);
         } else {
@@ -1353,7 +1416,8 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
     }
 
     if (op == SSA_OP_LEA_LOCAL) {
-        var offset: u64 = ssa_operand_value(inst->src1);
+        // Preserve signed stack offsets embedded in const operands.
+        var offset: i64 = (i64)inst->src1;
         _ssa_emit_lea_local(inst->dest, offset);
         return 0;
     }
@@ -1387,13 +1451,21 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_CALL) {
         var info_ptr3: u64 = ssa_operand_value(inst->src1);
-        _ssa_emit_call(inst->dest, info_ptr3, _ssa_live_map_get(g_live_mask_map, (u64)inst));
+        var extra_dest: u64 = 0;
+        if (inst->src2 != 0 && ssa_operand_is_const(inst->src2) == 0) {
+            extra_dest = ssa_operand_value(inst->src2);
+        }
+        _ssa_emit_call(inst->dest, extra_dest, info_ptr3, _ssa_live_map_get(g_live_mask_map, (u64)inst));
         return 0;
     }
 
     if (op == SSA_OP_CALL_PTR) {
         var info_ptr3b: u64 = ssa_operand_value(inst->src1);
-        _ssa_emit_call_ptr(inst->dest, info_ptr3b, _ssa_live_map_get(g_live_mask_map, (u64)inst));
+        var extra_dest2: u64 = 0;
+        if (inst->src2 != 0 && ssa_operand_is_const(inst->src2) == 0) {
+            extra_dest2 = ssa_operand_value(inst->src2);
+        }
+        _ssa_emit_call_ptr(inst->dest, extra_dest2, info_ptr3b, _ssa_live_map_get(g_live_mask_map, (u64)inst));
         return 0;
     }
 

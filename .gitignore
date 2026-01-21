@@ -1,6 +1,7 @@
 /pages
 /build
-
 # FUSE temporary files created when deleting open files
 .fuse_hidden*
 **/.fuse_hidden*
+
+/v3_19/build/*

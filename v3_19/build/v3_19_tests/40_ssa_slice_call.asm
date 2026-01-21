@@ -15,7 +15,7 @@ _40_ssa_slice_call__first_byte:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    lea rax, [rbp+16]
+    lea rax, [rbp-9223372036854775792]
     mov rax, [rax]
     mov rbx, 0
     mov rax, rax
@@ -34,7 +34,7 @@ _40_ssa_slice_call__last_byte:
     sub rsp, 1024
 .Lssa_1_1:
     mov rax, [rbp+32]
-    lea rbx, [rbp+16]
+    lea rbx, [rbp-9223372036854775792]
     mov rbx, [rbx]
     mov rcx, 1
     mov rax, rax
@@ -57,12 +57,10 @@ main:
     mov rax, [rbp+24]
     lea rax, [rel _str0]
     mov rbx, 3
-    push rax
     push rbx
     push rax
     call _40_ssa_slice_call__first_byte
     add rsp, 16
-    add rsp, 8
     mov rbx, 65
     cmp rax, rbx
     setne al
@@ -81,12 +79,10 @@ main:
     lea rbx, [rel _str1]
     mov rcx, 3
     push rax
-    push rax
     push rcx
     push rbx
     call _40_ssa_slice_call__last_byte
     add rsp, 24
-    add rsp, 8
     mov rbx, 90
     cmp rax, rbx
     setne al

@@ -37,17 +37,17 @@ main:
     jne .Lssa_0_9
     jmp .Lssa_0_10
 .Lssa_0_2:
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rax, 1
     mov rbx, rax
     jmp .Lssa_0_1
 .Lssa_0_3:
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rax, 2
     mov rbx, rax
     jmp .Lssa_0_1
 .Lssa_0_4:
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rax, 3
     mov rbx, rax
     jmp .Lssa_0_1
@@ -81,7 +81,7 @@ main:
     jne .Lssa_0_13
     jmp .Lssa_0_14
 .Lssa_0_12:
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rax, 4
     jmp .Lssa_0_11
 .Lssa_0_13:

@@ -17,7 +17,7 @@ main:
 .Lssa_0_0:
     mov rax, [rbp+16]
     mov rax, [rbp+24]
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     lea rbx, [rel _str0]
     mov rcx, 2
     mov [rax], rbx
@@ -25,9 +25,9 @@ main:
     mov rax, rax
     add rax, rbx
     mov [rax], rcx
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     mov rax, [rax]
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     mov rax, [rax]
     mov rbx, 0
     mov rax, rax
@@ -47,9 +47,9 @@ main:
     ret
     jmp .Lssa_0_2
 .Lssa_0_2:
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     mov rax, [rax]
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     mov rax, [rax]
     mov rbx, 1
     mov rax, rax

@@ -41,7 +41,7 @@ _32_ssa_for_switch__calc:
     jne .Lssa_0_5
     jmp .Lssa_0_6
 .Lssa_0_3:
-    lea rbx, [rbp+9223372036854775792]
+    lea rbx, [rbp-16]
     mov rbx, 1
     add rbx, rdx
     mov rdx, rbx
@@ -69,17 +69,17 @@ _32_ssa_for_switch__calc:
     mov rcx, rbx
     jmp .Lssa_0_3
 .Lssa_0_9:
-    lea rbx, [rbp+9223372036854775800]
+    lea rbx, [rbp-8]
     mov rbx, 1
     add rbx, rcx
     jmp .Lssa_0_8
 .Lssa_0_10:
-    lea rbx, [rbp+9223372036854775800]
+    lea rbx, [rbp-8]
     mov rbx, 10
     add rbx, rcx
     jmp .Lssa_0_8
 .Lssa_0_11:
-    lea rbx, [rbp+9223372036854775800]
+    lea rbx, [rbp-8]
     mov rbx, 100
     add rbx, rcx
     jmp .Lssa_0_8
@@ -110,9 +110,7 @@ main:
     mov rax, [rbp+24]
     mov rax, 4
     push rax
-    push rax
     call _32_ssa_for_switch__calc
-    add rsp, 8
     add rsp, 8
     mov rbx, 111
     cmp rax, rbx

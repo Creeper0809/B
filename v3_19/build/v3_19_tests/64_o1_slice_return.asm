@@ -17,18 +17,18 @@ _64_o1_slice_return__make_slice:
 .Lssa_0_0:
     mov rax, [rbp+16]
     mov rbx, [rbp+24]
-    lea rcx, [rbp+9223372036854775792]
+    lea rcx, [rbp-16]
     mov [rcx], rax
     mov rax, rcx
     add rax, 8
     mov [rax], rbx
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     mov rbx, [rax]
     mov rax, rax
     add rax, 8
     mov rax, [rax]
-    mov rax, rbx
     mov rdx, rax
+    mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
@@ -43,29 +43,29 @@ main:
 .Lssa_1_1:
     mov rax, [rbp+16]
     mov rax, [rbp+24]
-    lea rax, [rbp+9223372036854775804]
+    lea rax, [rbp-4]
     mov rax, rax
     add rax, 0
     mov rbx, 65
     mov byte [rax], bl
-    lea rax, [rbp+9223372036854775804]
+    lea rax, [rbp-4]
     mov rax, rax
     add rax, 1
     mov rbx, 66
     mov byte [rax], bl
-    lea rax, [rbp+9223372036854775804]
+    lea rax, [rbp-4]
     mov rax, rax
     add rax, 2
     mov rbx, 67
     mov byte [rax], bl
-    lea rax, [rbp+9223372036854775804]
+    lea rax, [rbp-4]
     mov rax, rax
     add rax, 3
     mov rbx, 68
     mov byte [rax], bl
-    lea rax, [rbp+9223372036854775788]
+    lea rax, [rbp-20]
     mov rbx, 4
-    lea rcx, [rbp+9223372036854775804]
+    lea rcx, [rbp-4]
     push rax
     push rbx
     push rcx
@@ -75,7 +75,7 @@ main:
     mov [rbx], rax
     mov [rbx+8], rdx
     add rsp, 8
-    lea rax, [rbp+9223372036854775788]
+    lea rax, [rbp-20]
     mov rax, [rax]
     mov rax, rax
     add rax, 0
@@ -93,7 +93,7 @@ main:
     ret
     jmp .Lssa_1_3
 .Lssa_1_3:
-    lea rax, [rbp+9223372036854775788]
+    lea rax, [rbp-20]
     mov rax, [rax]
     mov rax, rax
     add rax, 3

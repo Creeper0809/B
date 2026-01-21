@@ -17,7 +17,7 @@ main:
 .Lssa_0_0:
     mov rax, [rbp+16]
     mov rax, [rbp+24]
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     mov rbx, 1
     mov [rax], rbx
     mov rbx, 8
@@ -25,7 +25,7 @@ main:
     add rax, rbx
     mov rbx, 2
     mov [rax], rbx
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     mov rax, [rax]
     mov rbx, 1
     cmp rax, rbx
@@ -41,7 +41,7 @@ main:
     ret
     jmp .Lssa_0_2
 .Lssa_0_2:
-    lea rax, [rbp+9223372036854775792]
+    lea rax, [rbp-16]
     mov rbx, 8
     mov rax, rax
     add rax, rbx
@@ -60,7 +60,7 @@ main:
     ret
     jmp .Lssa_0_4
 .Lssa_0_4:
-    lea rax, [rbp+9223372036854775776]
+    lea rax, [rbp-32]
     mov rbx, 3
     mov [rax], rbx
     mov rbx, 8
@@ -68,7 +68,7 @@ main:
     add rax, rbx
     mov rbx, 4
     mov [rax], rbx
-    lea rax, [rbp+9223372036854775776]
+    lea rax, [rbp-32]
     mov rax, [rax]
     mov rbx, 3
     cmp rax, rbx
@@ -84,7 +84,7 @@ main:
     ret
     jmp .Lssa_0_6
 .Lssa_0_6:
-    lea rax, [rbp+9223372036854775776]
+    lea rax, [rbp-32]
     mov rbx, 8
     mov rax, rax
     add rax, rbx

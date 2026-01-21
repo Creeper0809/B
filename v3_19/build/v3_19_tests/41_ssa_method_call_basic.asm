@@ -58,22 +58,20 @@ main:
     mov rax, [rbp+16]
     mov rax, [rbp+24]
     mov rax, 3
-    lea rbx, [rbp+9223372036854775800]
+    lea rbx, [rbp-8]
     push rax
     push rbx
     call _41_ssa_method_call_basic__Counter_init
     add rsp, 16
     mov rax, 4
-    lea rbx, [rbp+9223372036854775800]
+    lea rbx, [rbp-8]
     push rax
     push rbx
     call _41_ssa_method_call_basic__Counter_add
     add rsp, 16
-    lea rax, [rbp+9223372036854775800]
-    push rax
+    lea rax, [rbp-8]
     push rax
     call _41_ssa_method_call_basic__Counter_get
-    add rsp, 8
     add rsp, 8
     mov rbx, 7
     cmp rax, rbx
@@ -90,16 +88,14 @@ main:
     jmp .Lssa_3_5
 .Lssa_3_5:
     mov rax, 5
-    lea rbx, [rbp+9223372036854775800]
+    lea rbx, [rbp-8]
     push rax
     push rbx
     call _41_ssa_method_call_basic__Counter_add
     add rsp, 16
-    lea rax, [rbp+9223372036854775800]
-    push rax
+    lea rax, [rbp-8]
     push rax
     call _41_ssa_method_call_basic__Counter_get
-    add rsp, 8
     add rsp, 8
     mov rbx, 12
     cmp rax, rbx

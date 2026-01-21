@@ -238,22 +238,30 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
                 }
             }
 
-            if (!ssa_operand_is_const(cur->src1)) {
-                var r1: u64 = ssa_operand_value(cur->src1);
-                if (r1 <= max_reg && _ssa_bitset_test(def, r1) == 0) {
-                    _ssa_bitset_set(use, r1);
+            if (!(op == SSA_OP_CALL || op == SSA_OP_CALL_PTR)) {
+                if (!ssa_operand_is_const(cur->src1)) {
+                    var r1: u64 = ssa_operand_value(cur->src1);
+                    if (r1 <= max_reg && _ssa_bitset_test(def, r1) == 0) {
+                        _ssa_bitset_set(use, r1);
+                    }
                 }
-            }
-            if (!ssa_operand_is_const(cur->src2)) {
-                var r2: u64 = ssa_operand_value(cur->src2);
-                if (r2 <= max_reg && _ssa_bitset_test(def, r2) == 0) {
-                    _ssa_bitset_set(use, r2);
+                if (!ssa_operand_is_const(cur->src2)) {
+                    var r2: u64 = ssa_operand_value(cur->src2);
+                    if (r2 <= max_reg && _ssa_bitset_test(def, r2) == 0) {
+                        _ssa_bitset_set(use, r2);
+                    }
                 }
             }
 
             if (cur->dest != 0) {
                 if (op != SSA_OP_BR && op != SSA_OP_JMP && cur->dest <= max_reg) {
                     _ssa_bitset_set(def, cur->dest);
+                }
+            }
+            if (op == SSA_OP_CALL || op == SSA_OP_CALL_PTR) {
+                if (cur->src2 != 0 && ssa_operand_is_const(cur->src2) == 0) {
+                    var extra_def: u64 = ssa_operand_value(cur->src2);
+                    if (extra_def <= max_reg) { _ssa_bitset_set(def, extra_def); }
                 }
             }
 

@@ -58,12 +58,12 @@ main:
     mov rax, [rbp+16]
     mov rax, [rbp+24]
     mov rax, 1
-    lea rbx, [rbp+9223372036854775800]
+    lea rbx, [rbp-8]
     push rax
     push rbx
     call _42_ssa_method_call_ptr__Counter_init
     add rsp, 16
-    lea rax, [rbp+9223372036854775800]
+    lea rax, [rbp-8]
     mov rbx, 6
     push rax
     push rbx
@@ -72,12 +72,10 @@ main:
     add rsp, 16
     pop rax
     push rax
-    push rbx
     push rax
     call _42_ssa_method_call_ptr__Counter_get
     add rsp, 8
     mov rbx, rax
-    add rsp, 8
     pop rax
     mov rcx, 7
     push rax
@@ -104,9 +102,7 @@ main:
     add rsp, 16
     pop rax
     push rax
-    push rax
     call _42_ssa_method_call_ptr__Counter_get
-    add rsp, 8
     add rsp, 8
     mov rbx, 9
     cmp rax, rbx
