@@ -116,9 +116,11 @@ main:
     sub rsp, 1024
 .Lssa_34_34:
     mov rax, 10
-    mov rdi, rax
+    push rax
+    pop rdi
     call _56_o1_call_save_smoke__foo
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_io__print_u64
     mov rax, 0
     mov rsp, rbp

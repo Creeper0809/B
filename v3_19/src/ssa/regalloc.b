@@ -129,8 +129,12 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
         var cur: *SSAInstruction = b->inst_head;
         while (cur != 0) {
             var op: u64 = ssa_inst_get_op(cur);
-            if (op != SSA_OP_BR && op != SSA_OP_JMP) {
-                if (cur->dest > max_id) { max_id = cur->dest; }
+            if (op != SSA_OP_BR && op != SSA_OP_JMP && op != SSA_OP_RET_SLICE_HEAP) {
+                var mask: u64 = 1;
+                mask = mask << 63;
+                if ((cur->dest & mask) == 0) {
+                    if (cur->dest > max_id) { max_id = cur->dest; }
+                }
             }
             if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
                 var info_ptr: u64 = ssa_operand_value(cur->src1);
@@ -254,8 +258,12 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
             }
 
             if (cur->dest != 0) {
-                if (op != SSA_OP_BR && op != SSA_OP_JMP && cur->dest <= max_reg) {
-                    _ssa_bitset_set(def, cur->dest);
+                if (op != SSA_OP_BR && op != SSA_OP_JMP && op != SSA_OP_RET_SLICE_HEAP) {
+                    var mask2: u64 = 1;
+                    mask2 = mask2 << 63;
+                    if ((cur->dest & mask2) == 0 && cur->dest <= max_reg) {
+                        _ssa_bitset_set(def, cur->dest);
+                    }
                 }
             }
             if (op == SSA_OP_CALL || op == SSA_OP_CALL_PTR) {

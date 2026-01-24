@@ -149,91 +149,122 @@ main:
     mov rax, rdi
     lea rax, [rel _str0]
     mov rbx, 20
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     lea rax, [rel _str1]
     mov rbx, 21
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     lea rax, [rel _str2]
     mov rbx, 9
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 10
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str3]
     mov rbx, 9
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 0
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str4]
     mov rbx, 10
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 0
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str5]
     mov rbx, 22
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     lea rax, [rel _str6]
     mov rbx, 13
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 9223372036854775793
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str7]
     mov rbx, 13
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 9223372036854775803
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str8]
     mov rbx, 13
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 50
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str9]
     mov rbx, 19
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     lea rax, [rel _str10]
     mov rbx, 20
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 3000000
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str11]
     mov rbx, 25
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 1
     cmp rax, 0
@@ -242,8 +273,10 @@ main:
 .Lssa_60_61:
     lea rax, [rel _str12]
     mov rbx, 12
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     jmp .Lssa_60_62
 .Lssa_60_62:
@@ -254,27 +287,35 @@ main:
 .Lssa_60_63:
     lea rax, [rel _str13]
     mov rbx, 13
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     jmp .Lssa_60_64
 .Lssa_60_64:
     lea rax, [rel _str14]
     mov rbx, 23
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     lea rax, [rel _str15]
     lea rbx, [rel _str16]
     mov rcx, 15
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call std_io__emit
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_str__str_len
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     mov rax, 0

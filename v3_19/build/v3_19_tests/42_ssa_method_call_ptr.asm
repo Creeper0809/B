@@ -59,18 +59,23 @@ main:
     mov rax, rdi
     lea rax, [rbp-8]
     mov rbx, 1
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _42_ssa_method_call_ptr__Counter_init
     lea rax, [rbp-8]
     mov rbx, 6
     push rax
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _42_ssa_method_call_ptr__Counter_add
     pop rax
     push rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call _42_ssa_method_call_ptr__Counter_get
     mov rbx, rax
     pop rax
@@ -93,11 +98,14 @@ main:
 .Lssa_3_5:
     mov rbx, 2
     push rax
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _42_ssa_method_call_ptr__Counter_add
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call _42_ssa_method_call_ptr__Counter_get
     mov rbx, 9
     cmp rax, rbx

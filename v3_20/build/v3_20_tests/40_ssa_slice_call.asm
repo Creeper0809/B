@@ -13,12 +13,18 @@ _start:
 _40_ssa_slice_call__first_byte:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
     lea rax, [rbp-16]
-    mov rbx, rdi
+    mov rbx, [rbp-1032]
     mov [rax], rbx
-    mov rbx, rsi
+    mov rbx, [rbp-1040]
     mov rcx, 8
     mov rax, rax
     add rax, rcx
@@ -39,13 +45,19 @@ _40_ssa_slice_call__first_byte:
 _40_ssa_slice_call__last_byte:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
-    mov rax, rdx
+    mov rax, [rbp-1048]
     lea rbx, [rbp-16]
-    mov rcx, rdi
+    mov rcx, [rbp-1032]
     mov [rbx], rcx
-    mov rcx, rsi
+    mov rcx, [rbp-1040]
     mov rdx, 8
     mov rbx, rbx
     add rbx, rdx
@@ -67,14 +79,22 @@ _40_ssa_slice_call__last_byte:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_2_2:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     lea rax, [rel _str0]
     mov rbx, 3
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _40_ssa_slice_call__first_byte
     mov rbx, 65
     cmp rax, rbx
@@ -93,9 +113,12 @@ main:
     lea rax, [rel _str1]
     mov rbx, 3
     mov rcx, 3
-    mov rdi, rax
-    mov rsi, rbx
-    mov rdx, rcx
+    push rcx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _40_ssa_slice_call__last_byte
     mov rbx, 90
     cmp rax, rbx

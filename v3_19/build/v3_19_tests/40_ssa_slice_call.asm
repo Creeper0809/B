@@ -73,8 +73,10 @@ main:
     mov rax, rdi
     lea rax, [rel _str0]
     mov rbx, 3
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _40_ssa_slice_call__first_byte
     mov rbx, 65
     cmp rax, rbx
@@ -93,9 +95,12 @@ main:
     lea rax, [rel _str1]
     mov rbx, 3
     mov rcx, 3
-    mov rdi, rax
-    mov rsi, rbx
-    mov rdx, rcx
+    push rcx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _40_ssa_slice_call__last_byte
     mov rbx, 90
     cmp rax, rbx

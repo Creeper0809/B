@@ -28,9 +28,11 @@ const SSA_LIVE_RCX = 4;
 const SSA_LIVE_RDX = 8;
 const SSA_LIVE_R8  = 16;
 const SSA_LIVE_R9  = 32;
+const SSA_LIVE_R10 = 64;
+const SSA_LIVE_R11 = 128;
 
 func _ssa_live_all_mask() -> u64 {
-    return SSA_LIVE_RAX | SSA_LIVE_RBX | SSA_LIVE_RCX | SSA_LIVE_RDX | SSA_LIVE_R8 | SSA_LIVE_R9;
+    return SSA_LIVE_RAX | SSA_LIVE_RBX | SSA_LIVE_RCX | SSA_LIVE_RDX | SSA_LIVE_R8 | SSA_LIVE_R9 | SSA_LIVE_R10 | SSA_LIVE_R11;
 }
 
 func _ssa_phys_mask(phys: u64) -> u64 {
@@ -40,6 +42,8 @@ func _ssa_phys_mask(phys: u64) -> u64 {
     if (phys == SSA_PHYS_RDX) { return SSA_LIVE_RDX; }
     if (phys == SSA_PHYS_R8) { return SSA_LIVE_R8; }
     if (phys == SSA_PHYS_R9) { return SSA_LIVE_R9; }
+    if (phys == SSA_PHYS_R10) { return SSA_LIVE_R10; }
+    if (phys == SSA_PHYS_R11) { return SSA_LIVE_R11; }
     return 0;
 }
 
@@ -155,6 +159,12 @@ func _ssa_inst_use_def_mask(inst: *SSAInstruction, use_out: u64, def_out: u64) -
         *(def_out) = def_mask;
         return 0;
     }
+    if (op == SSA_OP_RET_SLICE_HEAP) {
+        use_mask = _ssa_operand_use_mask(inst->src1) | _ssa_operand_use_mask(inst->src2);
+        *(use_out) = use_mask;
+        *(def_out) = def_mask;
+        return 0;
+    }
 
     if (op == SSA_OP_BR) {
         use_mask = _ssa_operand_use_mask(inst->src1);
@@ -207,6 +217,17 @@ func _ssa_emit_asm(text_vec: u64) -> u64 {
     return 0;
 }
 
+func _ssa_ensure_heap_brk_global() -> u64 {
+    var globals: u64 = emitter_get_globals();
+    if (globals == 0) { return 0; }
+    if (is_global_var("__cg_heap_brk", 13) != 0) { return 0; }
+    var ginfo: u64 = heap_alloc(16);
+    *(ginfo) = "__cg_heap_brk";
+    *(ginfo + 8) = 13;
+    vec_push(globals, ginfo);
+    return 0;
+}
+
 func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) -> u64 {
     var args_vec: u64 = *(info_ptr + 16);
     var nargs: u64 = *(info_ptr + 24);
@@ -232,35 +253,41 @@ func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) ->
     if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
     if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_push_reg(SSA_PHYS_R8); }
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
+    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_push_reg(SSA_PHYS_R10); }
+    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_push_reg(SSA_PHYS_R11); }
+    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_push_reg(SSA_PHYS_R10); }
+    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_push_reg(SSA_PHYS_R11); }
+    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_push_reg(SSA_PHYS_R10); }
+    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_push_reg(SSA_PHYS_R11); }
 
     _ssa_emit_push_reg(ssa_operand_value(addr_opr));
 
-    // System V ABI: Move arguments to parameter registers
+    var stack_args: u64 = 0;
+    var si: i64 = (i64)nargs - 1;
+    while (si >= 0) {
+        var sreg: u64 = vec_get(args_vec, (u64)si);
+        emit("    push ", 9);
+        _ssa_emit_reg_name(sreg);
+        emit_nl();
+        stack_args = stack_args + 1;
+        si = si - 1;
+    }
+
+    var reg_count: u64 = nargs;
+    if (reg_count > 6) { reg_count = 6; }
     var i: u64 = 0;
-    while (i < nargs) {
-        var reg: u64 = vec_get(args_vec, i);
-        emit("    mov ", 8);
-        if (i == 0) {
-            emit("rdi", 3);
-        } else if (i == 1) {
-            emit("rsi", 3);
-        } else if (i == 2) {
-            emit("rdx", 3);
-        } else if (i == 3) {
-            emit("rcx", 3);
-        } else if (i == 4) {
-            emit("r8", 2);
-        } else if (i == 5) {
-            emit("r9", 2);
-        } else {
-            // TODO: handle stack parameters (7+ args)
-            emit("[ERROR: >6 args not yet supported]\n", 37);
-        }
-        emit(", ", 2);
-        _ssa_emit_reg_name(reg);
+    while (i < reg_count) {
+        emit("    pop ", 8);
+        if (i == 0) { emit("rdi", 3); }
+        else if (i == 1) { emit("rsi", 3); }
+        else if (i == 2) { emit("rdx", 3); }
+        else if (i == 3) { emit("rcx", 3); }
+        else if (i == 4) { emit("r8", 2); }
+        else if (i == 5) { emit("r9", 2); }
         emit_nl();
         i = i + 1;
     }
+    stack_args = stack_args - reg_count;
 
     emit("    call ", 9);
     var name_ptr: u64 = *(info_ptr);
@@ -268,11 +295,20 @@ func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) ->
     emit(name_ptr, name_len);
     emit_nl();
 
-    emit("    mov rbx, [rsp]\n", 21);
+    emit("    mov rbx, [rsp", 19);
+    if (stack_args > 0) {
+        emit("+", 1);
+        emit_u64(stack_args * 8);
+    }
+    emit("]\n", 2);
     emit("    mov [rbx], rax\n", 20);
     emit("    mov [rbx+8], rdx\n", 24);
-    emit("    add rsp, 8\n", 17);
+    emit("    add rsp, ", 13);
+    emit_u64((stack_args + 1) * 8);
+    emit_nl();
 
+    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R11); }
+    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R10); }
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R9); }
     if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R8); }
     if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RDX); }
@@ -733,9 +769,8 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
     if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
         if (fn->ret_struct_name_ptr == 0 || fn->ret_struct_name_len == 0) { return 0; }
         var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
-        if (struct_size > 16) { return 0; }
+        if (struct_size == 0) { return 0; }
     }
-    if (fn->ret_type == TYPE_SLICE && fn->ret_ptr_depth == 0) { return 0; }
     return _ssa_codegen_stmt_supported(fn->body, globals);
 }
 
@@ -750,6 +785,8 @@ func _ssa_emit_reg_name(phys: u64) -> u64 {
     if (phys == SSA_PHYS_RDX) { emit("rdx", 3); return 0; }
     if (phys == SSA_PHYS_R8) { emit("r8", 2); return 0; }
     if (phys == SSA_PHYS_R9) { emit("r9", 2); return 0; }
+    if (phys == SSA_PHYS_R10) { emit("r10", 3); return 0; }
+    if (phys == SSA_PHYS_R11) { emit("r11", 3); return 0; }
     emit("rax", 3);
     return 0;
 }
@@ -762,6 +799,8 @@ func _ssa_emit_reg_name_size(phys: u64, size: u64) -> u64 {
         if (phys == SSA_PHYS_RDX) { emit("dl", 2); return 0; }
         if (phys == SSA_PHYS_R8) { emit("r8b", 3); return 0; }
         if (phys == SSA_PHYS_R9) { emit("r9b", 3); return 0; }
+        if (phys == SSA_PHYS_R10) { emit("r10b", 4); return 0; }
+        if (phys == SSA_PHYS_R11) { emit("r11b", 4); return 0; }
         emit("al", 2);
         return 0;
     }
@@ -772,6 +811,8 @@ func _ssa_emit_reg_name_size(phys: u64, size: u64) -> u64 {
         if (phys == SSA_PHYS_RDX) { emit("dx", 2); return 0; }
         if (phys == SSA_PHYS_R8) { emit("r8w", 3); return 0; }
         if (phys == SSA_PHYS_R9) { emit("r9w", 3); return 0; }
+        if (phys == SSA_PHYS_R10) { emit("r10w", 4); return 0; }
+        if (phys == SSA_PHYS_R11) { emit("r11w", 4); return 0; }
         emit("ax", 2);
         return 0;
     }
@@ -782,6 +823,8 @@ func _ssa_emit_reg_name_size(phys: u64, size: u64) -> u64 {
         if (phys == SSA_PHYS_RDX) { emit("edx", 3); return 0; }
         if (phys == SSA_PHYS_R8) { emit("r8d", 3); return 0; }
         if (phys == SSA_PHYS_R9) { emit("r9d", 3); return 0; }
+        if (phys == SSA_PHYS_R10) { emit("r10d", 4); return 0; }
+        if (phys == SSA_PHYS_R11) { emit("r11d", 4); return 0; }
         emit("eax", 3);
         return 0;
     }
@@ -841,7 +884,12 @@ func _ssa_emit_call(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -
     var nargs: u64 = *(info_ptr + 24);
     var ret_type: u64 = *(info_ptr + 32);
     var ret_ptr_depth: u64 = *(info_ptr + 40);
+    var ret_struct_size: u64 = *(info_ptr + 48);
     if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+    var is_sret: u64 = 0;
+    if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0 && ret_struct_size > 16) {
+        is_sret = 1;
+    }
 
     var keep_rax: u64 = 0;
     var keep_rdx: u64 = 0;
@@ -874,47 +922,58 @@ func _ssa_emit_call(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -
     if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_push_reg(SSA_PHYS_R8); }
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
 
-    // System V ABI: Move arguments to parameter registers
+    var stack_args: u64 = 0;
+    var si2: i64 = (i64)nargs - 1;
+    while (si2 >= 0) {
+        var sreg2: u64 = vec_get(args_vec, (u64)si2);
+        emit("    push ", 9);
+        _ssa_emit_reg_name(sreg2);
+        emit_nl();
+        stack_args = stack_args + 1;
+        si2 = si2 - 1;
+    }
+
+    var reg_count2: u64 = nargs;
+    if (reg_count2 > 6) { reg_count2 = 6; }
     var i: u64 = 0;
-    while (i < nargs) {
-        var reg: u64 = vec_get(args_vec, i);
-        emit("    mov ", 8);
-        if (i == 0) {
-            emit("rdi", 3);
-        } else if (i == 1) {
-            emit("rsi", 3);
-        } else if (i == 2) {
-            emit("rdx", 3);
-        } else if (i == 3) {
-            emit("rcx", 3);
-        } else if (i == 4) {
-            emit("r8", 2);
-        } else if (i == 5) {
-            emit("r9", 2);
-        } else {
-            // TODO: handle stack parameters (7+ args)
-            emit("[ERROR: >6 args not yet supported]\n", 37);
-        }
-        emit(", ", 2);
-        _ssa_emit_reg_name(reg);
+    while (i < reg_count2) {
+        emit("    pop ", 8);
+        if (i == 0) { emit("rdi", 3); }
+        else if (i == 1) { emit("rsi", 3); }
+        else if (i == 2) { emit("rdx", 3); }
+        else if (i == 3) { emit("rcx", 3); }
+        else if (i == 4) { emit("r8", 2); }
+        else if (i == 5) { emit("r9", 2); }
         emit_nl();
         i = i + 1;
     }
+    stack_args = stack_args - reg_count2;
 
     emit("    call ", 9);
     emit(name_ptr, name_len);
     emit_nl();
 
-    if (dest != 0 && dest != SSA_PHYS_RAX) {
-        _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
+    if (is_sret == 0) {
+        if (dest != 0 && dest != SSA_PHYS_RAX) {
+            _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
+        }
+        if (extra_dest != 0 && extra_dest != SSA_PHYS_RDX) {
+            emit("    mov ", 8);
+            _ssa_emit_reg_name(extra_dest);
+            emit(", rdx\n", 7);
+        }
     }
 
-    if (extra_dest != 0 && extra_dest != SSA_PHYS_RDX) {
-        emit("    mov ", 8);
-        _ssa_emit_reg_name(extra_dest);
-        emit(", rdx\n", 7);
+    if (stack_args > 0) {
+        emit("    add rsp, ", 13);
+        emit_u64(stack_args * 8);
+        emit_nl();
     }
 
+    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R11); }
+    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R10); }
+    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R11); }
+    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R10); }
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R9); }
     if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R8); }
     if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_RDX); }
@@ -930,7 +989,12 @@ func _ssa_emit_call_ptr(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u6
     var nargs: u64 = *(info_ptr + 16);
     var ret_type: u64 = *(info_ptr + 24);
     var ret_ptr_depth: u64 = *(info_ptr + 32);
+    var ret_struct_size: u64 = *(info_ptr + 40);
     if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
+    var is_sret: u64 = 0;
+    if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0 && ret_struct_size > 16) {
+        is_sret = 1;
+    }
 
     var keep_rax: u64 = 0;
     var keep_rdx: u64 = 0;
@@ -963,45 +1027,52 @@ func _ssa_emit_call_ptr(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u6
     if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_push_reg(SSA_PHYS_R8); }
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
 
-    // System V ABI: Move arguments to parameter registers
+    var stack_args: u64 = 0;
+    var si3: i64 = (i64)nargs - 1;
+    while (si3 >= 0) {
+        var sreg3: u64 = vec_get(args_vec, (u64)si3);
+        emit("    push ", 9);
+        _ssa_emit_reg_name(sreg3);
+        emit_nl();
+        stack_args = stack_args + 1;
+        si3 = si3 - 1;
+    }
+
+    var reg_count0: u64 = nargs;
+    if (reg_count0 > 6) { reg_count0 = 6; }
     var i: u64 = 0;
-    while (i < nargs) {
-        var reg: u64 = vec_get(args_vec, i);
-        emit("    mov ", 8);
-        if (i == 0) {
-            emit("rdi", 3);
-        } else if (i == 1) {
-            emit("rsi", 3);
-        } else if (i == 2) {
-            emit("rdx", 3);
-        } else if (i == 3) {
-            emit("rcx", 3);
-        } else if (i == 4) {
-            emit("r8", 2);
-        } else if (i == 5) {
-            emit("r9", 2);
-        } else {
-            // TODO: handle stack parameters (7+ args)
-            emit("[ERROR: >6 args not yet supported]\n", 37);
-        }
-        emit(", ", 2);
-        _ssa_emit_reg_name(reg);
+    while (i < reg_count0) {
+        emit("    pop ", 8);
+        if (i == 0) { emit("rdi", 3); }
+        else if (i == 1) { emit("rsi", 3); }
+        else if (i == 2) { emit("rdx", 3); }
+        else if (i == 3) { emit("rcx", 3); }
+        else if (i == 4) { emit("r8", 2); }
+        else if (i == 5) { emit("r9", 2); }
         emit_nl();
         i = i + 1;
     }
+    stack_args = stack_args - reg_count0;
 
     emit("    call ", 9);
     _ssa_emit_reg_name(callee_reg);
     emit_nl();
 
-    if (dest != 0 && dest != SSA_PHYS_RAX) {
-        _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
+    if (is_sret == 0) {
+        if (dest != 0 && dest != SSA_PHYS_RAX) {
+            _ssa_emit_mov_reg_opr(dest, ssa_operand_reg(SSA_PHYS_RAX));
+        }
+        if (extra_dest != 0 && extra_dest != SSA_PHYS_RDX) {
+            emit("    mov ", 8);
+            _ssa_emit_reg_name(extra_dest);
+            emit(", rdx\n", 7);
+        }
     }
 
-    if (extra_dest != 0 && extra_dest != SSA_PHYS_RDX) {
-        emit("    mov ", 8);
-        _ssa_emit_reg_name(extra_dest);
-        emit(", rdx\n", 7);
+    if (stack_args > 0) {
+        emit("    add rsp, ", 13);
+        emit_u64(stack_args * 8);
+        emit_nl();
     }
 
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(dest, SSA_PHYS_R9); }
@@ -1426,6 +1497,80 @@ func _ssa_emit_ret(inst: *SSAInstruction) -> u64 {
     return 0;
 }
 
+func _ssa_emit_ret_slice_heap(inst: *SSAInstruction) -> u64 {
+    _ssa_ensure_heap_brk_global();
+    var elem_size: u64 = ssa_ret_slice_heap_get((u64)inst);
+
+    emit("    mov r12, ", 13);
+    _ssa_emit_opr(inst->src2);
+    emit_nl();
+    emit("    mov r8, ", 12);
+    _ssa_emit_opr(inst->src2);
+    emit_nl();
+    emit("    mov r13, ", 13);
+    _ssa_emit_opr(inst->src1);
+    emit_nl();
+    emit("    mov rax, ", 13);
+    emit_u64(elem_size);
+    emit_nl();
+    emit("    imul r8, rax\n", 20);
+
+    var init_label: u64 = new_label();
+    var ok_label: u64 = new_label();
+    var fail_label: u64 = new_label();
+    emit("    mov rax, [_gvar___cg_heap_brk]\n", 35);
+    emit("    cmp rax, 0\n", 16);
+    emit("    jne ", 8);
+    emit_label(init_label);
+    emit_nl();
+    emit("    mov rax, 12\n", 18);
+    emit("    xor rdi, rdi\n", 19);
+    emit("    syscall\n", 13);
+    emit("    mov [_gvar___cg_heap_brk], rax\n", 39);
+    emit_label_def(init_label);
+    emit("    mov rbx, [_gvar___cg_heap_brk]\n", 35);
+    emit("    mov rdi, rbx\n", 19);
+    emit("    add rdi, r8\n", 18);
+    emit("    mov rax, 12\n", 18);
+    emit("    syscall\n", 13);
+    emit("    cmp rax, rdi\n", 18);
+    emit("    jb ", 7);
+    emit_label(fail_label);
+    emit_nl();
+    emit("    mov [_gvar___cg_heap_brk], rax\n", 39);
+    emit("    jmp ", 8);
+    emit_label(ok_label);
+    emit_nl();
+    emit_label_def(fail_label);
+    emit("    xor rbx, rbx\n", 19);
+    emit_label_def(ok_label);
+
+    emit("    mov rdx, r12\n", 19);
+    emit("    mov rsi, r13\n", 17);
+    emit("    mov rdi, rbx\n", 19);
+    emit("    xor r9, r9\n", 17);
+    var loop_label: u64 = new_label();
+    var end_label: u64 = new_label();
+    emit_label_def(loop_label);
+    emit("    cmp r9, r8\n", 19);
+    emit("    jge ", 8);
+    emit_label(end_label);
+    emit_nl();
+    emit("    mov r10b, [rsi+r9]\n", 30);
+    emit("    mov [rdi+r9], r10b\n", 30);
+    emit("    add r9, 1\n", 16);
+    emit("    jmp ", 8);
+    emit_label(loop_label);
+    emit_nl();
+    emit_label_def(end_label);
+    emit("    mov rax, rbx\n", 19);
+
+    emit("    mov rsp, rbp\n", 20);
+    emit("    pop rbp\n", 13);
+    emit("    ret\n", 9);
+    return 0;
+}
+
 // ============================================
 // 명령어 디스패치
 // ============================================
@@ -1485,26 +1630,19 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_PARAM) {
         var idx: u64 = ssa_operand_value(inst->src1);
-        emit("    mov ", 8);
-        _ssa_emit_reg_name(inst->dest);
-        emit(", ", 2);
-        // System V ABI: first 6 integer args in RDI, RSI, RDX, RCX, R8, R9
-        if (idx == 0) {
-            emit("rdi\n", 4);
-        } else if (idx == 1) {
-            emit("rsi\n", 4);
-        } else if (idx == 2) {
-            emit("rdx\n", 4);
-        } else if (idx == 3) {
-            emit("rcx\n", 4);
-        } else if (idx == 4) {
-            emit("r8\n", 3);
-        } else if (idx == 5) {
-            emit("r9\n", 3);
+        if (idx <= 5) {
+            var save_offset: u64 = 1032 + idx * 8;
+            emit("    mov ", 8);
+            _ssa_emit_reg_name(inst->dest);
+            emit(", [rbp-", 7);
+            emit_u64(save_offset);
+            emit("]\n", 2);
         } else {
             // Stack parameters (7th onwards)
             var offset: u64 = 16 + (idx - 6) * 8;
-            emit("[rbp+", 5);
+            emit("    mov ", 8);
+            _ssa_emit_reg_name(inst->dest);
+            emit(", [rbp+", 7);
             emit_u64(offset);
             emit("]\n", 2);
         }
@@ -1601,6 +1739,7 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
     if (op == SSA_OP_BR) { return _ssa_emit_br(fn_id, inst); }
     if (op == SSA_OP_JMP) { return _ssa_emit_jmp(fn_id, inst); }
     if (op == SSA_OP_RET) { return _ssa_emit_ret(inst); }
+    if (op == SSA_OP_RET_SLICE_HEAP) { return _ssa_emit_ret_slice_heap(inst); }
 
     return 0;
 }
@@ -1634,7 +1773,13 @@ func ssa_codegen_emit_func(fn_ptr: u64, ssa_fn_ptr: u64) -> u64 {
     emit(":\n", 2);
     emit("    push rbp\n", 14);
     emit("    mov rbp, rsp\n", 19);
-    emit("    sub rsp, 1024\n", 21);
+    emit("    sub rsp, 1088\n", 21);
+    emit("    mov [rbp-1032], rdi\n", 27);
+    emit("    mov [rbp-1040], rsi\n", 27);
+    emit("    mov [rbp-1048], rdx\n", 27);
+    emit("    mov [rbp-1056], rcx\n", 27);
+    emit("    mov [rbp-1064], r8\n", 26);
+    emit("    mov [rbp-1072], r9\n", 26);
 
     var blocks: u64 = ssa_fn->blocks_data;
     var bcount: u64 = ssa_fn->blocks_len;

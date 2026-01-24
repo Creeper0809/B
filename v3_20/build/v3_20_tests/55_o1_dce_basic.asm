@@ -13,7 +13,13 @@ _start:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
     mov rax, 0
     mov rsp, rbp

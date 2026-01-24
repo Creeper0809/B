@@ -35,8 +35,10 @@ main:
     lea rax, [rel _50_ssa_call_ptr_basic__add]
     mov rbx, 7
     mov rcx, 8
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call rax
     mov rbx, 15
     cmp rax, rbx
@@ -74,8 +76,10 @@ main:
     lea rax, [rel _50_ssa_call_ptr_basic__add]
     mov rbx, 1
     mov rcx, 2
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call rax
     mov rbx, 3
     cmp rax, rbx

@@ -13,9 +13,15 @@ _start:
 _38_ssa_global_access__inc:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     lea rbx, [rel _gvar__38_ssa_global_access__g]
     lea rcx, [rel _gvar__38_ssa_global_access__g]
     mov rcx, [rcx]
@@ -33,9 +39,15 @@ _38_ssa_global_access__inc:
 _38_ssa_global_access__bump_h:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     lea rbx, [rel _gvar__38_ssa_global_access__h]
     lea rcx, [rel _gvar__38_ssa_global_access__h]
     mov rcx, [rcx]
@@ -53,10 +65,16 @@ _38_ssa_global_access__bump_h:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_2_2:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     lea rax, [rel _gvar__38_ssa_global_access__g]
     mov rbx, 0
     mov [rax], rbx
@@ -64,7 +82,8 @@ main:
     mov rbx, 1
     mov [rax], rbx
     mov rax, 5
-    mov rdi, rax
+    push rax
+    pop rdi
     call _38_ssa_global_access__inc
     mov rbx, 5
     cmp rax, rbx
@@ -81,7 +100,8 @@ main:
     jmp .Lssa_2_4
 .Lssa_2_4:
     mov rax, 3
-    mov rdi, rax
+    push rax
+    pop rdi
     call _38_ssa_global_access__inc
     mov rbx, 8
     cmp rax, rbx
@@ -98,7 +118,8 @@ main:
     jmp .Lssa_2_6
 .Lssa_2_6:
     mov rax, 4
-    mov rdi, rax
+    push rax
+    pop rdi
     call _38_ssa_global_access__bump_h
     mov rbx, 5
     cmp rax, rbx

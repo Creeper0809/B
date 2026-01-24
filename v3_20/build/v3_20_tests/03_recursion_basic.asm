@@ -13,9 +13,15 @@ _start:
 _03_recursion_basic__factorial:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     push rax
     cmp rax, 1
     setle al
@@ -35,7 +41,8 @@ _03_recursion_basic__factorial:
     mov rbx, rax
     sub rbx, 1
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _03_recursion_basic__factorial
     mov rbx, rax
     pop rax
@@ -51,9 +58,15 @@ _03_recursion_basic__factorial:
 _03_recursion_basic__fib:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_3:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     push rax
     cmp rax, 2
     setl al
@@ -71,14 +84,16 @@ _03_recursion_basic__fib:
     mov rbx, rax
     sub rbx, 1
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _03_recursion_basic__fib
     mov rbx, rax
     pop rax
     mov rax, rax
     sub rax, 2
     push rbx
-    mov rdi, rax
+    push rax
+    pop rdi
     call _03_recursion_basic__fib
     pop rbx
     add rax, rbx
@@ -92,12 +107,19 @@ _03_recursion_basic__fib:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_2_6:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     mov rax, 5
-    mov rdi, rax
+    push rax
+    pop rdi
     call _03_recursion_basic__factorial
     cmp rax, 120
     setne al
@@ -113,7 +135,8 @@ main:
     jmp .Lssa_2_8
 .Lssa_2_8:
     mov rax, 10
-    mov rdi, rax
+    push rax
+    pop rdi
     call _03_recursion_basic__fib
     cmp rax, 55
     setne al

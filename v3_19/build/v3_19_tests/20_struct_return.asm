@@ -163,8 +163,10 @@ _20_struct_return__get_value:
     mov rbx, 20
     mov rdx, 22
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Inner_new
     mov rbx, rax
     mov rcx, rdx
@@ -232,8 +234,10 @@ _20_struct_return__get_vec:
 .Lssa_7_8:
     mov rax, 10
     mov rcx, 20
-    mov rdi, rax
-    mov rsi, rcx
+    push rcx
+    push rax
+    pop rdi
+    pop rsi
     call _20_struct_return__Vec2_new
     mov rbx, rdx
     mov rdx, rbx
@@ -244,8 +248,10 @@ _20_struct_return__get_vec:
 .Lssa_7_9:
     mov rax, 5
     mov rcx, 7
-    mov rdi, rax
-    mov rsi, rcx
+    push rcx
+    push rax
+    pop rdi
+    pop rsi
     call _20_struct_return__Vec2_new
     mov rbx, rdx
     mov rdx, rbx
@@ -262,8 +268,10 @@ _20_struct_return__get_vec:
 .Lssa_7_11:
     mov rax, 30
     mov rcx, 40
-    mov rdi, rax
-    mov rsi, rcx
+    push rcx
+    push rax
+    pop rdi
+    pop rsi
     call _20_struct_return__Vec2_new
     mov rbx, rdx
     mov rdx, rbx
@@ -367,8 +375,10 @@ _20_struct_return__Pair_swap:
     add rcx, 8
     mov rcx, [rcx]
     mov rax, [rax]
-    mov rdi, rcx
-    mov rsi, rax
+    push rax
+    push rcx
+    pop rdi
+    pop rsi
     call _20_struct_return__Pair_new
     mov rbx, rdx
     mov rdx, rbx
@@ -396,8 +406,10 @@ _20_struct_return__fibonacci_pair:
 .Lssa_12_18:
     mov rbx, 0
     mov rcx, 1
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Pair_new
     mov rbx, rax
     mov rax, rdx
@@ -419,8 +431,10 @@ _20_struct_return__fibonacci_pair:
 .Lssa_12_20:
     mov rbx, 1
     mov rcx, 1
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Pair_new
     mov rbx, rax
     mov rax, rdx
@@ -435,7 +449,8 @@ _20_struct_return__fibonacci_pair:
     mov rax, rax
     sub rax, 1
     push rbx
-    mov rdi, rax
+    push rax
+    pop rdi
     call _20_struct_return__fibonacci_pair
     mov rcx, rdx
     pop rbx
@@ -455,8 +470,10 @@ _20_struct_return__fibonacci_pair:
     mov rdx, [rdx]
     mov rbx, rbx
     add rbx, rdx
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _20_struct_return__Pair_new
     mov rcx, rdx
     mov rdx, rcx
@@ -519,8 +536,10 @@ _20_struct_return__Data_transform:
     mov rdx, rdx
     add rdx, 1
     push rbx
-    mov rdi, rcx
-    mov rsi, rdx
+    push rdx
+    push rcx
+    pop rdi
+    pop rsi
     call _20_struct_return__Data_new
     mov rcx, rax
     mov rax, rdx
@@ -550,8 +569,10 @@ _20_struct_return__Data_transform:
     mov rdx, rdx
     imul rdx, 2
     push rbx
-    mov rdi, rcx
-    mov rsi, rdx
+    push rdx
+    push rcx
+    pop rdi
+    pop rsi
     call _20_struct_return__Data_new
     mov rcx, rax
     mov rax, rdx
@@ -582,8 +603,10 @@ _20_struct_return__Data_transform:
     mov rdx, [rbx]
     mov rcx, rcx
     sub rcx, rdx
-    mov rdi, rax
-    mov rsi, rcx
+    push rcx
+    push rax
+    pop rdi
+    pop rsi
     call _20_struct_return__Data_new
     mov rbx, rdx
     mov rdx, rbx
@@ -596,8 +619,10 @@ _20_struct_return__Data_transform:
     mov rcx, rbx
     add rcx, 8
     mov rcx, [rcx]
-    mov rdi, rax
-    mov rsi, rcx
+    push rcx
+    push rax
+    pop rdi
+    pop rsi
     call _20_struct_return__Data_new
     mov rbx, rdx
     mov rdx, rbx
@@ -617,8 +642,10 @@ main:
     mov rbx, 10
     mov rdx, 20
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Point_new
     mov rbx, rax
     mov rcx, rdx
@@ -628,7 +655,8 @@ main:
     add rax, 8
     mov [rax], rcx
     lea rax, [rbp-16]
-    mov rdi, rax
+    push rax
+    pop rdi
     call _20_struct_return__Point_sum
     cmp rax, 30
     setne al
@@ -661,8 +689,10 @@ main:
     mov rbx, 5
     mov rdx, 10
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Point_new
     mov rbx, rax
     mov rcx, rdx
@@ -675,8 +705,10 @@ main:
     mov rbx, 3
     mov rdx, 7
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Point_new
     mov rbx, rax
     mov rcx, rdx
@@ -689,8 +721,10 @@ main:
     lea rbx, [rbp-32]
     lea rdx, [rbp-48]
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Point_add
     mov rbx, rax
     mov rcx, rdx
@@ -703,8 +737,10 @@ main:
     lea rbx, [rbp-64]
     mov rdx, 2
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Point_scale
     mov rbx, rax
     mov rcx, rdx
@@ -737,7 +773,8 @@ main:
     lea rax, [rbp-96]
     mov rbx, 1
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _20_struct_return__get_vec
     mov rbx, rax
     mov rcx, rdx
@@ -749,7 +786,8 @@ main:
     lea rax, [rbp-112]
     mov rbx, 2
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _20_struct_return__get_vec
     mov rbx, rax
     mov rcx, rdx
@@ -761,7 +799,8 @@ main:
     lea rax, [rbp-128]
     mov rbx, 3
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _20_struct_return__get_vec
     mov rbx, rax
     mov rcx, rdx
@@ -815,8 +854,10 @@ main:
     mov rbx, 100
     mov rdx, 200
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Color_new
     mov rbx, rax
     mov rcx, rdx
@@ -829,8 +870,10 @@ main:
     mov rbx, 50
     mov rdx, 75
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Color_new
     mov rbx, rax
     mov rcx, rdx
@@ -841,14 +884,18 @@ main:
     mov [rax], rcx
     lea rax, [rbp-32]
     lea rbx, [rbp-152]
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _20_struct_return__compute
     lea rbx, [rbp-48]
     lea rcx, [rbp-168]
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__compute
     mov rbx, rax
     pop rax
@@ -871,8 +918,10 @@ main:
     mov rbx, 10
     mov rdx, 20
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Pair_new
     mov rbx, rax
     mov rcx, rdx
@@ -884,7 +933,8 @@ main:
     lea rax, [rbp-208]
     lea rbx, [rbp-192]
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _20_struct_return__Pair_swap
     mov rbx, rax
     mov rcx, rdx
@@ -929,7 +979,8 @@ main:
     lea rax, [rbp-224]
     mov rbx, 5
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _20_struct_return__fibonacci_pair
     mov rbx, rax
     mov rcx, rdx
@@ -957,8 +1008,10 @@ main:
     mov rbx, 5
     mov rdx, 3
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Data_new
     mov rbx, rax
     mov rcx, rdx
@@ -997,8 +1050,10 @@ main:
     push rax
     push rdx
     push r8
-    mov rdi, rbx
-    mov rsi, rax
+    push rax
+    push rbx
+    pop rdi
+    pop rsi
     call _20_struct_return__Data_transform
     mov rbx, rax
     pop r8

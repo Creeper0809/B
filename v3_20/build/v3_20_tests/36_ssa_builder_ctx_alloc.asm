@@ -13,7 +13,13 @@ _start:
 _36_ssa_builder_ctx_alloc__foo:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
     mov rax, 1
     mov rbx, 2
@@ -29,10 +35,16 @@ _36_ssa_builder_ctx_alloc__foo:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     call _36_ssa_builder_ctx_alloc__foo
     mov rbx, 3
     cmp rax, rbx

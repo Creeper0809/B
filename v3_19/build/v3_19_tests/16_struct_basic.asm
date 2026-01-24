@@ -207,12 +207,16 @@ main:
     mov rbx, 20
     mov rcx, 22
     push rax
-    mov rdi, rax
-    mov rsi, rbx
-    mov rdx, rcx
+    push rcx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _16_struct_basic__set_point
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call _16_struct_basic__get_sum
     cmp rax, 42
     setne al

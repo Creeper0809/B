@@ -295,6 +295,31 @@ func ssa_operand_value(opr: u64) -> u64 {
     return opr & SSA_OPR_VALUE_MASK;
 }
 
+var g_ret_slice_heap_map;
+
+func ssa_ret_slice_heap_clear() -> u64 {
+    g_ret_slice_heap_map = 0;
+    return 0;
+}
+
+func ssa_ret_slice_heap_set(inst_ptr: u64, elem_size: u64) -> u64 {
+    if (g_ret_slice_heap_map == 0) { g_ret_slice_heap_map = vec_new(16); }
+    vec_push(g_ret_slice_heap_map, inst_ptr);
+    vec_push(g_ret_slice_heap_map, elem_size);
+    return 0;
+}
+
+func ssa_ret_slice_heap_get(inst_ptr: u64) -> u64 {
+    if (g_ret_slice_heap_map == 0) { return 0; }
+    var n: u64 = vec_len(g_ret_slice_heap_map);
+    var i: u64 = 0;
+    while (i + 1 < n) {
+        if (vec_get(g_ret_slice_heap_map, i) == inst_ptr) { return vec_get(g_ret_slice_heap_map, i + 1); }
+        i = i + 2;
+    }
+    return 0;
+}
+
 func ssa_block_add_pred(block: *SSABlock, pred: *SSABlock) -> u64 {
     push_trace("ssa_block_add_pred", "ssa_core.b", __LINE__);
     pop_trace();

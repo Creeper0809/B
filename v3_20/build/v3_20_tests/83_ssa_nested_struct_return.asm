@@ -13,9 +13,15 @@ _start:
 _83_ssa_nested_struct_return__make_inner:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     mov rsp, rbp
     pop rbp
     ret
@@ -26,17 +32,25 @@ _83_ssa_nested_struct_return__make_inner:
 _83_ssa_nested_struct_return__make_outer:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
-    mov rax, rsi
-    mov rbx, rdi
+    mov rax, [rbp-1040]
+    mov rbx, [rbp-1032]
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _83_ssa_nested_struct_return__make_inner
     mov rbx, rax
     pop rax
     push rbx
-    mov rdi, rax
+    push rax
+    pop rdi
     call _83_ssa_nested_struct_return__make_inner
     pop rbx
     mov rdx, rax
@@ -51,14 +65,22 @@ _83_ssa_nested_struct_return__make_outer:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_2_2:
     lea rax, [rbp-16]
     mov rbx, 30
     mov rdx, 40
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _83_ssa_nested_struct_return__make_outer
     mov rbx, rax
     mov rcx, rdx

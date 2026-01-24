@@ -53,6 +53,7 @@ const SSA_OP_CALL_PTR = 29;
 const SSA_OP_JMP = 30;
 const SSA_OP_BR = 31;
 const SSA_OP_RET = 32;
+const SSA_OP_RET_SLICE_HEAP = 71;
 
 // SSA destruction helper
 const SSA_OP_COPY = 40;

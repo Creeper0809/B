@@ -36,6 +36,7 @@ func _ssa_dump_op_name(op: u64) -> u64 {
     if (op == SSA_OP_JMP) { emit("jmp", 3); pop_trace(); return 0; }
     if (op == SSA_OP_BR) { emit("br", 2); pop_trace(); return 0; }
     if (op == SSA_OP_RET) { emit("ret", 3); pop_trace(); return 0; }
+    if (op == SSA_OP_RET_SLICE_HEAP) { emit("ret_slice_heap", 14); pop_trace(); return 0; }
     if (op == SSA_OP_COPY) { emit("copy", 4); pop_trace(); return 0; }
     if (op == SSA_OP_LEA_STR) { emit("lea_str", 7); pop_trace(); return 0; }
     if (op == SSA_OP_LEA_LOCAL) { emit("lea_local", 9); pop_trace(); return 0; }
@@ -85,6 +86,19 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
             emit(", ", 2);
             _ssa_dump_operand(inst->src2);
         }
+        emit_nl();
+        pop_trace();
+        return 0;
+    }
+    if (op == SSA_OP_RET_SLICE_HEAP) {
+        emit("  ret_slice_heap ", 17);
+        if (inst->dest != 0) {
+            _ssa_dump_operand(inst->dest);
+        }
+        emit(", ", 2);
+        _ssa_dump_operand(inst->src1);
+        emit(", ", 2);
+        _ssa_dump_operand(inst->src2);
         emit_nl();
         pop_trace();
         return 0;

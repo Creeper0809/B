@@ -71,7 +71,13 @@ std_os__os_sys_write:
 std_io__io_get_output_fd:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_24_24:
     xor eax, eax
     mov rsp, rbp
@@ -80,7 +86,13 @@ std_io__io_get_output_fd:
 std_io__heap_alloc:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_25_25:
     xor eax, eax
     mov rsp, rbp
@@ -89,7 +101,13 @@ std_io__heap_alloc:
 std_io__println:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_30_30:
     xor eax, eax
     mov rsp, rbp
@@ -98,7 +116,13 @@ std_io__println:
 std_io__print_u64:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_31_31:
     xor eax, eax
     mov rsp, rbp
@@ -107,22 +131,33 @@ std_io__print_u64:
 _23_sizeof__print_result:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_33_33:
-    mov rax, rdx
-    mov rbx, rsi
-    mov rcx, rdi
+    mov rax, [rbp-1048]
+    mov rbx, [rbp-1040]
+    mov rcx, [rbp-1032]
     push rax
-    mov rdi, rcx
-    mov rsi, rbx
+    push rbx
+    push rcx
+    pop rdi
+    pop rsi
     call std_io__println
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_io__print_u64
     lea rax, [rel _str0]
     mov rbx, 1
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 0
     mov rsp, rbp
@@ -135,27 +170,41 @@ _23_sizeof__print_result:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_34_34:
     lea rax, [rel _str1]
     mov rbx, 27
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 1
     lea rbx, [rel _str2]
     mov rcx, 14
-    mov rdi, rbx
-    mov rsi, rcx
-    mov rdx, rax
+    push rax
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
     mov rax, 2
     lea rbx, [rel _str3]
     mov rcx, 15
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
-    mov rdx, rax
+    push rax
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
     pop rax
     mov rbx, 4
@@ -163,9 +212,12 @@ main:
     mov rdx, 15
     push rax
     push rbx
-    mov rdi, rcx
-    mov rsi, rdx
-    mov rdx, rbx
+    push rbx
+    push rdx
+    push rcx
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
     pop rbx
     pop rax
@@ -175,9 +227,12 @@ main:
     push rax
     push rbx
     push rcx
-    mov rdi, rdx
-    mov rsi, r8
-    mov rdx, rcx
+    push rcx
+    push r8
+    push rdx
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
     pop rcx
     pop rbx
@@ -189,9 +244,12 @@ main:
     push rbx
     push rcx
     push rdx
-    mov rdi, r8
-    mov rsi, r9
-    mov rdx, rdx
+    push rdx
+    push r9
+    push r8
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
     pop rdx
     pop rcx
@@ -203,8 +261,10 @@ main:
     push rbx
     push rcx
     push rdx
-    mov rdi, r8
-    mov rsi, r9
+    push r9
+    push r8
+    pop rdi
+    pop rsi
     call std_io__println
     pop rdx
     pop rcx
@@ -212,15 +272,18 @@ main:
     pop rax
     mov r8, 8
     lea r9, [rel _str8]
-    mov rax, 15
+    mov r10, 15
     push rax
     push rbx
     push rcx
     push rdx
     push r8
-    mov rdi, r9
-    mov rsi, rax
-    mov rdx, r8
+    push r8
+    push r10
+    push r9
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
     pop r8
     pop rdx
@@ -228,17 +291,20 @@ main:
     pop rbx
     pop rax
     mov r9, 8
-    lea rax, [rel _str9]
-    mov rax, 16
+    lea r10, [rel _str9]
+    mov r11, 16
     push rax
     push rbx
     push rcx
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
-    mov rdx, r9
+    push r9
+    push r11
+    push r10
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
     pop r9
     pop r8
@@ -246,8 +312,8 @@ main:
     pop rcx
     pop rbx
     pop rax
-    mov rax, 8
-    lea rax, [rel _str10]
+    mov r10, 8
+    lea r11, [rel _str10]
     mov rax, 17
     push rax
     push rbx
@@ -255,17 +321,22 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
-    mov rdx, rax
+    push r10
+    push rax
+    push r11
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
+    pop r10
+    pop r10
     pop r9
     pop r8
     pop rdx
     pop rcx
     pop rbx
     pop rax
-    lea rax, [rel _str11]
+    lea r11, [rel _str11]
     mov rax, 23
     push rax
     push rbx
@@ -273,16 +344,20 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
+    push rax
+    push r11
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r10
+    pop r10
     pop r9
     pop r8
     pop rdx
     pop rcx
     pop rbx
     pop rax
-    mov rax, 16
+    mov r11, 16
     lea rax, [rel _str12]
     mov rax, 17
     push rax
@@ -291,10 +366,17 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
-    mov rdx, rax
+    push r11
+    push rax
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -310,10 +392,17 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
-    mov rdx, rax
+    push rax
+    push rax
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -329,10 +418,17 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
-    mov rdx, rax
+    push rax
+    push rax
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -347,9 +443,15 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
+    push rax
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -365,10 +467,17 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
-    mov rdx, rax
+    push rax
+    push rax
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -384,10 +493,17 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
-    mov rdx, rax
+    push rax
+    push rax
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _23_sizeof__print_result
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -402,9 +518,15 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
+    push rax
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -425,9 +547,15 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
+    push rax
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -452,9 +580,15 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rax
+    push rax
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -477,9 +611,15 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -500,9 +640,15 @@ main:
     push rdx
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     pop rdx
@@ -521,9 +667,15 @@ main:
     mov rbx, 33
     push r8
     push r9
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     pop r8
     mov rax, 0
@@ -540,9 +692,15 @@ main:
     lea rax, [rel _str24]
     mov rbx, 34
     push r9
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     pop r9
     mov rax, 0
     mov rbx, rax
@@ -557,14 +715,20 @@ main:
 .Lssa_34_47:
     lea rax, [rel _str25]
     mov rbx, 35
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r10
+    pop r11
+    pop r10
     mov rax, 0
     mov rbx, rax
     jmp .Lssa_34_48
 .Lssa_34_48:
-    cmp rax, 8
+    cmp r10, 8
     setne al
     movzx rax, al
     cmp rax, 0
@@ -573,14 +737,18 @@ main:
 .Lssa_34_49:
     lea rax, [rel _str26]
     mov rbx, 36
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
+    pop r11
+    pop r11
     mov rax, 0
     mov rbx, rax
     jmp .Lssa_34_50
 .Lssa_34_50:
-    cmp rax, 16
+    cmp r11, 16
     setne al
     movzx rax, al
     cmp rax, 0
@@ -589,8 +757,10 @@ main:
 .Lssa_34_51:
     lea rax, [rel _str27]
     mov rbx, 37
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 0
     mov rbx, rax
@@ -605,8 +775,10 @@ main:
 .Lssa_34_53:
     lea rax, [rel _str28]
     mov rbx, 36
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 0
     mov rbx, rax
@@ -621,8 +793,10 @@ main:
 .Lssa_34_55:
     lea rax, [rel _str29]
     mov rbx, 42
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 0
     mov rbx, rax
@@ -637,8 +811,10 @@ main:
 .Lssa_34_57:
     lea rax, [rel _str30]
     mov rbx, 37
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 0
     mov rbx, rax
@@ -653,8 +829,10 @@ main:
 .Lssa_34_59:
     lea rax, [rel _str31]
     mov rbx, 36
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 0
     jmp .Lssa_34_60
@@ -665,8 +843,10 @@ main:
 .Lssa_34_61:
     lea rax, [rel _str32]
     mov rbx, 27
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     jmp .Lssa_34_62
 .Lssa_34_62:
@@ -677,8 +857,10 @@ main:
 .Lssa_34_63:
     lea rax, [rel _str33]
     mov rbx, 28
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     jmp .Lssa_34_62
 .Lssa_34_64:

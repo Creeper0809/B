@@ -14,23 +14,29 @@ _51_ssa_slice_return__make_slice:
     push rbp
     mov rbp, rsp
     sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov rax, [rbp-8]
-    mov [rbp-32], rax
-    mov rax, [rbp-16]
-    mov [rbp-24], rax
-    lea rax, [rbp-32]
+.Lssa_0_0:
+    mov rax, rsi
+    mov rbx, rdi
+    lea rcx, [rbp-16]
+    mov [rcx], rbx
+    mov rbx, 8
+    add rbx, rcx
+    mov [rbx], rax
+    lea rax, [rbp-16]
     mov rbx, [rax]
-    mov rdx, [rax+8]
+    mov rcx, 8
+    mov rax, rax
+    add rax, rcx
+    mov rax, [rax]
+    mov rdx, rax
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
+    xor eax, eax
     mov rsp, rbp
     pop rbp
-   ret
+    ret
 main:
     push rbp
     mov rbp, rsp
@@ -66,8 +72,10 @@ main:
     lea rbx, [rbp-4]
     mov rcx, 4
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call _51_ssa_slice_return__make_slice
     mov rbx, [rsp]
     mov [rbx], rax

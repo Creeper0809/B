@@ -101,7 +101,8 @@ main:
     sub rsp, 1024
 .Lssa_33_33:
     mov rax, 123
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_io__print_u64
     mov rax, 0
     mov rsp, rbp

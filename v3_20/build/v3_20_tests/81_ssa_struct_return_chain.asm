@@ -13,10 +13,16 @@ _start:
 _81_ssa_struct_return_chain__make_point:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
-    mov rax, rsi
-    mov rbx, rdi
+    mov rax, [rbp-1040]
+    mov rbx, [rbp-1032]
     mov rdx, rax
     mov rax, rbx
     mov rsp, rbp
@@ -29,11 +35,17 @@ _81_ssa_struct_return_chain__make_point:
 _81_ssa_struct_return_chain__pass_through:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
     lea rax, [rbp-16]
-    mov rbx, rdi
-    mov rcx, rsi
+    mov rbx, [rbp-1032]
+    mov rcx, [rbp-1040]
     mov [rax], rbx
     mov rax, rax
     add rax, 8
@@ -55,14 +67,22 @@ _81_ssa_struct_return_chain__pass_through:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_2_2:
     lea rax, [rbp-16]
     mov rbx, 20
     mov rdx, 22
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _81_ssa_struct_return_chain__make_point
     mov rbx, rax
     mov rcx, rdx
@@ -78,25 +98,10 @@ main:
     add rbx, 8
     mov rbx, [rbx]
     push rax
-    mov rdi, rdx
-    mov rsi, rbx
-    call _81_ssa_struct_return_chain__pass_through
-    mov rbx, rax
-    mov rcx, rdx
-    pop rax
-    mov [rax], rbx
-    mov rax, rax
-    add rax, 8
-    mov [rax], rcx
-    lea rax, [rbp-48]
-    lea rbx, [rbp-32]
-    mov rdx, [rbx]
-    mov rbx, rbx
-    add rbx, 8
-    mov rbx, [rbx]
-    push rax
-    mov rdi, rdx
-    mov rsi, rbx
+    push rbx
+    push rdx
+    pop rdi
+    pop rsi
     call _81_ssa_struct_return_chain__pass_through
     mov rbx, rax
     mov rcx, rdx
@@ -108,16 +113,6 @@ main:
     lea rax, [rbp-32]
     mov rax, [rax]
     lea rbx, [rbp-32]
-    mov rbx, rbx
-    add rbx, 8
-    mov rbx, [rbx]
-    mov rax, rax
-    add rax, rbx
-    lea rbx, [rbp-48]
-    mov rbx, [rbx]
-    mov rax, rax
-    add rax, rbx
-    lea rbx, [rbp-48]
     mov rbx, rbx
     add rbx, 8
     mov rbx, [rbx]

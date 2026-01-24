@@ -17,6 +17,8 @@ const SSA_PHYS_RCX = 3;
 const SSA_PHYS_RDX = 4;
 const SSA_PHYS_R8 = 5;
 const SSA_PHYS_R9 = 6;
+const SSA_PHYS_R10 = 7;
+const SSA_PHYS_R11 = 8;
 
 var g_regalloc_ctx;
 
@@ -129,8 +131,12 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
         var cur: *SSAInstruction = b->inst_head;
         while (cur != 0) {
             var op: u64 = ssa_inst_get_op(cur);
-            if (op != SSA_OP_BR && op != SSA_OP_JMP) {
-                if (cur->dest > max_id) { max_id = cur->dest; }
+            if (op != SSA_OP_BR && op != SSA_OP_JMP && op != SSA_OP_RET_SLICE_HEAP) {
+                var mask: u64 = 1;
+                mask = mask << 63;
+                if ((cur->dest & mask) == 0) {
+                    if (cur->dest > max_id) { max_id = cur->dest; }
+                }
             }
             if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
                 var info_ptr: u64 = ssa_operand_value(cur->src1);
@@ -254,8 +260,12 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
             }
 
             if (cur->dest != 0) {
-                if (op != SSA_OP_BR && op != SSA_OP_JMP && cur->dest <= max_reg) {
-                    _ssa_bitset_set(def, cur->dest);
+                if (op != SSA_OP_BR && op != SSA_OP_JMP && op != SSA_OP_RET_SLICE_HEAP) {
+                    var mask2: u64 = 1;
+                    mask2 = mask2 << 63;
+                    if ((cur->dest & mask2) == 0 && cur->dest <= max_reg) {
+                        _ssa_bitset_set(def, cur->dest);
+                    }
                 }
             }
             if (op == SSA_OP_CALL || op == SSA_OP_CALL_PTR) {
@@ -539,6 +549,8 @@ func _ssa_regalloc_color_to_phys(color: u64) -> u64 {
     if (color == 4) { return SSA_PHYS_RDX; }
     if (color == 5) { return SSA_PHYS_R8; }
     if (color == 6) { return SSA_PHYS_R9; }
+    if (color == 7) { return SSA_PHYS_R10; }
+    if (color == 8) { return SSA_PHYS_R11; }
     return 0;
 }
 

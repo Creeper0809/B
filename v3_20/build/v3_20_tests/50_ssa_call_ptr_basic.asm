@@ -13,10 +13,16 @@ _start:
 _50_ssa_call_ptr_basic__add:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
-    mov rax, rsi
-    mov rbx, rdi
+    mov rax, [rbp-1040]
+    mov rbx, [rbp-1032]
     add rax, rbx
     mov rsp, rbp
     pop rbp
@@ -28,15 +34,23 @@ _50_ssa_call_ptr_basic__add:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     lea rax, [rel _50_ssa_call_ptr_basic__add]
     mov rbx, 7
     mov rcx, 8
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call rax
     mov rbx, 15
     cmp rax, rbx
@@ -74,8 +88,10 @@ main:
     lea rax, [rel _50_ssa_call_ptr_basic__add]
     mov rbx, 1
     mov rcx, 2
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call rax
     mov rbx, 3
     cmp rax, rbx

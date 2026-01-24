@@ -13,9 +13,15 @@ _start:
 _07_switch_statement__get_value:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_33_33:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     push rax
     cmp rax, 0
     sete al
@@ -88,9 +94,15 @@ _07_switch_statement__get_value:
 _07_switch_statement__test_switch_int:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_34_42:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     push rax
     cmp rax, 1
     sete al
@@ -143,9 +155,15 @@ _07_switch_statement__test_switch_int:
 _07_switch_statement__test_switch_enum:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_35_54:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     push rax
     cmp rax, 0
     sete al
@@ -211,9 +229,15 @@ _07_switch_statement__test_switch_enum:
 _07_switch_statement__test_switch_default_only:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_36_69:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     jmp .Lssa_36_71
 .Lssa_36_70:
     mov rsp, rbp
@@ -229,10 +253,16 @@ _07_switch_statement__test_switch_default_only:
 _07_switch_statement__test_switch_nested:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_37_72:
-    mov rax, rsi
-    mov rbx, rdi
+    mov rax, [rbp-1040]
+    mov rbx, [rbp-1032]
     push rax
     cmp rbx, 1
     sete al
@@ -276,9 +306,15 @@ _07_switch_statement__test_switch_nested:
 _07_switch_statement__test_switch_string:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_38_83:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     lea rbx, [rel _str0]
     push rax
     cmp rax, rbx
@@ -336,10 +372,16 @@ _07_switch_statement__test_switch_string:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_39_92:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     mov rax, 0
     cmp rax, 0
     jne .Lssa_39_93
@@ -352,18 +394,21 @@ main:
     jmp .Lssa_39_94
 .Lssa_39_94:
     mov rax, 0
-    mov rdi, rax
+    push rax
+    pop rdi
     call _07_switch_statement__get_value
     mov rbx, 1
     push rax
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call _07_switch_statement__get_value
     mov rbx, rax
     pop rax
     mov rcx, 2
     push rax
     push rbx
-    mov rdi, rcx
+    push rcx
+    pop rdi
     call _07_switch_statement__get_value
     mov rcx, rax
     pop rbx
@@ -372,7 +417,8 @@ main:
     push rax
     push rbx
     push rcx
-    mov rdi, rdx
+    push rdx
+    pop rdi
     call _07_switch_statement__get_value
     mov rdx, rax
     pop rcx
@@ -411,7 +457,8 @@ main:
     jmp .Lssa_39_98
 .Lssa_39_98:
     mov rax, 2
-    mov rdi, rax
+    push rax
+    pop rdi
     call _07_switch_statement__test_switch_int
     cmp rax, 200
     setne al
@@ -427,7 +474,8 @@ main:
     jmp .Lssa_39_100
 .Lssa_39_100:
     mov rax, 1
-    mov rdi, rax
+    push rax
+    pop rdi
     call _07_switch_statement__test_switch_int
     cmp rax, 100
     setne al
@@ -443,7 +491,8 @@ main:
     jmp .Lssa_39_102
 .Lssa_39_102:
     mov rax, 99
-    mov rdi, rax
+    push rax
+    pop rdi
     call _07_switch_statement__test_switch_int
     cmp rax, 999
     setne al
@@ -459,7 +508,8 @@ main:
     jmp .Lssa_39_104
 .Lssa_39_104:
     mov rax, 1
-    mov rdi, rax
+    push rax
+    pop rdi
     call _07_switch_statement__test_switch_enum
     cmp rax, 2000
     setne al
@@ -475,7 +525,8 @@ main:
     jmp .Lssa_39_106
 .Lssa_39_106:
     mov rax, 0
-    mov rdi, rax
+    push rax
+    pop rdi
     call _07_switch_statement__test_switch_enum
     cmp rax, 1000
     setne al
@@ -491,7 +542,8 @@ main:
     jmp .Lssa_39_108
 .Lssa_39_108:
     mov rax, 123
-    mov rdi, rax
+    push rax
+    pop rdi
     call _07_switch_statement__test_switch_default_only
     cmp rax, 777
     setne al
@@ -508,8 +560,10 @@ main:
 .Lssa_39_110:
     mov rax, 1
     mov rbx, 2
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _07_switch_statement__test_switch_nested
     cmp rax, 12
     setne al
@@ -525,7 +579,8 @@ main:
     jmp .Lssa_39_112
 .Lssa_39_112:
     lea rax, [rel _str1]
-    mov rdi, rax
+    push rax
+    pop rdi
     call _07_switch_statement__test_switch_string
     cmp rax, 200
     setne al

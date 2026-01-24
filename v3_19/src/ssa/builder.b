@@ -140,13 +140,14 @@ struct BuilderCtx {
     symtab: u64;           // symtab for type/offset lookup
     next_reg: u64;
     next_var_id: u64;
+    sret_addr_reg: u64;
 }
 
 func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
     push_trace("builder_ctx_new", "ssa_builder.b", __LINE__);
     pop_trace();
-    // BuilderCtx = 10 * 8 bytes = 80 bytes
-    var p: u64 = heap_alloc(80);
+    // BuilderCtx = 11 * 8 bytes = 88 bytes
+    var p: u64 = heap_alloc(88);
     var ctx: *BuilderCtx = (*BuilderCtx)p;
     ctx->ssa_ctx = ssa_ctx;
     ctx->cur_func = 0;
@@ -158,6 +159,7 @@ func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
     ctx->symtab = 0;
     ctx->next_reg = 1;
     ctx->next_var_id = 1;
+    ctx->sret_addr_reg = 0;
     return p;
 }
 
@@ -373,10 +375,18 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
     var params: u64 = fn->params_vec;
     if (params == 0) { return 0; }
 
+    ctx->sret_addr_reg = 0;
+    var has_sret: u64 = 0;
+    if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
+        var ret_struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+        if (ret_struct_size > 16) { has_sret = 1; }
+    }
+
     var n: u64 = vec_len(params);
     var param_offsets: u64 = vec_new(n);
     var param_arg_idx: u64 = vec_new(n);
     var arg_idx: u64 = 0;
+    if (has_sret != 0) { arg_idx = 1; }
 
     var i: u64 = 0;
     while (i < n) {
@@ -509,6 +519,12 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr);
         builder_symtab_add_param(ctx, p2, 16 + start_idx * 8);
     }
+    if (has_sret != 0) {
+        var sret_reg: u64 = builder_new_reg(ctx);
+        var sret_param: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, sret_reg, ssa_operand_const(0), 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)sret_param);
+        ctx->sret_addr_reg = sret_reg;
+    }
     return 0;
 }
 
@@ -561,6 +577,31 @@ func builder_store_by_size(ctx: *BuilderCtx, addr_reg: u64, val_reg: u64, size: 
     else if (size == 4) { op = SSA_OP_STORE32; }
     var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, op, 0, ssa_operand_reg(addr_reg), ssa_operand_reg(val_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
+    return 0;
+}
+
+func builder_struct_copy(ctx: *BuilderCtx, dst_addr: u64, src_addr: u64, size: u64) -> u64 {
+    var offset: u64 = 0;
+    while (offset < size) {
+        var chunk: u64 = size - offset;
+        if (chunk > 8) { chunk = 8; }
+        var src_reg: u64 = src_addr;
+        var dst_reg: u64 = dst_addr;
+        if (offset != 0) {
+            var off_reg: u64 = build_const(ctx, offset);
+            var src_tmp: u64 = builder_new_reg(ctx);
+            var dst_tmp: u64 = builder_new_reg(ctx);
+            var add_src: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, src_tmp, ssa_operand_reg(src_addr), ssa_operand_reg(off_reg));
+            var add_dst: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, dst_tmp, ssa_operand_reg(dst_addr), ssa_operand_reg(off_reg));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_src);
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_dst);
+            src_reg = src_tmp;
+            dst_reg = dst_tmp;
+        }
+        var val_reg: u64 = builder_load_by_size(ctx, src_reg, chunk);
+        builder_store_by_size(ctx, dst_reg, val_reg, chunk);
+        offset = offset + chunk;
+    }
     return 0;
 }
 
@@ -698,7 +739,20 @@ func builder_slice_regs(ctx: *BuilderCtx, expr: u64) -> u64 {
     var k: u64 = ast_kind(expr);
     if (k == AST_SLICE) {
         var s: *AstSlice = (*AstSlice)expr;
-        var ptr_reg: u64 = build_expr(ctx, s->ptr_expr);
+        var ptr_reg: u64 = 0;
+        var ptr_kind: u64 = ast_kind(s->ptr_expr);
+        if (ptr_kind == AST_IDENT) {
+            var ti_ptr: u64 = get_expr_type_with_symtab(s->ptr_expr, ctx->symtab);
+            if (ti_ptr != 0) {
+                var ti: *TypeInfo = (*TypeInfo)ti_ptr;
+                if (ti->type_kind == TYPE_ARRAY && ti->ptr_depth == 0) {
+                    ptr_reg = builder_lvalue_addr(ctx, s->ptr_expr);
+                }
+            }
+        }
+        if (ptr_reg == 0) {
+            ptr_reg = build_expr(ctx, s->ptr_expr);
+        }
         var len_reg: u64 = build_expr(ctx, s->len_expr);
         *(info) = ptr_reg;
         *(info + 8) = len_reg;
@@ -877,26 +931,88 @@ func builder_emit_call(ctx: *BuilderCtx, call: *AstCall, dst: u64, extra_dst: u6
 
     var ret_type: u64 = TYPE_I64;
     var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
     var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)call, ctx->symtab);
     if (ret_ti_ptr != 0) {
         var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
         ret_type = ret_ti->type_kind;
         ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
     }
 
-    var info: u64 = heap_alloc(48);
+    var info: u64 = heap_alloc(56);
     *(info) = resolved_ptr;
     *(info + 8) = resolved_len;
     *(info + 16) = arg_regs;
     *(info + 24) = total_regs;
     *(info + 32) = ret_type;
     *(info + 40) = ret_ptr_depth;
+    *(info + 48) = ret_struct_size;
 
     var extra_opr: u64 = 0;
     if (extra_dst != 0) { extra_opr = ssa_operand_reg(extra_dst); }
     var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL, dst, ssa_operand_const(info), extra_opr);
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
     return dst;
+}
+
+func builder_emit_call_sret(ctx: *BuilderCtx, call: *AstCall, addr_reg: u64) -> u64 {
+    if (addr_reg == 0) { return 0; }
+    var name_ptr: u64 = call->name_ptr;
+    var name_len: u64 = call->name_len;
+    if (compiler_func_exists(name_ptr, name_len) == 0) {
+        var callee: u64 = ast_ident(name_ptr, name_len);
+        var cp: u64 = ast_call_ptr(callee, call->args_vec);
+        return builder_emit_call_ptr_sret(ctx, (*AstCallPtr)cp, addr_reg);
+    }
+    var resolved_ptr: u64 = name_ptr;
+    var resolved_len: u64 = name_len;
+    var resolved: u64 = resolve_name(name_ptr, name_len);
+    if (resolved != 0) {
+        resolved_ptr = *(resolved);
+        resolved_len = *(resolved + 8);
+    }
+
+    var args: u64 = call->args_vec;
+    var nargs: u64 = 0;
+    if (args != 0) { nargs = vec_len(args); }
+    var arg_regs: u64 = vec_new(nargs * 2 + 1);
+    vec_push(arg_regs, addr_reg);
+    var i: u64 = 0;
+    while (i < nargs) {
+        var arg: u64 = vec_get(args, i);
+        builder_append_call_arg(ctx, arg_regs, arg);
+        i = i + 1;
+    }
+    var total_regs: u64 = vec_len(arg_regs);
+
+    var ret_type: u64 = TYPE_STRUCT;
+    var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
+    var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)call, ctx->symtab);
+    if (ret_ti_ptr != 0) {
+        var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
+        ret_type = ret_ti->type_kind;
+        ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
+    }
+
+    var info: u64 = heap_alloc(56);
+    *(info) = resolved_ptr;
+    *(info + 8) = resolved_len;
+    *(info + 16) = arg_regs;
+    *(info + 24) = total_regs;
+    *(info + 32) = ret_type;
+    *(info + 40) = ret_ptr_depth;
+    *(info + 48) = ret_struct_size;
+
+    var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL, 0, ssa_operand_const(info), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
+    return 0;
 }
 
 func builder_emit_call_slice_store(ctx: *BuilderCtx, call: *AstCall, addr_reg: u64) -> u64 {
@@ -929,20 +1045,25 @@ func builder_emit_call_slice_store(ctx: *BuilderCtx, call: *AstCall, addr_reg: u
 
     var ret_type: u64 = TYPE_I64;
     var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
     var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)call, ctx->symtab);
     if (ret_ti_ptr != 0) {
         var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
         ret_type = ret_ti->type_kind;
         ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
     }
 
-    var info: u64 = heap_alloc(48);
+    var info: u64 = heap_alloc(56);
     *(info) = resolved_ptr;
     *(info + 8) = resolved_len;
     *(info + 16) = arg_regs;
     *(info + 24) = total_regs;
     *(info + 32) = ret_type;
     *(info + 40) = ret_ptr_depth;
+    *(info + 48) = ret_struct_size;
 
     var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL_SLICE_STORE, 0, ssa_operand_const(info), ssa_operand_reg(addr_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
@@ -984,26 +1105,93 @@ func builder_emit_method_call(ctx: *BuilderCtx, mc: *AstMethodCall, dst: u64, ex
 
     var ret_type: u64 = TYPE_I64;
     var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
     var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)mc, ctx->symtab);
     if (ret_ti_ptr != 0) {
         var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
         ret_type = ret_ti->type_kind;
         ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
     }
 
-    var info: u64 = heap_alloc(48);
+    var info: u64 = heap_alloc(56);
     *(info) = resolved_ptr;
     *(info + 8) = resolved_len;
     *(info + 16) = arg_regs;
     *(info + 24) = total_regs;
     *(info + 32) = ret_type;
     *(info + 40) = ret_ptr_depth;
+    *(info + 48) = ret_struct_size;
 
     var extra_opr2: u64 = 0;
     if (extra_dst != 0) { extra_opr2 = ssa_operand_reg(extra_dst); }
     var call_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL, dst, ssa_operand_const(info), extra_opr2);
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr2);
     return dst;
+}
+
+func builder_emit_method_call_sret(ctx: *BuilderCtx, mc: *AstMethodCall, addr_reg: u64) -> u64 {
+    if (addr_reg == 0) { return 0; }
+    var receiver: u64 = mc->receiver;
+    var recv_type_ptr: u64 = get_expr_type_with_symtab(receiver, ctx->symtab);
+    if (recv_type_ptr == 0) { return 0; }
+    var recv_ti: *TypeInfo = (*TypeInfo)recv_type_ptr;
+    if (recv_ti->type_kind != TYPE_STRUCT) { return 0; }
+    var struct_ptr: u64 = recv_ti->struct_name_ptr;
+    var struct_len: u64 = recv_ti->struct_name_len;
+
+    var full_ptr: u64 = builder_build_method_name(struct_ptr, struct_len, mc->method_ptr, mc->method_len);
+    var full_len: u64 = struct_len + 1 + mc->method_len;
+    var resolved_ptr: u64 = full_ptr;
+    var resolved_len: u64 = full_len;
+    var resolved: u64 = resolve_name(full_ptr, full_len);
+    if (resolved != 0) {
+        resolved_ptr = *(resolved);
+        resolved_len = *(resolved + 8);
+    }
+
+    var args: u64 = mc->args_vec;
+    var nargs: u64 = 0;
+    if (args != 0) { nargs = vec_len(args); }
+    var arg_regs: u64 = vec_new(nargs * 2 + 2);
+    vec_push(arg_regs, addr_reg);
+    var recv_addr: u64 = builder_lvalue_addr(ctx, receiver);
+    vec_push(arg_regs, recv_addr);
+    var i: u64 = 0;
+    while (i < nargs) {
+        var arg: u64 = vec_get(args, i);
+        builder_append_call_arg(ctx, arg_regs, arg);
+        i = i + 1;
+    }
+    var total_regs: u64 = vec_len(arg_regs);
+
+    var ret_type: u64 = TYPE_STRUCT;
+    var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
+    var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)mc, ctx->symtab);
+    if (ret_ti_ptr != 0) {
+        var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
+        ret_type = ret_ti->type_kind;
+        ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
+    }
+
+    var info: u64 = heap_alloc(56);
+    *(info) = resolved_ptr;
+    *(info + 8) = resolved_len;
+    *(info + 16) = arg_regs;
+    *(info + 24) = total_regs;
+    *(info + 32) = ret_type;
+    *(info + 40) = ret_ptr_depth;
+    *(info + 48) = ret_struct_size;
+
+    var call_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL, 0, ssa_operand_const(info), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr2);
+    return 0;
 }
 
 func builder_emit_method_call_slice_store(ctx: *BuilderCtx, mc: *AstMethodCall, addr_reg: u64) -> u64 {
@@ -1041,20 +1229,25 @@ func builder_emit_method_call_slice_store(ctx: *BuilderCtx, mc: *AstMethodCall, 
 
     var ret_type: u64 = TYPE_I64;
     var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
     var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)mc, ctx->symtab);
     if (ret_ti_ptr != 0) {
         var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
         ret_type = ret_ti->type_kind;
         ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
     }
 
-    var info: u64 = heap_alloc(48);
+    var info: u64 = heap_alloc(56);
     *(info) = resolved_ptr;
     *(info + 8) = resolved_len;
     *(info + 16) = arg_regs;
     *(info + 24) = total_regs;
     *(info + 32) = ret_type;
     *(info + 40) = ret_ptr_depth;
+    *(info + 48) = ret_struct_size;
 
     var call_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL_SLICE_STORE, 0, ssa_operand_const(info), ssa_operand_reg(addr_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr2);
@@ -1096,25 +1289,72 @@ func builder_emit_call_ptr(ctx: *BuilderCtx, cp: *AstCallPtr, dst: u64, extra_ds
 
     var ret_type: u64 = TYPE_I64;
     var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
     var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)cp, ctx->symtab);
     if (ret_ti_ptr != 0) {
         var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
         ret_type = ret_ti->type_kind;
         ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
     }
 
-    var info: u64 = heap_alloc(40);
+    var info: u64 = heap_alloc(48);
     *(info) = callee_reg;
     *(info + 8) = arg_regs;
     *(info + 16) = total_regs;
     *(info + 24) = ret_type;
     *(info + 32) = ret_ptr_depth;
+    *(info + 40) = ret_struct_size;
 
     var extra_opr3: u64 = 0;
     if (extra_dst != 0) { extra_opr3 = ssa_operand_reg(extra_dst); }
     var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL_PTR, dst, ssa_operand_const(info), extra_opr3);
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
     return dst;
+}
+
+func builder_emit_call_ptr_sret(ctx: *BuilderCtx, cp: *AstCallPtr, addr_reg: u64) -> u64 {
+    if (addr_reg == 0) { return 0; }
+    var callee_reg: u64 = build_expr(ctx, cp->callee);
+    var args: u64 = cp->args_vec;
+    var nargs: u64 = 0;
+    if (args != 0) { nargs = vec_len(args); }
+    var arg_regs: u64 = vec_new(nargs * 2 + 1);
+    vec_push(arg_regs, addr_reg);
+    var i: u64 = 0;
+    while (i < nargs) {
+        var arg: u64 = vec_get(args, i);
+        builder_append_call_arg(ctx, arg_regs, arg);
+        i = i + 1;
+    }
+    var total_regs: u64 = vec_len(arg_regs);
+
+    var ret_type: u64 = TYPE_STRUCT;
+    var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
+    var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)cp, ctx->symtab);
+    if (ret_ti_ptr != 0) {
+        var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
+        ret_type = ret_ti->type_kind;
+        ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
+    }
+
+    var info: u64 = heap_alloc(48);
+    *(info) = callee_reg;
+    *(info + 8) = arg_regs;
+    *(info + 16) = total_regs;
+    *(info + 24) = ret_type;
+    *(info + 32) = ret_ptr_depth;
+    *(info + 40) = ret_struct_size;
+
+    var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL_PTR, 0, ssa_operand_const(info), 0);
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
+    return 0;
 }
 
 func builder_emit_call_ptr_slice_store(ctx: *BuilderCtx, cp: *AstCallPtr, addr_reg: u64) -> u64 {
@@ -1152,19 +1392,24 @@ func builder_emit_call_ptr_slice_store(ctx: *BuilderCtx, cp: *AstCallPtr, addr_r
 
     var ret_type: u64 = TYPE_I64;
     var ret_ptr_depth: u64 = 0;
+    var ret_struct_size: u64 = 0;
     var ret_ti_ptr: u64 = get_expr_type_with_symtab((u64)cp, ctx->symtab);
     if (ret_ti_ptr != 0) {
         var ret_ti: *TypeInfo = (*TypeInfo)ret_ti_ptr;
         ret_type = ret_ti->type_kind;
         ret_ptr_depth = ret_ti->ptr_depth;
+        if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
+            ret_struct_size = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+        }
     }
 
-    var info: u64 = heap_alloc(40);
+    var info: u64 = heap_alloc(48);
     *(info) = callee_reg;
     *(info + 8) = arg_regs;
     *(info + 16) = total_regs;
     *(info + 24) = ret_type;
     *(info + 32) = ret_ptr_depth;
+    *(info + 40) = ret_struct_size;
 
     var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL_SLICE_STORE, 0, ssa_operand_const(info), ssa_operand_reg(addr_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
@@ -2335,6 +2580,21 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                         return 0;
                     }
                 }
+                if (struct_size > 16) {
+                    if (init_kind == AST_CALL || init_kind == AST_METHOD_CALL || init_kind == AST_CALL_PTR) {
+                        var offset2: u64 = symtab_find(ctx->symtab, vd->name_ptr, vd->name_len);
+                        if (offset2 == 0) { return 0; }
+                        var base_addr2: u64 = builder_new_lea_local(ctx, offset2);
+                        if (init_kind == AST_CALL) {
+                            builder_emit_call_sret(ctx, (*AstCall)vd->init_expr, base_addr2);
+                        } else if (init_kind == AST_METHOD_CALL) {
+                            builder_emit_method_call_sret(ctx, (*AstMethodCall)vd->init_expr, base_addr2);
+                        } else {
+                            builder_emit_call_ptr_sret(ctx, (*AstCallPtr)vd->init_expr, base_addr2);
+                        }
+                        return 0;
+                    }
+                }
             }
             var val_reg: u64 = build_expr(ctx, vd->init_expr);
             var st_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id), ssa_operand_reg(val_reg));
@@ -2511,10 +2771,29 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
         if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0) {
             if (ret_struct_name_ptr == 0 || ret_struct_name_len == 0) { return 0; }
             var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, ret_struct_name_ptr, ret_struct_name_len);
+            var expr_kind: u64 = ast_kind(ret->expr);
             if (struct_size > 16) {
+                if (ctx->sret_addr_reg == 0) { return 0; }
+                if (expr_kind == AST_STRUCT_LITERAL) {
+                    var lit2: *AstStructLiteral = (*AstStructLiteral)ret->expr;
+                    builder_struct_literal_init(ctx, lit2->struct_def, lit2->values_vec, ctx->sret_addr_reg);
+                } else if (expr_kind == AST_CALL || expr_kind == AST_METHOD_CALL || expr_kind == AST_CALL_PTR) {
+                    if (expr_kind == AST_CALL) {
+                        builder_emit_call_sret(ctx, (*AstCall)ret->expr, ctx->sret_addr_reg);
+                    } else if (expr_kind == AST_METHOD_CALL) {
+                        builder_emit_method_call_sret(ctx, (*AstMethodCall)ret->expr, ctx->sret_addr_reg);
+                    } else {
+                        builder_emit_call_ptr_sret(ctx, (*AstCallPtr)ret->expr, ctx->sret_addr_reg);
+                    }
+                } else {
+                    var src_addr: u64 = builder_lvalue_addr(ctx, ret->expr);
+                    if (src_addr == 0) { return 0; }
+                    builder_struct_copy(ctx, ctx->sret_addr_reg, src_addr, struct_size);
+                }
+                var ret_ptr0: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET, 0, 0, 0);
+                ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr0);
                 return 0;
             }
-            var expr_kind: u64 = ast_kind(ret->expr);
             if (expr_kind == AST_STRUCT_LITERAL) {
                 return builder_emit_return_struct_from_literal(ctx, (*AstStructLiteral)ret->expr, struct_size);
             }
@@ -2526,6 +2805,25 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
         
         if (ret_type == TYPE_SLICE && ret_ptr_depth == 0) {
             var expr_kind2: u64 = ast_kind(ret->expr);
+            if (expr_kind2 == AST_SLICE) {
+                var slice_node: *AstSlice = (*AstSlice)ret->expr;
+                if (ast_kind(slice_node->ptr_expr) == AST_IDENT) {
+                    var ti_ptr2: u64 = get_expr_type_with_symtab(slice_node->ptr_expr, ctx->symtab);
+                    if (ti_ptr2 != 0) {
+                        var ti2: *TypeInfo = (*TypeInfo)ti_ptr2;
+                        if (ti2->type_kind == TYPE_ARRAY && ti2->ptr_depth == 0) {
+                            var elem_size: u64 = sizeof_type(ti2->elem_type_kind, ti2->elem_ptr_depth, ti2->struct_name_ptr, ti2->struct_name_len);
+                            var slice_info0: u64 = builder_slice_regs(ctx, ret->expr);
+                            var ptr_reg0: u64 = *(slice_info0);
+                            var len_reg0: u64 = *(slice_info0 + 8);
+                            var ret_ptr_heap: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET_SLICE_HEAP, 0, ssa_operand_reg(ptr_reg0), ssa_operand_reg(len_reg0));
+                            ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr_heap);
+                            ssa_ret_slice_heap_set(ret_ptr_heap, elem_size);
+                            return 0;
+                        }
+                    }
+                }
+            }
             if (expr_kind2 == AST_CALL || expr_kind2 == AST_METHOD_CALL || expr_kind2 == AST_CALL_PTR) {
                 return builder_emit_return_slice_from_call(ctx, ret->expr);
             }

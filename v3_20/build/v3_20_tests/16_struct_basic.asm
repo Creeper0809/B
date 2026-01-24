@@ -13,11 +13,17 @@ _start:
 _16_struct_basic__set_point:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
-    mov rax, rdx
-    mov rbx, rsi
-    mov rcx, rdi
+    mov rax, [rbp-1048]
+    mov rbx, [rbp-1040]
+    mov rcx, [rbp-1032]
     mov [rcx], rbx
     mov rbx, rcx
     add rbx, 8
@@ -29,9 +35,15 @@ _16_struct_basic__set_point:
 _16_struct_basic__get_sum:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     mov rbx, [rax]
     mov rax, rax
     add rax, 8
@@ -47,10 +59,16 @@ _16_struct_basic__get_sum:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_2_2:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     lea rax, [rbp-16]
     mov rbx, 10
     mov [rax], rbx
@@ -207,12 +225,16 @@ main:
     mov rbx, 20
     mov rcx, 22
     push rax
-    mov rdi, rax
-    mov rsi, rbx
-    mov rdx, rcx
+    push rcx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _16_struct_basic__set_point
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call _16_struct_basic__get_sum
     cmp rax, 42
     setne al

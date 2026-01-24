@@ -58,8 +58,10 @@ main:
     mov [rax], rbx
     mov rax, 2
     mov rbx, 3
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _39_ssa_call_basic__add
     mov rbx, 5
     cmp rax, rbx
@@ -92,8 +94,10 @@ main:
 .Lssa_2_6:
     mov rax, 4
     mov rbx, 6
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _39_ssa_call_basic__add
     mov rbx, 10
     cmp rax, rbx

@@ -13,30 +13,40 @@ _start:
 _84_ssa_slice_return_direct__make_slice:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov rax, [rbp-8]
-    mov rbx, rax
-    mov rax, [rbp-16]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_0_0:
+    mov rax, [rbp-1040]
+    mov rbx, [rbp-1032]
     mov rdx, rax
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
+    xor eax, eax
     mov rsp, rbp
     pop rbp
-   ret
+    ret
 _84_ssa_slice_return_direct__get_first:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
     lea rax, [rbp-16]
-    mov rbx, rdi
+    mov rbx, [rbp-1032]
     mov [rax], rbx
-    mov rbx, rsi
+    mov rbx, [rbp-1040]
     mov rax, rax
     add rax, 8
     mov [rax], rbx
@@ -55,7 +65,13 @@ _84_ssa_slice_return_direct__get_first:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_2_2:
     lea rax, [rbp-3]
     mov rax, rax
@@ -74,10 +90,13 @@ main:
     mov byte [rax], bl
     lea rax, [rbp-3]
     mov rbx, 3
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call _84_ssa_slice_return_direct__make_slice
-    mov rdi, rax
+    push rax
+    pop rdi
     call _84_ssa_slice_return_direct__get_first
     cmp rax, 42
     setne al

@@ -140,45 +140,59 @@ main:
     mov rax, rdi
     lea rax, [rel _str0]
     mov rbx, 19
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     lea rax, [rel _str1]
     mov rbx, 11
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 100
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str2]
     mov rbx, 11
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 10
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     lea rax, [rel _str3]
     mov rbx, 16
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     mov rax, 42
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     mov rax, 90
     lea rbx, [rel _str4]
     mov rcx, 22
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call std_io__emit
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     call std_util__emit_nl
     mov rax, 0

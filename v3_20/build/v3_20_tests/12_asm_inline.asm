@@ -71,7 +71,13 @@ std_os__os_sys_write:
 std_io__sys_write:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_18_18:
     xor eax, eax
     mov rsp, rbp
@@ -80,7 +86,13 @@ std_io__sys_write:
 std_io__io_get_output_fd:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_24_24:
     xor eax, eax
     mov rsp, rbp
@@ -89,7 +101,13 @@ std_io__io_get_output_fd:
 std_io__heap_alloc:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_25_25:
     xor eax, eax
     mov rsp, rbp
@@ -98,7 +116,13 @@ std_io__heap_alloc:
 std_io__emit:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_27_27:
     xor eax, eax
     mov rsp, rbp
@@ -107,7 +131,13 @@ std_io__emit:
 std_util__emit_u64:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_55_55:
     xor eax, eax
     mov rsp, rbp
@@ -116,7 +146,13 @@ std_util__emit_u64:
 std_util__emit_i64:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_57_57:
     xor eax, eax
     mov rsp, rbp
@@ -125,7 +161,13 @@ std_util__emit_i64:
 std_util__emit_nl:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_59_59:
     xor eax, eax
     mov rsp, rbp
@@ -170,25 +212,36 @@ _12_asm_inline__add_asm:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_62_62:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     lea rax, [rel _str0]
     mov rbx, 25
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     call _12_asm_inline__get_value_asm
     lea rbx, [rel _str1]
     mov rcx, 18
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call std_io__emit
     pop rax
     push rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     pop rax
     push rax
@@ -197,8 +250,10 @@ main:
     mov rbx, 10
     mov rcx, 32
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call _12_asm_inline__add_asm
     mov rbx, rax
     pop rax
@@ -206,14 +261,17 @@ main:
     mov rdx, 18
     push rax
     push rbx
-    mov rdi, rcx
-    mov rsi, rdx
+    push rdx
+    push rcx
+    pop rdi
+    pop rsi
     call std_io__emit
     pop rbx
     pop rax
     push rax
     push rbx
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call std_util__emit_i64
     pop rbx
     pop rax
@@ -231,8 +289,10 @@ main:
 .Lssa_62_63:
     lea rax, [rel _str3]
     mov rbx, 15
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     jmp .Lssa_62_64
 .Lssa_62_64:

@@ -13,10 +13,16 @@ _start:
 _78_ssa_struct_return__make_point:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
-    mov rax, rsi
-    mov rbx, rdi
+    mov rax, [rbp-1040]
+    mov rbx, [rbp-1032]
     mov rdx, rax
     mov rax, rbx
     mov rsp, rbp
@@ -29,14 +35,22 @@ _78_ssa_struct_return__make_point:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
     lea rax, [rbp-16]
     mov rbx, 20
     mov rdx, 22
     push rax
-    mov rdi, rbx
-    mov rsi, rdx
+    push rdx
+    push rbx
+    pop rdi
+    pop rsi
     call _78_ssa_struct_return__make_point
     mov rbx, rax
     mov rcx, rdx

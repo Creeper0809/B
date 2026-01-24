@@ -86,6 +86,7 @@ func ssa_builder_build_program(prog: u64) -> u64 {
     var count: u64 = vec_len(funcs);
 
     var ssa_ctx_ptr: u64 = ssa_context_new();
+    ssa_ret_slice_heap_clear();
     var bctx_ptr: u64 = builder_ctx_new((*SSAContext)ssa_ctx_ptr);
     var bctx: *BuilderCtx = (*BuilderCtx)bctx_ptr;
 

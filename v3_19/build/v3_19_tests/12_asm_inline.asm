@@ -176,19 +176,24 @@ main:
     mov rax, rdi
     lea rax, [rel _str0]
     mov rbx, 25
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     call _12_asm_inline__get_value_asm
     lea rbx, [rel _str1]
     mov rcx, 18
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call std_io__emit
     pop rax
     push rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_util__emit_i64
     pop rax
     push rax
@@ -197,8 +202,10 @@ main:
     mov rbx, 10
     mov rcx, 32
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call _12_asm_inline__add_asm
     mov rbx, rax
     pop rax
@@ -206,14 +213,17 @@ main:
     mov rdx, 18
     push rax
     push rbx
-    mov rdi, rcx
-    mov rsi, rdx
+    push rdx
+    push rcx
+    pop rdi
+    pop rsi
     call std_io__emit
     pop rbx
     pop rax
     push rax
     push rbx
-    mov rdi, rbx
+    push rbx
+    pop rdi
     call std_util__emit_i64
     pop rbx
     pop rax
@@ -231,8 +241,10 @@ main:
 .Lssa_62_63:
     lea rax, [rel _str3]
     mov rbx, 15
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__emit
     jmp .Lssa_62_64
 .Lssa_62_64:

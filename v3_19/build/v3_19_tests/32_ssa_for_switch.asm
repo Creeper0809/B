@@ -109,7 +109,8 @@ main:
     mov rax, rsi
     mov rax, rdi
     mov rax, 4
-    mov rdi, rax
+    push rax
+    pop rdi
     call _32_ssa_for_switch__calc
     mov rbx, 111
     cmp rax, rbx

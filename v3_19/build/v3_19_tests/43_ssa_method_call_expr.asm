@@ -55,12 +55,16 @@ main:
     lea rax, [rbp-16]
     mov rbx, 10
     mov rcx, 20
-    mov rdi, rax
-    mov rsi, rbx
-    mov rdx, rcx
+    push rcx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
     call _43_ssa_method_call_expr__Pair_init
     lea rax, [rbp-16]
-    mov rdi, rax
+    push rax
+    pop rdi
     call _43_ssa_method_call_expr__Pair_sum
     mov rbx, 30
     cmp rax, rbx

@@ -64,7 +64,8 @@ main:
     mov rbx, 1
     mov [rax], rbx
     mov rax, 5
-    mov rdi, rax
+    push rax
+    pop rdi
     call _38_ssa_global_access__inc
     mov rbx, 5
     cmp rax, rbx
@@ -81,7 +82,8 @@ main:
     jmp .Lssa_2_4
 .Lssa_2_4:
     mov rax, 3
-    mov rdi, rax
+    push rax
+    pop rdi
     call _38_ssa_global_access__inc
     mov rbx, 8
     cmp rax, rbx
@@ -98,7 +100,8 @@ main:
     jmp .Lssa_2_6
 .Lssa_2_6:
     mov rax, 4
-    mov rdi, rax
+    push rax
+    pop rdi
     call _38_ssa_global_access__bump_h
     mov rbx, 5
     cmp rax, rbx

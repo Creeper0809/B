@@ -13,9 +13,15 @@ _start:
 _37_ssa_destroy_copy_before_term__choose:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_0_0:
-    mov rax, rdi
+    mov rax, [rbp-1032]
     mov rbx, 0
     mov rbx, 0
     cmp rax, rbx
@@ -46,12 +52,19 @@ _37_ssa_destroy_copy_before_term__choose:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_4:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     mov rax, 1
-    mov rdi, rax
+    push rax
+    pop rdi
     call _37_ssa_destroy_copy_before_term__choose
     mov rbx, 1
     cmp rax, rbx
@@ -68,7 +81,8 @@ main:
     jmp .Lssa_1_6
 .Lssa_1_6:
     mov rax, 0
-    mov rdi, rax
+    push rax
+    pop rdi
     call _37_ssa_destroy_copy_before_term__choose
     mov rbx, 2
     cmp rax, rbx

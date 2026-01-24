@@ -13,28 +13,38 @@ _start:
 _59_ssa_slice_call_init__make_slice:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov rax, [rbp-8]
-    mov rbx, rax
-    mov rax, [rbp-16]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_0_0:
+    mov rax, [rbp-1040]
+    mov rbx, [rbp-1032]
     mov rdx, rax
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
+    xor eax, eax
     mov rsp, rbp
     pop rbp
-   ret
+    ret
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
 .Lssa_1_1:
-    mov rax, rsi
-    mov rax, rdi
+    mov rax, [rbp-1040]
+    mov rax, [rbp-1032]
     lea rax, [rbp-3]
     mov rbx, 0
     mov rax, rax
@@ -57,8 +67,10 @@ main:
     lea rbx, [rbp-3]
     mov rcx, 3
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call _59_ssa_slice_call_init__make_slice
     mov rbx, [rsp]
     mov [rbx], rax

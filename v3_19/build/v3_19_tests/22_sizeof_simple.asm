@@ -120,73 +120,97 @@ main:
 .Lssa_33_33:
     lea rax, [rel _str0]
     mov rbx, 19
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 1
     lea rbx, [rel _str1]
     mov rcx, 13
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call std_io__print
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_io__print_u64
     lea rax, [rel _str2]
     mov rbx, 1
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 8
     lea rbx, [rel _str3]
     mov rcx, 14
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call std_io__print
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_io__print_u64
     lea rax, [rel _str2]
     mov rbx, 1
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 8
     lea rbx, [rel _str4]
     mov rcx, 15
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call std_io__print
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_io__print_u64
     lea rax, [rel _str2]
     mov rbx, 1
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 16
     lea rbx, [rel _str5]
     mov rcx, 16
     push rax
-    mov rdi, rbx
-    mov rsi, rcx
+    push rcx
+    push rbx
+    pop rdi
+    pop rsi
     call std_io__print
     pop rax
-    mov rdi, rax
+    push rax
+    pop rdi
     call std_io__print_u64
     lea rax, [rel _str2]
     mov rbx, 1
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     lea rax, [rel _str6]
     mov rbx, 7
-    mov rdi, rax
-    mov rsi, rbx
+    push rbx
+    push rax
+    pop rdi
+    pop rsi
     call std_io__println
     mov rax, 0
     mov rsp, rbp

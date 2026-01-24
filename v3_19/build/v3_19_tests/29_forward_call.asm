@@ -16,7 +16,8 @@ main:
     sub rsp, 1024
 .Lssa_0_0:
     mov rax, 41
-    mov rdi, rax
+    push rax
+    pop rdi
     call _29_forward_call__add_one
     cmp rax, 42
     setne al

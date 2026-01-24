@@ -539,7 +539,7 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
         if (CODEGEN_DEBUG != 0) {
             println("[DEBUG] codegen: destroy", 25);
         }
-        ssa_regalloc_run((*SSAContext)ssa_ctx_ptr, 6);
+        ssa_regalloc_run((*SSAContext)ssa_ctx_ptr, 8);
         if (CODEGEN_DEBUG != 0) {
             println("[DEBUG] codegen: regalloc", 26);
         }
