@@ -48,8 +48,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_1_4:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     mov rax, 1
     mov rdi, rax
     call _37_ssa_destroy_copy_before_term__choose

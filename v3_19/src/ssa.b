@@ -95,6 +95,8 @@ func ssa_builder_build_program(prog: u64) -> u64 {
         var fn: *AstFunc = (*AstFunc)fn_ptr;
         if (str_has_prefix(fn->name_ptr, fn->name_len, "std_", 4) != 0) {
             ssa_new_function(bctx->ssa_ctx, fn->name_ptr, fn->name_len);
+        } else if (ssa_codegen_is_supported_func(fn_ptr, program->globals_vec) == 0) {
+            ssa_new_function(bctx->ssa_ctx, fn->name_ptr, fn->name_len);
         } else {
             ssa_builder_build_func(bctx, fn_ptr);
         }

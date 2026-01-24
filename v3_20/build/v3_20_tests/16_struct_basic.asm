@@ -15,13 +15,13 @@ _16_struct_basic__set_point:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
+    mov rax, rdx
     mov rbx, rsi
-    mov rcx, rdx
-    mov [rax], rbx
-    mov rax, rax
-    add rax, 8
-    mov [rax], rcx
+    mov rcx, rdi
+    mov [rcx], rbx
+    mov rbx, rcx
+    add rbx, 8
+    mov [rbx], rax
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -49,8 +49,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_2_2:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     lea rax, [rbp-16]
     mov rbx, 10
     mov [rax], rbx

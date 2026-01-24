@@ -15,9 +15,10 @@ _81_ssa_struct_return_chain__make_point:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
-    mov rbx, rsi
-    mov rdx, rbx
+    mov rax, rsi
+    mov rbx, rdi
+    mov rdx, rax
+    mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
@@ -87,9 +88,36 @@ main:
     mov rax, rax
     add rax, 8
     mov [rax], rcx
+    lea rax, [rbp-48]
+    lea rbx, [rbp-32]
+    mov rdx, [rbx]
+    mov rbx, rbx
+    add rbx, 8
+    mov rbx, [rbx]
+    push rax
+    mov rdi, rdx
+    mov rsi, rbx
+    call _81_ssa_struct_return_chain__pass_through
+    mov rbx, rax
+    mov rcx, rdx
+    pop rax
+    mov [rax], rbx
+    mov rax, rax
+    add rax, 8
+    mov [rax], rcx
     lea rax, [rbp-32]
     mov rax, [rax]
     lea rbx, [rbp-32]
+    mov rbx, rbx
+    add rbx, 8
+    mov rbx, [rbx]
+    mov rax, rax
+    add rax, rbx
+    lea rbx, [rbp-48]
+    mov rbx, [rbx]
+    mov rax, rax
+    add rax, rbx
+    lea rbx, [rbp-48]
     mov rbx, rbx
     add rbx, 8
     mov rbx, [rbx]

@@ -106,8 +106,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_1_16:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     mov rax, 4
     mov rdi, rax
     call _32_ssa_for_switch__calc

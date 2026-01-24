@@ -1,7 +1,7 @@
 // Covers: Struct return function chaining
 // Mode: ssa
 // Opt: O1
-// Expect exit code: 84
+// Expect exit code: 42
 
 struct Point {
     x: i64;

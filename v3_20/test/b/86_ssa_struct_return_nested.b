@@ -1,7 +1,7 @@
 // Covers: Nested struct return
 // Mode: ssa
 // Opt: O1
-// Expect exit code: 200
+// Expect exit code: 150
 
 struct Inner {
     val: i64;

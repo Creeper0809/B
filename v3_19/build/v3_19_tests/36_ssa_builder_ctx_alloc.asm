@@ -31,8 +31,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_1_1:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     call _36_ssa_builder_ctx_alloc__foo
     mov rbx, 3
     cmp rax, rbx

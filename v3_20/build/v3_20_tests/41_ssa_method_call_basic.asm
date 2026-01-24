@@ -15,9 +15,9 @@ _41_ssa_method_call_basic__Counter_init:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
-    mov rbx, rsi
-    mov [rax], rbx
+    mov rax, rsi
+    mov rbx, rdi
+    mov [rbx], rax
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -27,11 +27,11 @@ _41_ssa_method_call_basic__Counter_add:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_1_1:
-    mov rax, rdi
-    mov rbx, rsi
-    mov rcx, [rax]
-    add rbx, rcx
-    mov [rax], rbx
+    mov rax, rsi
+    mov rbx, rdi
+    mov rcx, [rbx]
+    add rax, rcx
+    mov [rbx], rax
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -55,8 +55,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_3_3:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     lea rax, [rbp-8]
     mov rbx, 3
     mov rdi, rax

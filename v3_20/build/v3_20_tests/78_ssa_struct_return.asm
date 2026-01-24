@@ -15,9 +15,10 @@ _78_ssa_struct_return__make_point:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
-    mov rbx, rsi
-    mov rdx, rbx
+    mov rax, rsi
+    mov rbx, rdi
+    mov rdx, rax
+    mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret

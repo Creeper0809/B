@@ -15,9 +15,8 @@ _50_ssa_call_ptr_basic__add:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
-    mov rbx, rsi
-    mov rax, rax
+    mov rax, rsi
+    mov rbx, rdi
     add rax, rbx
     mov rsp, rbp
     pop rbp
@@ -31,8 +30,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_1_1:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     lea rax, [rel _50_ssa_call_ptr_basic__add]
     mov rbx, 7
     mov rcx, 8

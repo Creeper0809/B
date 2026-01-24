@@ -15,14 +15,14 @@ _20_struct_return__Point_new:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     lea rcx, [rbp-16]
-    mov [rcx], rax
-    lea rax, [rbp-16]
-    mov rax, rax
-    add rax, 8
-    mov [rax], rbx
+    mov [rcx], rbx
+    lea rbx, [rbp-16]
+    mov rbx, rbx
+    add rbx, 8
+    mov [rbx], rax
     lea rax, [rbp-16]
     mov rbx, [rax]
     mov rax, rax
@@ -60,24 +60,23 @@ _20_struct_return__Point_add:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_2_2:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     lea rcx, [rbp-16]
-    mov rdx, [rax]
-    mov r8, [rbx]
+    mov rdx, [rbx]
+    mov r8, [rax]
     mov rdx, rdx
     add rdx, r8
     mov [rcx], rdx
     lea rcx, [rbp-16]
     mov rcx, rcx
     add rcx, 8
-    mov rax, rax
-    add rax, 8
-    mov rax, [rax]
     mov rbx, rbx
     add rbx, 8
     mov rbx, [rbx]
     mov rax, rax
+    add rax, 8
+    mov rax, [rax]
     add rax, rbx
     mov [rcx], rax
     lea rax, [rbp-16]
@@ -99,20 +98,19 @@ _20_struct_return__Point_scale:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_3_3:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     lea rcx, [rbp-16]
-    mov rdx, [rax]
+    mov rdx, [rbx]
     mov rdx, rdx
-    imul rdx, rbx
+    imul rdx, rax
     mov [rcx], rdx
     lea rcx, [rbp-16]
     mov rcx, rcx
     add rcx, 8
-    mov rax, rax
-    add rax, 8
-    mov rax, [rax]
-    mov rax, rax
+    mov rbx, rbx
+    add rbx, 8
+    mov rbx, [rbx]
     imul rax, rbx
     mov [rcx], rax
     lea rax, [rbp-16]
@@ -134,14 +132,14 @@ _20_struct_return__Inner_new:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_4_4:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     lea rcx, [rbp-16]
-    mov [rcx], rax
-    lea rax, [rbp-16]
-    mov rax, rax
-    add rax, 8
-    mov [rax], rbx
+    mov [rcx], rbx
+    lea rbx, [rbp-16]
+    mov rbx, rbx
+    add rbx, 8
+    mov [rbx], rax
     lea rax, [rbp-16]
     mov rbx, [rax]
     mov rax, rax
@@ -195,14 +193,14 @@ _20_struct_return__Vec2_new:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_6_6:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     lea rcx, [rbp-16]
-    mov [rcx], rax
-    lea rax, [rbp-16]
-    mov rax, rax
-    add rax, 8
-    mov [rax], rbx
+    mov [rcx], rbx
+    lea rbx, [rbp-16]
+    mov rbx, rbx
+    add rbx, 8
+    mov [rbx], rax
     lea rax, [rbp-16]
     mov rbx, [rax]
     mov rax, rax
@@ -284,14 +282,14 @@ _20_struct_return__Color_new:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_8_13:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     lea rcx, [rbp-16]
-    mov [rcx], rax
-    lea rax, [rbp-16]
-    mov rax, rax
-    add rax, 8
-    mov [rax], rbx
+    mov [rcx], rbx
+    lea rbx, [rbp-16]
+    mov rbx, rbx
+    add rbx, 8
+    mov [rbx], rax
     lea rax, [rbp-16]
     mov rbx, [rax]
     mov rax, rax
@@ -311,20 +309,19 @@ _20_struct_return__compute:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_9_14:
-    mov rax, rdi
-    mov rbx, rsi
-    mov rcx, [rax]
-    mov rax, rax
-    add rax, 8
-    mov rax, [rax]
-    add rax, rcx
+    mov rax, rsi
+    mov rbx, rdi
     mov rcx, [rbx]
-    mov rax, rax
-    add rax, rcx
     mov rbx, rbx
     add rbx, 8
     mov rbx, [rbx]
+    add rbx, rcx
+    mov rcx, [rax]
+    mov rbx, rbx
+    add rbx, rcx
     mov rax, rax
+    add rax, 8
+    mov rax, [rax]
     add rax, rbx
     mov rsp, rbp
     pop rbp
@@ -338,14 +335,14 @@ _20_struct_return__Pair_new:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_10_15:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     lea rcx, [rbp-16]
-    mov [rcx], rax
-    lea rax, [rbp-16]
-    mov rax, rax
-    add rax, 8
-    mov [rax], rbx
+    mov [rcx], rbx
+    lea rbx, [rbp-16]
+    mov rbx, rbx
+    add rbx, 8
+    mov [rbx], rax
     lea rax, [rbp-16]
     mov rbx, [rax]
     mov rax, rax
@@ -475,14 +472,14 @@ _20_struct_return__Data_new:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_13_22:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     lea rcx, [rbp-16]
-    mov [rcx], rax
-    lea rax, [rbp-16]
-    mov rax, rax
-    add rax, 8
-    mov [rax], rbx
+    mov [rcx], rbx
+    lea rbx, [rbp-16]
+    mov rbx, rbx
+    add rbx, 8
+    mov [rbx], rax
     lea rax, [rbp-16]
     mov rbx, [rax]
     mov rax, rax
@@ -502,10 +499,10 @@ _20_struct_return__Data_transform:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_14_23:
-    mov rax, rdi
-    mov rbx, rsi
+    mov rax, rsi
+    mov rbx, rdi
     push rax
-    cmp rbx, 1
+    cmp rax, 1
     sete al
     movzx rcx, al
     pop rax
@@ -513,10 +510,10 @@ _20_struct_return__Data_transform:
     jne .Lssa_14_24
     jmp .Lssa_14_25
 .Lssa_14_24:
-    mov rcx, [rax]
+    mov rcx, [rbx]
     mov rcx, rcx
     add rcx, 1
-    mov rdx, rax
+    mov rdx, rbx
     add rdx, 8
     mov rdx, [rdx]
     mov rdx, rdx
@@ -536,7 +533,7 @@ _20_struct_return__Data_transform:
     jmp .Lssa_14_25
 .Lssa_14_25:
     push rax
-    cmp rbx, 2
+    cmp rax, 2
     sete al
     movzx rcx, al
     pop rax
@@ -544,10 +541,10 @@ _20_struct_return__Data_transform:
     jne .Lssa_14_26
     jmp .Lssa_14_27
 .Lssa_14_26:
-    mov rcx, [rax]
+    mov rcx, [rbx]
     mov rcx, rcx
     imul rcx, 2
-    mov rdx, rax
+    mov rdx, rbx
     add rdx, 8
     mov rdx, [rdx]
     mov rdx, rdx
@@ -566,45 +563,41 @@ _20_struct_return__Data_transform:
     ret
     jmp .Lssa_14_27
 .Lssa_14_27:
-    push rax
-    cmp rbx, 3
+    cmp rax, 3
     sete al
-    movzx rbx, al
-    pop rax
-    cmp rbx, 0
+    movzx rax, al
+    cmp rax, 0
     jne .Lssa_14_28
     jmp .Lssa_14_29
 .Lssa_14_28:
-    mov rbx, [rax]
-    mov rcx, rax
+    mov rax, [rbx]
+    mov rcx, rbx
     add rcx, 8
     mov rcx, [rcx]
-    mov rbx, rbx
-    sub rbx, rcx
-    mov rcx, rax
+    mov rax, rax
+    sub rax, rcx
+    mov rcx, rbx
     add rcx, 8
     mov rcx, [rcx]
-    mov rdx, [rax]
+    mov rdx, [rbx]
     mov rcx, rcx
     sub rcx, rdx
-    mov rdi, rbx
+    mov rdi, rax
     mov rsi, rcx
     call _20_struct_return__Data_new
-    mov rbx, rax
-    mov rax, rdx
-    mov rdx, rax
-    mov rax, rbx
+    mov rbx, rdx
+    mov rdx, rbx
     mov rsp, rbp
     pop rbp
     ret
     jmp .Lssa_14_29
 .Lssa_14_29:
-    mov rcx, [rax]
-    mov rax, rax
-    add rax, 8
-    mov rax, [rax]
-    mov rdi, rcx
-    mov rsi, rax
+    mov rax, [rbx]
+    mov rcx, rbx
+    add rcx, 8
+    mov rcx, [rcx]
+    mov rdi, rax
+    mov rsi, rcx
     call _20_struct_return__Data_new
     mov rbx, rdx
     mov rdx, rbx

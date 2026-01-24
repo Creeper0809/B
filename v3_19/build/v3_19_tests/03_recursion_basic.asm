@@ -94,8 +94,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_2_6:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     mov rax, 5
     mov rdi, rax
     call _03_recursion_basic__factorial

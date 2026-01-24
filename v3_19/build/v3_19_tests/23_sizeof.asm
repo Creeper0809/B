@@ -109,15 +109,15 @@ _23_sizeof__print_result:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_33_33:
-    mov rax, rdi
+    mov rax, rdx
     mov rbx, rsi
-    mov rcx, rdx
-    push rcx
-    mov rdi, rax
+    mov rcx, rdi
+    push rax
+    mov rdi, rcx
     mov rsi, rbx
     call std_io__println
-    pop rcx
-    mov rdi, rcx
+    pop rax
+    mov rdi, rax
     call std_io__print_u64
     lea rax, [rel _str0]
     mov rbx, 1

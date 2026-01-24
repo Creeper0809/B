@@ -15,10 +15,6 @@ out/
 *.out
 *.asm
 *.s
-**/test/b/*.b
-**/test/ir/*.b
-**/test/expected/*.txt
-**/test/manual/*.b
 **/build/
 
 # Logs and databases

@@ -28,18 +28,19 @@ _83_ssa_nested_struct_return__make_outer:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_1_1:
-    mov rax, rdi
-    mov rbx, rsi
-    push rbx
-    mov rdi, rax
-    call _83_ssa_nested_struct_return__make_inner
-    pop rbx
+    mov rax, rsi
+    mov rbx, rdi
     push rax
     mov rdi, rbx
     call _83_ssa_nested_struct_return__make_inner
     mov rbx, rax
     pop rax
-    mov rdx, rbx
+    push rbx
+    mov rdi, rax
+    call _83_ssa_nested_struct_return__make_inner
+    pop rbx
+    mov rdx, rax
+    mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret

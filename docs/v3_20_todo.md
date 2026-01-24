@@ -6,3 +6,6 @@
 - [x] Backport SysV AST codegen to v3_19 for bootstrap.
 - [x] Make std/os syscalls ABI-agnostic via module-qualified global arg slots.
 - [ ] Add tests for SysV ABI argument passing (slices, >6 args).
+- [x] Fix SSA struct param indexing and sret handling.
+- [x] Handle SSA member access on struct-returning calls.
+- [x] Reconcile struct-return chain/nested expected outputs.

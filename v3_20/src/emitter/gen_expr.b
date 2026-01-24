@@ -106,6 +106,24 @@ func _cg_sysv_pop_arg_regs(total_words: u64) -> u64 {
     return 0;
 }
 
+func _cg_sysv_pop_arg_regs_sret(total_words: u64) -> u64 {
+    var reg_count: u64 = total_words;
+    if (reg_count > 5) { reg_count = 5; }
+    var i: u64 = 0;
+    while (i < reg_count) {
+        emit("    pop ", 8);
+        if (i == 0) { emit("rsi", 3); }
+        else if (i == 1) { emit("rdx", 3); }
+        else if (i == 2) { emit("rcx", 3); }
+        else if (i == 3) { emit("r8", 2); }
+        else if (i == 4) { emit("r9", 2); }
+        emit_nl();
+        i = i + 1;
+    }
+    if (total_words > 5) { return total_words - 5; }
+    return 0;
+}
+
 func _cg_sysv_push_call_arg(arg: u64, symtab: u64) -> u64 {
     var arg_type: u64 = get_expr_type_with_symtab(arg, symtab);
     if (arg_type != 0) {
@@ -126,6 +144,26 @@ func _cg_sysv_push_call_arg(arg: u64, symtab: u64) -> u64 {
                 emit("    push rbx\n", 13);
             }
             return 2;
+        }
+        if (at->type_kind == TYPE_STRUCT && at->ptr_depth == 0) {
+            var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, at->struct_name_ptr, at->struct_name_len);
+            if (struct_size <= 8) {
+                cg_lvalue(arg);
+                emit("    mov rax, [rax]\n", 19);
+                emit("    push rax\n", 13);
+                return 1;
+            } else if (struct_size <= 16) {
+                cg_lvalue(arg);
+                emit("    mov rbx, [rax+8]\n", 21);
+                emit("    push rbx\n", 13);
+                emit("    mov rbx, [rax]\n", 19);
+                emit("    push rbx\n", 13);
+                return 2;
+            }
+            // Larger structs not supported
+            emit("    xor eax, eax\n", 17);
+            emit("    push rax\n", 13);
+            return 1;
         }
     }
     cg_expr(arg);

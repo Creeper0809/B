@@ -16,11 +16,9 @@ _86_ssa_struct_return_nested__make_outer:
     sub rsp, 1024
 .Lssa_0_0:
     mov rax, rdi
-    mov rbx, 0
-    mov rax, rax
-    imul rax, 2
-    mov rdx, rax
-    mov rax, rbx
+    mov rbx, rax
+    imul rbx, 2
+    mov rdx, rbx
     mov rsp, rbp
     pop rbp
     ret
@@ -50,6 +48,10 @@ main:
     lea rbx, [rbp-16]
     mov rbx, rbx
     add rbx, 8
+    mov rbx, [rbx]
+    mov rax, rax
+    add rax, rbx
+    lea rbx, [rbp-16]
     mov rbx, [rbx]
     mov rax, rax
     add rax, rbx

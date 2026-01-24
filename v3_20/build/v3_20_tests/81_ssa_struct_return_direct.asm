@@ -15,9 +15,10 @@ _81_ssa_struct_return_direct__make_point:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
-    mov rbx, rsi
-    mov rdx, rbx
+    mov rax, rsi
+    mov rbx, rdi
+    mov rdx, rax
+    mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
@@ -30,16 +31,16 @@ _81_ssa_struct_return_direct__add_points:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_1_1:
-    lea rax, [rbp-16]
-    mov rbx, rdi
-    mov rcx, rsi
+    lea rax, [rbp-32]
+    mov rbx, rdx
+    mov rcx, rcx
     mov [rax], rbx
     mov rax, rax
     add rax, 8
     mov [rax], rcx
-    lea rax, [rbp-32]
-    mov rbx, rdx
-    mov rcx, rcx
+    lea rax, [rbp-16]
+    mov rbx, rdi
+    mov rcx, rsi
     mov [rax], rbx
     mov rax, rax
     add rax, 8

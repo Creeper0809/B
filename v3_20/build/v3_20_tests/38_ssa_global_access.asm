@@ -55,8 +55,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_2_2:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     lea rax, [rel _gvar__38_ssa_global_access__g]
     mov rbx, 0
     mov [rax], rbx

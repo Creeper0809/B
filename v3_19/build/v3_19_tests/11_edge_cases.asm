@@ -145,8 +145,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_60_60:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     lea rax, [rel _str0]
     mov rbx, 20
     mov rdi, rax

@@ -133,6 +133,35 @@ func emit_call_resolved(name_ptr: u64, name_len: u64) -> u64 {
     return 0;
 }
 
+func cg_call_sret(call: *AstCall, dest_offset: u64, symtab: u64) -> u64 {
+    var args: u64 = call->args_vec;
+    var nargs: u64 = 0;
+    if (args != 0) { nargs = vec_len(args); }
+    var total_arg_words: u64 = 0;
+    if (nargs > 0) {
+        var i: i64 = (i64)nargs - 1;
+        while (i >= 0) {
+            var arg: u64 = vec_get(args, (u64)i);
+            total_arg_words = total_arg_words + _cg_sysv_push_call_arg(arg, symtab);
+            i = i - 1;
+        }
+    }
+
+    emit("    lea rdi, [rbp", 18);
+    if (dest_offset < 0) { emit_i64(dest_offset); }
+    else { emit("+", 1); emit_u64(dest_offset); }
+    emit("]\n", 2);
+
+    var stack_words: u64 = _cg_sysv_pop_arg_regs_sret(total_arg_words);
+    emit_call_resolved(call->name_ptr, call->name_len);
+    if (stack_words > 0) {
+        emit("    add rsp, ", 13);
+        emit_u64(stack_words * 8);
+        emit_nl();
+    }
+    return 0;
+}
+
 func cg_ensure_heap_brk_global() -> u64 {
     var globals: u64 = emitter_get_globals();
     if (globals == 0) { return 0; }
@@ -165,20 +194,92 @@ func cg_return_stmt(node: u64, symtab: u64) -> u64 {
             // Find struct size
             var struct_size: u64 = sizeof_type(ret_type, 0, ret_struct_name_ptr, ret_struct_name_len);
             
-            // For simplicity, support up to 16 bytes (rax + rdx)
+            // Large structs: return via hidden sret pointer in rdi
             if (struct_size > 16) {
-                emit("    ; ERROR: Struct return size > 16 bytes not supported\n", 53);
-                panic();
+                if (expr_kind == AST_STRUCT_LITERAL) {
+                    var lit2: *AstStructLiteral = (*AstStructLiteral)expr;
+                    var values2: u64 = lit2->values_vec;
+                    var vcount2: u64 = 0;
+                    if (values2 != 0) { vcount2 = vec_len(values2); }
+                    var off: u64 = 0;
+                    var i2: u64 = 0;
+                    while (i2 < vcount2) {
+                        emit("    push rdi\n", 13);
+                        cg_expr(vec_get(values2, i2));
+                        emit("    pop rdi\n", 12);
+                        emit("    mov [rdi", 12);
+                        if (off != 0) { emit("+", 1); emit_u64(off); }
+                        emit("], rax\n", 7);
+                        off = off + 8;
+                        i2 = i2 + 1;
+                    }
+                    if (off < struct_size) {
+                        emit("    xor eax, eax\n", 17);
+                        while (off < struct_size) {
+                            emit("    mov [rdi", 12);
+                            if (off != 0) { emit("+", 1); emit_u64(off); }
+                            emit("], rax\n", 7);
+                            off = off + 8;
+                        }
+                    }
+                } else {
+                    emit("    push rdi\n", 13);
+                    cg_lvalue(expr);
+                    emit("    mov rbx, rax\n", 19);
+                    emit("    pop rdi\n", 12);
+                    var off2: u64 = 0;
+                    while (off2 < struct_size) {
+                        emit("    mov rax, [rbx", 18);
+                        if (off2 != 0) { emit("+", 1); emit_u64(off2); }
+                        emit("]\n", 2);
+                        emit("    mov [rdi", 12);
+                        if (off2 != 0) { emit("+", 1); emit_u64(off2); }
+                        emit("], rax\n", 7);
+                        off2 = off2 + 8;
+                    }
+                }
+                emit("    mov rsp, rbp\n", 17);
+                emit("    pop rbp\n", 12);
+                emit("    ret\n", 8);
+                return 0;
             }
             
             // If expression is a function call, it already returns struct in rax/rdx
             if (expr_kind == AST_CALL) {
                 cg_expr(expr);
                 // rax and rdx already contain the struct value
+            } else if (expr_kind == AST_STRUCT_LITERAL) {
+                // For struct literals, evaluate fields and place in rax/rdx
+                var lit: *AstStructLiteral = (*AstStructLiteral)expr;
+                var values: u64 = lit->values_vec;
+                if (values == 0) {
+                    emit("    xor eax, eax\n", 17);
+                    emit("    xor edx, edx\n", 17);
+                } else {
+                    var vcount: u64 = vec_len(values);
+                    // First field -> rax
+                    if (vcount > 0) {
+                        cg_expr(vec_get(values, 0));
+                        // rax now has first field
+                    } else {
+                        emit("    xor eax, eax\n", 17);
+                    }
+                    // Second field -> rdx (if struct > 8 bytes)
+                    if (struct_size > 8) {
+                        if (vcount > 1) {
+                            emit("    push rax\n", 13);
+                            cg_expr(vec_get(values, 1));
+                            emit("    mov rdx, rax\n", 17);
+                            emit("    pop rax\n", 12);
+                        } else {
+                            emit("    xor edx, edx\n", 17);
+                        }
+                    }
+                }
             } else {
                 // For other expressions (AST_IDENT, etc), get address and load
                 cg_lvalue(expr);
-                
+
                 // rax now contains address of struct
                 // Load struct content into rax (and rdx if needed)
                 emit("    mov r10, rax\n", 17);   // Save struct address in r10
@@ -389,6 +490,14 @@ func cg_var_decl_stmt(node: u64, symtab: u64, g_structs_vec: u64) -> u64 {
             panic("Codegen error");
         }
         var init_kind: u64 = ast_kind(init);
+
+        if (type_kind == TYPE_STRUCT && ptr_depth == 0) {
+            var struct_size0: u64 = sizeof_type(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+            if (struct_size0 > 16 && init_kind == AST_CALL) {
+                cg_call_sret((*AstCall)init, offset, symtab);
+                return;
+            }
+        }
         
         // Handle struct literal initialization specially
         if (init_kind == AST_STRUCT_LITERAL) {

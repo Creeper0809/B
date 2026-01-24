@@ -70,6 +70,7 @@ for TEST_FILE in $TEST_FILES; do
     MODE=$(grep -m1 -E '^// Mode:' "$TEST_FILE" | awk -F': ' '{print $2}' | tr -d ' ' || echo "nossa")
     OPT=$(grep -m1 -E '^// Opt:' "$TEST_FILE" | awk -F': ' '{print $2}' | tr -d ' ' || echo "O0")
     
+    
     # Fallback to 0 if EXPECTED is empty after parsing.
     if [ -z "$EXPECTED" ]; then
         EXPECTED=0

@@ -409,11 +409,17 @@ func cg_func(node: u64) -> u64 {
     
     var nparams: u64 = vec_len(fn->params_vec);
     var arg_word_index: u64 = 0;
+    if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
+        var ret_struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+        if (ret_struct_size > 16) { arg_word_index = 1; }
+    }
     for(var i: u64 = 0 ; i < nparams ; i++){
         var p: *FuncParam = (*FuncParam)vec_get(fn->params_vec, i);
         var param_size: u64 = 8;
         if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
             param_size = 16;
+        } else if (p->type_kind == TYPE_STRUCT && p->ptr_depth == 0) {
+            param_size = sizeof_type(TYPE_STRUCT, 0, p->struct_name_ptr, p->struct_name_len);
         }
         var offset: u64 = symtab_add(g_symtab, p->name_ptr, p->name_len, p->type_kind, p->ptr_depth, param_size);
         var type_info: u64 = symtab_get_type(g_symtab, p->name_ptr, p->name_len);
@@ -459,6 +465,19 @@ func cg_func(node: u64) -> u64 {
             _cg_sysv_store_arg_word(arg_word_index, offset);
             _cg_sysv_store_arg_word(arg_word_index + 1, offset + 8);
             arg_word_index = arg_word_index + 2;
+        } else if (p->type_kind == TYPE_STRUCT && p->ptr_depth == 0) {
+            var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, p->struct_name_ptr, p->struct_name_len);
+            if (struct_size <= 8) {
+                _cg_sysv_store_arg_word(arg_word_index, offset);
+                arg_word_index = arg_word_index + 1;
+            } else if (struct_size <= 16) {
+                _cg_sysv_store_arg_word(arg_word_index, offset);
+                _cg_sysv_store_arg_word(arg_word_index + 1, offset + 8);
+                arg_word_index = arg_word_index + 2;
+            } else {
+                _cg_sysv_store_arg_word(arg_word_index, offset);
+                arg_word_index = arg_word_index + 1;
+            }
         } else {
             _cg_sysv_store_arg_word(arg_word_index, offset);
             arg_word_index = arg_word_index + 1;

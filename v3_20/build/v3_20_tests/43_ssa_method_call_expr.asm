@@ -15,14 +15,13 @@ _43_ssa_method_call_expr__Pair_init:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
+    mov rax, rdx
     mov rbx, rsi
-    mov rcx, rdx
-    mov [rax], rbx
+    mov rcx, rdi
+    mov [rcx], rbx
     mov rbx, 8
-    mov rax, rax
-    add rax, rbx
-    mov [rax], rcx
+    add rbx, rcx
+    mov [rbx], rax
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -51,8 +50,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_2_2:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     lea rax, [rbp-16]
     mov rbx, 10
     mov rcx, 20

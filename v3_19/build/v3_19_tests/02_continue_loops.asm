@@ -15,8 +15,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_0_0:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     mov rax, 0
     mov rbx, 0
     mov rcx, rbx

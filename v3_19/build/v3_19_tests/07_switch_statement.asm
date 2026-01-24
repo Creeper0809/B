@@ -231,12 +231,14 @@ _07_switch_statement__test_switch_nested:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_37_72:
-    mov rax, rdi
-    mov rbx, rsi
-    cmp rax, 1
+    mov rax, rsi
+    mov rbx, rdi
+    push rax
+    cmp rbx, 1
     sete al
-    movzx rax, al
-    cmp rax, 0
+    movzx rbx, al
+    pop rax
+    cmp rbx, 0
     jne .Lssa_37_74
     jmp .Lssa_37_76
 .Lssa_37_73:
@@ -244,7 +246,7 @@ _07_switch_statement__test_switch_nested:
     pop rbp
     ret
 .Lssa_37_74:
-    cmp rbx, 2
+    cmp rax, 2
     sete al
     movzx rax, al
     cmp rax, 0
@@ -336,8 +338,8 @@ main:
     mov rbp, rsp
     sub rsp, 1024
 .Lssa_39_92:
-    mov rax, rdi
     mov rax, rsi
+    mov rax, rdi
     mov rax, 0
     cmp rax, 0
     jne .Lssa_39_93

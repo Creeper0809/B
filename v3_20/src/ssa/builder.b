@@ -374,14 +374,21 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
     if (params == 0) { return 0; }
 
     var n: u64 = vec_len(params);
+    var param_offsets: u64 = vec_new(n);
+    var param_arg_idx: u64 = vec_new(n);
+    var arg_idx: u64 = 0;
+
     var i: u64 = 0;
-    var param_idx: u64 = 0;
-    var arg_offset: u64 = 0;
     while (i < n) {
         var p: *Param = (*Param)vec_get(params, i);
+        var param_words: u64 = 1;
         if (p->type_kind == TYPE_STRUCT && p->ptr_depth == 0) {
             var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, p->struct_name_ptr, p->struct_name_len);
             if (struct_size == 0) { return 0; }
+            if (struct_size <= 8) { param_words = 1; }
+            else if (struct_size <= 16) { param_words = 2; }
+            else { return 0; }
+
             var offset: u64 = symtab_add(ctx->symtab, p->name_ptr, p->name_len, p->type_kind, p->ptr_depth, struct_size);
             var type_info: u64 = symtab_get_type(ctx->symtab, p->name_ptr, p->name_len);
             var ti: *TypeInfo = (*TypeInfo)type_info;
@@ -405,20 +412,62 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
                     }
                 }
             }
+            vec_push(param_offsets, offset);
+        } else if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
+            var offset2: u64 = symtab_add(ctx->symtab, p->name_ptr, p->name_len, p->type_kind, p->ptr_depth, 16);
+            var type_info2: u64 = symtab_get_type(ctx->symtab, p->name_ptr, p->name_len);
+            var ti2: *TypeInfo = (*TypeInfo)type_info2;
+            ti2->is_tagged = p->is_tagged;
+            ti2->struct_name_ptr = p->struct_name_ptr;
+            ti2->struct_name_len = p->struct_name_len;
+            ti2->tag_layout_ptr = p->tag_layout_ptr;
+            ti2->tag_layout_len = p->tag_layout_len;
+            ti2->elem_type_kind = p->elem_type_kind;
+            ti2->elem_ptr_depth = p->elem_ptr_depth;
+            ti2->array_len = p->array_len;
+            var g_structs_vec2: u64 = typeinfo_get_structs();
+            if (p->elem_type_kind == TYPE_STRUCT && g_structs_vec2 != 0 && p->struct_name_ptr != 0) {
+                var num_structs2: u64 = vec_len(g_structs_vec2);
+                for (var sj2: u64 = 0; sj2 < num_structs2; sj2++) {
+                    var sd_ptr2: u64 = vec_get(g_structs_vec2, sj2);
+                    var sd2: *AstStructDef = (*AstStructDef)sd_ptr2;
+                    if (sd2->name_len == p->struct_name_len && str_eq(sd2->name_ptr, sd2->name_len, p->struct_name_ptr, p->struct_name_len) != 0) {
+                        ti2->struct_def = sd_ptr2;
+                        break;
+                    }
+                }
+            }
+            param_words = 2;
+            vec_push(param_offsets, offset2);
+        } else {
+            vec_push(param_offsets, 0);
+        }
 
-            var base_addr: u64 = builder_new_lea_local(ctx, offset);
-            if (struct_size <= 8) {
+        vec_push(param_arg_idx, arg_idx);
+        arg_idx = arg_idx + param_words;
+        i = i + 1;
+    }
+
+    i = n;
+    while (i > 0) {
+        i = i - 1;
+        var p2: *Param = (*Param)vec_get(params, i);
+        var start_idx: u64 = vec_get(param_arg_idx, i);
+        if (p2->type_kind == TYPE_STRUCT && p2->ptr_depth == 0) {
+            var struct_size2: u64 = sizeof_type(TYPE_STRUCT, 0, p2->struct_name_ptr, p2->struct_name_len);
+            if (struct_size2 == 0) { return 0; }
+            var offset3: u64 = vec_get(param_offsets, i);
+            var base_addr: u64 = builder_new_lea_local(ctx, offset3);
+            if (struct_size2 <= 8) {
                 var reg0: u64 = builder_new_reg(ctx);
-                var param0: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg0, ssa_operand_const(param_idx), 0);
+                var param0: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg0, ssa_operand_const(start_idx), 0);
                 ssa_inst_append(ctx->cur_block, (*SSAInstruction)param0);
-                builder_store_by_size(ctx, base_addr, reg0, struct_size);
-                param_idx = param_idx + 1;
-                arg_offset = arg_offset + 8;
-            } else if (struct_size <= 16) {
+                builder_store_by_size(ctx, base_addr, reg0, struct_size2);
+            } else if (struct_size2 <= 16) {
                 var reg_lo: u64 = builder_new_reg(ctx);
                 var reg_hi: u64 = builder_new_reg(ctx);
-                var param_lo: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_lo, ssa_operand_const(param_idx), 0);
-                var param_hi: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_hi, ssa_operand_const(param_idx + 1), 0);
+                var param_lo: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_lo, ssa_operand_const(start_idx), 0);
+                var param_hi: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_hi, ssa_operand_const(start_idx + 1), 0);
                 ssa_inst_append(ctx->cur_block, (*SSAInstruction)param_lo);
                 ssa_inst_append(ctx->cur_block, (*SSAInstruction)param_hi);
                 builder_store_by_size(ctx, base_addr, reg_lo, 8);
@@ -426,74 +475,39 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
                 var addr2: u64 = builder_new_reg(ctx);
                 var add_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr2, ssa_operand_reg(base_addr), ssa_operand_reg(off_reg));
                 ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr);
-                var tail_size: u64 = struct_size - 8;
+                var tail_size: u64 = struct_size2 - 8;
                 builder_store_by_size(ctx, addr2, reg_hi, tail_size);
-                param_idx = param_idx + 2;
-                arg_offset = arg_offset + 16;
             } else {
                 return 0;
             }
-            i = i + 1;
             continue;
         }
-        if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
-            var offset: u64 = symtab_add(ctx->symtab, p->name_ptr, p->name_len, p->type_kind, p->ptr_depth, 16);
-            var type_info: u64 = symtab_get_type(ctx->symtab, p->name_ptr, p->name_len);
-            var ti: *TypeInfo = (*TypeInfo)type_info;
-            ti->is_tagged = p->is_tagged;
-            ti->struct_name_ptr = p->struct_name_ptr;
-            ti->struct_name_len = p->struct_name_len;
-            ti->tag_layout_ptr = p->tag_layout_ptr;
-            ti->tag_layout_len = p->tag_layout_len;
-            ti->elem_type_kind = p->elem_type_kind;
-            ti->elem_ptr_depth = p->elem_ptr_depth;
-            ti->array_len = p->array_len;
-            var g_structs_vec: u64 = typeinfo_get_structs();
-            if (p->elem_type_kind == TYPE_STRUCT && g_structs_vec != 0 && p->struct_name_ptr != 0) {
-                var num_structs2: u64 = vec_len(g_structs_vec);
-                for (var sj: u64 = 0; sj < num_structs2; sj++) {
-                    var sd_ptr2: u64 = vec_get(g_structs_vec, sj);
-                    var sd2: *AstStructDef = (*AstStructDef)sd_ptr2;
-                    if (sd2->name_len == p->struct_name_len && str_eq(sd2->name_ptr, sd2->name_len, p->struct_name_ptr, p->struct_name_len) != 0) {
-                        ti->struct_def = sd_ptr2;
-                        break;
-                    }
-                }
-            }
 
-            var base_addr: u64 = builder_new_lea_local(ctx, offset);
-
+        if (p2->type_kind == TYPE_SLICE && p2->ptr_depth == 0) {
+            var offset4: u64 = vec_get(param_offsets, i);
+            var base_addr2: u64 = builder_new_lea_local(ctx, offset4);
             var ptr_reg: u64 = builder_new_reg(ctx);
-            var ptr_param: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, ptr_reg, ssa_operand_const(param_idx), 0);
+            var ptr_param: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, ptr_reg, ssa_operand_const(start_idx), 0);
             ssa_inst_append(ctx->cur_block, (*SSAInstruction)ptr_param);
-            builder_store_by_size(ctx, base_addr, ptr_reg, 8);
-
+            builder_store_by_size(ctx, base_addr2, ptr_reg, 8);
             var len_reg: u64 = builder_new_reg(ctx);
-            var len_param: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, len_reg, ssa_operand_const(param_idx + 1), 0);
+            var len_param: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, len_reg, ssa_operand_const(start_idx + 1), 0);
             ssa_inst_append(ctx->cur_block, (*SSAInstruction)len_param);
-            var off_reg: u64 = build_const(ctx, 8);
-            var addr2: u64 = builder_new_reg(ctx);
-            var add_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr2, ssa_operand_reg(base_addr), ssa_operand_reg(off_reg));
-            ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr);
-            builder_store_by_size(ctx, addr2, len_reg, 8);
-
-            arg_offset = arg_offset + 16;
-            param_idx = param_idx + 2;
-            i = i + 1;
+            var off_reg2: u64 = build_const(ctx, 8);
+            var addr3: u64 = builder_new_reg(ctx);
+            var add_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr3, ssa_operand_reg(base_addr2), ssa_operand_reg(off_reg2));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr2);
+            builder_store_by_size(ctx, addr3, len_reg, 8);
             continue;
         }
 
-        var var_id: u64 = builder_get_var_id(ctx, p->name_ptr, p->name_len);
+        var var_id: u64 = builder_get_var_id(ctx, p2->name_ptr, p2->name_len);
         var reg_id: u64 = builder_new_reg(ctx);
-        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_id, ssa_operand_const(param_idx), 0);
+        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_id, ssa_operand_const(start_idx), 0);
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
         var st_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_STORE, 0, ssa_operand_const(var_id), ssa_operand_reg(reg_id));
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)st_ptr);
-
-        builder_symtab_add_param(ctx, p, 16 + arg_offset);
-        arg_offset = arg_offset + 8;
-        param_idx = param_idx + 1;
-        i = i + 1;
+        builder_symtab_add_param(ctx, p2, 16 + start_idx * 8);
     }
     return 0;
 }
@@ -2048,6 +2062,20 @@ func builder_emit_return_struct_from_addr(ctx: *BuilderCtx, expr: u64, struct_si
     return 0;
 }
 
+func builder_build_struct_literal_scalar(ctx: *BuilderCtx, lit: *AstStructLiteral) -> u64 {
+    var values: u64 = lit->values_vec;
+    if (values == 0) { return build_const(ctx, 0); }
+    var count: u64 = vec_len(values);
+    if (count == 0) { return build_const(ctx, 0); }
+    var first: u64 = vec_get(values, 0);
+    if (ast_kind(first) == AST_STRUCT_LITERAL) {
+        return builder_build_struct_literal_scalar(ctx, (*AstStructLiteral)first);
+    }
+    var reg: u64 = build_expr(ctx, first);
+    if (reg == 0) { reg = build_const(ctx, 0); }
+    return reg;
+}
+
 func builder_emit_return_struct_from_literal(ctx: *BuilderCtx, lit: *AstStructLiteral, struct_size: u64) -> u64 {
     var values: u64 = lit->values_vec;
     if (values == 0) {
@@ -2077,7 +2105,12 @@ func builder_emit_return_struct_from_literal(ctx: *BuilderCtx, lit: *AstStructLi
         if (fields != 0 && num_values > 0) {
             var field0: *FieldDesc = (*FieldDesc)vec_get(fields, 0);
             first_size = sizeof_field_desc(field0);
-            first_val = build_expr(ctx, vec_get(values, 0));
+            var v0: u64 = vec_get(values, 0);
+            if (ast_kind(v0) == AST_STRUCT_LITERAL) {
+                first_val = builder_build_struct_literal_scalar(ctx, (*AstStructLiteral)v0);
+            } else {
+                first_val = build_expr(ctx, v0);
+            }
             if (first_val == 0) {
                 first_val = build_const(ctx, 0);
             }
@@ -2088,7 +2121,12 @@ func builder_emit_return_struct_from_literal(ctx: *BuilderCtx, lit: *AstStructLi
                         var field1: *FieldDesc = (*FieldDesc)vec_get(fields, 1);
                         second_size = sizeof_field_desc(field1);
                     }
-                    second_val = build_expr(ctx, vec_get(values, 1));
+                    var v1: u64 = vec_get(values, 1);
+                    if (ast_kind(v1) == AST_STRUCT_LITERAL) {
+                        second_val = builder_build_struct_literal_scalar(ctx, (*AstStructLiteral)v1);
+                    } else {
+                        second_val = build_expr(ctx, v1);
+                    }
                     if (second_val == 0) {
                         second_val = build_const(ctx, 0);
                     }
@@ -2099,14 +2137,24 @@ func builder_emit_return_struct_from_literal(ctx: *BuilderCtx, lit: *AstStructLi
         }
     } else {
         if (num_values > 0) {
-            first_val = build_expr(ctx, vec_get(values, 0));
+            var v0b: u64 = vec_get(values, 0);
+            if (ast_kind(v0b) == AST_STRUCT_LITERAL) {
+                first_val = builder_build_struct_literal_scalar(ctx, (*AstStructLiteral)v0b);
+            } else {
+                first_val = build_expr(ctx, v0b);
+            }
             if (first_val == 0) {
                 first_val = build_const(ctx, 0);
             }
             first_size = 8;
             if (struct_size > 8) {
                 if (num_values > 1) {
-                    second_val = build_expr(ctx, vec_get(values, 1));
+                    var v1b: u64 = vec_get(values, 1);
+                    if (ast_kind(v1b) == AST_STRUCT_LITERAL) {
+                        second_val = builder_build_struct_literal_scalar(ctx, (*AstStructLiteral)v1b);
+                    } else {
+                        second_val = build_expr(ctx, v1b);
+                    }
                     if (second_val == 0) {
                         second_val = build_const(ctx, 0);
                     }

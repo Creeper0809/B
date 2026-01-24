@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/tmp/test_make_point.out)"
+    ]
+  }
+}
