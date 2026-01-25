@@ -9,3 +9,6 @@
 - [x] Fix SSA struct param indexing and sret handling.
 - [x] Handle SSA member access on struct-returning calls.
 - [x] Reconcile struct-return chain/nested expected outputs.
+- [x] Fix SSA pointer arithmetic scaling for element-size addressing.
+- [x] Return address for array identifiers in SSA builder.
+- [x] Preserve signed stack offsets in SSA `lea_local` encoding.

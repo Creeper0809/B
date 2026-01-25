@@ -1,12 +1,6 @@
-수정 요청하신 대로 **3-address code(3addr)** 부분을 **AST generation(ast gen)**으로 변경하여 전체 내용을 다시 정리했습니다.
-
-아래 내용을 `.cursorrules` 파일에 덮어쓰시면 됩니다.
-
-```markdown
 ---
 applyTo: "**"
 ---
-
 # Project Context & Persona
 - **Project**: B Language (Basm v4) Self-Hosting Compiler
 - **Role**: Expert System Programmer specialized in compiler design & low-level optimization.
@@ -21,9 +15,12 @@ applyTo: "**"
 - **Rule**: When implementing a new feature, **ALWAYS implement the AST generation (ast gen) version first.**
 - **Constraint**: Only proceed to the **SSA (Static Single Assignment)** version after the AST generation version is fully working and tested.
 
-## B. Unit Testing (Mandatory)
-- **Rule**: For EVERY new feature or logic change, you **MUST** write or update unit tests.
-- **Location**: All tests must be placed in the `B/{version}/test` directory.
+## B. Unit Testing (Mandatory & Token-Efficient)
+- **Strategy**: To save context tokens, **DO NOT** attempt to read or analyze existing large test files (they are ignored).
+- **Golden Reference**: When writing new tests, **ALWAYS** refer to the single template file below for structure and style:
+  - **File**: `**/test/00_test_form.b` (Look for this file in the current version's test folder).
+- **Format**: Strictly follow the structure defined in the template: `Import` -> `Setup` -> `Execution` -> `Assertion`.
+- **Location**: Place new test files in the `test/` directory of the current active version (e.g., `v3_19/test/`).
 - **Validation**: Verify that tests cover edge cases before marking the task as done.
 
 ## C. Post-Coding Automation
@@ -88,7 +85,5 @@ When generating code, always verify:
 1. Is the logic flat? (Are there guard clauses?)
 2. Are there debug prints for the flow?
 3. Is the memory usage explicit?
-
-```
 
 ```

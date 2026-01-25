@@ -534,7 +534,12 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
 
 func builder_new_lea_local(ctx: *BuilderCtx, offset: u64) -> u64 {
     var reg_id: u64 = builder_new_reg(ctx);
-    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_LOCAL, reg_id, offset, 0);
+    // Encode signed 64-bit stack offset into 63-bit field with bias so
+    // ssa_operand_value can carry it without losing sign.
+    var signed_off: i64 = (i64)offset;
+    var bias: u64 = 4611686018427387904; // 1<<62
+    var enc: u64 = (u64)(signed_off + (i64)bias);
+    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_LOCAL, reg_id, ssa_operand_const(enc), 0);
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
     return reg_id;
 }
@@ -1666,6 +1671,21 @@ func build_short_circuit(ctx: *BuilderCtx, op: u64, left: u64, right: u64) -> u6
     return dest;
 }
 
+func builder_scale_ptr_arith(ctx: *BuilderCtx, left_expr: u64, op: u64, rhs_reg: u64) -> u64 {
+    if (op != TOKEN_PLUS && op != TOKEN_MINUS) { return rhs_reg; }
+    var left_ti_ptr: u64 = get_expr_type_with_symtab(left_expr, ctx->symtab);
+    if (left_ti_ptr == 0) { return rhs_reg; }
+    var left_ti: *TypeInfo = (*TypeInfo)left_ti_ptr;
+    if (left_ti->ptr_depth == 0) { return rhs_reg; }
+    var elem_size: u64 = get_pointee_size(left_ti->type_kind, left_ti->ptr_depth);
+    if (elem_size <= 1) { return rhs_reg; }
+    var size_reg: u64 = build_const(ctx, elem_size);
+    var scaled_reg: u64 = builder_new_reg(ctx);
+    var mul_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_MUL, scaled_reg, ssa_operand_reg(rhs_reg), ssa_operand_reg(size_reg));
+    ssa_inst_append(ctx->cur_block, (*SSAInstruction)mul_ptr);
+    return scaled_reg;
+}
+
 func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
     push_trace("build_expr", "ssa_builder.b", __LINE__);
     pop_trace();
@@ -1692,6 +1712,13 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
         var idn: *AstIdent = (*AstIdent)node;
         var offset: u64 = symtab_find(ctx->symtab, idn->name_ptr, idn->name_len);
         if (offset != 0) {
+            var var_type_ptr: u64 = symtab_get_type(ctx->symtab, idn->name_ptr, idn->name_len);
+            if (var_type_ptr != 0) {
+                var var_ti: *TypeInfo = (*TypeInfo)var_type_ptr;
+                if (var_ti->ptr_depth == 0 && var_ti->type_kind == TYPE_ARRAY) {
+                    return builder_new_lea_local(ctx, offset);
+                }
+            }
             var var_id: u64 = builder_get_var_id(ctx, idn->name_ptr, idn->name_len);
             var reg_id: u64 = builder_new_reg(ctx);
             var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LOAD, reg_id, ssa_operand_const(var_id), 0);
@@ -1726,6 +1753,7 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
         }
         var lhs_reg: u64 = build_expr(ctx, bin->left);
         var rhs_reg: u64 = build_expr(ctx, bin->right);
+        rhs_reg = builder_scale_ptr_arith(ctx, bin->left, bin->op, rhs_reg);
         var op: u64 = builder_binop_to_ssa_op(bin->op);
         if (op == SSA_OP_NOP) {
             return build_const(ctx, 0);

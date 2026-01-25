@@ -693,7 +693,7 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         return 1;
     }
 
-    if (kind == AST_ASM) { return 0; }
+    if (kind == AST_ASM) { return 1; }
 
     if (kind == AST_EXPR_STMT) {
         var es: *AstExprStmt = (*AstExprStmt)node;
@@ -1607,8 +1607,10 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_LEA_LOCAL) {
         // Preserve signed stack offsets embedded in const operands.
-        var offset: i64 = (i64)inst->src1;
-        _ssa_emit_lea_local(inst->dest, offset);
+        var offset_val: u64 = ssa_operand_value(inst->src1);
+        var bias: u64 = 4611686018427387904; // 1<<62
+        var signed_off: i64 = (i64)(offset_val - bias);
+        _ssa_emit_lea_local(inst->dest, signed_off);
         return 0;
     }
 

@@ -88,328 +88,168 @@ std_str__str_concat3:
 std_os__os_sys_brk:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 12
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_5_5:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_write:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov [rbp-24], rdx
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-16]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg1]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-24]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg2]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 1
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    mov rsi , [ rel _gvar_std_os__g_syscall_arg1 ]
-    mov rdx , [ rel _gvar_std_os__g_syscall_arg2 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_6_6:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_read:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov [rbp-24], rdx
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-16]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg1]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-24]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg2]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 0
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    mov rsi , [ rel _gvar_std_os__g_syscall_arg1 ]
-    mov rdx , [ rel _gvar_std_os__g_syscall_arg2 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_7_7:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_open:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov [rbp-24], rdx
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-16]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg1]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-24]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg2]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 2
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    mov rsi , [ rel _gvar_std_os__g_syscall_arg1 ]
-    mov rdx , [ rel _gvar_std_os__g_syscall_arg2 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_8_8:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_close:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 3
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_9_9:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_fstat:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-16]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg1]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 5
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    mov rsi , [ rel _gvar_std_os__g_syscall_arg1 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_10_10:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_fork:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov rax , 57
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_11_11:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_execve:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov [rbp-24], rdx
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-16]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg1]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-24]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg2]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 59
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    mov rsi , [ rel _gvar_std_os__g_syscall_arg1 ]
-    mov rdx , [ rel _gvar_std_os__g_syscall_arg2 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_12_12:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_wait4:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov [rbp-24], rdx
-    mov [rbp-32], rcx
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-16]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg1]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-24]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg2]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-32]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg3]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 61
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    mov rsi , [ rel _gvar_std_os__g_syscall_arg1 ]
-    mov rdx , [ rel _gvar_std_os__g_syscall_arg2 ]
-    mov r10 , [ rel _gvar_std_os__g_syscall_arg3 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_13_13:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_exit:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 60
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    syscall
-    mov rax, 0
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_14_14:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_sys_dup2:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov [rbp-8], rdi
-    mov [rbp-16], rsi
-    mov rax, [rbp-8]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg0]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-16]
-    push rax
-    lea rax, [rel _gvar_std_os__g_syscall_arg1]
-    pop rbx
-    mov [rax], rbx
-    mov rax , 33
-    mov rdi , [ rel _gvar_std_os__g_syscall_arg0 ]
-    mov rsi , [ rel _gvar_std_os__g_syscall_arg1 ]
-    syscall
-    mov [ rel _gvar_std_os__g_syscall_ret ] , rax
-    mov rax, [rel _gvar_std_os__g_syscall_ret]
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_15_15:
+    xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
-    mov rsp, rbp
-    pop rbp
-   ret
 std_os__os_execute:
     push rbp
     mov rbp, rsp
