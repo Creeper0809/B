@@ -13,29 +13,30 @@ _start:
 _84_ssa_slice_return_chain__get_slice:
     push rbp
     mov rbp, rsp
-    sub rsp, 1088
-    mov [rbp-1032], rdi
-    mov [rbp-1040], rsi
-    mov [rbp-1048], rdx
-    mov [rbp-1056], rcx
-    mov [rbp-1064], r8
-    mov [rbp-1072], r9
-.Lssa_0_0:
+    sub rsp, 1024
+    mov rax, 1
+    push rax
     lea rax, [rbp-16]
-    mov rax, rax
-    add rax, 0
-    mov rbx, 1
+    push rax
+    mov rax, 0
+    imul rax, 8
+    pop rbx
+    add rax, rbx
+    pop rbx
     mov [rax], rbx
+    mov rax, 2
+    push rax
     lea rax, [rbp-16]
-    mov rax, rax
-    add rax, 8
-    mov rbx, 2
+    push rax
+    mov rax, 1
+    imul rax, 8
+    pop rbx
+    add rax, rbx
+    pop rbx
     mov [rax], rbx
-    lea rax, [rbp-16]
-    mov rbx, 2
-    mov r12, rbx
-    mov r8, rbx
-    mov r13, rax
+    mov rax, 2
+    mov r12, rax
+    mov r8, rax
     mov rax, 8
     imul r8, rax
     mov rax, [_gvar___cg_heap_brk]
@@ -59,7 +60,8 @@ _84_ssa_slice_return_chain__get_slice:
     xor rbx, rbx
 .L1:
     mov rdx, r12
-    mov rsi, r13
+    lea rax, [rbp-16]
+    mov rsi, rax
     mov rdi, rbx
     xor r9, r9
 .L3:
@@ -74,10 +76,10 @@ _84_ssa_slice_return_chain__get_slice:
     mov rsp, rbp
     pop rbp
     ret
-    xor eax, eax
+   xor eax, eax
     mov rsp, rbp
     pop rbp
-    ret
+   ret
 _84_ssa_slice_return_chain__pass_slice:
     push rbp
     mov rbp, rsp

@@ -1118,10 +1118,9 @@ main:
     mov [rax], rcx
     mov rax, 0
     mov rbx, 0
-    mov r8, rax
+    mov rdx, rax
     mov r8, rbx
     mov rdx, rax
-    mov rax, rax
     jmp .Lssa_15_47
 .Lssa_15_47:
     cmp r8, 10
@@ -1143,35 +1142,39 @@ main:
     mov rax, rax
     add rax, 1
     lea rbx, [rbp-240]
-    push rax
-    push rdx
-    push r8
+    lea rcx, [rbp-240]
     push rax
     push rbx
+    push r8
+    push rax
+    push rcx
     pop rdi
     pop rsi
     call _20_struct_return__Data_transform
-    mov rbx, rax
+    mov rcx, rax
     pop r8
-    pop rdx
+    pop rbx
     pop rax
+    mov [rbx], rcx
+    mov rbx, rbx
+    add rbx, 8
+    mov [rbx], rdx
+    lea rbx, [rbp-240]
+    mov rbx, [rbx]
+    add rbx, rdx
     lea rcx, [rbp-240]
-    mov rcx, [rcx]
-    add rcx, rdx
-    lea rdx, [rbp-240]
-    mov rdx, rdx
-    add rdx, 8
-    mov rdx, [rdx]
     mov rcx, rcx
-    add rcx, rdx
+    add rcx, 8
+    mov rcx, [rcx]
+    mov rbx, rbx
+    add rbx, rcx
     jmp .Lssa_15_49
 .Lssa_15_49:
-    mov rdx, r8
-    add rdx, 1
-    mov r8, rax
-    mov r8, rdx
-    mov rdx, rcx
-    mov rax, rbx
+    mov rcx, r8
+    add rcx, 1
+    mov rdx, rax
+    mov r8, rcx
+    mov rdx, rbx
     jmp .Lssa_15_47
 .Lssa_15_50:
     cmp rdx, 0

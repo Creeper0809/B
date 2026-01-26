@@ -27,7 +27,9 @@ main:
     mov rbx, 0
     mov [rax], rbx
     lea rax, [rbp-24]
-    mov [rax], rax
+    lea rbx, [rbp-8]
+    mov rbx, [rbx]
+    mov [rax], rbx
     lea rax, [rbp-24]
     mov rax, rax
     add rax, 8

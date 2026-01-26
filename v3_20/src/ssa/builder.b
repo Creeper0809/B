@@ -2652,6 +2652,23 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
     if (kind == AST_ASSIGN) {
         var asn: *AstAssign = (*AstAssign)node;
         var target_kind: u64 = ast_kind(asn->target);
+        var tgt_ti_ptr: u64 = 0;
+        var tgt_is_struct: u64 = 0;
+        var tgt_struct_size: u64 = 0;
+        var tgt_struct_name_ptr: u64 = 0;
+        var tgt_struct_name_len: u64 = 0;
+        if (target_kind == AST_IDENT || target_kind == AST_DEREF || target_kind == AST_DEREF8 || target_kind == AST_MEMBER_ACCESS) {
+            tgt_ti_ptr = get_expr_type_with_symtab(asn->target, ctx->symtab);
+            if (tgt_ti_ptr != 0) {
+                var ti_s: *TypeInfo = (*TypeInfo)tgt_ti_ptr;
+                if (ti_s->type_kind == TYPE_STRUCT && ti_s->ptr_depth == 0) {
+                    tgt_is_struct = 1;
+                    tgt_struct_name_ptr = ti_s->struct_name_ptr;
+                    tgt_struct_name_len = ti_s->struct_name_len;
+                    tgt_struct_size = sizeof_type(TYPE_STRUCT, 0, tgt_struct_name_ptr, tgt_struct_name_len);
+                }
+            }
+        }
         if (target_kind == AST_MEMBER_ACCESS) {
             var m: *AstMemberAccess = (*AstMemberAccess)asn->target;
             var obj: u64 = m->object;
@@ -2767,7 +2784,48 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
             return 0;
         }
 
-        var tgt_ti_ptr: u64 = get_expr_type_with_symtab(asn->target, ctx->symtab);
+        if (tgt_is_struct != 0 && tgt_struct_size > 0) {
+            var val_kind_s: u64 = ast_kind(asn->value);
+            if (val_kind_s == AST_CALL || val_kind_s == AST_METHOD_CALL || val_kind_s == AST_CALL_PTR) {
+                if (tgt_struct_size > 16) {
+                    if (val_kind_s == AST_CALL) {
+                        builder_emit_call_sret(ctx, (*AstCall)asn->value, target_addr);
+                    } else if (val_kind_s == AST_METHOD_CALL) {
+                        builder_emit_method_call_sret(ctx, (*AstMethodCall)asn->value, target_addr);
+                    } else {
+                        builder_emit_call_ptr_sret(ctx, (*AstCallPtr)asn->value, target_addr);
+                    }
+                    return 0;
+                }
+                var lo_reg_s: u64 = builder_new_reg(ctx);
+                var hi_reg_s: u64 = 0;
+                if (tgt_struct_size > 8) { hi_reg_s = builder_new_reg(ctx); }
+                if (val_kind_s == AST_CALL) {
+                    builder_emit_call(ctx, (*AstCall)asn->value, lo_reg_s, hi_reg_s);
+                } else if (val_kind_s == AST_METHOD_CALL) {
+                    builder_emit_method_call(ctx, (*AstMethodCall)asn->value, lo_reg_s, hi_reg_s);
+                } else {
+                    builder_emit_call_ptr(ctx, (*AstCallPtr)asn->value, lo_reg_s, hi_reg_s);
+                }
+                builder_store_by_size(ctx, target_addr, lo_reg_s, 8);
+                if (hi_reg_s != 0) {
+                    var off8s: u64 = build_const(ctx, 8);
+                    var addr2s: u64 = builder_new_reg(ctx);
+                    var add_ptrs: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr2s, ssa_operand_reg(target_addr), ssa_operand_reg(off8s));
+                    ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptrs);
+                    var tail_size_s: u64 = tgt_struct_size - 8;
+                    if (tail_size_s > 8) { tail_size_s = 8; }
+                    builder_store_by_size(ctx, addr2s, hi_reg_s, tail_size_s);
+                }
+                return 0;
+            }
+
+            var src_addr_s: u64 = builder_lvalue_addr(ctx, asn->value);
+            if (src_addr_s == 0) { return 0; }
+            builder_struct_copy(ctx, target_addr, src_addr_s, tgt_struct_size);
+            return 0;
+        }
+
         if (tgt_ti_ptr != 0) {
             var ti: *TypeInfo = (*TypeInfo)tgt_ti_ptr;
             if (ti->type_kind == TYPE_SLICE && ti->ptr_depth == 0) {

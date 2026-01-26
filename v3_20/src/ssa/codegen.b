@@ -458,6 +458,24 @@ func _ssa_build_live_map(fn: *SSAFunction) -> u64 {
     return map;
 }
 
+func _ssa_fn_has_ret_slice_heap(fn: *SSAFunction) -> u64 {
+    if (fn == 0) { return 0; }
+    var blocks: u64 = fn->blocks_data;
+    var bcount: u64 = fn->blocks_len;
+    var bi: u64 = 0;
+    while (bi < bcount) {
+        var b_ptr: u64 = *(*u64)(blocks + bi * 8);
+        var b: *SSABlock = (*SSABlock)b_ptr;
+        var cur: *SSAInstruction = b->inst_head;
+        while (cur != 0) {
+            if (ssa_inst_get_op(cur) == SSA_OP_RET_SLICE_HEAP) { return 1; }
+            cur = cur->next;
+        }
+        bi = bi + 1;
+    }
+    return 0;
+}
+
 // ============================================
 // 지원 여부 판정
 // ============================================
@@ -732,6 +750,13 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         if (vd->type_kind == TYPE_SLICE && vd->ptr_depth == 0) {
             if (ast_kind(vd->init_expr) == AST_CALL || ast_kind(vd->init_expr) == AST_CALL_PTR || ast_kind(vd->init_expr) == AST_METHOD_CALL) { return 1; }
         }
+        if (vd->type_kind == TYPE_STRUCT && vd->ptr_depth == 0) {
+            var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, vd->struct_name_ptr, vd->struct_name_len);
+            if (struct_size > 16) {
+                var ik: u64 = ast_kind(vd->init_expr);
+                if (ik == AST_CALL || ik == AST_CALL_PTR || ik == AST_METHOD_CALL) { return 1; }
+            }
+        }
         if (ast_kind(vd->init_expr) == AST_STRUCT_LITERAL) {
             return _ssa_codegen_struct_literal_supported(vd->init_expr, globals);
         }
@@ -746,6 +771,17 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
     if (kind == AST_ASSIGN) {
         var asn: *AstAssign = (*AstAssign)node;
         var tk: u64 = ast_kind(asn->target);
+        if (ast_kind(asn->value) == AST_CALL) {
+            var call2: *AstCall = (*AstCall)asn->value;
+            var fn_ptr2: u64 = compiler_get_func(call2->name_ptr, call2->name_len);
+            if (fn_ptr2 != 0) {
+                var fn2: *AstFunc = (*AstFunc)fn_ptr2;
+                if (fn2->ret_type == TYPE_STRUCT && fn2->ret_ptr_depth == 0) {
+                    var struct_size2: u64 = sizeof_type(TYPE_STRUCT, 0, fn2->ret_struct_name_ptr, fn2->ret_struct_name_len);
+                    if (struct_size2 > 16) { return 1; }
+                }
+            }
+        }
         if (tk == AST_IDENT) {
             var idn2: *AstIdent = (*AstIdent)asn->target;
             if (ast_kind(asn->value) == AST_STRUCT_LITERAL) {
@@ -765,6 +801,7 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_RETURN) {
         var ret: *AstReturn = (*AstReturn)node;
+        if (ret->expr != 0 && ast_kind(ret->expr) == AST_SLICE) { return 0; }
         return _ssa_codegen_expr_supported(ret->expr, globals);
     }
 
@@ -1712,7 +1749,11 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
     if (op == SSA_OP_ASM) {
         var text_vec: u64 = ssa_operand_value(inst->src1);
         var live_mask: u64 = _ssa_live_map_get(g_live_mask_map, (u64)inst);
-        _ssa_emit_asm_with_save(text_vec, live_mask);
+        if (g_live_mask_map == 0) {
+            _ssa_emit_asm(text_vec);
+        } else {
+            _ssa_emit_asm_with_save(text_vec, live_mask);
+        }
         return 0;
     }
 
@@ -1802,7 +1843,11 @@ func ssa_codegen_emit_func(fn_ptr: u64, ssa_fn_ptr: u64) -> u64 {
     var g_symtab: u64 = emitter_get_symtab();
     symtab_clear(g_symtab);
 
-    g_live_mask_map = _ssa_build_live_map(ssa_fn);
+    if (_ssa_fn_has_ret_slice_heap(ssa_fn) != 0) {
+        g_live_mask_map = 0;
+    } else {
+        g_live_mask_map = _ssa_build_live_map(ssa_fn);
+    }
 
     emit(fn->name_ptr, fn->name_len);
     emit(":\n", 2);

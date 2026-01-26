@@ -16,3 +16,5 @@
 - [x] Accept build/v3_20.out basename for std path resolution.
 - [x] Force AST codegen for std_ in SSA mode.
 - [x] Save/restore live registers around SSA inline asm.
+- [x] SSA struct assignment/copy (large struct sret + value copy).
+- [ ] Re-enable SSA slice-literal returns (current fallback to AST).

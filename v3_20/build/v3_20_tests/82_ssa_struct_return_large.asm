@@ -47,16 +47,25 @@ _82_ssa_struct_return_large__make_large:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
-    mov rax, 90
+    sub rsp, 1088
+    mov [rbp-1032], rdi
+    mov [rbp-1040], rsi
+    mov [rbp-1048], rdx
+    mov [rbp-1056], rcx
+    mov [rbp-1064], r8
+    mov [rbp-1072], r9
+.Lssa_1_1:
+    lea rax, [rbp-32]
+    mov rbx, 10
+    mov rcx, 20
+    mov rdx, 30
+    mov r8, 90
+    push r8
+    push rdx
+    push rcx
+    push rbx
     push rax
-    mov rax, 30
-    push rax
-    mov rax, 20
-    push rax
-    mov rax, 10
-    push rax
-    lea rdi, [rbp-32]
+    pop rdi
     pop rsi
     pop rdx
     pop rcx
@@ -64,28 +73,28 @@ main:
     call _82_ssa_struct_return_large__make_large
     lea rax, [rbp-32]
     mov rax, [rax]
-    push rax
-    lea rax, [rbp-24]
-    mov rax, [rax]
-    mov rbx, rax
-    pop rax
+    lea rbx, [rbp-32]
+    mov rbx, rbx
+    add rbx, 8
+    mov rbx, [rbx]
+    mov rax, rax
     add rax, rbx
-    push rax
-    lea rax, [rbp-16]
-    mov rax, [rax]
-    mov rbx, rax
-    pop rax
+    lea rbx, [rbp-32]
+    mov rbx, rbx
+    add rbx, 16
+    mov rbx, [rbx]
+    mov rax, rax
     add rax, rbx
-    push rax
-    lea rax, [rbp-8]
-    mov rax, [rax]
-    mov rbx, rax
-    pop rax
+    lea rbx, [rbp-32]
+    mov rbx, rbx
+    add rbx, 24
+    mov rbx, [rbx]
+    mov rax, rax
     add rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-   xor eax, eax
+    xor eax, eax
     mov rsp, rbp
     pop rbp
-   ret
+    ret

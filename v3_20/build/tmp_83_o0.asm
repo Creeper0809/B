@@ -93,47 +93,49 @@ _83_ssa_slice_return_basic__get_slice:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1088
-    mov [rbp-1032], rdi
-    mov [rbp-1040], rsi
-    mov [rbp-1048], rdx
-    mov [rbp-1056], rcx
-    mov [rbp-1064], r8
-    mov [rbp-1072], r9
-.Lssa_1_1:
-    lea rax, [rbp-16]
-    push rax
+    sub rsp, 1024
     call _83_ssa_slice_return_basic__get_slice
-    mov rbx, [rsp]
-    mov [rbx], rax
-    mov [rbx+8], rdx
-    add rsp, 8
+    mov [rbp-16], rax
+    mov [rbp-8], rdx
     lea rax, [rbp-16]
     mov rax, [rax]
-    mov rax, rax
-    add rax, 0
+    push rax
+    mov rax, 0
+    imul rax, 8
+    pop rbx
+    add rax, rbx
     mov rax, [rax]
-    lea rbx, [rbp-16]
-    mov rbx, [rbx]
-    mov rbx, rbx
-    add rbx, 8
-    mov rbx, [rbx]
-    mov rax, rax
+    push rax
+    lea rax, [rbp-16]
+    mov rax, [rax]
+    push rax
+    mov rax, 1
+    imul rax, 8
+    pop rbx
     add rax, rbx
-    lea rbx, [rbp-16]
-    mov rbx, [rbx]
-    mov rbx, rbx
-    add rbx, 16
-    mov rbx, [rbx]
-    mov rax, rax
+    mov rax, [rax]
+    mov rbx, rax
+    pop rax
+    add rax, rbx
+    push rax
+    lea rax, [rbp-16]
+    mov rax, [rax]
+    push rax
+    mov rax, 2
+    imul rax, 8
+    pop rbx
+    add rax, rbx
+    mov rax, [rax]
+    mov rbx, rax
+    pop rax
     add rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-    xor eax, eax
+   xor eax, eax
     mov rsp, rbp
     pop rbp
-    ret
+   ret
 
 section .bss
 _gvar___cg_heap_brk: resq 1
