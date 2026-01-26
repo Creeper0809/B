@@ -151,7 +151,7 @@ func ssa_inst_insert_before_terminator(block: *SSABlock, inst: *SSAInstruction) 
     if (tail == 0) { return ssa_inst_append(block, inst); }
 
     var op: u64 = ssa_inst_get_op(tail);
-    if (op != SSA_OP_JMP && op != SSA_OP_BR && op != SSA_OP_RET) {
+    if (op != SSA_OP_JMP && op != SSA_OP_BR && op != SSA_OP_RET && op != SSA_OP_RET_SLICE_HEAP) {
         return ssa_inst_append(block, inst);
     }
 
@@ -296,9 +296,11 @@ func ssa_operand_value(opr: u64) -> u64 {
 }
 
 var g_ret_slice_heap_map;
+var g_ret_slice_heap_map_ex;
 
 func ssa_ret_slice_heap_clear() -> u64 {
     g_ret_slice_heap_map = 0;
+    g_ret_slice_heap_map_ex = 0;
     return 0;
 }
 
@@ -309,6 +311,17 @@ func ssa_ret_slice_heap_set(inst_ptr: u64, elem_size: u64) -> u64 {
     return 0;
 }
 
+func ssa_ret_slice_heap_set_ex(inst_ptr: u64, elem_size: u64, ptr_val: u64, len_val: u64, ptr_is_reg: u64, len_is_reg: u64) -> u64 {
+    if (g_ret_slice_heap_map_ex == 0) { g_ret_slice_heap_map_ex = vec_new(24); }
+    vec_push(g_ret_slice_heap_map_ex, inst_ptr);
+    vec_push(g_ret_slice_heap_map_ex, elem_size);
+    vec_push(g_ret_slice_heap_map_ex, ptr_val);
+    vec_push(g_ret_slice_heap_map_ex, len_val);
+    vec_push(g_ret_slice_heap_map_ex, ptr_is_reg);
+    vec_push(g_ret_slice_heap_map_ex, len_is_reg);
+    return 0;
+}
+
 func ssa_ret_slice_heap_get(inst_ptr: u64) -> u64 {
     if (g_ret_slice_heap_map == 0) { return 0; }
     var n: u64 = vec_len(g_ret_slice_heap_map);
@@ -316,6 +329,49 @@ func ssa_ret_slice_heap_get(inst_ptr: u64) -> u64 {
     while (i + 1 < n) {
         if (vec_get(g_ret_slice_heap_map, i) == inst_ptr) { return vec_get(g_ret_slice_heap_map, i + 1); }
         i = i + 2;
+    }
+    return 0;
+}
+
+func ssa_ret_slice_heap_get_ex(inst_ptr: u64, elem_out: u64, ptr_out: u64, len_out: u64, ptr_is_reg_out: u64, len_is_reg_out: u64) -> u64 {
+    if (g_ret_slice_heap_map_ex == 0) { return 0; }
+    var n: u64 = vec_len(g_ret_slice_heap_map_ex);
+    var i: u64 = 0;
+    while (i + 5 < n) {
+        if (vec_get(g_ret_slice_heap_map_ex, i) == inst_ptr) {
+            *(*u64)(elem_out) = vec_get(g_ret_slice_heap_map_ex, i + 1);
+            *(*u64)(ptr_out) = vec_get(g_ret_slice_heap_map_ex, i + 2);
+            *(*u64)(len_out) = vec_get(g_ret_slice_heap_map_ex, i + 3);
+            *(*u64)(ptr_is_reg_out) = vec_get(g_ret_slice_heap_map_ex, i + 4);
+            *(*u64)(len_is_reg_out) = vec_get(g_ret_slice_heap_map_ex, i + 5);
+            return 1;
+        }
+        i = i + 6;
+    }
+    return 0;
+}
+
+func ssa_ret_slice_heap_remap_ex(inst_ptr: u64, map: u64, map_len: u64) -> u64 {
+    if (g_ret_slice_heap_map_ex == 0) { return 0; }
+    var n: u64 = vec_len(g_ret_slice_heap_map_ex);
+    var i: u64 = 0;
+    while (i + 5 < n) {
+        if (vec_get(g_ret_slice_heap_map_ex, i) == inst_ptr) {
+            var ptr_val: u64 = vec_get(g_ret_slice_heap_map_ex, i + 2);
+            var len_val: u64 = vec_get(g_ret_slice_heap_map_ex, i + 3);
+            var ptr_is_reg: u64 = vec_get(g_ret_slice_heap_map_ex, i + 4);
+            var len_is_reg: u64 = vec_get(g_ret_slice_heap_map_ex, i + 5);
+            if (ptr_is_reg != 0 && ptr_val < map_len) {
+                var pptr: u64 = *(*u64)(map + ptr_val * 8);
+                if (pptr != 0) { vec_set(g_ret_slice_heap_map_ex, i + 2, pptr); }
+            }
+            if (len_is_reg != 0 && len_val < map_len) {
+                var plen: u64 = *(*u64)(map + len_val * 8);
+                if (plen != 0) { vec_set(g_ret_slice_heap_map_ex, i + 3, plen); }
+            }
+            return 1;
+        }
+        i = i + 6;
     }
     return 0;
 }

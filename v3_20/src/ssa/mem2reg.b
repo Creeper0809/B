@@ -160,13 +160,24 @@ func _ssa_mem2reg_max_reg(fn: *SSAFunction) -> u64 {
 
         var phi: *SSAInstruction = b->phi_head;
         while (phi != 0) {
-            if (phi->dest > max_id) { max_id = phi->dest; }
+            var mask: u64 = 1;
+            mask = mask << 63;
+            if ((phi->dest & mask) == 0 && phi->dest < 1048576) {
+                if (phi->dest > max_id) { max_id = phi->dest; }
+            }
             phi = phi->next;
         }
 
         var cur: *SSAInstruction = b->inst_head;
         while (cur != 0) {
-            if (cur->dest > max_id) { max_id = cur->dest; }
+            var op: u64 = ssa_inst_get_op(cur);
+            if (op != SSA_OP_BR && op != SSA_OP_JMP && op != SSA_OP_RET && op != SSA_OP_RET_SLICE_HEAP) {
+                var mask2: u64 = 1;
+                mask2 = mask2 << 63;
+                if ((cur->dest & mask2) == 0 && cur->dest < 1048576) {
+                    if (cur->dest > max_id) { max_id = cur->dest; }
+                }
+            }
             cur = cur->next;
         }
 
@@ -317,9 +328,11 @@ func _ssa_mem2reg_rename_block(fn: *SSAFunction, block: *SSABlock, max_var: u64,
     while (cur != 0) {
         var op: u64 = ssa_inst_get_op(cur);
 
-        cur->src1 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src1);
-        if (!((op == SSA_OP_CALL || op == SSA_OP_CALL_PTR) && cur->src2 != 0)) {
-            cur->src2 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src2);
+        if (op != SSA_OP_RET_SLICE_HEAP) {
+            cur->src1 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src1);
+            if (!((op == SSA_OP_CALL || op == SSA_OP_CALL_PTR) && cur->src2 != 0)) {
+                cur->src2 = _ssa_mem2reg_rewrite_opr(reg_map_val, reg_map_set, reg_map_cap, cur->src2);
+            }
         }
 
         if (op == SSA_OP_CALL) {

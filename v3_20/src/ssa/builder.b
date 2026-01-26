@@ -614,8 +614,8 @@ func builder_append_slice_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 
     var k: u64 = ast_kind(arg);
     if (k == AST_SLICE) {
         var slice_info: u64 = builder_slice_regs(ctx, arg);
-        var ptr_reg: u64 = *(slice_info);
-        var len_reg: u64 = *(slice_info + 8);
+        var ptr_reg: u64 = *(*u64)(slice_info);
+        var len_reg: u64 = *(*u64)(slice_info + 8);
         vec_push(arg_regs, ptr_reg);
         vec_push(arg_regs, len_reg);
         return 0;
@@ -765,8 +765,8 @@ func builder_slice_regs(ctx: *BuilderCtx, expr: u64) -> u64 {
             ptr_reg = build_expr(ctx, s->ptr_expr);
         }
         var len_reg: u64 = build_expr(ctx, s->len_expr);
-        *(info) = ptr_reg;
-        *(info + 8) = len_reg;
+        *(*u64)(info) = ptr_reg;
+        *(*u64)(info + 8) = len_reg;
         return info;
     }
 
@@ -777,8 +777,8 @@ func builder_slice_regs(ctx: *BuilderCtx, expr: u64) -> u64 {
     var add_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr2, ssa_operand_reg(addr_reg), ssa_operand_reg(off_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr);
     var len_reg2: u64 = builder_load_by_size(ctx, addr2, 8);
-    *(info) = ptr_reg2;
-    *(info + 8) = len_reg2;
+    *(*u64)(info) = ptr_reg2;
+    *(*u64)(info + 8) = len_reg2;
     return info;
 }
 
@@ -835,8 +835,8 @@ func builder_struct_literal_init(ctx: *BuilderCtx, struct_def: u64, values: u64,
             builder_struct_literal_init(ctx, lit_def, lit->values_vec, addr_reg);
         } else if (field->type_kind == TYPE_SLICE && field->ptr_depth == 0) {
             var slice_info: u64 = builder_slice_regs(ctx, value);
-            var ptr_reg: u64 = *(slice_info);
-            var len_reg: u64 = *(slice_info + 8);
+            var ptr_reg: u64 = *(*u64)(slice_info);
+            var len_reg: u64 = *(*u64)(slice_info + 8);
             builder_store_by_size(ctx, addr_reg, ptr_reg, 8);
             var off8: u64 = build_const(ctx, 8);
             var addr3: u64 = builder_new_reg(ctx);
@@ -858,8 +858,8 @@ func builder_struct_literal_init(ctx: *BuilderCtx, struct_def: u64, values: u64,
 
 func builder_store_slice_regs(ctx: *BuilderCtx, base_addr: u64, slice_info: u64) -> u64 {
     if (base_addr == 0 || slice_info == 0) { return 0; }
-    var ptr_reg: u64 = *(slice_info);
-    var len_reg: u64 = *(slice_info + 8);
+    var ptr_reg: u64 = *(*u64)(slice_info);
+    var len_reg: u64 = *(*u64)(slice_info + 8);
     builder_store_by_size(ctx, base_addr, ptr_reg, 8);
     var off_reg: u64 = build_const(ctx, 8);
     var addr2: u64 = builder_new_reg(ctx);
@@ -1575,7 +1575,7 @@ func builder_block_is_terminated(block: *SSABlock) -> u64 {
     var tail: *SSAInstruction = block->inst_tail;
     if (tail == 0) { return 0; }
     var op: u64 = ssa_inst_get_op(tail);
-    if (op == SSA_OP_JMP || op == SSA_OP_BR || op == SSA_OP_RET) { return 1; }
+    if (op == SSA_OP_JMP || op == SSA_OP_BR || op == SSA_OP_RET || op == SSA_OP_RET_SLICE_HEAP) { return 1; }
     return 0;
 }
 
@@ -2911,12 +2911,23 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                         var ti2: *TypeInfo = (*TypeInfo)ti_ptr2;
                         if (ti2->type_kind == TYPE_ARRAY && ti2->ptr_depth == 0) {
                             var elem_size: u64 = sizeof_type(ti2->elem_type_kind, ti2->elem_ptr_depth, ti2->struct_name_ptr, ti2->struct_name_len);
-                            var slice_info0: u64 = builder_slice_regs(ctx, ret->expr);
-                            var ptr_reg0: u64 = *(slice_info0);
-                            var len_reg0: u64 = *(slice_info0 + 8);
-                            var ret_ptr_heap: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET_SLICE_HEAP, 0, ssa_operand_reg(ptr_reg0), ssa_operand_reg(len_reg0));
+                            var ptr_reg0: u64 = builder_lvalue_addr(ctx, slice_node->ptr_expr);
+                            if (ptr_reg0 == 0) {
+                                ptr_reg0 = build_expr(ctx, slice_node->ptr_expr);
+                            }
+                            var len_reg0: u64 = build_expr(ctx, slice_node->len_expr);
+                            var ret_ptr_heap: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET_SLICE_HEAP, elem_size, ssa_operand_reg(ptr_reg0), ssa_operand_reg(len_reg0));
                             ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr_heap);
+                            var ptr_is_reg: u64 = 1;
+                            var len_is_reg: u64 = 1;
+                            var len_val: u64 = len_reg0;
+                            if (ast_kind(slice_node->len_expr) == AST_LITERAL) {
+                                var lit_len: *AstLiteral = (*AstLiteral)slice_node->len_expr;
+                                len_val = lit_len->value;
+                                len_is_reg = 0;
+                            }
                             ssa_ret_slice_heap_set(ret_ptr_heap, elem_size);
+                            ssa_ret_slice_heap_set_ex(ret_ptr_heap, elem_size, ptr_reg0, len_val, ptr_is_reg, len_is_reg);
                             return 0;
                         }
                     }
@@ -2926,8 +2937,8 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                 return builder_emit_return_slice_from_call(ctx, ret->expr);
             }
             var slice_info: u64 = builder_slice_regs(ctx, ret->expr);
-            var ptr_reg: u64 = *(slice_info);
-            var len_reg: u64 = *(slice_info + 8);
+            var ptr_reg: u64 = *(*u64)(slice_info);
+            var len_reg: u64 = *(*u64)(slice_info + 8);
             var ret_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET, 0, ssa_operand_reg(ptr_reg), ssa_operand_reg(len_reg));
             ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr2);
             return 0;
@@ -2942,8 +2953,8 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                     return builder_emit_return_slice_from_call(ctx, ret->expr);
                 }
                 var slice_info2: u64 = builder_slice_regs(ctx, ret->expr);
-                var ptr_reg2: u64 = *(slice_info2);
-                var len_reg2: u64 = *(slice_info2 + 8);
+                var ptr_reg2: u64 = *(*u64)(slice_info2);
+                var len_reg2: u64 = *(*u64)(slice_info2 + 8);
                 var ret_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET, 0, ssa_operand_reg(ptr_reg2), ssa_operand_reg(len_reg2));
                 ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr3);
                 return 0;

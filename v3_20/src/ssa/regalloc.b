@@ -20,6 +20,8 @@ const SSA_PHYS_R9 = 6;
 const SSA_PHYS_R10 = 7;
 const SSA_PHYS_R11 = 8;
 
+const SSA_REG_MAX_LIMIT = 1048576;
+
 var g_regalloc_ctx;
 
 func _ssa_all_ones() -> u64 {
@@ -107,6 +109,15 @@ func _ssa_bitset_sub(dst: u64, sub: u64, nbits: u64) -> u64 {
     return 0;
 }
 
+func _ssa_reg_is_reasonable(id: u64) -> u64 {
+    if (id == 0) { return 0; }
+    var mask: u64 = 1;
+    mask = mask << 63;
+    if ((id & mask) != 0) { return 0; }
+    if (id > SSA_REG_MAX_LIMIT) { return 0; }
+    return 1;
+}
+
 func _ssa_reg_max(fn: *SSAFunction) -> u64 {
     var max_id: u64 = 0;
     var blocks: u64 = fn->blocks_data;
@@ -119,10 +130,10 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
 
         var phi: *SSAInstruction = b->phi_head;
         while (phi != 0) {
-            if (phi->dest > max_id) { max_id = phi->dest; }
+            if (_ssa_reg_is_reasonable(phi->dest) != 0 && phi->dest > max_id) { max_id = phi->dest; }
             var arg: *SSAPhiArg = (*SSAPhiArg)phi->src1;
             while (arg != 0) {
-                if (arg->val > max_id) { max_id = arg->val; }
+                if (_ssa_reg_is_reasonable(arg->val) != 0 && arg->val > max_id) { max_id = arg->val; }
                 arg = arg->next;
             }
             phi = phi->next;
@@ -135,7 +146,7 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
                 var mask: u64 = 1;
                 mask = mask << 63;
                 if ((cur->dest & mask) == 0) {
-                    if (cur->dest > max_id) { max_id = cur->dest; }
+                    if (_ssa_reg_is_reasonable(cur->dest) != 0 && cur->dest > max_id) { max_id = cur->dest; }
                 }
             }
             if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
@@ -146,21 +157,21 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
                 var ai: u64 = 0;
                 while (ai < nargs) {
                     var r: u64 = vec_get(args_vec, ai);
-                    if (r > max_id) { max_id = r; }
+                    if (_ssa_reg_is_reasonable(r) != 0 && r > max_id) { max_id = r; }
                     ai = ai + 1;
                 }
             }
             if (op == SSA_OP_CALL_PTR) {
                 var info_ptrp: u64 = ssa_operand_value(cur->src1);
                 var callee_reg: u64 = *(info_ptrp);
-                if (callee_reg > max_id) { max_id = callee_reg; }
+                if (_ssa_reg_is_reasonable(callee_reg) != 0 && callee_reg > max_id) { max_id = callee_reg; }
                 var args_vecp: u64 = *(info_ptrp + 8);
                 var nargsp: u64 = *(info_ptrp + 16);
                 if (nargsp == 0 && args_vecp != 0) { nargsp = vec_len(args_vecp); }
                 var aip: u64 = 0;
                 while (aip < nargsp) {
                     var rp: u64 = vec_get(args_vecp, aip);
-                    if (rp > max_id) { max_id = rp; }
+                    if (_ssa_reg_is_reasonable(rp) != 0 && rp > max_id) { max_id = rp; }
                     aip = aip + 1;
                 }
             }
@@ -170,11 +181,11 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
             }
             if (!ssa_operand_is_const(cur->src1)) {
                 var r1: u64 = ssa_operand_value(cur->src1);
-                if (r1 > max_id) { max_id = r1; }
+                if (_ssa_reg_is_reasonable(r1) != 0 && r1 > max_id) { max_id = r1; }
             }
             if (!ssa_operand_is_const(cur->src2)) {
                 var r2: u64 = ssa_operand_value(cur->src2);
-                if (r2 > max_id) { max_id = r2; }
+                if (_ssa_reg_is_reasonable(r2) != 0 && r2 > max_id) { max_id = r2; }
             }
             cur = cur->next;
         }
@@ -391,7 +402,7 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
 
             if (inst->dest != 0) {
                 var d: u64 = inst->dest;
-                if (d < nregs && op != SSA_OP_BR && op != SSA_OP_JMP) {
+                if (d < nregs && op != SSA_OP_BR && op != SSA_OP_JMP && op != SSA_OP_RET_SLICE_HEAP) {
                     var i2: u64 = 1;
                     while (i2 < nregs) {
                         if (_ssa_bitset_test(live, i2) != 0 && i2 != d) {
@@ -449,6 +460,16 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
                 }
             }
 
+            if (op == SSA_OP_RET || op == SSA_OP_RET_SLICE_HEAP) {
+                if (ssa_operand_is_const(inst->src1) == 0 && ssa_operand_is_const(inst->src2) == 0) {
+                    var r1: u64 = ssa_operand_value(inst->src1);
+                    var r2: u64 = ssa_operand_value(inst->src2);
+                    if (r1 < nregs && r2 < nregs && r1 != r2) {
+                        _ssa_bitset_set(*(*u64)(adj + r1 * 8), r2);
+                        _ssa_bitset_set(*(*u64)(adj + r2 * 8), r1);
+                    }
+                }
+            }
             if (op != SSA_OP_NOP && op != SSA_OP_PHI) {
                 if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
                     var info_ptr: u64 = ssa_operand_value(inst->src1);
@@ -661,7 +682,7 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
         var cur: *SSAInstruction = b->inst_head;
         while (cur != 0) {
             var op2: u64 = ssa_inst_get_op(cur);
-            if (op2 != SSA_OP_BR && op2 != SSA_OP_JMP) {
+            if (op2 != SSA_OP_BR && op2 != SSA_OP_JMP && op2 != SSA_OP_RET_SLICE_HEAP) {
                 if (cur->dest != 0 && cur->dest < map_len) {
                     var pd: u64 = *(*u64)(map + cur->dest * 8);
                     if (pd != 0) { cur->dest = pd; }
@@ -715,6 +736,9 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
                     var p2: u64 = *(*u64)(map + r2 * 8);
                     if (p2 != 0) { cur->src2 = ssa_operand_reg(p2); }
                 }
+            }
+            if (op2 == SSA_OP_RET_SLICE_HEAP) {
+                ssa_ret_slice_heap_remap_ex((u64)cur, map, map_len);
             }
             cur = cur->next;
         }

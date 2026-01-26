@@ -21,6 +21,8 @@ import compiler;
 const SSA_CODEGEN_DEBUG = 0;
 
 var g_live_mask_map;
+var g_last_lea_local_off;
+var g_last_lea_local_valid;
 
 const SSA_LIVE_RAX = 1;
 const SSA_LIVE_RBX = 2;
@@ -801,7 +803,6 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_RETURN) {
         var ret: *AstReturn = (*AstReturn)node;
-        if (ret->expr != 0 && ast_kind(ret->expr) == AST_SLICE) { return 0; }
         return _ssa_codegen_expr_supported(ret->expr, globals);
     }
 
@@ -1176,6 +1177,8 @@ func _ssa_emit_label_ref(fn_id: u64, block_id: u64) -> u64 {
 // ============================================
 
 func _ssa_emit_lea_local(dest: u64, offset: i64) -> u64 {
+    g_last_lea_local_off = offset;
+    g_last_lea_local_valid = 1;
     emit("    lea ", 8);
     _ssa_emit_reg_name(dest);
     emit(", [rbp", 7);
@@ -1568,17 +1571,57 @@ func _ssa_emit_ret(inst: *SSAInstruction) -> u64 {
 
 func _ssa_emit_ret_slice_heap(inst: *SSAInstruction) -> u64 {
     _ssa_ensure_heap_brk_global();
-    var elem_size: u64 = ssa_ret_slice_heap_get((u64)inst);
+    var elem_size: u64 = inst->dest;
+    if (elem_size == 0) {
+        elem_size = ssa_ret_slice_heap_get((u64)inst);
+    }
 
-    emit("    mov r12, ", 13);
-    _ssa_emit_opr(inst->src2);
-    emit_nl();
-    emit("    mov r8, ", 12);
-    _ssa_emit_opr(inst->src2);
-    emit_nl();
-    emit("    mov r13, ", 13);
-    _ssa_emit_opr(inst->src1);
-    emit_nl();
+    var ex_elem: u64 = 0;
+    var ex_ptr_val: u64 = 0;
+    var ex_len_val: u64 = 0;
+    var ex_ptr_is_reg: u64 = 0;
+    var ex_len_is_reg: u64 = 0;
+    var has_ex: u64 = ssa_ret_slice_heap_get_ex((u64)inst, &ex_elem, &ex_ptr_val, &ex_len_val, &ex_ptr_is_reg, &ex_len_is_reg);
+    if (has_ex != 0 && ex_elem != 0) {
+        elem_size = ex_elem;
+    }
+
+    if (has_ex != 0 && ex_len_is_reg == 0) {
+        emit("    mov r12, ", 13);
+        emit_u64(ex_len_val);
+        emit_nl();
+        emit("    mov r8, ", 12);
+        emit_u64(ex_len_val);
+        emit_nl();
+    } else {
+        emit("    mov r12, ", 13);
+        _ssa_emit_opr(inst->src2);
+        emit_nl();
+        emit("    mov r8, ", 12);
+        _ssa_emit_opr(inst->src2);
+        emit_nl();
+    }
+
+    var src1_bad: u64 = 0;
+    if (ssa_operand_is_const(inst->src1) == 0) {
+        var r_src1: u64 = ssa_operand_value(inst->src1);
+        if (r_src1 < SSA_PHYS_RAX || r_src1 > SSA_PHYS_R11) { src1_bad = 1; }
+    }
+
+    if (has_ex != 0 && ex_ptr_is_reg != 0) {
+        emit("    mov r13, ", 13);
+        _ssa_emit_reg_name(ex_ptr_val);
+        emit_nl();
+    } else if (g_last_lea_local_valid != 0 && (ssa_operand_is_const(inst->src1) != 0 || src1_bad != 0 || inst->src1 == inst->src2)) {
+        emit("    lea r13, [rbp", 20);
+        if (g_last_lea_local_off < 0) { emit_i64(g_last_lea_local_off); }
+        else { emit("+", 1); emit_u64((u64)g_last_lea_local_off); }
+        emit("]\n", 2);
+    } else {
+        emit("    mov r13, ", 13);
+        _ssa_emit_opr(inst->src1);
+        emit_nl();
+    }
     emit("    mov rax, ", 13);
     emit_u64(elem_size);
     emit_nl();
@@ -1827,6 +1870,7 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 func ssa_codegen_emit_func(fn_ptr: u64, ssa_fn_ptr: u64) -> u64 {
     push_trace("ssa_codegen_emit_func", "ssa_codegen.b", __LINE__);
     pop_trace();
+    g_last_lea_local_valid = 0;
     if (fn_ptr == 0 || ssa_fn_ptr == 0) { return 0; }
     var fn: *AstFunc = (*AstFunc)fn_ptr;
     var ssa_fn: *SSAFunction = (*SSAFunction)ssa_fn_ptr;

@@ -17,4 +17,8 @@
 - [x] Force AST codegen for std_ in SSA mode.
 - [x] Save/restore live registers around SSA inline asm.
 - [x] SSA struct assignment/copy (large struct sret + value copy).
-- [ ] Re-enable SSA slice-literal returns (current fallback to AST).
+- [x] Re-enable SSA slice-literal returns (current fallback to AST).
+- [x] Diagnose RET_SLICE_HEAP ptr/len corruption in SSA builder/regalloc.
+- [x] Stabilize SSA slice return path after re-enabling (fix regressions if any).
+- [x] Fix RET_SLICE_HEAP ptr operand corruption (tests 83/84 segfault).
+- [x] Re-run SSA slice return tests (83/84) after fix.
