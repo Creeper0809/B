@@ -181,6 +181,26 @@ std_io__heap_alloc:
     mov rsp, rbp
     pop rbp
    ret
+std_io__print_nl:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 1024
+    call std_io__io_get_output_fd
+    mov [rbp-8], rax
+    mov rax, 1
+    push rax
+    lea rax, [rel _str8]
+    push rax
+    mov rax, [rbp-8]
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
+    call std_os__os_sys_write
+   xor eax, eax
+    mov rsp, rbp
+    pop rbp
+   ret
 std_io__print_u64:
     push rbp
     mov rbp, rsp
@@ -195,12 +215,12 @@ std_io__print_u64:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L8
+    jz .L9
     call std_io__io_get_output_fd
     mov [rbp-16], rax
     mov rax, 1
     push rax
-    lea rax, [rel _str10]
+    lea rax, [rel _str11]
     push rax
     mov rax, [rbp-16]
     push rax
@@ -212,7 +232,7 @@ std_io__print_u64:
     mov rsp, rbp
     pop rbp
     ret
-.L8:
+.L9:
     mov rax, 32
     push rax
     pop rdi
@@ -222,7 +242,7 @@ std_io__print_u64:
     mov [rbp-32], rax
     mov rax, [rbp-8]
     mov [rbp-40], rax
-.L11:
+.L12:
     mov rax, [rbp-40]
     push rax
     mov rax, 0
@@ -232,7 +252,7 @@ std_io__print_u64:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L12
+    jz .L13
     mov rax, [rbp-40]
     push rax
     mov rax, 10
@@ -278,8 +298,8 @@ std_io__print_u64:
     lea rax, [rbp-32]
     pop rbx
     mov [rax], rbx
-    jmp .L11
-.L12:
+    jmp .L12
+.L13:
     mov rax, [rbp-32]
     push rax
     mov rax, 1
@@ -287,7 +307,7 @@ std_io__print_u64:
     pop rax
     sub rax, rbx
     mov [rbp-56], rax
-.L13:
+.L14:
     mov rax, [rbp-56]
     push rax
     mov rax, 0
@@ -297,7 +317,7 @@ std_io__print_u64:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L14
+    jz .L15
     call std_io__io_get_output_fd
     mov [rbp-64], rax
     mov rax, 1
@@ -325,8 +345,8 @@ std_io__print_u64:
     lea rax, [rbp-56]
     pop rbx
     mov [rax], rbx
-    jmp .L13
-.L14:
+    jmp .L14
+.L15:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -342,11 +362,12 @@ main:
     mov [rbp-1064], r8
     mov [rbp-1072], r9
 .Lssa_33_33:
-    mov rax, 123
+    mov rax, 1222
     push rax
     pop rdi
     call std_io__print_u64
-    mov rax, 0
+    call std_io__print_nl
+    mov rax, 10
     mov rsp, rbp
     pop rbp
     ret
@@ -356,7 +377,8 @@ main:
     ret
 
 section .data
-_str10: db 48,0
+_str8: db 10,0
+_str11: db 48,0
 
 section .bss
 _gvar_std_os__g_syscall_arg0: resq 1

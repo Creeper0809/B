@@ -933,32 +933,90 @@ func init_compiler_globals() -> u64 {
 }
 
 func setup_paths(filename: u64, filename_len: u64) -> u64 {
+    return setup_paths_with_compiler(0, 0, filename, filename_len);
+}
+
+func extract_version_from_compiler_path(path: u64, path_len: u64) -> u64 {
+    if (path == 0 || path_len == 0) { return 0; }
+    var base: u64 = path_basename_noext(path, path_len);
+    var base_len: u64 = str_len(base);
+    var needle: u64 = "_stage";
+    var i: u64 = 0;
+    while (i + 6 <= base_len) {
+        if (str_eq(base + i, 6, needle, 6)) {
+            var vlen: u64 = i;
+            if (vlen == 0) { return 0; }
+            var vptr: u64 = heap_alloc(vlen + 1);
+            str_copy(vptr, base, vlen);
+            *(*u8)(vptr + vlen) = 0;
+            var out: u64 = heap_alloc(16);
+            *(out) = vptr;
+            *(out + 8) = vlen;
+            return out;
+        }
+        i = i + 1;
+    }
+    // Fallback: accept direct version name (e.g., v3_20.out -> v3_20)
+    if (base_len >= 2) {
+        var c0: u64 = *(*u8)base;
+        var c1: u64 = *(*u8)(base + 1);
+        if (c0 == 118 && c1 >= 48 && c1 <= 57) { // 'v' + digit
+            var vptr2: u64 = heap_alloc(base_len + 1);
+            str_copy(vptr2, base, base_len);
+            *(*u8)(vptr2 + base_len) = 0;
+            var out2: u64 = heap_alloc(16);
+            *(out2) = vptr2;
+            *(out2 + 8) = base_len;
+            return out2;
+        }
+    }
+    return 0;
+}
+
+func setup_paths_with_compiler(compiler_path: u64, compiler_len: u64, filename: u64, filename_len: u64) -> u64 {
     g_base_dir = path_dirname(filename, filename_len);
     g_base_dir_len = str_len(g_base_dir);
+
+    var version_info: u64 = extract_version_from_compiler_path(compiler_path, compiler_len);
+    if (version_info != 0) {
+        var version_ptr: u64 = *(version_info);
+        var version_len: u64 = *(version_info + 8);
+        var compiler_dir: u64 = path_dirname(compiler_path, compiler_len);
+        var compiler_dir_len: u64 = str_len(compiler_dir);
+        var project_root: u64 = path_dirname(compiler_dir, compiler_dir_len);
+        var project_root_len: u64 = str_len(project_root);
+        var slash: u64 = "/";
+        var version_dir: u64 = str_concat3(project_root, project_root_len, slash, 1, version_ptr, version_len);
+        var version_dir_len: u64 = str_len(version_dir);
+        var src_suffix: u64 = "/src";
+        g_lib_dir = str_concat(version_dir, version_dir_len, src_suffix, 4);
+        g_lib_dir_len = str_len(g_lib_dir);
+        return 0;
+    }
 
     // Find version directory by going up from base_dir
     // src: B/v3_XX/src -> up 1 = B/v3_XX
     // test: B/v3_XX/test/b -> up 2 = B/v3_XX
     var up_one: u64 = path_dirname(g_base_dir, g_base_dir_len);
     var up_one_len: u64 = str_len(up_one);
-    var version_dir: u64 = path_dirname(up_one, up_one_len);
-    var version_dir_len: u64 = str_len(version_dir);
+    var version_dir2: u64 = path_dirname(up_one, up_one_len);
+    var version_dir_len2: u64 = str_len(version_dir2);
     var slash_config: u64 = "/config.ini";
     var config_path1: u64 = str_concat(up_one, up_one_len, slash_config, 11);
-    var version: u64 = read_version_from_config(config_path1);
+    var version2: u64 = read_version_from_config(config_path1);
 
-    if (version == 0) {
-        var config_path2: u64 = str_concat(version_dir, version_dir_len, slash_config, 11);
-        version = read_version_from_config(config_path2);
+    if (version2 == 0) {
+        var config_path2: u64 = str_concat(version_dir2, version_dir_len2, slash_config, 11);
+        version2 = read_version_from_config(config_path2);
     }
 
-    if (version == 0) {
-        version = "v3_15";  // Fallback to hardcoded default
+    if (version2 == 0) {
+        version2 = "v3_15";  // Fallback to hardcoded default
     }
 
     // Build lib_dir path: "{version_dir}/src"
-    var src_suffix: u64 = "/src";
-    g_lib_dir = str_concat(version_dir, version_dir_len, src_suffix, 4);
+    var src_suffix2: u64 = "/src";
+    g_lib_dir = str_concat(version_dir2, version_dir_len2, src_suffix2, 4);
     g_lib_dir_len = str_len(g_lib_dir);
     return 0;
 }

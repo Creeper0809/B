@@ -12,3 +12,7 @@
 - [x] Fix SSA pointer arithmetic scaling for element-size addressing.
 - [x] Return address for array identifiers in SSA builder.
 - [x] Preserve signed stack offsets in SSA `lea_local` encoding.
+- [x] Resolve std modules from compiler binary path (not compile target path).
+- [x] Accept build/v3_20.out basename for std path resolution.
+- [x] Force AST codegen for std_ in SSA mode.
+- [x] Save/restore live registers around SSA inline asm.

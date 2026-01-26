@@ -15,6 +15,9 @@ func main(argc: u64, argv: u64) -> u64 {
         return 1;
     }
 
+    var compiler_path: u64 = *(argv);
+    var compiler_len: u64 = 0;
+    if (compiler_path != 0) { compiler_len = str_len(compiler_path); }
     var filename: u64 = 0;
     var i: u64 = 1;
     while (i < argc) {
@@ -60,7 +63,7 @@ func main(argc: u64, argv: u64) -> u64 {
 
     var filename_len: u64 = str_len(filename);
 
-    setup_paths(filename, filename_len);
+    setup_paths_with_compiler(compiler_path, compiler_len, filename, filename_len);
 
     push_trace("main", "main.b", __LINE__);
 

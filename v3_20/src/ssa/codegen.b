@@ -217,6 +217,32 @@ func _ssa_emit_asm(text_vec: u64) -> u64 {
     return 0;
 }
 
+func _ssa_emit_asm_with_save(text_vec: u64, live_mask: u64) -> u64 {
+    var all_mask: u64 = _ssa_live_all_mask();
+    var save_mask: u64 = live_mask & all_mask;
+
+    if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RAX); }
+    if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RBX); }
+    if ((save_mask & SSA_LIVE_RCX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RCX); }
+    if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_push_reg(SSA_PHYS_RDX); }
+    if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_push_reg(SSA_PHYS_R8); }
+    if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
+    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_push_reg(SSA_PHYS_R10); }
+    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_push_reg(SSA_PHYS_R11); }
+
+    _ssa_emit_asm(text_vec);
+
+    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R11); }
+    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R10); }
+    if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R9); }
+    if ((save_mask & SSA_LIVE_R8) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_R8); }
+    if ((save_mask & SSA_LIVE_RDX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RDX); }
+    if ((save_mask & SSA_LIVE_RCX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RCX); }
+    if ((save_mask & SSA_LIVE_RBX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RBX); }
+    if ((save_mask & SSA_LIVE_RAX) != 0) { _ssa_emit_restore_reg(0, SSA_PHYS_RAX); }
+    return 0;
+}
+
 func _ssa_ensure_heap_brk_global() -> u64 {
     var globals: u64 = emitter_get_globals();
     if (globals == 0) { return 0; }
@@ -752,6 +778,12 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
     pop_trace();
     if (fn_ptr == 0) { return 0; }
     var fn: *AstFunc = (*AstFunc)fn_ptr;
+    if (fn->name_len >= 4) {
+        if (*(*u8)fn->name_ptr == 115 && *(*u8)(fn->name_ptr + 1) == 116 &&
+            *(*u8)(fn->name_ptr + 2) == 100 && *(*u8)(fn->name_ptr + 3) == 95) {
+            return 0;
+        }
+    }
 
     var params: u64 = fn->params_vec;
     if (params != 0) {
@@ -1679,7 +1711,8 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_ASM) {
         var text_vec: u64 = ssa_operand_value(inst->src1);
-        _ssa_emit_asm(text_vec);
+        var live_mask: u64 = _ssa_live_map_get(g_live_mask_map, (u64)inst);
+        _ssa_emit_asm_with_save(text_vec, live_mask);
         return 0;
     }
 
