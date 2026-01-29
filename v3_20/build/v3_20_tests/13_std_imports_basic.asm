@@ -13,7 +13,7 @@ _start:
 std_str__str_eq:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -97,7 +97,7 @@ std_str__str_eq:
 std_str__str_copy:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -150,7 +150,7 @@ std_str__str_copy:
 std_str__str_len:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, 0
     mov [rbp-16], rax
@@ -194,7 +194,7 @@ std_str__str_len:
 std_str__str_concat:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -265,7 +265,7 @@ std_str__str_concat:
 std_str__str_concat3:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -368,7 +368,7 @@ std_str__str_concat3:
 std_os__os_sys_brk:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -390,7 +390,7 @@ std_os__os_sys_brk:
 std_os__os_sys_write:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -426,7 +426,7 @@ std_os__os_sys_write:
 std_os__os_sys_read:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -462,7 +462,7 @@ std_os__os_sys_read:
 std_os__os_sys_open:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -498,7 +498,7 @@ std_os__os_sys_open:
 std_os__os_sys_close:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -520,7 +520,7 @@ std_os__os_sys_close:
 std_os__os_sys_fstat:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, [rbp-8]
@@ -549,7 +549,7 @@ std_os__os_sys_fstat:
 std_os__os_sys_fork:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov rax , 57
     syscall
     mov [ rel _gvar_std_os__g_syscall_ret ] , rax
@@ -564,7 +564,7 @@ std_os__os_sys_fork:
 std_os__os_sys_execve:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -600,7 +600,7 @@ std_os__os_sys_execve:
 std_os__os_sys_wait4:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -643,7 +643,7 @@ std_os__os_sys_wait4:
 std_os__os_sys_exit:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -664,7 +664,7 @@ std_os__os_sys_exit:
 std_os__os_sys_dup2:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, [rbp-8]
@@ -693,7 +693,7 @@ std_os__os_sys_dup2:
 std_os__os_execute:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     call std_os__os_sys_fork
@@ -769,7 +769,7 @@ std_os__os_execute:
 std_io__sys_brk:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -785,7 +785,7 @@ std_io__sys_brk:
 std_io__sys_write:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -809,7 +809,7 @@ std_io__sys_write:
 std_io__sys_read:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -833,7 +833,7 @@ std_io__sys_read:
 std_io__sys_open:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -857,7 +857,7 @@ std_io__sys_open:
 std_io__sys_close:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -873,7 +873,7 @@ std_io__sys_close:
 std_io__sys_fstat:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, [rbp-16]
@@ -893,7 +893,7 @@ std_io__sys_fstat:
 std_io__io_set_output_fd:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -911,7 +911,7 @@ std_io__io_set_output_fd:
 std_io__io_get_output_fd:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov rax, [rel _gvar_std_io__g_out_fd]
     push rax
     mov rax, 0
@@ -938,7 +938,7 @@ std_io__io_get_output_fd:
 std_io__heap_alloc:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -1024,7 +1024,7 @@ std_io__heap_alloc:
 std_io__emitln:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -1060,7 +1060,7 @@ std_io__emitln:
 std_io__emit:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, 0
@@ -1130,7 +1130,7 @@ std_io__emit:
 std_io__print:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     call std_io__io_get_output_fd
@@ -1152,7 +1152,7 @@ std_io__print:
 std_io__print_nl:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     call std_io__io_get_output_fd
     mov [rbp-8], rax
     mov rax, 1
@@ -1172,7 +1172,7 @@ std_io__print_nl:
 std_io__println:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     call std_io__io_get_output_fd
@@ -1204,7 +1204,7 @@ std_io__println:
 std_io__print_u64:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -1354,7 +1354,7 @@ std_io__print_u64:
 std_io__print_i64:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -1401,7 +1401,7 @@ std_io__print_i64:
 std_path__path_dirname:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, 0
@@ -1535,7 +1535,7 @@ std_path__path_dirname:
 std_path__path_join:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -1579,7 +1579,7 @@ std_path__path_join:
 std_path__module_to_path:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, 2
@@ -1625,7 +1625,7 @@ std_path__module_to_path:
 std_path__path_basename_noext:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, 0
@@ -1859,7 +1859,7 @@ std_path__path_basename_noext:
 std_char__is_alpha:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -1951,7 +1951,7 @@ std_char__is_alpha:
 std_char__is_digit:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -1996,7 +1996,7 @@ std_char__is_digit:
 std_char__is_alnum:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -2031,7 +2031,7 @@ std_char__is_alnum:
 std_char__is_whitespace:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -2104,7 +2104,7 @@ std_char__is_whitespace:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov rax, 3
     push rax
     lea rax, [rel _str92]

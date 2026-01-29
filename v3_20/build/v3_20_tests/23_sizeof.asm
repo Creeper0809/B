@@ -13,7 +13,7 @@ _start:
 std_os__os_sys_brk:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -35,7 +35,7 @@ std_os__os_sys_brk:
 std_os__os_sys_write:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov [rbp-24], rdx
@@ -71,7 +71,7 @@ std_os__os_sys_write:
 std_io__io_get_output_fd:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov rax, [rel _gvar_std_io__g_out_fd]
     push rax
     mov rax, 0
@@ -98,7 +98,7 @@ std_io__io_get_output_fd:
 std_io__heap_alloc:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -184,7 +184,7 @@ std_io__heap_alloc:
 std_io__println:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     call std_io__io_get_output_fd
@@ -216,7 +216,7 @@ std_io__println:
 std_io__print_u64:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax

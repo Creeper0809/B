@@ -258,6 +258,36 @@ func sizeof_type(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_na
 func sizeof_type_ex(ti: u64) -> u64 {
     var info: *TypeInfo = (*TypeInfo)ti;
     if (info->ptr_depth > 0) { return 8; }
+    if (info->type_kind == TYPE_STRUCT && info->ptr_depth == 0) {
+        if (info->struct_name_ptr == 0 && info->struct_def != 0) {
+            var struct_def: u64 = info->struct_def;
+            var packed_flag: u64 = *(struct_def + 32);
+            if (packed_flag == 1) {
+                var fields_p: u64 = *(struct_def + 24);
+                var num_fields_p: u64 = vec_len(fields_p);
+                var total_bits: u64 = 0;
+                for (var pi: u64 = 0; pi < num_fields_p; pi++) {
+                    var field_p: *FieldDesc = (*FieldDesc)vec_get(fields_p, pi);
+                    if (field_p->bit_width > 0) {
+                        total_bits = total_bits + field_p->bit_width;
+                    } else {
+                        var fsize: u64 = sizeof_field_desc(field_p);
+                        total_bits = total_bits + fsize * 8;
+                    }
+                }
+                return (total_bits + 7) / 8;
+            }
+
+            var fields: u64 = *(struct_def + 24);
+            var num_fields: u64 = vec_len(fields);
+            var total_size: u64 = 0;
+            for (var i: u64 = 0; i < num_fields; i++) {
+                var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
+                total_size = total_size + sizeof_field_desc(field);
+            }
+            return total_size;
+        }
+    }
     if (info->type_kind == TYPE_ARRAY) {
         var elem_size: u64 = sizeof_type(info->elem_type_kind, info->elem_ptr_depth, info->struct_name_ptr, info->struct_name_len);
         return elem_size * info->array_len;
@@ -306,6 +336,10 @@ func get_field_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64)
 
 func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     var kind: u64 = ast_kind(node);
+
+    if (kind == AST_SIZEOF || kind == AST_SIZEOF_EXPR) {
+        return typeinfo_make(TYPE_U64, 0);
+    }
 
     if (kind == AST_CALL) {
         if (g_funcs_vec != 0) {

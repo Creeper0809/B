@@ -498,6 +498,19 @@ func cg_expr(node: u64) -> u64 {
         emit_nl();
         return;
     }
+
+    if (kind == AST_SIZEOF_EXPR) {
+        var sz_expr: *AstSizeofExpr = (*AstSizeofExpr)node;
+        var ti_ptr: u64 = get_expr_type_with_symtab(sz_expr->expr, symtab);
+        var size_val: u64 = 8;
+        if (ti_ptr != 0) {
+            size_val = sizeof_type_ex(ti_ptr);
+        }
+        emit("    mov rax, ", 13);
+        emit_u64(size_val);
+        emit_nl();
+        return;
+    }
     
     if (kind == AST_CALL) {
         var call: *AstCall = (*AstCall)node;

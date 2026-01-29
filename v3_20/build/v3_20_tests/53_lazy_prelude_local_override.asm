@@ -13,7 +13,7 @@ _start:
 _53_lazy_prelude_local_override__str_len:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, 7
     mov rsp, rbp
@@ -26,7 +26,7 @@ _53_lazy_prelude_local_override__str_len:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     lea rax, [rel _str0]

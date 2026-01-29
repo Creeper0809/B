@@ -403,7 +403,7 @@ func cg_func(node: u64) -> u64 {
     
     emitln("    push rbp");
     emitln("    mov rbp, rsp");
-    emitln("    sub rsp, 1024");
+    emitln("    sub rsp, 2048");
     
     var g_structs_vec: u64 = typeinfo_get_structs();
     

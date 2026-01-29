@@ -504,6 +504,44 @@ func _ssa_codegen_call_returns_large_struct(call_ptr: u64) -> u64 {
     return 1;
 }
 
+func _ssa_codegen_call_ptr_returns_large_struct(cp_ptr: u64) -> u64 {
+    if (cp_ptr == 0) { return 0; }
+    var cp: *AstCallPtr = (*AstCallPtr)cp_ptr;
+    var callee: u64 = cp->callee;
+    var name_ptr: u64 = 0;
+    var name_len: u64 = 0;
+    var ck: u64 = ast_kind(callee);
+    if (ck == AST_IDENT) {
+        var idn: *AstIdent = (*AstIdent)callee;
+        name_ptr = idn->name_ptr;
+        name_len = idn->name_len;
+    } else if (ck == AST_ADDR_OF) {
+        var a: *AstAddrOf = (*AstAddrOf)callee;
+        if (ast_kind(a->operand) == AST_IDENT) {
+            var idn2: *AstIdent = (*AstIdent)a->operand;
+            name_ptr = idn2->name_ptr;
+            name_len = idn2->name_len;
+        }
+    }
+    if (name_ptr == 0) { return 0; }
+    var resolved_ptr: u64 = name_ptr;
+    var resolved_len: u64 = name_len;
+    var resolved: u64 = resolve_name(name_ptr, name_len);
+    if (resolved != 0) {
+        resolved_ptr = *(resolved);
+        resolved_len = *(resolved + 8);
+    }
+    var fn_ptr: u64 = compiler_get_func(resolved_ptr, resolved_len);
+    if (fn_ptr == 0) { return 0; }
+    var fn: *AstFunc = (*AstFunc)fn_ptr;
+    if (fn->ret_type != TYPE_STRUCT) { return 0; }
+    if (fn->ret_ptr_depth != 0) { return 0; }
+    if (fn->ret_struct_name_ptr == 0 || fn->ret_struct_name_len == 0) { return 0; }
+    var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+    if (struct_size <= 16) { return 0; }
+    return 1;
+}
+
 func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
     push_trace("_ssa_codegen_expr_supported", "ssa_codegen.b", __LINE__);
     pop_trace();
@@ -560,7 +598,16 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_MEMBER_ACCESS) {
         var m: *AstMemberAccess = (*AstMemberAccess)node;
-        return _ssa_codegen_expr_supported(m->object, globals);
+        var ok: u64 = _ssa_codegen_expr_supported(m->object, globals);
+        if (ok != 0) { return 1; }
+        var obj_kind: u64 = ast_kind(m->object);
+        if (obj_kind == AST_CALL) {
+            if (_ssa_codegen_call_returns_large_struct(m->object) != 0) { return 1; }
+        }
+        if (obj_kind == AST_CALL_PTR) {
+            if (_ssa_codegen_call_ptr_returns_large_struct(m->object) != 0) { return 1; }
+        }
+        return 0;
     }
 
     if (kind == AST_CAST) {
@@ -568,7 +615,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return _ssa_codegen_expr_supported(c->expr, globals);
     }
 
-    if (kind == AST_SIZEOF) { return 1; }
+    if (kind == AST_SIZEOF || kind == AST_SIZEOF_EXPR) { return 1; }
 
     if (kind == AST_CALL) {
         var call: *AstCall = (*AstCall)node;
@@ -586,14 +633,6 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
                 if (_ssa_codegen_expr_supported(arg, globals) == 0) { return 0; }
             }
             i = i + 1;
-        }
-        var fn_ptr: u64 = compiler_get_func(call->name_ptr, call->name_len);
-        if (fn_ptr != 0) {
-            var fn: *AstFunc = (*AstFunc)fn_ptr;
-            if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
-                var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
-                if (struct_size > 16) { return 0; }
-            }
         }
         return 1;
     }
@@ -651,7 +690,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return _ssa_codegen_struct_literal_supported(node, globals);
     }
 
-    return 0;
+    return 1;
 }
 
 func _ssa_codegen_struct_literal_supported(init: u64, globals: u64) -> u64 {
@@ -756,6 +795,9 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         if (ast_kind(es->expr) == AST_CALL) {
             if (_ssa_codegen_call_returns_large_struct(es->expr) != 0) { return 1; }
         }
+        if (ast_kind(es->expr) == AST_CALL_PTR) {
+            if (_ssa_codegen_call_ptr_returns_large_struct(es->expr) != 0) { return 1; }
+        }
         return _ssa_codegen_expr_supported(es->expr, globals);
     }
 
@@ -797,6 +839,9 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
                 }
             }
         }
+        if (ast_kind(asn->value) == AST_CALL_PTR) {
+            if (_ssa_codegen_call_ptr_returns_large_struct(asn->value) != 0) { return 1; }
+        }
         if (tk == AST_IDENT) {
             var idn2: *AstIdent = (*AstIdent)asn->target;
             if (ast_kind(asn->value) == AST_STRUCT_LITERAL) {
@@ -819,12 +864,15 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         if (ast_kind(ret->expr) == AST_CALL) {
             if (_ssa_codegen_call_returns_large_struct(ret->expr) != 0) { return 1; }
         }
+        if (ast_kind(ret->expr) == AST_CALL_PTR) {
+            if (_ssa_codegen_call_ptr_returns_large_struct(ret->expr) != 0) { return 1; }
+        }
         return _ssa_codegen_expr_supported(ret->expr, globals);
     }
 
     if (kind == AST_BREAK || kind == AST_CONTINUE) { return 1; }
 
-    return 0;
+    return 1;
 }
 
 func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
@@ -832,12 +880,6 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
     pop_trace();
     if (fn_ptr == 0) { return 0; }
     var fn: *AstFunc = (*AstFunc)fn_ptr;
-    if (fn->name_len >= 4) {
-        if (*(*u8)fn->name_ptr == 115 && *(*u8)(fn->name_ptr + 1) == 116 &&
-            *(*u8)(fn->name_ptr + 2) == 100 && *(*u8)(fn->name_ptr + 3) == 95) {
-            return 0;
-        }
-    }
 
     var params: u64 = fn->params_vec;
     if (params != 0) {

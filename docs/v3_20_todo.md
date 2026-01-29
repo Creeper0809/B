@@ -25,4 +25,8 @@
 - [x] Allow SSA sret calls in return/expr-stmt paths (AST_CALL large struct).
 - [x] Support SSA large struct byval params (callee copy from pointer).
 - [x] Support SSA large struct byval call args (direct/method/call_ptr + literal).
+- [x] Remove ptr8/ptr64 parsing from v3_20 parser.
 - [x] Fix SSA slice return chain for local arrays (heap-backed return in inferred-slice path).
+- [x] Increase compiler stack frame size to avoid large SSA builder local overflow.
+- [x] Track function-pointer return struct info for call_ptr member access.
+- [x] Fix large struct member access test expected exit code.

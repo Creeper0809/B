@@ -13,7 +13,7 @@ _start:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, 10

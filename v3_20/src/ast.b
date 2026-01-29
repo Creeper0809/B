@@ -181,6 +181,13 @@ struct AstSizeof {
     struct_name_len: u64;
 }
 
+// AST Sizeof Expr node layout (16 bytes)
+const SIZEOF_AST_SIZEOF_EXPR = 16;
+struct AstSizeofExpr {
+    kind: u64;
+    expr: u64;
+}
+
 // AST_ADDR_OF: [kind, operand]
 func ast_addr_of(operand: u64) -> u64 {
     var n: *AstAddrOf = (*AstAddrOf)(heap_alloc(SIZEOF_AST_ADDR_OF));
@@ -260,6 +267,14 @@ func ast_sizeof(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_nam
     n->ptr_depth = ptr_depth;
     n->struct_name_ptr = struct_name_ptr;
     n->struct_name_len = struct_name_len;
+    return (u64)n;
+}
+
+// AST_SIZEOF_EXPR: [kind, expr]
+func ast_sizeof_expr(expr: u64) -> u64 {
+    var n: *AstSizeofExpr = (*AstSizeofExpr)(heap_alloc(SIZEOF_AST_SIZEOF_EXPR));
+    n->kind = AST_SIZEOF_EXPR;
+    n->expr = expr;
     return (u64)n;
 }
 

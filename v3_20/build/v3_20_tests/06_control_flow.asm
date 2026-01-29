@@ -13,7 +13,7 @@ _start:
 _06_control_flow__classify_number:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     push rax
@@ -91,7 +91,7 @@ _06_control_flow__classify_number:
 _06_control_flow__test_else_if:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov rax, 85
     mov [rbp-8], rax
     mov rax, 0
@@ -671,7 +671,7 @@ _06_control_flow__test_else_if:
 _06_control_flow__bump:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
     mov rax, [rax]
@@ -695,7 +695,7 @@ _06_control_flow__bump:
 _06_control_flow__crash:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov rax, 123
     push rax
     mov rax, 0
@@ -712,7 +712,7 @@ _06_control_flow__crash:
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 1024
+    sub rsp, 2048
     mov [rbp-8], rdi
     mov [rbp-16], rsi
     mov rax, 1

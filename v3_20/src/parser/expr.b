@@ -18,42 +18,6 @@ import parser.util;
 import parser.type;
 
 // ============================================
-// Pointer Access Helpers
-// ============================================
-
-func is_ptr_keyword(ptr: u64, len: u64) -> u64 {
-    if (len == 5 && *(*u8)ptr == 112 && *(*u8)(ptr+1) == 116 && *(*u8)(ptr+2) == 114 && *(*u8)(ptr+3) == 54 && *(*u8)(ptr+4) == 52) {
-        return 64;  // ptr64
-    }
-    if (len == 4 && *(*u8)ptr == 112 && *(*u8)(ptr+1) == 116 && *(*u8)(ptr+2) == 114 && *(*u8)(ptr+3) == 56) {
-        return 8;   // ptr8
-    }
-    return 0;
-}
-
-func parse_ptr_access(p: u64) -> u64 {
-    var tok: u64 = parse_peek(p);
-    var ptr_kind: u64 = is_ptr_keyword(((*Token)tok)->ptr, ((*Token)tok)->len);
-    
-    if (ptr_kind > 0) {
-        parse_adv(p);
-        if (parse_peek_kind(p) == TOKEN_LBRACKET) {
-            parse_adv(p);
-            var idx: u64 = parse_expr(p);
-            parse_consume(p, TOKEN_RBRACKET);
-            if (ptr_kind == 64) {
-                return ast_deref(idx);
-            } else {
-                return ast_deref8(idx);
-            }
-        } else {
-            return ast_ident(((*Token)tok)->ptr, ((*Token)tok)->len);
-        }
-    }
-    return 0;
-}
-
-// ============================================
 // Primary Expression
 // ============================================
 
@@ -98,18 +62,36 @@ func parse_primary(p: u64) -> u64 {
     if (k == TOKEN_SIZEOF) {
         parse_adv(p);
         parse_consume(p, TOKEN_LPAREN);
-        
-        // Parse type: sizeof(u64), sizeof(*u8), sizeof(StructName), sizeof(*StructName)
-        var ty: u64 = parse_type_ex(p);
-        var type_kind: u64 = *(*u64)ty;
-        var ptr_depth: u64 = *(*u64)(ty + 8);
-        var struct_name_ptr: u64 = *(*u64)(ty + 24);
-        var struct_name_len: u64 = *(*u64)(ty + 32);
-        
+
+        var nk: u64 = parse_peek_kind(p);
+        var is_type: u64 = 0;
+        if (nk == TOKEN_STAR || nk == TOKEN_U8 || nk == TOKEN_U16 || nk == TOKEN_U32 || nk == TOKEN_U64 || nk == TOKEN_I64) {
+            is_type = 1;
+        } else if (nk == TOKEN_IDENTIFIER) {
+            var t: u64 = parse_peek(p);
+            var n_ptr: u64 = ((*Token)t)->ptr;
+            var n_len: u64 = ((*Token)t)->len;
+            if (is_struct_type(n_ptr, n_len) != 0) { is_type = 1; }
+        }
+
+        if (is_type != 0) {
+            // Parse type: sizeof(u64), sizeof(*u8), sizeof(StructName), sizeof(*StructName)
+            var ty: u64 = parse_type_ex(p);
+            var type_kind: u64 = *(*u64)ty;
+            var ptr_depth: u64 = *(*u64)(ty + 8);
+            var struct_name_ptr: u64 = *(*u64)(ty + 24);
+            var struct_name_len: u64 = *(*u64)(ty + 32);
+
+            parse_consume(p, TOKEN_RPAREN);
+
+            pop_trace();
+            return ast_sizeof(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+        }
+
+        var expr: u64 = parse_expr(p);
         parse_consume(p, TOKEN_RPAREN);
-        
         pop_trace();
-        return ast_sizeof(type_kind, ptr_depth, struct_name_ptr, struct_name_len);
+        return ast_sizeof_expr(expr);
     }
     
     if (k == TOKEN_AMPERSAND) {
@@ -160,18 +142,6 @@ func parse_primary(p: u64) -> u64 {
         // Handle postfix operators after parenthesized expression: (expr)->field, (expr).field, (expr)[idx]
         pop_trace();
         return parse_postfix_from(p, expr);
-    }
-    
-    if (k == TOKEN_IDENTIFIER) {
-        var tok: u64 = parse_peek(p);
-        var ptr_kind: u64 = is_ptr_keyword(((*Token)tok)->ptr, ((*Token)tok)->len);
-        if (ptr_kind > 0) {
-            var result: u64 = parse_ptr_access(p);
-            if (result != 0) {
-                pop_trace();
-                return result;
-            }
-        }
     }
     
     if (k == TOKEN_IDENTIFIER) {

@@ -111,6 +111,7 @@ const AST_METHOD_CALL = 113;
 const AST_INDEX = 114;
 const AST_SLICE = 115;
 const AST_CALL_PTR = 116;
+const AST_SIZEOF_EXPR = 117;
 
 // Statements
 const AST_RETURN = 200;
