@@ -31,10 +31,11 @@ _84_ssa_slice_return_chain__get_slice:
     add rax, 8
     mov rbx, 2
     mov [rax], rbx
-    mov rax, 2
-    mov r12, rax
-    mov r8, rax
-    lea r13, [rbp-16]
+    lea rax, [rbp-16]
+    mov rbx, 2
+    mov r12, 2
+    mov r8, 2
+    mov r13, rax
     mov rax, 8
     imul r8, rax
     mov rax, [_gvar___cg_heap_brk]

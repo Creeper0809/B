@@ -283,10 +283,6 @@ func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) ->
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
     if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_push_reg(SSA_PHYS_R10); }
     if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_push_reg(SSA_PHYS_R11); }
-    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_push_reg(SSA_PHYS_R10); }
-    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_push_reg(SSA_PHYS_R11); }
-    if ((save_mask & SSA_LIVE_R10) != 0) { _ssa_emit_push_reg(SSA_PHYS_R10); }
-    if ((save_mask & SSA_LIVE_R11) != 0) { _ssa_emit_push_reg(SSA_PHYS_R11); }
 
     _ssa_emit_push_reg(ssa_operand_value(addr_opr));
 
@@ -492,6 +488,20 @@ func _ssa_codegen_is_global(globals: u64, name_ptr: u64, name_len: u64) -> u64 {
         i = i + 1;
     }
     return 0;
+}
+
+func _ssa_codegen_call_returns_large_struct(call_ptr: u64) -> u64 {
+    if (call_ptr == 0) { return 0; }
+    var call: *AstCall = (*AstCall)call_ptr;
+    var fn_ptr: u64 = compiler_get_func(call->name_ptr, call->name_len);
+    if (fn_ptr == 0) { return 0; }
+    var fn: *AstFunc = (*AstFunc)fn_ptr;
+    if (fn->ret_type != TYPE_STRUCT) { return 0; }
+    if (fn->ret_ptr_depth != 0) { return 0; }
+    if (fn->ret_struct_name_ptr == 0 || fn->ret_struct_name_len == 0) { return 0; }
+    var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+    if (struct_size <= 16) { return 0; }
+    return 1;
 }
 
 func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
@@ -743,6 +753,9 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_EXPR_STMT) {
         var es: *AstExprStmt = (*AstExprStmt)node;
+        if (ast_kind(es->expr) == AST_CALL) {
+            if (_ssa_codegen_call_returns_large_struct(es->expr) != 0) { return 1; }
+        }
         return _ssa_codegen_expr_supported(es->expr, globals);
     }
 
@@ -803,6 +816,9 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_RETURN) {
         var ret: *AstReturn = (*AstReturn)node;
+        if (ast_kind(ret->expr) == AST_CALL) {
+            if (_ssa_codegen_call_returns_large_struct(ret->expr) != 0) { return 1; }
+        }
         return _ssa_codegen_expr_supported(ret->expr, globals);
     }
 

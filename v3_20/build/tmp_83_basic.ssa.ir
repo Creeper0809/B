@@ -1,0 +1,36 @@
+func _83_ssa_slice_return_basic__get_slice
+b0:
+  r1 = lea_local #4611686018427387880, r0
+  r5 = add r1, #0
+  r6 = const #1
+  r0 = store64 r5, r6
+  r7 = lea_local #4611686018427387880, r0
+  r11 = add r7, #8
+  r12 = const #2
+  r0 = store64 r11, r12
+  r13 = lea_local #4611686018427387880, r0
+  r17 = add r13, #16
+  r18 = const #3
+  r0 = store64 r17, r18
+  r19 = lea_local #4611686018427387880, r0
+  r20 = const #3
+  ret r19, r20
+func main
+b1:
+  r1 = lea_local #4611686018427387888, r0
+  r0 = call_slice_store #473035714, r1
+  r3 = lea_local #4611686018427387888, r0
+  r4 = load64 r3, r0
+  r8 = add r4, #0
+  r9 = load64 r8, r0
+  r11 = lea_local #4611686018427387888, r0
+  r12 = load64 r11, r0
+  r16 = add r12, #8
+  r17 = load64 r16, r0
+  r18 = add r9, r17
+  r20 = lea_local #4611686018427387888, r0
+  r21 = load64 r20, r0
+  r25 = add r21, #16
+  r26 = load64 r25, r0
+  r27 = add r18, r26
+  ret r27
