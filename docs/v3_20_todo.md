@@ -23,4 +23,6 @@
 - [x] Fix RET_SLICE_HEAP ptr operand corruption (tests 83/84 segfault).
 - [x] Re-run SSA slice return tests (83/84) after fix.
 - [x] Allow SSA sret calls in return/expr-stmt paths (AST_CALL large struct).
+- [x] Support SSA large struct byval params (callee copy from pointer).
+- [x] Support SSA large struct byval call args (direct/method/call_ptr + literal).
 - [x] Fix SSA slice return chain for local arrays (heap-backed return in inferred-slice path).

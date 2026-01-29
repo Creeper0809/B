@@ -159,13 +159,14 @@ struct BuilderCtx {
     next_reg: u64;
     next_var_id: u64;
     sret_addr_reg: u64;
+    debug_mode: u64;
 }
 
 func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
     push_trace("builder_ctx_new", "ssa_builder.b", __LINE__);
     pop_trace();
-    // BuilderCtx = 11 * 8 bytes = 88 bytes
-    var p: u64 = heap_alloc(88);
+    // BuilderCtx = 12 * 8 bytes = 96 bytes
+    var p: u64 = heap_alloc(96);
     var ctx: *BuilderCtx = (*BuilderCtx)p;
     ctx->ssa_ctx = ssa_ctx;
     ctx->cur_func = 0;
@@ -178,6 +179,7 @@ func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
     ctx->next_reg = 1;
     ctx->next_var_id = 1;
     ctx->sret_addr_reg = 0;
+    ctx->debug_mode = SSA_BUILDER_DEBUG;
     return p;
 }
 
@@ -418,7 +420,16 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
             if (struct_size == 0) { return 0; }
             if (struct_size <= 8) { param_words = 1; }
             else if (struct_size <= 16) { param_words = 2; }
-            else { return 0; }
+            else {
+                param_words = 1;
+                if (ctx->debug_mode != 0) {
+                    emit("[DEBUG] ssa param large struct: ", 35);
+                    emit(p->name_ptr, p->name_len);
+                    emit(" size=", 6);
+                    print_u64(struct_size);
+                    emit("\n", 1);
+                }
+            }
 
             var offset: u64 = symtab_add(ctx->symtab, p->name_ptr, p->name_len, p->type_kind, p->ptr_depth, struct_size);
             var type_info: u64 = symtab_get_type(ctx->symtab, p->name_ptr, p->name_len);
@@ -509,7 +520,17 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
                 var tail_size: u64 = struct_size2 - 8;
                 builder_store_by_size(ctx, addr2, reg_hi, tail_size);
             } else {
-                return 0;
+                var reg_ptr: u64 = builder_new_reg(ctx);
+                var param_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, reg_ptr, ssa_operand_const(start_idx), 0);
+                ssa_inst_append(ctx->cur_block, (*SSAInstruction)param_ptr);
+                if (ctx->debug_mode != 0) {
+                    emit("[DEBUG] ssa param copy large struct: ", 40);
+                    emit(p2->name_ptr, p2->name_len);
+                    emit(" size=", 6);
+                    print_u64(struct_size2);
+                    emit("\n", 1);
+                }
+                builder_struct_copy(ctx, base_addr, reg_ptr, struct_size2);
             }
             continue;
         }
@@ -699,6 +720,46 @@ func builder_get_sret_struct_size(ctx: *BuilderCtx, expr: u64) -> u64 {
 func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
     var arg_kind: u64 = ast_kind(arg);
 
+    // Fast-path: struct literal arguments (handle byval lowering directly)
+    if (arg_kind == AST_STRUCT_LITERAL) {
+        var lit: *AstStructLiteral = (*AstStructLiteral)arg;
+        var struct_size_lit: u64 = builder_struct_size_from_def(lit->struct_def);
+        if (struct_size_lit == 0 && lit->values_vec != 0) {
+            struct_size_lit = vec_len(lit->values_vec) * 8;
+        }
+        if (struct_size_lit == 0) { return 0; }
+
+        var temp_offset_lit: u64 = symtab_add(ctx->symtab, 0, 0, TYPE_STRUCT, 0, struct_size_lit);
+        var temp_addr_lit: u64 = builder_new_lea_local(ctx, temp_offset_lit);
+        builder_struct_literal_init(ctx, lit->struct_def, lit->values_vec, temp_addr_lit);
+
+        if (struct_size_lit <= 8) {
+            var val_lit: u64 = builder_load_by_size(ctx, temp_addr_lit, struct_size_lit);
+            vec_push(arg_regs, val_lit);
+            return 0;
+        }
+        if (struct_size_lit <= 16) {
+            var lo_lit: u64 = builder_load_by_size(ctx, temp_addr_lit, 8);
+            var off_lit: u64 = build_const(ctx, 8);
+            var addr_lit2: u64 = builder_new_reg(ctx);
+            var add_lit: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr_lit2, ssa_operand_reg(temp_addr_lit), ssa_operand_reg(off_lit));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_lit);
+            var tail_lit: u64 = struct_size_lit - 8;
+            var hi_lit: u64 = builder_load_by_size(ctx, addr_lit2, tail_lit);
+            vec_push(arg_regs, lo_lit);
+            vec_push(arg_regs, hi_lit);
+            return 0;
+        }
+
+        if (ctx->debug_mode != 0) {
+            emit("[DEBUG] ssa call arg large struct literal size=", 52);
+            print_u64(struct_size_lit);
+            emit("\n", 1);
+        }
+        vec_push(arg_regs, temp_addr_lit);
+        return 0;
+    }
+
     // Handle AST_CALL with struct return FIRST
     if (arg_kind == AST_CALL) {
         var call: *AstCall = (*AstCall)arg;
@@ -721,9 +782,7 @@ func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
                     vec_push(arg_regs, hi_reg);
                     return 0;
                 }
-                emit("[ERROR] SSA does not support struct return size > 16 in call args\n", 68);
-                panic("SSA build error");
-                return 0;
+                // Large struct return in call args is handled by byval lowering below.
             }
             // Non-struct return from call - fall through to generic handling
         }
@@ -742,8 +801,23 @@ func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
         }
         if (ti->type_kind == TYPE_STRUCT && ti->ptr_depth == 0) {
             var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, ti->struct_name_ptr, ti->struct_name_len);
-            if (struct_size == 0) { return 0; }
             var arg_kind: u64 = ast_kind(arg);
+            if (struct_size == 0) {
+                var def_ptr: u64 = ti->struct_def;
+                if (def_ptr == 0 && arg_kind == AST_STRUCT_LITERAL) {
+                    var lit_def: *AstStructLiteral = (*AstStructLiteral)arg;
+                    def_ptr = lit_def->struct_def;
+                }
+                var def_size: u64 = builder_struct_size_from_def(def_ptr);
+                if (def_size > 0) { struct_size = def_size; }
+            }
+            if (struct_size == 0 && arg_kind == AST_STRUCT_LITERAL) {
+                var lit_fallback: *AstStructLiteral = (*AstStructLiteral)arg;
+                if (lit_fallback->values_vec != 0) {
+                    struct_size = vec_len(lit_fallback->values_vec) * 8;
+                }
+            }
+            if (struct_size == 0) { return 0; }
             if (struct_size <= 8) {
                 if (arg_kind == AST_CALL) {
                     var reg0: u64 = builder_new_reg(ctx);
@@ -797,8 +871,30 @@ func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
                 vec_push(arg_regs, hi_reg);
                 return 0;
             }
-            emit("[ERROR] SSA struct arg size > 16\n", 39);
-            panic("SSA build error");
+            if (ctx->debug_mode != 0) {
+                emit("[DEBUG] ssa call arg large struct: ", 38);
+                emit(ti->struct_name_ptr, ti->struct_name_len);
+                emit(" size=", 6);
+                print_u64(struct_size);
+                emit("\n", 1);
+            }
+            var temp_offset: u64 = symtab_add(ctx->symtab, 0, 0, TYPE_STRUCT, 0, struct_size);
+            var temp_addr: u64 = builder_new_lea_local(ctx, temp_offset);
+            if (arg_kind == AST_STRUCT_LITERAL) {
+                var lit: *AstStructLiteral = (*AstStructLiteral)arg;
+                builder_struct_literal_init(ctx, lit->struct_def, lit->values_vec, temp_addr);
+            } else if (arg_kind == AST_CALL) {
+                builder_emit_call_sret(ctx, (*AstCall)arg, temp_addr);
+            } else if (arg_kind == AST_METHOD_CALL) {
+                builder_emit_method_call_sret(ctx, (*AstMethodCall)arg, temp_addr);
+            } else if (arg_kind == AST_CALL_PTR) {
+                builder_emit_call_ptr_sret(ctx, (*AstCallPtr)arg, temp_addr);
+            } else {
+                var src_addr: u64 = builder_lvalue_addr(ctx, arg);
+                if (src_addr == 0) { return 0; }
+                builder_struct_copy(ctx, temp_addr, src_addr, struct_size);
+            }
+            vec_push(arg_regs, temp_addr);
             return 0;
         }
     }
