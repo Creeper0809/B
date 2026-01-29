@@ -30,5 +30,5 @@
 - [x] Increase compiler stack frame size to avoid large SSA builder local overflow.
 - [x] Track function-pointer return struct info for call_ptr member access.
 - [x] Fix large struct member access test expected exit code.
-- [x] Remove SSA fallback gating and force SSA for all functions (including std_).
-- [x] Allow SSA for large struct returns in call/call_ptr support checks.
+- [x] Restore SSA fallback gating for AST-first workflow.
+- [x] Fix SSA struct-literal support gate (return 1 on success).

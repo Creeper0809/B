@@ -634,6 +634,14 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
             }
             i = i + 1;
         }
+        var fn_ptr: u64 = compiler_get_func(call->name_ptr, call->name_len);
+        if (fn_ptr != 0) {
+            var fn: *AstFunc = (*AstFunc)fn_ptr;
+            if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
+                var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+                if (struct_size > 16) { return 0; }
+            }
+        }
         return 1;
     }
 
@@ -662,6 +670,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
             }
             i2 = i2 + 1;
         }
+        if (_ssa_codegen_call_ptr_returns_large_struct(node) != 0) { return 0; }
         return 1;
     }
 
@@ -690,7 +699,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         return _ssa_codegen_struct_literal_supported(node, globals);
     }
 
-    return 1;
+    return 0;
 }
 
 func _ssa_codegen_struct_literal_supported(init: u64, globals: u64) -> u64 {
@@ -879,7 +888,33 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
     push_trace("ssa_codegen_is_supported_func", "ssa_codegen.b", __LINE__);
     pop_trace();
     if (fn_ptr == 0) { return 0; }
-    return 1;
+    var fn: *AstFunc = (*AstFunc)fn_ptr;
+    if (fn->name_len >= 4) {
+        if (*(*u8)fn->name_ptr == 115 && *(*u8)(fn->name_ptr + 1) == 116 &&
+            *(*u8)(fn->name_ptr + 2) == 100 && *(*u8)(fn->name_ptr + 3) == 95) {
+            return 0;
+        }
+    }
+
+    var params: u64 = fn->params_vec;
+    if (params != 0) {
+        var pn: u64 = vec_len(params);
+        var pi: u64 = 0;
+        while (pi < pn) {
+            var p: *Param = (*Param)vec_get(params, pi);
+            if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
+                pi = pi + 1;
+                continue;
+            }
+            pi = pi + 1;
+        }
+    }
+    if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
+        if (fn->ret_struct_name_ptr == 0 || fn->ret_struct_name_len == 0) { return 0; }
+        var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
+        if (struct_size == 0) { return 0; }
+    }
+    return _ssa_codegen_stmt_supported(fn->body, globals);
 }
 
 // ============================================
