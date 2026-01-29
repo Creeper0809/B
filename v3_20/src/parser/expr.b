@@ -392,6 +392,12 @@ func parse_unary(p: u64) -> u64 {
         var operand: u64 = parse_unary(p);
         return ast_unary(TOKEN_BANG, operand);
     }
+
+    if (k == TOKEN_TILDE) {
+        parse_adv(p);
+        var operand2: u64 = parse_unary(p);
+        return ast_unary(TOKEN_TILDE, operand2);
+    }
     
     return parse_postfix(p);
 }

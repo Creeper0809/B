@@ -36,6 +36,7 @@ const CHAR_CARET = 94;
 const CHAR_LBRACE = 123;
 const CHAR_PIPE = 124;
 const CHAR_RBRACE = 125;
+const CHAR_TILDE = 126;
 
 // Lexer structure: [src_ptr, src_len, pos, line, col]
 
@@ -386,6 +387,7 @@ func lex_next(l: u64) -> u64 {
         }
         return tok_new(TOKEN_PERCENT, src + start, 1, line, col);
     }
+    if (c == CHAR_TILDE) { return tok_new(TOKEN_TILDE, src + start, 1, line, col); }
     if (c == CHAR_CARET) { return tok_new(TOKEN_CARET, src + start, 1, line, col); }
     // NOTE: '&' and '|' are handled above to support &&/||.
     

@@ -88,6 +88,7 @@ const TOKEN_MINUS_EQ = 83;
 const TOKEN_STAR_EQ = 84;
 const TOKEN_SLASH_EQ = 85;
 const TOKEN_PERCENT_EQ = 86;
+const TOKEN_TILDE = 87;
 
 // ============================================
 // AST Node Types

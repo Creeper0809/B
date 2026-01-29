@@ -32,3 +32,4 @@
 - [x] Fix large struct member access test expected exit code.
 - [x] Restore SSA fallback gating for AST-first workflow.
 - [x] Fix SSA struct-literal support gate (return 1 on success).
+- [x] Support unary bitwise NOT (~) in AST and SSA (with tests).

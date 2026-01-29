@@ -56,6 +56,7 @@ func token_kind_name(kind: u64) -> u64 {
     if (kind == TOKEN_STAR_EQ) { return "'*='"; }
     if (kind == TOKEN_SLASH_EQ) { return "'/='"; }
     if (kind == TOKEN_PERCENT_EQ) { return "'%='"; }
+    if (kind == TOKEN_TILDE) { return "'~'"; }
     if (kind == TOKEN_VAR) { return "'var'"; }
     if (kind == TOKEN_FUNC) { return "'func'"; }
     if (kind == TOKEN_RETURN) { return "'return'"; }
@@ -117,6 +118,7 @@ func token_kind_name_len(kind: u64) -> u64 {
     if (kind == TOKEN_STAR_EQ) { return 4; }
     if (kind == TOKEN_SLASH_EQ) { return 4; }
     if (kind == TOKEN_PERCENT_EQ) { return 4; }
+    if (kind == TOKEN_TILDE) { return 3; }
     if (kind == TOKEN_VAR) { return 5; }
     if (kind == TOKEN_FUNC) { return 6; }
     if (kind == TOKEN_RETURN) { return 8; }

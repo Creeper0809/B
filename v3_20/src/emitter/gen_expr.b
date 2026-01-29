@@ -348,6 +348,8 @@ func cg_expr(node: u64) -> u64 {
             emit("    test rax, rax\n", 18);
             emit("    setz al\n", 12);
             emit("    movzx rax, al\n", 18);
+        } else if (op == TOKEN_TILDE) {
+            emit("    not rax\n", 12);
         }
         return;
     }

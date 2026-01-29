@@ -2002,6 +2002,14 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
             return dst2;
         }
 
+        if (op == TOKEN_TILDE) {
+            var all_ones_reg: u64 = build_const(ctx, -1);
+            var dst3: u64 = builder_new_reg(ctx);
+            var inst_ptr5: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_XOR, dst3, ssa_operand_reg(val_reg), ssa_operand_reg(all_ones_reg));
+            ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr5);
+            return dst3;
+        }
+
         return val_reg;
     }
 
