@@ -6,3 +6,5 @@
 - [x] Repair SSA builder file integrity after refactor.
 - [x] Update v3_21 config.ini version fields.
 - [x] Build v3_21 and pass test suite (94/94).
+- [x] Stabilize SSA call_slice_store info across passes (builder/opt/mem2reg/regalloc/codegen/dump).
+- [x] Refactor v3_21 main argv handling to struct-based layouts and sizeof allocations.

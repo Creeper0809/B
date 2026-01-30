@@ -337,37 +337,70 @@ func _ssa_mem2reg_rename_block(fn: *SSAFunction, block: *SSABlock, max_var: u64,
 
         if (op == SSA_OP_CALL) {
             var info_ptr: u64 = ssa_operand_value(cur->src1);
-            var args_vec: u64 = *(info_ptr + 16);
-            var nargs: u64 = *(info_ptr + 24);
+            var info: *SSACallInfo = (*SSACallInfo)info_ptr;
+            var args_vec: u64 = info->args_vec;
+            var nargs: u64 = info->nargs;
             if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
-            var ai: u64 = 0;
-            while (ai < nargs) {
+            for (var ai: u64 = 0; ai < nargs; ai++) {
                 var r: u64 = vec_get(args_vec, ai);
                 if (r < reg_map_cap && *(*u64)(reg_map_set + r * 8) != 0) {
                     var nr: u64 = *(*u64)(reg_map_val + r * 8);
                     if (nr != 0) { vec_set(args_vec, ai, nr); }
                 }
-                ai = ai + 1;
             }
         }
         if (op == SSA_OP_CALL_PTR) {
             var info_ptrp: u64 = ssa_operand_value(cur->src1);
-            var callee_reg: u64 = *(info_ptrp);
+            var info_ptr_info: *SSACallPtrInfo = (*SSACallPtrInfo)info_ptrp;
+            var callee_reg: u64 = info_ptr_info->callee_reg;
             if (callee_reg < reg_map_cap && *(*u64)(reg_map_set + callee_reg * 8) != 0) {
                 var ncallee: u64 = *(*u64)(reg_map_val + callee_reg * 8);
-                if (ncallee != 0) { *(info_ptrp) = ncallee; }
+                if (ncallee != 0) { info_ptr_info->callee_reg = ncallee; }
             }
-            var args_vecp: u64 = *(info_ptrp + 8);
-            var nargsp: u64 = *(info_ptrp + 16);
+            var args_vecp: u64 = info_ptr_info->args_vec;
+            var nargsp: u64 = info_ptr_info->nargs;
             if (nargsp == 0 && args_vecp != 0) { nargsp = vec_len(args_vecp); }
-            var aip: u64 = 0;
-            while (aip < nargsp) {
+            for (var aip: u64 = 0; aip < nargsp; aip++) {
                 var r: u64 = vec_get(args_vecp, aip);
                 if (r < reg_map_cap && *(*u64)(reg_map_set + r * 8) != 0) {
                     var nr: u64 = *(*u64)(reg_map_val + r * 8);
                     if (nr != 0) { vec_set(args_vecp, aip, nr); }
                 }
-                aip = aip + 1;
+            }
+        }
+        if (op == SSA_OP_CALL_SLICE_STORE) {
+            var info_ptrs: u64 = ssa_operand_value(cur->src1);
+            var info_ptr_info2: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptrs;
+            if (info_ptr_info2->is_ptr > 1) {
+                var info_call: *SSACallInfo = (*SSACallInfo)info_ptrs;
+                var args_vecs: u64 = info_call->args_vec;
+                var nargss: u64 = info_call->nargs;
+                if (nargss == 0 && args_vecs != 0) { nargss = vec_len(args_vecs); }
+                for (var ais: u64 = 0; ais < nargss; ais++) {
+                    var r2: u64 = vec_get(args_vecs, ais);
+                    if (r2 < reg_map_cap && *(*u64)(reg_map_set + r2 * 8) != 0) {
+                        var nr2: u64 = *(*u64)(reg_map_val + r2 * 8);
+                        if (nr2 != 0) { vec_set(args_vecs, ais, nr2); }
+                    }
+                }
+            } else {
+                if (info_ptr_info2->is_ptr != 0) {
+                    var callee_reg2: u64 = info_ptr_info2->callee_reg;
+                    if (callee_reg2 < reg_map_cap && *(*u64)(reg_map_set + callee_reg2 * 8) != 0) {
+                        var ncallee2: u64 = *(*u64)(reg_map_val + callee_reg2 * 8);
+                        if (ncallee2 != 0) { info_ptr_info2->callee_reg = ncallee2; }
+                    }
+                }
+                var args_vecs2: u64 = info_ptr_info2->args_vec;
+                var nargss2: u64 = info_ptr_info2->nargs;
+                if (nargss2 == 0 && args_vecs2 != 0) { nargss2 = vec_len(args_vecs2); }
+                for (var ais2: u64 = 0; ais2 < nargss2; ais2++) {
+                    var r2b: u64 = vec_get(args_vecs2, ais2);
+                    if (r2b < reg_map_cap && *(*u64)(reg_map_set + r2b * 8) != 0) {
+                        var nr2b: u64 = *(*u64)(reg_map_val + r2b * 8);
+                        if (nr2b != 0) { vec_set(args_vecs2, ais2, nr2b); }
+                    }
+                }
             }
         }
 

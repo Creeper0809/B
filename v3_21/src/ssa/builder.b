@@ -1272,15 +1272,16 @@ func builder_emit_call_slice_store(ctx: *BuilderCtx, call: *AstCall, addr_reg: u
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_INFO);
-    var info: *SSACallInfo = (*SSACallInfo)info_ptr;
+    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_SLICE_STORE_INFO);
+    var info: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptr;
+    info->is_ptr = 0;
     info->name_ptr = resolved_ptr;
     info->name_len = resolved_len;
+    info->callee_reg = 0;
     info->args_vec = arg_regs;
     info->nargs = total_regs;
     info->ret_type = ret_type;
     info->ret_ptr_depth = ret_ptr_depth;
-    info->ret_struct_size = ret_struct_size;
 
     var call_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL_SLICE_STORE, 0, ssa_operand_const(info_ptr), ssa_operand_reg(addr_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr);
@@ -1453,15 +1454,16 @@ func builder_emit_method_call_slice_store(ctx: *BuilderCtx, mc: *AstMethodCall, 
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_INFO);
-    var info: *SSACallInfo = (*SSACallInfo)info_ptr;
+    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_SLICE_STORE_INFO);
+    var info: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptr;
+    info->is_ptr = 0;
     info->name_ptr = resolved_ptr;
     info->name_len = resolved_len;
+    info->callee_reg = 0;
     info->args_vec = arg_regs;
     info->nargs = total_regs;
     info->ret_type = ret_type;
     info->ret_ptr_depth = ret_ptr_depth;
-    info->ret_struct_size = ret_struct_size;
 
     var call_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_CALL_SLICE_STORE, 0, ssa_operand_const(info_ptr), ssa_operand_reg(addr_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)call_ptr2);

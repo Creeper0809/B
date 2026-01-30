@@ -14,12 +14,11 @@ const SSA_O1_DEBUG = 0;
 
 func _ssa_opt_const_find(map: u64, key: u64) -> u64 {
     var n: u64 = vec_len(map);
-    var i: u64 = 0;
     var k: u64 = key + 1;
-    while (i < n) {
+    var i: u64 = 0;
+    for (i = 0; i < n; i = i + 2) {
         var cur: u64 = vec_get(map, i);
         if (cur != 0 && cur == k) { return i + 1; }
-        i = i + 2;
     }
     return 0;
 }
@@ -55,12 +54,11 @@ func _ssa_opt_const_get(map: u64, key: u64) -> u64 {
 
 func _ssa_opt_use_find(map: u64, key: u64) -> u64 {
     var n: u64 = vec_len(map);
-    var i: u64 = 0;
     var k: u64 = key + 1;
-    while (i < n) {
+    var i: u64 = 0;
+    for (i = 0; i < n; i = i + 2) {
         var cur: u64 = vec_get(map, i);
         if (cur != 0 && cur == k) { return i + 1; }
-        i = i + 2;
     }
     return 0;
 }
@@ -115,7 +113,7 @@ func _ssa_opt_collect_uses(fn: *SSAFunction) -> u64 {
     var bcount: u64 = fn->blocks_len;
 
     var bi: u64 = 0;
-    while (bi < bcount) {
+    for (bi = 0; bi < bcount; bi = bi + 1) {
         var b_ptr: u64 = *(*u64)(blocks + bi * 8);
         var b: *SSABlock = (*SSABlock)b_ptr;
 
@@ -133,32 +131,50 @@ func _ssa_opt_collect_uses(fn: *SSAFunction) -> u64 {
         while (cur != 0) {
             var op: u64 = ssa_inst_get_op(cur);
 
-            if (op == SSA_OP_CALL || op == SSA_OP_CALL_SLICE_STORE) {
-                var info: u64 = ssa_operand_value(cur->src1);
-                var arg_regs: u64 = *(info + 16);
-                var total_regs: u64 = *(info + 24);
+            if (op == SSA_OP_CALL) {
+                var info: *SSACallInfo = (*SSACallInfo)ssa_operand_value(cur->src1);
+                var arg_regs: u64 = info->args_vec;
+                var total_regs: u64 = info->nargs;
                 if (total_regs == 0 && arg_regs != 0) { total_regs = vec_len(arg_regs); }
                 var i: u64 = 0;
-                while (i < total_regs) {
+                for (i = 0; i < total_regs; i = i + 1) {
                     _ssa_opt_use_inc(uses, vec_get(arg_regs, i));
-                    i = i + 1;
                 }
-                if (op == SSA_OP_CALL_SLICE_STORE) {
-                    if (cur->src2 != 0 && ssa_operand_is_const(cur->src2) == 0) {
-                        _ssa_opt_use_inc(uses, ssa_operand_value(cur->src2));
+            } else if (op == SSA_OP_CALL_SLICE_STORE) {
+                var info_slice: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)ssa_operand_value(cur->src1);
+                if (info_slice->is_ptr > 1) {
+                    var info_call: *SSACallInfo = (*SSACallInfo)ssa_operand_value(cur->src1);
+                    var arg_regs_slice: u64 = info_call->args_vec;
+                    var total_regs_slice: u64 = info_call->nargs;
+                    if (total_regs_slice == 0 && arg_regs_slice != 0) { total_regs_slice = vec_len(arg_regs_slice); }
+                    var k: u64 = 0;
+                    for (k = 0; k < total_regs_slice; k = k + 1) {
+                        _ssa_opt_use_inc(uses, vec_get(arg_regs_slice, k));
+                    }
+                } else {
+                    var arg_regs_slice: u64 = info_slice->args_vec;
+                    var total_regs_slice: u64 = info_slice->nargs;
+                    if (total_regs_slice == 0 && arg_regs_slice != 0) { total_regs_slice = vec_len(arg_regs_slice); }
+                    var k2: u64 = 0;
+                    for (k2 = 0; k2 < total_regs_slice; k2 = k2 + 1) {
+                        _ssa_opt_use_inc(uses, vec_get(arg_regs_slice, k2));
+                    }
+                    if (info_slice->is_ptr != 0) {
+                        _ssa_opt_use_inc(uses, info_slice->callee_reg);
                     }
                 }
+                if (cur->src2 != 0 && ssa_operand_is_const(cur->src2) == 0) {
+                    _ssa_opt_use_inc(uses, ssa_operand_value(cur->src2));
+                }
             } else if (op == SSA_OP_CALL_PTR) {
-                var info2: u64 = ssa_operand_value(cur->src1);
-                var callee_reg: u64 = *(info2);
-                _ssa_opt_use_inc(uses, callee_reg);
-                var arg_regs2: u64 = *(info2 + 8);
-                var total_regs2: u64 = *(info2 + 16);
+                var info2: *SSACallPtrInfo = (*SSACallPtrInfo)ssa_operand_value(cur->src1);
+                _ssa_opt_use_inc(uses, info2->callee_reg);
+                var arg_regs2: u64 = info2->args_vec;
+                var total_regs2: u64 = info2->nargs;
                 if (total_regs2 == 0 && arg_regs2 != 0) { total_regs2 = vec_len(arg_regs2); }
                 var j: u64 = 0;
-                while (j < total_regs2) {
+                for (j = 0; j < total_regs2; j = j + 1) {
                     _ssa_opt_use_inc(uses, vec_get(arg_regs2, j));
-                    j = j + 1;
                 }
             } else {
                 if (cur->src1 != 0 && ssa_operand_is_const(cur->src1) == 0) {
@@ -171,8 +187,6 @@ func _ssa_opt_collect_uses(fn: *SSAFunction) -> u64 {
 
             cur = cur->next;
         }
-
-        bi = bi + 1;
     }
 
     return uses;
@@ -187,7 +201,7 @@ func _ssa_opt_dce_run(fn: *SSAFunction) -> u64 {
         var blocks: u64 = fn->blocks_data;
         var bcount: u64 = fn->blocks_len;
         var bi: u64 = 0;
-        while (bi < bcount) {
+        for (bi = 0; bi < bcount; bi = bi + 1) {
             var b_ptr: u64 = *(*u64)(blocks + bi * 8);
             var b: *SSABlock = (*SSABlock)b_ptr;
 
@@ -204,19 +218,16 @@ func _ssa_opt_dce_run(fn: *SSAFunction) -> u64 {
 
                 cur = cur->next;
             }
-
-            bi = bi + 1;
         }
     }
 
     var blocks2: u64 = fn->blocks_data;
     var bcount2: u64 = fn->blocks_len;
     var bi2: u64 = 0;
-    while (bi2 < bcount2) {
+    for (bi2 = 0; bi2 < bcount2; bi2 = bi2 + 1) {
         var b_ptr2: u64 = *(*u64)(blocks2 + bi2 * 8);
         var b2: *SSABlock = (*SSABlock)b_ptr2;
         _ssa_opt_remove_nops(b2);
-        bi2 = bi2 + 1;
     }
     return 0;
 }
@@ -326,14 +337,14 @@ func ssa_opt_o1_run(ctx: *SSAContext) -> u64 {
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
     var i: u64 = 0;
-    while (i < n) {
+    for (i = 0; i < n; i = i + 1) {
         var f_ptr: u64 = *(*u64)(funcs + i * 8);
         var fn: *SSAFunction = (*SSAFunction)f_ptr;
 
         var blocks: u64 = fn->blocks_data;
         var bcount: u64 = fn->blocks_len;
         var bi: u64 = 0;
-        while (bi < bcount) {
+        for (bi = 0; bi < bcount; bi = bi + 1) {
             var b_ptr: u64 = *(*u64)(blocks + bi * 8);
             var b: *SSABlock = (*SSABlock)b_ptr;
 
@@ -453,12 +464,9 @@ func ssa_opt_o1_run(ctx: *SSAContext) -> u64 {
             }
 
             _ssa_opt_remove_nops(b);
-            bi = bi + 1;
         }
 
         _ssa_opt_dce_run(fn);
-
-        i = i + 1;
     }
 
     if (SSA_O1_DEBUG != 0) {

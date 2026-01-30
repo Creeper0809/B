@@ -82,28 +82,51 @@ func _ssa_phi_use_mask(block: *SSABlock) -> u64 {
 
 func _ssa_call_use_mask(info_ptr: u64) -> u64 {
     var mask: u64 = 0;
-    var arg_regs: u64 = *(info_ptr + 16);
-    var total_regs: u64 = *(info_ptr + 24);
+    var info: *SSACallInfo = (*SSACallInfo)info_ptr;
+    var arg_regs: u64 = info->args_vec;
+    var total_regs: u64 = info->nargs;
     if (total_regs == 0 && arg_regs != 0) { total_regs = vec_len(arg_regs); }
-    var i: u64 = 0;
-    while (i < total_regs) {
+    for (var i: u64 = 0; i < total_regs; i++) {
         mask = mask | _ssa_phys_mask(vec_get(arg_regs, i));
-        i = i + 1;
     }
     return mask;
 }
 
 func _ssa_call_ptr_use_mask(info_ptr: u64) -> u64 {
     var mask: u64 = 0;
-    var callee_reg: u64 = *(info_ptr);
+    var info: *SSACallPtrInfo = (*SSACallPtrInfo)info_ptr;
+    var callee_reg: u64 = info->callee_reg;
     mask = mask | _ssa_phys_mask(callee_reg);
-    var arg_regs: u64 = *(info_ptr + 8);
-    var total_regs: u64 = *(info_ptr + 16);
+    var arg_regs: u64 = info->args_vec;
+    var total_regs: u64 = info->nargs;
     if (total_regs == 0 && arg_regs != 0) { total_regs = vec_len(arg_regs); }
-    var i: u64 = 0;
-    while (i < total_regs) {
+    for (var i: u64 = 0; i < total_regs; i++) {
         mask = mask | _ssa_phys_mask(vec_get(arg_regs, i));
-        i = i + 1;
+    }
+    return mask;
+}
+
+func _ssa_call_slice_store_use_mask(info_ptr: u64) -> u64 {
+    var mask: u64 = 0;
+    var info: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptr;
+    if (info->is_ptr > 1) {
+        var info_call: *SSACallInfo = (*SSACallInfo)info_ptr;
+        var arg_regs: u64 = info_call->args_vec;
+        var total_regs: u64 = info_call->nargs;
+        if (total_regs == 0 && arg_regs != 0) { total_regs = vec_len(arg_regs); }
+        for (var i: u64 = 0; i < total_regs; i++) {
+            mask = mask | _ssa_phys_mask(vec_get(arg_regs, i));
+        }
+    } else {
+        if (info->is_ptr != 0) {
+            mask = mask | _ssa_phys_mask(info->callee_reg);
+        }
+        var arg_regs: u64 = info->args_vec;
+        var total_regs: u64 = info->nargs;
+        if (total_regs == 0 && arg_regs != 0) { total_regs = vec_len(arg_regs); }
+        for (var i: u64 = 0; i < total_regs; i++) {
+            mask = mask | _ssa_phys_mask(vec_get(arg_regs, i));
+        }
     }
     return mask;
 }
@@ -148,7 +171,7 @@ func _ssa_inst_use_def_mask(inst: *SSAInstruction, use_out: u64, def_out: u64) -
     }
 
     if (op == SSA_OP_CALL_SLICE_STORE) {
-        use_mask = _ssa_call_use_mask(ssa_operand_value(inst->src1));
+        use_mask = _ssa_call_slice_store_use_mask(ssa_operand_value(inst->src1));
         use_mask = use_mask | _ssa_operand_use_mask(inst->src2);
         *(use_out) = use_mask;
         *(def_out) = def_mask;
@@ -201,7 +224,7 @@ func _ssa_emit_asm(text_vec: u64) -> u64 {
     var asm_len: u64 = vec_len(text_vec);
     var i: u64 = 0;
     var at_line_start: u64 = 1;
-    while (i < asm_len) {
+    for (var i: u64 = 0; i < asm_len; i++) {
         var ch: u64 = vec_get(text_vec, i);
         if (ch == 10) {
             emit_nl();
@@ -213,7 +236,6 @@ func _ssa_emit_asm(text_vec: u64) -> u64 {
             }
             emit_char(ch);
         }
-        i = i + 1;
     }
     emit_nl();
     return 0;
@@ -257,10 +279,26 @@ func _ssa_ensure_heap_brk_global() -> u64 {
 }
 
 func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) -> u64 {
-    var args_vec: u64 = *(info_ptr + 16);
-    var nargs: u64 = *(info_ptr + 24);
-    var ret_type: u64 = *(info_ptr + 32);
-    var ret_ptr_depth: u64 = *(info_ptr + 40);
+    var info: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptr;
+    var is_ptr: u64 = info->is_ptr;
+    var name_ptr: u64 = info->name_ptr;
+    var name_len: u64 = info->name_len;
+    var callee_reg: u64 = info->callee_reg;
+    var args_vec: u64 = info->args_vec;
+    var nargs: u64 = info->nargs;
+    var ret_type: u64 = info->ret_type;
+    var ret_ptr_depth: u64 = info->ret_ptr_depth;
+    if (is_ptr > 1) {
+        var info_call: *SSACallInfo = (*SSACallInfo)info_ptr;
+        is_ptr = 0;
+        name_ptr = info_call->name_ptr;
+        name_len = info_call->name_len;
+        callee_reg = 0;
+        args_vec = info_call->args_vec;
+        nargs = info_call->nargs;
+        ret_type = info_call->ret_type;
+        ret_ptr_depth = info_call->ret_ptr_depth;
+    }
     if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
 
     var keep_rax: u64 = 0;
@@ -299,8 +337,7 @@ func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) ->
 
     var reg_count: u64 = nargs;
     if (reg_count > 6) { reg_count = 6; }
-    var i: u64 = 0;
-    while (i < reg_count) {
+    for (var i: u64 = 0; i < reg_count; i++) {
         emit("    pop ", 8);
         if (i == 0) { emit("rdi", 3); }
         else if (i == 1) { emit("rsi", 3); }
@@ -309,14 +346,15 @@ func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) ->
         else if (i == 4) { emit("r8", 2); }
         else if (i == 5) { emit("r9", 2); }
         emit_nl();
-        i = i + 1;
     }
     stack_args = stack_args - reg_count;
 
     emit("    call ", 9);
-    var name_ptr: u64 = *(info_ptr);
-    var name_len: u64 = *(info_ptr + 8);
-    emit(name_ptr, name_len);
+    if (is_ptr != 0) {
+        _ssa_emit_reg_name(callee_reg);
+    } else {
+        emit(name_ptr, name_len);
+    }
     emit_nl();
 
     emit("    mov rbx, [rsp", 19);
@@ -1016,13 +1054,14 @@ func _ssa_emit_restore_reg(dest: u64, phys: u64) -> u64 {
 }
 
 func _ssa_emit_call(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
-    var name_ptr: u64 = *(info_ptr);
-    var name_len: u64 = *(info_ptr + 8);
-    var args_vec: u64 = *(info_ptr + 16);
-    var nargs: u64 = *(info_ptr + 24);
-    var ret_type: u64 = *(info_ptr + 32);
-    var ret_ptr_depth: u64 = *(info_ptr + 40);
-    var ret_struct_size: u64 = *(info_ptr + 48);
+    var info: *SSACallInfo = (*SSACallInfo)info_ptr;
+    var name_ptr: u64 = info->name_ptr;
+    var name_len: u64 = info->name_len;
+    var args_vec: u64 = info->args_vec;
+    var nargs: u64 = info->nargs;
+    var ret_type: u64 = info->ret_type;
+    var ret_ptr_depth: u64 = info->ret_ptr_depth;
+    var ret_struct_size: u64 = info->ret_struct_size;
     if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
     var is_sret: u64 = 0;
     if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0 && ret_struct_size > 16) {
@@ -1122,12 +1161,13 @@ func _ssa_emit_call(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -
 }
 
 func _ssa_emit_call_ptr(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -> u64 {
-    var callee_reg: u64 = *(info_ptr);
-    var args_vec: u64 = *(info_ptr + 8);
-    var nargs: u64 = *(info_ptr + 16);
-    var ret_type: u64 = *(info_ptr + 24);
-    var ret_ptr_depth: u64 = *(info_ptr + 32);
-    var ret_struct_size: u64 = *(info_ptr + 40);
+    var info: *SSACallPtrInfo = (*SSACallPtrInfo)info_ptr;
+    var callee_reg: u64 = info->callee_reg;
+    var args_vec: u64 = info->args_vec;
+    var nargs: u64 = info->nargs;
+    var ret_type: u64 = info->ret_type;
+    var ret_ptr_depth: u64 = info->ret_ptr_depth;
+    var ret_struct_size: u64 = info->ret_struct_size;
     if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
     var is_sret: u64 = 0;
     if (ret_type == TYPE_STRUCT && ret_ptr_depth == 0 && ret_struct_size > 16) {

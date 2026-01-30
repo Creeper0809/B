@@ -42,11 +42,9 @@ func ssa_build_program(prog: u64) -> u64 {
     var ctx_ptr: u64 = ssa_context_new();
     var ctx: *SSAContext = (*SSAContext)ctx_ptr;
 
-    var i: u64 = 0;
-    while (i < count) {
+    for (var i: u64 = 0; i < count; i++) {
         var fn_ptr: u64 = vec_get(funcs, i);
         ssa_build_func(ctx, fn_ptr);
-        i = i + 1;
     }
     pop_trace();
     return ctx_ptr;
@@ -94,8 +92,7 @@ func ssa_builder_build_program(prog: u64) -> u64 {
     var bctx_ptr: u64 = builder_ctx_new((*SSAContext)ssa_ctx_ptr);
     var bctx: *BuilderCtx = (*BuilderCtx)bctx_ptr;
 
-    var i: u64 = 0;
-    while (i < count) {
+    for (var i: u64 = 0; i < count; i++) {
         var fn_ptr: u64 = vec_get(funcs, i);
         var fn: *AstFunc = (*AstFunc)fn_ptr;
         if (fn->body == 0) {
@@ -105,7 +102,6 @@ func ssa_builder_build_program(prog: u64) -> u64 {
         } else {
             ssa_builder_build_func(bctx, fn_ptr);
         }
-        i = i + 1;
     }
     pop_trace();
     return ssa_ctx_ptr;

@@ -9,51 +9,58 @@ import compiler;
 import codegen;
 import opt;
 
+// Explicit argv layouts for execve-style argument arrays.
+// Each field is a single u64 pointer slot, matching the exact contiguous memory
+// layout expected by execve without any manual byte offset calculations.
+struct Argv6 { a0: u64; a1: u64; a2: u64; a3: u64; a4: u64; a5: u64; }
+struct Argv5 { a0: u64; a1: u64; a2: u64; a3: u64; a4: u64; }
+struct Argv2 { a0: u64; a1: u64; }
+
+
 func main(argc: u64, argv: u64) -> u64 {
     if (argc < 2) {
         emit("Usage: v3_19 [-O0|-O1] [-dump-ir|-dump-ssa|-asm] <source.b>\n", 60);
         return 1;
     }
 
-    var compiler_path: u64 = *(argv);
+    var argv_ptr: *u64 = (*u64)argv;
+    // Compute sizes at runtime to keep sizeof in use without const-restrictions.
+    // This keeps allocations correct while avoiding manual byte multipliers.
+    var argv6_size: u64 = sizeof(Argv6);
+    var argv5_size: u64 = sizeof(Argv5);
+    var argv2_size: u64 = sizeof(Argv2);
+    var compiler_path: u64 = *argv_ptr;
     var compiler_len: u64 = 0;
     if (compiler_path != 0) { compiler_len = str_len(compiler_path); }
     var filename: u64 = 0;
-    var i: u64 = 1;
-    while (i < argc) {
-        var arg: u64 = *(argv + i * 8);
+    for (var i: u64 = 1; i < argc; i++) {
+        var arg: u64 = *(argv_ptr + i);
         var arg_len: u64 = str_len(arg);
 
         if (str_eq(arg, arg_len, "-O1", 3)) {
             opt_set_level(1);
-            i = i + 1;
             continue;
         }
         if (str_eq(arg, arg_len, "-O0", 3)) {
             opt_set_level(0);
-            i = i + 1;
             continue;
         }
         if (str_eq(arg, arg_len, "-dump-ir", 8)) {
             opt_set_ir_mode(IR_3ADDR);
             opt_set_output_mode(OUT_IR);
-            i = i + 1;
             continue;
         }
         if (str_eq(arg, arg_len, "-dump-ssa", 9)) {
             opt_set_ir_mode(IR_SSA);
             opt_set_output_mode(OUT_IR);
-            i = i + 1;
             continue;
         }
         if (str_eq(arg, arg_len, "-asm", 4)) {
             opt_set_output_mode(OUT_ASM);
-            i = i + 1;
             continue;
         }
 
         filename = arg;
-        i = i + 1;
     }
 
     if (filename == 0) {
@@ -106,31 +113,31 @@ func main(argc: u64, argv: u64) -> u64 {
         os_sys_dup2(saved_fd, 1);
         sys_close(saved_fd);
 
-        var nasm_argv: u64 = heap_alloc(8 * 6);
-        *(*u64)(nasm_argv + 0) = (u64)"nasm";
-        *(*u64)(nasm_argv + 8) = (u64)"-felf64";
-        *(*u64)(nasm_argv + 16) = asm_path;
-        *(*u64)(nasm_argv + 24) = (u64)"-o";
-        *(*u64)(nasm_argv + 32) = obj_path;
-        *(*u64)(nasm_argv + 40) = 0;
-        os_execute((u64)"/usr/bin/nasm", nasm_argv);
+        var nasm_argv: *Argv6 = (*Argv6)heap_alloc(argv6_size);
+        nasm_argv->a0 = (u64)"nasm";
+        nasm_argv->a1 = (u64)"-felf64";
+        nasm_argv->a2 = asm_path;
+        nasm_argv->a3 = (u64)"-o";
+        nasm_argv->a4 = obj_path;
+        nasm_argv->a5 = 0;
+        os_execute((u64)"/usr/bin/nasm", (u64)nasm_argv);
 
-        var ld_argv: u64 = heap_alloc(8 * 5);
-        *(*u64)(ld_argv + 0) = (u64)"ld";
-        *(*u64)(ld_argv + 8) = obj_path;
-        *(*u64)(ld_argv + 16) = (u64)"-o";
-        *(*u64)(ld_argv + 24) = exe_path;
-        *(*u64)(ld_argv + 32) = 0;
-        os_execute((u64)"/usr/bin/ld", ld_argv);
+        var ld_argv: *Argv5 = (*Argv5)heap_alloc(argv5_size);
+        ld_argv->a0 = (u64)"ld";
+        ld_argv->a1 = obj_path;
+        ld_argv->a2 = (u64)"-o";
+        ld_argv->a3 = exe_path;
+        ld_argv->a4 = 0;
+        os_execute((u64)"/usr/bin/ld", (u64)ld_argv);
 
         emit("[OK] output: ", 14);
         emit(exe_path, str_len(exe_path));
         emit("\n", 1);
 
-        var exe_argv: u64 = heap_alloc(8 * 2);
-        *(*u64)(exe_argv + 0) = exe_path;
-        *(*u64)(exe_argv + 8) = 0;
-        var status: i64 = os_execute(exe_path, exe_argv);
+        var exe_argv: *Argv2 = (*Argv2)heap_alloc(argv2_size);
+        exe_argv->a0 = exe_path;
+        exe_argv->a1 = 0;
+        var status: i64 = os_execute(exe_path, (u64)exe_argv);
         emit("[RUN] exit=", 11);
         print_i64(status);
         emit("\n", 1);

@@ -126,9 +126,10 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_CALL_PTR) {
         var info_ptr2: u64 = ssa_operand_value(inst->src1);
-        var callee_reg: u64 = *(info_ptr2);
-        var args_vec2: u64 = *(info_ptr2 + 8);
-        var nargs2: u64 = *(info_ptr2 + 16);
+        var info2: *SSACallPtrInfo = (*SSACallPtrInfo)info_ptr2;
+        var callee_reg: u64 = info2->callee_reg;
+        var args_vec2: u64 = info2->args_vec;
+        var nargs2: u64 = info2->nargs;
         if (nargs2 == 0 && args_vec2 != 0) { nargs2 = vec_len(args_vec2); }
         emit("  r", 3);
         emit_u64(inst->dest);
@@ -139,24 +140,65 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
         emit(" = call_ptr r", 13);
         emit_u64(callee_reg);
         emit("(", 1);
-        var i2: u64 = 0;
-        while (i2 < nargs2) {
+        for (var i2: u64 = 0; i2 < nargs2; i2++) {
             if (i2 > 0) { emit(", ", 2); }
             emit("r", 1);
             emit_u64(vec_get(args_vec2, i2));
-            i2 = i2 + 1;
         }
         emit(")\n", 2);
         pop_trace();
         return 0;
     }
 
+    if (op == SSA_OP_CALL_SLICE_STORE) {
+        var info_ptrs: u64 = ssa_operand_value(inst->src1);
+        var info_s: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptrs;
+        if (info_s->is_ptr > 1) {
+            var info_call: *SSACallInfo = (*SSACallInfo)info_ptrs;
+            var name_ptrs: u64 = info_call->name_ptr;
+            var name_lens: u64 = info_call->name_len;
+            var args_vecs: u64 = info_call->args_vec;
+            var nargss: u64 = info_call->nargs;
+            if (nargss == 0 && args_vecs != 0) { nargss = vec_len(args_vecs); }
+            emit("  call_slice_store ", 20);
+            emit(name_ptrs, name_lens);
+            emit("(", 1);
+            for (var is: u64 = 0; is < nargss; is++) {
+                if (is > 0) { emit(", ", 2); }
+                emit("r", 1);
+                emit_u64(vec_get(args_vecs, is));
+            }
+            emit(")\n", 2);
+        } else {
+            var args_vecs2: u64 = info_s->args_vec;
+            var nargss2: u64 = info_s->nargs;
+            if (nargss2 == 0 && args_vecs2 != 0) { nargss2 = vec_len(args_vecs2); }
+            emit("  call_slice_store ", 20);
+            if (info_s->is_ptr != 0) {
+                emit("r", 1);
+                emit_u64(info_s->callee_reg);
+            } else {
+                emit(info_s->name_ptr, info_s->name_len);
+            }
+            emit("(", 1);
+            for (var is2: u64 = 0; is2 < nargss2; is2++) {
+                if (is2 > 0) { emit(", ", 2); }
+                emit("r", 1);
+                emit_u64(vec_get(args_vecs2, is2));
+            }
+            emit(")\n", 2);
+        }
+        pop_trace();
+        return 0;
+    }
+
     if (op == SSA_OP_CALL) {
         var info_ptr: u64 = ssa_operand_value(inst->src1);
-        var name_ptr: u64 = *(info_ptr);
-        var name_len: u64 = *(info_ptr + 8);
-        var args_vec: u64 = *(info_ptr + 16);
-        var nargs: u64 = *(info_ptr + 24);
+        var info: *SSACallInfo = (*SSACallInfo)info_ptr;
+        var name_ptr: u64 = info->name_ptr;
+        var name_len: u64 = info->name_len;
+        var args_vec: u64 = info->args_vec;
+        var nargs: u64 = info->nargs;
         if (nargs == 0 && args_vec != 0) { nargs = vec_len(args_vec); }
         emit("  r", 3);
         emit_u64(inst->dest);
@@ -167,12 +209,10 @@ func _ssa_dump_inst(inst: *SSAInstruction) -> u64 {
         emit(" = call ", 8);
         emit(name_ptr, name_len);
         emit("(", 1);
-        var i: u64 = 0;
-        while (i < nargs) {
+        for (var i: u64 = 0; i < nargs; i++) {
             if (i > 0) { emit(", ", 2); }
             emit("r", 1);
             emit_u64(vec_get(args_vec, i));
-            i = i + 1;
         }
         emit(")\n", 2);
         pop_trace();
@@ -245,8 +285,7 @@ func ssa_dump_ctx(ctx: *SSAContext, with_phi: u64) -> u64 {
     if (ctx == 0) { pop_trace(); return 0; }
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         var f_ptr: u64 = *(*u64)(funcs + i * 8);
         var fn: *SSAFunction = (*SSAFunction)f_ptr;
 
@@ -256,8 +295,7 @@ func ssa_dump_ctx(ctx: *SSAContext, with_phi: u64) -> u64 {
 
         var blocks: u64 = fn->blocks_data;
         var bcount: u64 = fn->blocks_len;
-        var bi: u64 = 0;
-        while (bi < bcount) {
+        for (var bi: u64 = 0; bi < bcount; bi++) {
             var b_ptr: u64 = *(*u64)(blocks + bi * 8);
             var b: *SSABlock = (*SSABlock)b_ptr;
 
@@ -279,10 +317,7 @@ func ssa_dump_ctx(ctx: *SSAContext, with_phi: u64) -> u64 {
                 cur = cur->next;
             }
 
-            bi = bi + 1;
         }
-
-        i = i + 1;
     }
     pop_trace();
     return 0;
