@@ -1,0 +1,32 @@
+func _96_ssa_large_struct_member_access__make_large
+b0:
+  r1 = param #3
+  r2 = param #2
+  r3 = param #1
+  r4 = param #0
+  r5 = lea_local #4611686018427387880, r0
+  r0 = store64 r5, r3
+  r7 = lea_local #4611686018427387880, r0
+  r9 = add r7, #8
+  r0 = store64 r9, r2
+  r11 = lea_local #4611686018427387880, r0
+  r13 = add r11, #16
+  r0 = store64 r13, r1
+  r15 = lea_local #4611686018427387880, r0
+  r16 = load64 r15, r0
+  r0 = store64 r4, r16
+  r18 = add r15, #8
+  r19 = add r4, #8
+  r20 = load64 r18, r0
+  r0 = store64 r19, r20
+  r22 = add r15, #16
+  r23 = add r4, #16
+  r24 = load64 r22, r0
+  r0 = store64 r23, r24
+  ret 
+func main
+b1:
+  r2 = load64 r0, r0
+  r3 = load64 r0, r0
+  r6 = add r2, r3
+  ret r6

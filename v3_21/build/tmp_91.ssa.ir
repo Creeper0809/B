@@ -1,0 +1,65 @@
+func _91_ssa_struct_return_large_chain__make_large
+b0:
+  r1 = param #4
+  r2 = param #3
+  r3 = param #2
+  r4 = param #1
+  r5 = param #0
+  r0 = store64 r5, r4
+  r8 = add r5, #8
+  r0 = store64 r8, r3
+  r11 = add r5, #16
+  r0 = store64 r11, r2
+  r14 = add r5, #24
+  r0 = store64 r14, r1
+  ret 
+func _91_ssa_struct_return_large_chain__forward_large
+b1:
+  r1 = param #1
+  r2 = param #0
+  r3 = lea_local #4611686018427387872, r0
+  r7 = add r1, #1
+  r10 = add r1, #2
+  r13 = add r1, #3
+  r0 = call _91_ssa_struct_return_large_chain__make_large(r3, r1, r7, r10, r13)
+  r14 = lea_local #4611686018427387872, r0
+  r15 = load64 r14, r0
+  r0 = store64 r2, r15
+  r17 = add r14, #8
+  r18 = add r2, #8
+  r19 = load64 r17, r0
+  r0 = store64 r18, r19
+  r21 = add r14, #16
+  r22 = add r2, #16
+  r23 = load64 r21, r0
+  r0 = store64 r22, r23
+  r25 = add r14, #24
+  r26 = add r2, #24
+  r27 = load64 r25, r0
+  r0 = store64 r26, r27
+  ret 
+func main
+b2:
+  r1 = const #1
+  r2 = const #2
+  r3 = const #3
+  r4 = const #4
+  r0 = call _91_ssa_struct_return_large_chain__make_large(r1, r2, r3, r4)
+  r5 = lea_local #4611686018427387872, r0
+  r6 = const #10
+  r0 = call _91_ssa_struct_return_large_chain__forward_large(r5, r6)
+  r7 = lea_local #4611686018427387872, r0
+  r8 = load64 r7, r0
+  r9 = lea_local #4611686018427387872, r0
+  r11 = add r9, #8
+  r12 = load64 r11, r0
+  r13 = add r8, r12
+  r14 = lea_local #4611686018427387872, r0
+  r16 = add r14, #16
+  r17 = load64 r16, r0
+  r18 = add r13, r17
+  r19 = lea_local #4611686018427387872, r0
+  r21 = add r19, #24
+  r22 = load64 r21, r0
+  r23 = add r18, r22
+  ret r23

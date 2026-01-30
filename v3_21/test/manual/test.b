@@ -1,0 +1,16 @@
+import print_u64 from std.io;
+
+func main() -> i64{
+    var a : u64 = 10;
+    var b : u64 = a + 10 + 20;
+
+    if(b){
+        a = 10;
+    }
+    else{
+        a = 20;
+    }
+    print_u64(a);
+    print_u64(b);
+    return 0;
+}

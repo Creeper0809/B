@@ -1,0 +1,20 @@
+func _78_ssa_struct_return__make_point
+b0:
+  r1 = param #1
+  r2 = param #0
+func main
+b1:
+  r1 = lea_local #4611686018427387888, r0
+  r4 = const #20
+  r5 = const #22
+  r2, r3 = call _78_ssa_struct_return__make_point(r4, r5)
+  r0 = store64 r1, r2
+  r7 = add r1, #8
+  r0 = store64 r7, r3
+  r8 = lea_local #4611686018427387888, r0
+  r9 = load64 r8, r0
+  r10 = lea_local #4611686018427387888, r0
+  r12 = add r10, #8
+  r13 = load64 r12, r0
+  r14 = add r9, r13
+  ret r14

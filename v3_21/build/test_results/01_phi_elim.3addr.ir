@@ -1,0 +1,21 @@
+func main
+b0:
+  r1 = const #0
+  r0 = store #1, r1
+  r2 = const #1
+  r0 = store #2, r2
+  r3 = load #2
+  br r3 ? b1 : b3
+b1:
+  r4 = lea_local #4611686018427387896, r0
+  r5 = const #1
+  r0 = store #1, r5
+  jmp b2
+b2:
+  r8 = load #1
+  ret r8
+b3:
+  r6 = lea_local #4611686018427387896, r0
+  r7 = const #2
+  r0 = store #1, r7
+  jmp b2

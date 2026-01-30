@@ -1,0 +1,13 @@
+// Covers: SysV ABI >6 integer args
+// Mode: ssa
+// Opt: O1
+// Expect exit code: 36
+
+func sum8(a: i64, b: i64, c: i64, d: i64, e: i64, f: i64, g: i64, h: i64) -> i64 {
+    return a + b + c + d + e + f + g + h;
+}
+
+func main() -> i64 {
+    return sum8(1, 2, 3, 4, 5, 6, 7, 8);
+}
+

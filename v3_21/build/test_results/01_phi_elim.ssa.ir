@@ -1,0 +1,16 @@
+func main
+b0:
+  r1 = const #0
+  r2 = const #1
+  br r2 ? b1 : b3
+b1:
+  r4 = lea_local #4611686018427387896, r0
+  r5 = const #1
+  jmp b2
+b2:
+  r9 = phi (b1, r5) (b3, r7)
+  ret r9
+b3:
+  r6 = lea_local #4611686018427387896, r0
+  r7 = const #2
+  jmp b2
