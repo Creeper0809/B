@@ -2442,6 +2442,15 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
             if (ret_ti->type_kind == TYPE_VOID && ret_ti->ptr_depth == 0) {
                 dst = 0;
             }
+            if (ret_ti->type_kind == TYPE_STRUCT && ret_ti->ptr_depth == 0) {
+                var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, ret_ti->struct_name_ptr, ret_ti->struct_name_len);
+                if (struct_size > 16) {
+                    var temp_offset: u64 = symtab_add(ctx->symtab, 0, 0, TYPE_STRUCT, 0, struct_size);
+                    var temp_addr: u64 = builder_new_lea_local(ctx, temp_offset);
+                    builder_emit_call_sret(ctx, (*AstCall)call_ptr, temp_addr);
+                    return temp_addr;
+                }
+            }
         }
         return builder_emit_call(ctx, (*AstCall)call_ptr, dst, 0);
     }
@@ -2455,6 +2464,15 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
             if (ret_ti2->type_kind == TYPE_VOID && ret_ti2->ptr_depth == 0) {
                 dst2 = 0;
             }
+            if (ret_ti2->type_kind == TYPE_STRUCT && ret_ti2->ptr_depth == 0) {
+                var struct_size2: u64 = sizeof_type(TYPE_STRUCT, 0, ret_ti2->struct_name_ptr, ret_ti2->struct_name_len);
+                if (struct_size2 > 16) {
+                    var temp_offset2: u64 = symtab_add(ctx->symtab, 0, 0, TYPE_STRUCT, 0, struct_size2);
+                    var temp_addr2: u64 = builder_new_lea_local(ctx, temp_offset2);
+                    builder_emit_call_ptr_sret(ctx, (*AstCallPtr)cp_ptr, temp_addr2);
+                    return temp_addr2;
+                }
+            }
         }
         return builder_emit_call_ptr(ctx, (*AstCallPtr)cp_ptr, dst2, 0);
     }
@@ -2467,6 +2485,15 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
             var ret_ti3: *TypeInfo = (*TypeInfo)ret_ti_ptr3;
             if (ret_ti3->type_kind == TYPE_VOID && ret_ti3->ptr_depth == 0) {
                 dst3 = 0;
+            }
+            if (ret_ti3->type_kind == TYPE_STRUCT && ret_ti3->ptr_depth == 0) {
+                var struct_size3: u64 = sizeof_type(TYPE_STRUCT, 0, ret_ti3->struct_name_ptr, ret_ti3->struct_name_len);
+                if (struct_size3 > 16) {
+                    var temp_offset3: u64 = symtab_add(ctx->symtab, 0, 0, TYPE_STRUCT, 0, struct_size3);
+                    var temp_addr3: u64 = builder_new_lea_local(ctx, temp_offset3);
+                    builder_emit_method_call_sret(ctx, (*AstMethodCall)mc_ptr, temp_addr3);
+                    return temp_addr3;
+                }
             }
         }
         return builder_emit_method_call(ctx, (*AstMethodCall)mc_ptr, dst3, 0);

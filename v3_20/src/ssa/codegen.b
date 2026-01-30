@@ -546,6 +546,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
     push_trace("_ssa_codegen_expr_supported", "ssa_codegen.b", __LINE__);
     pop_trace();
     if (node == 0) { return 1; }
+    if (node < 4096) { return 0; }
     var kind: u64 = ast_kind(node);
 
     if (kind == AST_LITERAL) { return 1; }
@@ -639,7 +640,6 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
             var fn: *AstFunc = (*AstFunc)fn_ptr;
             if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
                 var struct_size: u64 = sizeof_type(TYPE_STRUCT, 0, fn->ret_struct_name_ptr, fn->ret_struct_name_len);
-                if (struct_size > 16) { return 0; }
             }
         }
         return 1;
@@ -670,7 +670,6 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
             }
             i2 = i2 + 1;
         }
-        if (_ssa_codegen_call_ptr_returns_large_struct(node) != 0) { return 0; }
         return 1;
     }
 
@@ -745,11 +744,13 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
     push_trace("_ssa_codegen_stmt_supported", "ssa_codegen.b", __LINE__);
     pop_trace();
     if (node == 0) { return 1; }
+    if (node < 4096) { return 0; }
     var kind: u64 = ast_kind(node);
 
     if (kind == AST_BLOCK) {
         var blk: *AstBlock = (*AstBlock)node;
         var stmts: u64 = blk->stmts_vec;
+        if (stmts == 0) { return 1; }
         var n: u64 = vec_len(stmts);
         var i: u64 = 0;
         while (i < n) {
@@ -801,6 +802,7 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_EXPR_STMT) {
         var es: *AstExprStmt = (*AstExprStmt)node;
+        if (es->expr == 0) { return 1; }
         if (ast_kind(es->expr) == AST_CALL) {
             if (_ssa_codegen_call_returns_large_struct(es->expr) != 0) { return 1; }
         }
@@ -870,6 +872,7 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
 
     if (kind == AST_RETURN) {
         var ret: *AstReturn = (*AstReturn)node;
+        if (ret->expr == 0) { return 1; }
         if (ast_kind(ret->expr) == AST_CALL) {
             if (_ssa_codegen_call_returns_large_struct(ret->expr) != 0) { return 1; }
         }
@@ -889,12 +892,7 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
     pop_trace();
     if (fn_ptr == 0) { return 0; }
     var fn: *AstFunc = (*AstFunc)fn_ptr;
-    if (fn->name_len >= 4) {
-        if (*(*u8)fn->name_ptr == 115 && *(*u8)(fn->name_ptr + 1) == 116 &&
-            *(*u8)(fn->name_ptr + 2) == 100 && *(*u8)(fn->name_ptr + 3) == 95) {
-            return 0;
-        }
-    }
+    if (fn->body == 0) { return 0; }
 
     var params: u64 = fn->params_vec;
     if (params != 0) {

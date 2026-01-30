@@ -33,3 +33,9 @@
 - [x] Restore SSA fallback gating for AST-first workflow.
 - [x] Fix SSA struct-literal support gate (return 1 on success).
 - [x] Support unary bitwise NOT (~) in AST and SSA (with tests).
+- [x] Enable SSA for std_ functions (remove prefix gate).
+- [x] Support large-struct sret calls in SSA expressions.
+- [x] Guard SSA block support against empty stmt vectors.
+- [x] Add SSA support checks for invalid AST pointers.
+- [x] Skip SSA for signature-only functions (no body).
+- [x] Guard SSA stmt support against null expr in expr/return.
