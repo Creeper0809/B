@@ -546,7 +546,6 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
     push_trace("_ssa_codegen_expr_supported", "ssa_codegen.b", __LINE__);
     pop_trace();
     if (node == 0) { return 1; }
-    if (node < 4096) { return 0; }
     var kind: u64 = ast_kind(node);
 
     if (kind == AST_LITERAL) { return 1; }
@@ -744,7 +743,6 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
     push_trace("_ssa_codegen_stmt_supported", "ssa_codegen.b", __LINE__);
     pop_trace();
     if (node == 0) { return 1; }
-    if (node < 4096) { return 0; }
     var kind: u64 = ast_kind(node);
 
     if (kind == AST_BLOCK) {
@@ -892,7 +890,6 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
     pop_trace();
     if (fn_ptr == 0) { return 0; }
     var fn: *AstFunc = (*AstFunc)fn_ptr;
-    if (fn->body == 0) { return 0; }
 
     var params: u64 = fn->params_vec;
     if (params != 0) {

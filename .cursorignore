@@ -28,7 +28,5 @@ vendor/
 .git/
 .github/
 old/
-docs/
-pages/
 !docs/v3_19_todo.md
 !pages/devlog-2026-01-21.md

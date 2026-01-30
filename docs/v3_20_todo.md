@@ -36,6 +36,8 @@
 - [x] Enable SSA for std_ functions (remove prefix gate).
 - [x] Support large-struct sret calls in SSA expressions.
 - [x] Guard SSA block support against empty stmt vectors.
-- [x] Add SSA support checks for invalid AST pointers.
-- [x] Skip SSA for signature-only functions (no body).
+- [x] Allow SSA support checks without invalid-pointer gating.
+- [x] Allow SSA to accept signature-only functions (emit empty SSA func).
+- [x] Build SSA for std_ functions in builder path.
 - [x] Guard SSA stmt support against null expr in expr/return.
+- [x] Add implicit SSA return for fallthrough blocks.

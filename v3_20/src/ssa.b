@@ -74,6 +74,10 @@ func ssa_builder_build_func(ctx: *BuilderCtx, fn_ptr: u64) -> u64 {
     builder_reset_func(ctx);
     builder_add_params(ctx, fn);
     build_block(ctx, fn->body);
+    if (builder_block_is_terminated(ctx->cur_block) == 0) {
+        var ret_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET, 0, 0, 0);
+        ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr);
+    }
     pop_trace();
     return 0;
 }
@@ -94,7 +98,7 @@ func ssa_builder_build_program(prog: u64) -> u64 {
     while (i < count) {
         var fn_ptr: u64 = vec_get(funcs, i);
         var fn: *AstFunc = (*AstFunc)fn_ptr;
-        if (str_has_prefix(fn->name_ptr, fn->name_len, "std_", 4) != 0) {
+        if (fn->body == 0) {
             ssa_new_function(bctx->ssa_ctx, fn->name_ptr, fn->name_len);
         } else if (ssa_codegen_is_supported_func(fn_ptr, program->globals_vec) == 0) {
             ssa_new_function(bctx->ssa_ctx, fn->name_ptr, fn->name_len);

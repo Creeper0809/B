@@ -32,6 +32,10 @@ _43_ssa_method_call_expr__Pair_init:
     mov rsp, rbp
     pop rbp
     ret
+    xor eax, eax
+    mov rsp, rbp
+    pop rbp
+    ret
 _43_ssa_method_call_expr__Pair_sum:
     push rbp
     mov rbp, rsp

@@ -32,6 +32,10 @@ _16_struct_basic__set_point:
     mov rsp, rbp
     pop rbp
     ret
+    xor eax, eax
+    mov rsp, rbp
+    pop rbp
+    ret
 _16_struct_basic__get_sum:
     push rbp
     mov rbp, rsp

@@ -28,6 +28,10 @@ _42_ssa_method_call_ptr__Counter_init:
     mov rsp, rbp
     pop rbp
     ret
+    xor eax, eax
+    mov rsp, rbp
+    pop rbp
+    ret
 _42_ssa_method_call_ptr__Counter_add:
     push rbp
     mov rbp, rsp
@@ -44,6 +48,10 @@ _42_ssa_method_call_ptr__Counter_add:
     mov rcx, [rbx]
     add rax, rcx
     mov [rbx], rax
+    xor eax, eax
+    mov rsp, rbp
+    pop rbp
+    ret
     xor eax, eax
     mov rsp, rbp
     pop rbp
