@@ -269,6 +269,11 @@ std_str__str_concat:
     pop rax
     add rax, rbx
     push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
+    push rax
     pop rdi
     call std_io__heap_alloc
     mov [rbp-40], rax
@@ -346,6 +351,11 @@ std_str__str_concat3:
     mov rbx, rax
     pop rax
     add rax, rbx
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc

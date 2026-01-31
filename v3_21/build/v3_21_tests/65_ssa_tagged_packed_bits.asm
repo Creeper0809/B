@@ -196,6 +196,9 @@ std_str__str_concat:
     mov r9, 1
     mov r8, r8
     add r8, r9
+    mov r9, 1
+    mov r8, r8
+    imul r8, r9
     push rax
     push rbx
     push rcx
@@ -275,6 +278,9 @@ std_str__str_concat3:
     mov r11, 1
     mov r10, r10
     add r10, r11
+    mov r11, 1
+    mov r10, r10
+    imul r10, r11
     push rax
     push rbx
     push rcx

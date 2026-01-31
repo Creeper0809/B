@@ -18,3 +18,4 @@
 - [x] Refactor emitter/emitter state allocations and loop styles.
 - [x] Normalize std/path allocations with sizeof(u8).
 - [x] Convert compiler module-id helper loops to for.
+- [x] Normalize std/str concat allocations with sizeof(u8).

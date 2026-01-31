@@ -23,7 +23,7 @@ func str_len(s) {
 }
 
 func str_concat(s1, len1, s2, len2) {
-    var result = heap_alloc(len1 + len2 + 1);
+    var result = heap_alloc((len1 + len2 + 1) * sizeof(u8));
     str_copy(result, s1, len1);
     str_copy(result + len1, s2, len2);
     *(*u8)(result + len1 + len2) = 0;
@@ -31,7 +31,7 @@ func str_concat(s1, len1, s2, len2) {
 }
 
 func str_concat3(s1, len1, s2, len2, s3, len3) {
-    var result = heap_alloc(len1 + len2 + len3 + 1);
+    var result = heap_alloc((len1 + len2 + len3 + 1) * sizeof(u8));
     str_copy(result, s1, len1);
     str_copy(result + len1, s2, len2);
     str_copy(result + len1 + len2, s3, len3);
