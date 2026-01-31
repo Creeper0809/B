@@ -48,3 +48,7 @@
 - [x] Normalize std/string_builder buffer allocations with sizeof(u8).
 - [x] Refactor codegen call-collector counted loops to for.
 - [x] Normalize emitter/gen_stmt heap_brk global info allocation.
+- [x] Normalize emitter/gen_expr method name buffer allocation and loops.
+- [x] Normalize ssa/codegen heap_brk global info allocation.
+- [x] Normalize parser/decl global info allocation with sizeof(GlobalInfo).
+- [x] Convert compiler config copy loop to for.

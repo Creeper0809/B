@@ -271,9 +271,10 @@ func _ssa_ensure_heap_brk_global() -> u64 {
     var globals: u64 = emitter_get_globals();
     if (globals == 0) { return 0; }
     if (is_global_var("__cg_heap_brk", 13) != 0) { return 0; }
-    var ginfo: u64 = heap_alloc(16);
-    *(ginfo) = "__cg_heap_brk";
-    *(ginfo + 8) = 13;
+    var ginfo: u64 = heap_alloc(2 * sizeof(u64));
+    var ginfo_u64: *u64 = (*u64)ginfo;
+    *(ginfo_u64 + 0) = "__cg_heap_brk";
+    *(ginfo_u64 + 1) = 13;
     vec_push(globals, ginfo);
     return 0;
 }

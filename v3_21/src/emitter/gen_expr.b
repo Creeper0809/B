@@ -1183,17 +1183,13 @@ func cg_method_call(node: u64, symtab: u64) -> u64 {
     
     // Call StructName_method()
     var full_len: u64 = struct_name_len + 1 + method_len;
-    var full_ptr: u64 = heap_alloc(full_len + 1);
-    var i: u64 = 0;
-    while (i < struct_name_len) {
+    var full_ptr: u64 = heap_alloc((full_len + 1) * sizeof(u8));
+    for (var i: u64 = 0; i < struct_name_len; i++) {
         *(*u8)(full_ptr + i) = *(*u8)(struct_name_ptr + i);
-        i = i + 1;
     }
     *(*u8)(full_ptr + struct_name_len) = 95;
-    var j: u64 = 0;
-    while (j < method_len) {
+    for (var j: u64 = 0; j < method_len; j++) {
         *(*u8)(full_ptr + struct_name_len + 1 + j) = *(*u8)(method_ptr + j);
-        j = j + 1;
     }
     *(*u8)(full_ptr + full_len) = 0;
 

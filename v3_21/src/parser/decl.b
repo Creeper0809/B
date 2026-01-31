@@ -732,7 +732,7 @@ func parse_program(p: u64) -> u64 {
             
             parse_consume(p, TOKEN_IDENTIFIER);
             parse_consume(p, TOKEN_SEMICOLON);
-            var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(16);
+            var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(sizeof(GlobalInfo));
             ginfo->name_ptr = ((*Token)tok)->ptr;
             ginfo->name_len = ((*Token)tok)->len;
             vec_push(globals, ginfo);

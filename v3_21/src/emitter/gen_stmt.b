@@ -37,85 +37,64 @@ func cg_stmt(node: u64) -> u64 {
     var kind: u64 = ast_kind(node);
     var symtab: u64 = emitter_get_symtab();
     var g_structs_vec: u64 = typeinfo_get_structs();
-    
-    if (kind == AST_RETURN) {
-        cg_return_stmt(node, symtab);
-        return;
-    }
-    
-    if (kind == AST_VAR_DECL) {
-        cg_var_decl_stmt(node, symtab, g_structs_vec);
-        return;
-    }
-    
-    if (kind == AST_ASSIGN) {
-        cg_assign_stmt(node, symtab);
-        return;
-    }
-    
-    if (kind == AST_EXPR_STMT) {
-        var expr_stmt: *AstExprStmt = (*AstExprStmt)node;
-        var expr: u64 = expr_stmt->expr;
-        cg_expr(expr);
-        return;
-    }
-    
-    if (kind == AST_IF) {
-        cg_if_stmt(node);
-        return;
-    }
-    
-    if (kind == AST_WHILE) {
-        cg_while_stmt(node);
-        return;
-    }
-    
-    if (kind == AST_FOR) {
-        cg_for_stmt(node);
-        return;
-    }
-    
-    if (kind == AST_SWITCH) {
-        cg_switch_stmt(node);
-        return;
-    }
-    
-    if (kind == AST_BREAK) {
-        var g_loop_labels: u64 = emitter_get_loop_labels();
-        var len: u64 = vec_len(g_loop_labels);
-        if (len == 0) {
-            emit("    ; ERROR: break outside loop\n", 29);
-            panic();
-        }
-        var label: u64 = vec_get(g_loop_labels, len - 1);
-        emit("    jmp ", 8);
-        emit_label(label);
-        emit_nl();
-        return;
-    }
 
-    if (kind == AST_CONTINUE) {
-        var g_loop_continue_labels: u64 = emitter_get_continue_labels();
-        var len: u64 = vec_len(g_loop_continue_labels);
-        if (len == 0) {
-            emit("    ; ERROR: continue outside loop\n", 32);
-            panic();
-        }
-        var label: u64 = vec_get(g_loop_continue_labels, len - 1);
-        emit("    jmp ", 8);
-        emit_label(label);
-        emit_nl();
-        return;
-    }
-    
-    if (kind == AST_ASM) {
-        cg_asm_stmt(node);
-        return;
-    }
-    
-    if (kind == AST_BLOCK) {
-        cg_block(node);
-        return;
+    switch (kind) {
+        case AST_RETURN:
+            cg_return_stmt(node, symtab);
+            return;
+        case AST_VAR_DECL:
+            cg_var_decl_stmt(node, symtab, g_structs_vec);
+            return;
+        case AST_ASSIGN:
+            cg_assign_stmt(node, symtab);
+            return;
+        case AST_EXPR_STMT:
+            var expr_stmt: *AstExprStmt = (*AstExprStmt)node;
+            var expr: u64 = expr_stmt->expr;
+            cg_expr(expr);
+            return;
+        case AST_IF:
+            cg_if_stmt(node);
+            return;
+        case AST_WHILE:
+            cg_while_stmt(node);
+            return;
+        case AST_FOR:
+            cg_for_stmt(node);
+            return;
+        case AST_SWITCH:
+            cg_switch_stmt(node);
+            return;
+        case AST_BREAK:
+            var g_loop_labels: u64 = emitter_get_loop_labels();
+            var len: u64 = vec_len(g_loop_labels);
+            if (len == 0) {
+                emit("    ; ERROR: break outside loop\n", 29);
+                panic();
+            }
+            var label: u64 = vec_get(g_loop_labels, len - 1);
+            emit("    jmp ", 8);
+            emit_label(label);
+            emit_nl();
+            return;
+        case AST_CONTINUE:
+            var g_loop_continue_labels: u64 = emitter_get_continue_labels();
+            var len2: u64 = vec_len(g_loop_continue_labels);
+            if (len2 == 0) {
+                emit("    ; ERROR: continue outside loop\n", 32);
+                panic();
+            }
+            var label2: u64 = vec_get(g_loop_continue_labels, len2 - 1);
+            emit("    jmp ", 8);
+            emit_label(label2);
+            emit_nl();
+            return;
+        case AST_ASM:
+            cg_asm_stmt(node);
+            return;
+        case AST_BLOCK:
+            cg_block(node);
+            return;
     }
 }
 
@@ -124,8 +103,9 @@ func emit_call_resolved(name_ptr: u64, name_len: u64) -> u64 {
     var resolved_len: u64 = name_len;
     var resolved: u64 = resolve_name(name_ptr, name_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = info->ptr;
+        resolved_len = info->len;
     }
     emit("    call ", 9);
     emit(resolved_ptr, resolved_len);
@@ -203,8 +183,7 @@ func cg_return_stmt(node: u64, symtab: u64) -> u64 {
                     var vcount2: u64 = 0;
                     if (values2 != 0) { vcount2 = vec_len(values2); }
                     var off: u64 = 0;
-                    var i2: u64 = 0;
-                    while (i2 < vcount2) {
+                    for (var i2: u64 = 0; i2 < vcount2; i2++) {
                         emit("    push rdi\n", 13);
                         cg_expr(vec_get(values2, i2));
                         emit("    pop rdi\n", 12);
@@ -212,15 +191,13 @@ func cg_return_stmt(node: u64, symtab: u64) -> u64 {
                         if (off != 0) { emit("+", 1); emit_u64(off); }
                         emit("], rax\n", 7);
                         off = off + 8;
-                        i2 = i2 + 1;
                     }
                     if (off < struct_size) {
                         emit("    xor eax, eax\n", 17);
-                        while (off < struct_size) {
+                        for (var fill_off: u64 = off; fill_off < struct_size; fill_off = fill_off + 8) {
                             emit("    mov [rdi", 12);
-                            if (off != 0) { emit("+", 1); emit_u64(off); }
+                            if (fill_off != 0) { emit("+", 1); emit_u64(fill_off); }
                             emit("], rax\n", 7);
-                            off = off + 8;
                         }
                     }
                 } else {
@@ -228,15 +205,13 @@ func cg_return_stmt(node: u64, symtab: u64) -> u64 {
                     cg_lvalue(expr);
                     emit("    mov rbx, rax\n", 19);
                     emit("    pop rdi\n", 12);
-                    var off2: u64 = 0;
-                    while (off2 < struct_size) {
+                    for (var off2: u64 = 0; off2 < struct_size; off2 = off2 + 8) {
                         emit("    mov rax, [rbx", 18);
                         if (off2 != 0) { emit("+", 1); emit_u64(off2); }
                         emit("]\n", 2);
                         emit("    mov [rdi", 12);
                         if (off2 != 0) { emit("+", 1); emit_u64(off2); }
                         emit("], rax\n", 7);
-                        off2 = off2 + 8;
                     }
                 }
                 emit("    mov rsp, rbp\n", 17);
@@ -994,8 +969,7 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
                 
                 // Now: rax = source address, r8 = dest address
                 // Copy struct_size bytes (8 bytes at a time)
-                var off: u64 = 0;
-                while (off < struct_size) {
+                for (var off: u64 = 0; off < struct_size; off = off + 8) {
                     emit("    mov rcx, [rax", 17);
                     if (off > 0) {
                         emit("+", 1);
@@ -1008,7 +982,6 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
                         emit_u64(off);
                     }
                     emit("], rcx\n", 7);
-                    off = off + 8;
                 }
                 return;
             }
@@ -1076,10 +1049,8 @@ func cg_while_stmt(node: u64) -> u64 {
     
     cg_block(body);
     
-    var len: u64 = vec_len(g_loop_labels);
-    *(g_loop_labels + 8) = len - 1;  // Set length
-    len = vec_len(g_loop_continue_labels);
-    *(g_loop_continue_labels + 8) = len - 1;  // Set length
+    vec_pop(g_loop_labels);
+    vec_pop(g_loop_continue_labels);
     
     emit("    jmp ", 8);
     emit_label(start_label);
@@ -1118,10 +1089,8 @@ func cg_for_stmt(node: u64) -> u64 {
     
     cg_block(body);
     
-    var labels_len: u64 = vec_len(g_loop_labels);
-    *(g_loop_labels + 8) = labels_len - 1;
-    labels_len = vec_len(g_loop_continue_labels);
-    *(g_loop_continue_labels + 8) = labels_len - 1;
+    vec_pop(g_loop_labels);
+    vec_pop(g_loop_continue_labels);
     
     emit_label_def(update_label);
     
@@ -1159,8 +1128,7 @@ func cg_switch_stmt(node: u64) -> u64 {
     var case_count: u64 = 0;
     
     // Count non-default cases and find min/max values
-    var i: u64 = 0;
-    while (i < num_cases) {
+    for (var i: u64 = 0; i < num_cases; i++) {
         var case_node: u64 = vec_get(cases, i);
         var case_stmt: *AstCase = (*AstCase)case_node;
         
@@ -1186,7 +1154,6 @@ func cg_switch_stmt(node: u64) -> u64 {
             has_default = 1;
         }
         
-        i = i + 1;
     }
     
     // Use jump table if: 3+ cases, range <= 256, density > 40%
@@ -1205,8 +1172,7 @@ func cg_switch_stmt(node: u64) -> u64 {
     }
     
     // Pop end_label from g_loop_labels
-    var len: u64 = vec_len(g_loop_labels);
-    *(g_loop_labels + 8) = len - 1;
+    vec_pop(g_loop_labels);
     
     emit_label_def(end_label);
 }
@@ -1221,8 +1187,7 @@ func cg_switch_linear(cases: u64, end_label: u64, has_default: u64) -> u64 {
     
     // First pass: generate comparisons and find default
     var case_labels: u64 = vec_new(num_cases);
-    var i: u64 = 0;
-    while (i < num_cases) {
+    for (var i: u64 = 0; i < num_cases; i++) {
         var case_node: u64 = vec_get(cases, i);
         var case_stmt: *AstCase = (*AstCase)case_node;
         var is_default: u64 = case_stmt->is_default;
@@ -1284,7 +1249,6 @@ func cg_switch_linear(cases: u64, end_label: u64, has_default: u64) -> u64 {
             }
         }
         
-        i = i + 1;
     }
     
     // If no match, jump to default or end
@@ -1299,8 +1263,7 @@ func cg_switch_linear(cases: u64, end_label: u64, has_default: u64) -> u64 {
     }
     
     // Second pass: generate case bodies
-    i = 0;
-    while (i < num_cases) {
+    for (var i: u64 = 0; i < num_cases; i++) {
         var case_node: u64 = vec_get(cases, i);
         var case_stmt: *AstCase = (*AstCase)case_node;
         var body: u64 = case_stmt->body;
@@ -1309,7 +1272,6 @@ func cg_switch_linear(cases: u64, end_label: u64, has_default: u64) -> u64 {
         emit_label_def(case_label);
         cg_block(body);
         
-        i = i + 1;
     }
     
     emit("    add rsp, 8    ; pop switch value\n", 37);
@@ -1327,15 +1289,12 @@ func cg_switch_jump_table(cases: u64, min_val: i64, max_val: i64, end_label: u64
     var value_to_label: u64 = vec_new((u64)range);
     
     // Initialize all table entries to default
-    var j: u64 = 0;
-    while (j < (u64)range) {
+    for (var j: u64 = 0; j < (u64)range; j++) {
         vec_push(value_to_label, end_label);
-        j = j + 1;
     }
     
     // First pass: create labels and build value->label mapping
-    var i: u64 = 0;
-    while (i < num_cases) {
+    for (var i: u64 = 0; i < num_cases; i++) {
         var case_node: u64 = vec_get(cases, i);
         var case_stmt: *AstCase = (*AstCase)case_node;
         var case_label: u64 = new_label();
@@ -1344,12 +1303,10 @@ func cg_switch_jump_table(cases: u64, min_val: i64, max_val: i64, end_label: u64
         if (case_stmt->is_default == 1) {
             default_label = case_label;
             // Update all unassigned entries to point to default
-            j = 0;
-            while (j < (u64)range) {
+            for (var j: u64 = 0; j < (u64)range; j++) {
                 if (vec_get(value_to_label, j) == end_label) {
                     vec_set(value_to_label, j, default_label);
                 }
-                j = j + 1;
             }
         } else {
             var value_node: u64 = case_stmt->value;
@@ -1362,7 +1319,6 @@ func cg_switch_jump_table(cases: u64, min_val: i64, max_val: i64, end_label: u64
             }
         }
         
-        i = i + 1;
     }
     
     // Generate bounds check and jump table lookup
@@ -1395,18 +1351,15 @@ func cg_switch_jump_table(cases: u64, min_val: i64, max_val: i64, end_label: u64
     // Emit jump table
     emit_nl();
     emit_label_def(table_label);
-    j = 0;
-    while (j < (u64)range) {
+    for (var j: u64 = 0; j < (u64)range; j++) {
         emit("    dq ", 7);
         emit_label(vec_get(value_to_label, j));
         emit_nl();
-        j = j + 1;
     }
     emit_nl();
     
     // Second pass: generate case bodies
-    i = 0;
-    while (i < num_cases) {
+    for (var i: u64 = 0; i < num_cases; i++) {
         var case_node: u64 = vec_get(cases, i);
         var case_stmt: *AstCase = (*AstCase)case_node;
         var body: u64 = case_stmt->body;
@@ -1415,7 +1368,6 @@ func cg_switch_jump_table(cases: u64, min_val: i64, max_val: i64, end_label: u64
         emit_label_def(case_label);
         cg_block(body);
         
-        i = i + 1;
     }
 }
 
@@ -1424,9 +1376,8 @@ func cg_asm_stmt(node: u64) -> u64 {
     var text_vec: u64 = asm_stmt->text_vec;
     var asm_len: u64 = vec_len(text_vec);
     
-    var i: u64 = 0;
     var at_line_start: u64 = 1;
-    while (i < asm_len) {
+    for (var i: u64 = 0; i < asm_len; i++) {
         var ch: u64 = vec_get(text_vec, i);
         if (ch == 10) {
             emit_nl();
@@ -1438,7 +1389,6 @@ func cg_asm_stmt(node: u64) -> u64 {
             }
             emit_char(ch);
         }
-        i = i + 1;
     }
     emit_nl();
 }

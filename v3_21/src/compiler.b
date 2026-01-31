@@ -110,10 +110,8 @@ func find_line_starting_with(content: u64, content_len: u64, prefix: u64, prefix
 
                 // Allocate and copy value
                 var value: u64 = heap_alloc((value_len + 1) * sizeof(u8));
-                var j: u64 = 0;
-                while (j < value_len) {
+                for (var j: u64 = 0; j < value_len; j++) {
                     *(*u8)(value + j) = *(*u8)(content + value_start + j);
-                    j = j + 1;
                 }
                 *(*u8)(value + value_len) = 0;
                 return value;
