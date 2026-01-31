@@ -36,7 +36,7 @@ func hashmap_new(capacity) {
     }
     var map: *HashMap = (*HashMap)heap_alloc(sizeof(HashMap));
     var bytes: u64 = cap * sizeof(HashEntry);
-    var entries: u64 = heap_alloc(bytes);
+    var entries: u64 = heap_alloc(cap * sizeof(HashEntry));
     
     for (var i: u64 = 0; i < bytes; i++) {
         *(*u8)(entries + i) = 0;
@@ -84,7 +84,7 @@ func hashmap_grow(map) {
 
     var new_cap: u64 = old_cap * 2;
     var new_bytes: u64 = new_cap * sizeof(HashEntry);
-    var new_entries: u64 = heap_alloc(new_bytes);
+    var new_entries: u64 = heap_alloc(new_cap * sizeof(HashEntry));
 
     for (var i: u64 = 0; i < new_bytes; i++) {
         *(*u8)(new_entries + i) = 0;

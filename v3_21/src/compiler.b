@@ -16,6 +16,15 @@ import parser.decl;
 struct NameInfoLocal { ptr: u64; len: u64; }
 struct ExportEntryLocal { name_ptr: u64; name_len: u64; mangled_ptr: u64; mangled_len: u64; }
 struct ConstResultLocal { found: u64; value: u64; }
+struct StatLocal {
+    pad0: u64;
+    pad1: u64;
+    pad2: u64;
+    pad3: u64;
+    pad4: u64;
+    pad5: u64;
+    size: u64;
+}
 
 // ============================================
 // Global Module State
@@ -49,14 +58,15 @@ func read_entire_file(path: u64) -> u64 {
     var fd: u64 = sys_open(path, 0, 0);
     if (fd < 0) { return 0; }
 
-    var statbuf: u64 = heap_alloc(144 * sizeof(u8));
-    sys_fstat(fd, statbuf);
-    var size: u64 = *(statbuf + 48);
+    var statbuf_raw: u64 = heap_alloc(144 * sizeof(u8));
+    var statbuf: *StatLocal = (*StatLocal)statbuf_raw;
+    sys_fstat(fd, statbuf_raw);
+    var size: u64 = statbuf->size;
 
     var buf: u64 = heap_alloc((size + 1) * sizeof(u8));
 
     var total: u64 = 0;
-    while (total < size) {
+    for (; total < size; ) {
         var n: u64 = sys_read(fd, buf + total, size - total);
         if (n <= 0) { break; }
         total = total + n;
@@ -86,17 +96,14 @@ func compiler_get_source_len() -> u64 {
 
 // Simple line-by-line config parser
 func find_line_starting_with(content: u64, content_len: u64, prefix: u64, prefix_len: u64) -> u64 {
-    var i: u64 = 0;
-
-    while (i < content_len) {
+    for (var i: u64 = 0; i < content_len; ) {
         // Find start of current line
         var line_start: u64 = i;
 
         // Find end of line
         var line_end: u64 = i;
-        while (line_end < content_len) {
+        for (; line_end < content_len; line_end++) {
             if (*(*u8)(content + line_end) == 10) { break; }
-            line_end = line_end + 1;
         }
 
         var line_len: u64 = line_end - line_start;

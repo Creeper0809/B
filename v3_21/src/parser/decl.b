@@ -181,14 +181,19 @@ func parse_skip_block(p: u64) -> u64 {
     var depth: u64 = 1;
     while (depth > 0) {
         var k: u64 = parse_peek_kind(p);
-        if (k == TOKEN_EOF) {
-            emit_stderr("[ERROR] Unexpected EOF while skipping block\n", 46);
-            panic("Parse error");
-        }
-        if (k == TOKEN_LBRACE) {
-            depth = depth + 1;
-        } else if (k == TOKEN_RBRACE) {
-            depth = depth - 1;
+        switch (k) {
+            case TOKEN_EOF:
+                emit_stderr("[ERROR] Unexpected EOF while skipping block\n", 46);
+                panic("Parse error");
+                break;
+            case TOKEN_LBRACE:
+                depth = depth + 1;
+                break;
+            case TOKEN_RBRACE:
+                depth = depth - 1;
+                break;
+            default:
+                break;
         }
         parse_adv(p);
     }
@@ -232,7 +237,7 @@ func parse_param(p: u64) -> u64 {
         }
     }
     
-    var param: *Param = (*Param)heap_alloc(SIZEOF_PARAM);
+    var param: *Param = (*Param)heap_alloc(sizeof(Param));
     param->name_ptr = ((*Token)name_tok)->ptr;
     param->name_len = ((*Token)name_tok)->len;
     param->type_kind = type_kind;
@@ -420,37 +425,43 @@ func parse_struct_def(p: u64) -> u64 {
 
         if (is_packed == 1) {
             var k: u64 = parse_peek_kind(p);
-            if (k == TOKEN_U8) {
-                parse_adv(p);
-                field_type_kind = TYPE_U8;
-                field_bit_width = 8;
-            } else if (k == TOKEN_U16) {
-                parse_adv(p);
-                field_type_kind = TYPE_U16;
-                field_bit_width = 16;
-            } else if (k == TOKEN_U32) {
-                parse_adv(p);
-                field_type_kind = TYPE_U32;
-                field_bit_width = 32;
-            } else if (k == TOKEN_U64) {
-                parse_adv(p);
-                field_type_kind = TYPE_U64;
-                field_bit_width = 64;
-            } else if (k == TOKEN_IDENTIFIER) {
-                var bw_tok: u64 = parse_peek(p);
-                var bw_ptr: u64 = ((*Token)bw_tok)->ptr;
-                var bw_len: u64 = ((*Token)bw_tok)->len;
-                parse_adv(p);
-                var bw: u64 = parse_uwidth_from_ident(bw_ptr, bw_len);
-                if (bw == 0 || bw > 64) {
+            switch (k) {
+                case TOKEN_U8:
+                    parse_adv(p);
+                    field_type_kind = TYPE_U8;
+                    field_bit_width = 8;
+                    break;
+                case TOKEN_U16:
+                    parse_adv(p);
+                    field_type_kind = TYPE_U16;
+                    field_bit_width = 16;
+                    break;
+                case TOKEN_U32:
+                    parse_adv(p);
+                    field_type_kind = TYPE_U32;
+                    field_bit_width = 32;
+                    break;
+                case TOKEN_U64:
+                    parse_adv(p);
+                    field_type_kind = TYPE_U64;
+                    field_bit_width = 64;
+                    break;
+                case TOKEN_IDENTIFIER:
+                    var bw_tok: u64 = parse_peek(p);
+                    var bw_ptr: u64 = ((*Token)bw_tok)->ptr;
+                    var bw_len: u64 = ((*Token)bw_tok)->len;
+                    parse_adv(p);
+                    var bw: u64 = parse_uwidth_from_ident(bw_ptr, bw_len);
+                    if (bw == 0 || bw > 64) {
+                        emit_stderr("[ERROR] packed field must be u1..u64\n", 43);
+                        panic("Parse error");
+                    }
+                    field_type_kind = TYPE_U64;
+                    field_bit_width = bw;
+                    break;
+                default:
                     emit_stderr("[ERROR] packed field must be u1..u64\n", 43);
                     panic("Parse error");
-                }
-                field_type_kind = TYPE_U64;
-                field_bit_width = bw;
-            } else {
-                emit_stderr("[ERROR] packed field must be u1..u64\n", 43);
-                panic("Parse error");
             }
         } else {
             var field_type: *TypeInfo = (*TypeInfo)parse_type_ex(p);
@@ -468,7 +479,7 @@ func parse_struct_def(p: u64) -> u64 {
         
         parse_consume(p, TOKEN_SEMICOLON);
         
-        var field_desc: *FieldDesc = (*FieldDesc)heap_alloc(SIZEOF_FIELD_DESC);
+        var field_desc: *FieldDesc = (*FieldDesc)heap_alloc(sizeof(FieldDesc));
         field_desc->name_ptr = field_name_ptr;
         field_desc->name_len = field_name_len;
         field_desc->type_kind =  field_type_kind;
@@ -705,43 +716,52 @@ func parse_program(p: u64) -> u64 {
     
     while (parse_peek_kind(p) != TOKEN_EOF) {
         var k: u64 = parse_peek_kind(p);
-        if (k == TOKEN_FUNC) {
-            vec_push(funcs, parse_func_decl(p));
-        } else if (k == TOKEN_CONST) {
-            vec_push(consts, parse_const_decl(p));
-        } else if (k == TOKEN_ENUM) {
-            // Enum을 여러 const로 변환
-            var enum_consts: u64 = parse_enum_def(p);
-            var num_enum_consts: u64 = vec_len(enum_consts);
-            for (var i: u64 = 0; i < num_enum_consts; i++) {
-                vec_push(consts, vec_get(enum_consts, i));
-            }
-        } else if (k == TOKEN_STRUCT || k == TOKEN_PACKED) {
-            var struct_def: u64 = parse_struct_def(p);
-            vec_push(structs, struct_def);
-            register_struct_type(struct_def);  // Register immediately for type checking
-        } else if (k == TOKEN_IMPL) {
-            // impl 블록: 내부 함수들을 StructName_methodName으로 변환
-            var impl_funcs: u64 = parse_impl_block(p);
-            var num_impl_funcs: u64 = vec_len(impl_funcs);
-            for (var i: u64 = 0; i < num_impl_funcs; i++) {
-                vec_push(funcs, vec_get(impl_funcs, i));
-            }
-        } else if (k == TOKEN_VAR) {
-            parse_consume(p, TOKEN_VAR);
-            var tok: u64 = parse_peek(p);
-            
-            parse_consume(p, TOKEN_IDENTIFIER);
-            parse_consume(p, TOKEN_SEMICOLON);
-            var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(sizeof(GlobalInfo));
-            ginfo->name_ptr = ((*Token)tok)->ptr;
-            ginfo->name_len = ((*Token)tok)->len;
-            vec_push(globals, ginfo);
-        } else if (k == TOKEN_IMPORT) {
-            vec_push(imports, parse_import_decl(p));
-        } else {
-            emit_stderr("[ERROR] Expected function, const, or import\n", 45);
-            break;
+        switch (k) {
+            case TOKEN_FUNC:
+                vec_push(funcs, parse_func_decl(p));
+                break;
+            case TOKEN_CONST:
+                vec_push(consts, parse_const_decl(p));
+                break;
+            case TOKEN_ENUM:
+                // Enum을 여러 const로 변환
+                var enum_consts: u64 = parse_enum_def(p);
+                var num_enum_consts: u64 = vec_len(enum_consts);
+                for (var i: u64 = 0; i < num_enum_consts; i++) {
+                    vec_push(consts, vec_get(enum_consts, i));
+                }
+                break;
+            case TOKEN_STRUCT:
+            case TOKEN_PACKED:
+                var struct_def: u64 = parse_struct_def(p);
+                vec_push(structs, struct_def);
+                register_struct_type(struct_def);  // Register immediately for type checking
+                break;
+            case TOKEN_IMPL:
+                // impl 블록: 내부 함수들을 StructName_methodName으로 변환
+                var impl_funcs: u64 = parse_impl_block(p);
+                var num_impl_funcs: u64 = vec_len(impl_funcs);
+                for (var i: u64 = 0; i < num_impl_funcs; i++) {
+                    vec_push(funcs, vec_get(impl_funcs, i));
+                }
+                break;
+            case TOKEN_VAR:
+                parse_consume(p, TOKEN_VAR);
+                var tok: u64 = parse_peek(p);
+
+                parse_consume(p, TOKEN_IDENTIFIER);
+                parse_consume(p, TOKEN_SEMICOLON);
+                var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(sizeof(GlobalInfo));
+                ginfo->name_ptr = ((*Token)tok)->ptr;
+                ginfo->name_len = ((*Token)tok)->len;
+                vec_push(globals, ginfo);
+                break;
+            case TOKEN_IMPORT:
+                vec_push(imports, parse_import_decl(p));
+                break;
+            default:
+                emit_stderr("[ERROR] Expected function, const, or import\n", 45);
+                break;
         }
     }
     
@@ -766,48 +786,61 @@ func parse_program_pass1(p: u64) -> u64 {
 
     while (parse_peek_kind(p) != TOKEN_EOF) {
         var k: u64 = parse_peek_kind(p);
-        if (k == TOKEN_FUNC) {
-            vec_push(funcs, parse_func_decl_signature(p));
-        } else if (k == TOKEN_IMPL) {
-            var impl_funcs: u64 = parse_impl_block_signature(p);
-            var num_impl_funcs: u64 = vec_len(impl_funcs);
-            for (var i: u64 = 0; i < num_impl_funcs; i++) {
-                vec_push(funcs, vec_get(impl_funcs, i));
-            }
-        } else if (k == TOKEN_STRUCT || k == TOKEN_PACKED) {
-            if (k == TOKEN_PACKED) { parse_adv(p); }
-            parse_consume(p, TOKEN_STRUCT);
-            parse_consume(p, TOKEN_IDENTIFIER);
-            parse_skip_block(p);
-        } else if (k == TOKEN_ENUM) {
-            parse_consume(p, TOKEN_ENUM);
-            parse_consume(p, TOKEN_IDENTIFIER);
-            parse_skip_block(p);
-        } else if (k == TOKEN_CONST) {
-            // const 선언은 ; 까지 스킵
-            parse_consume(p, TOKEN_CONST);
-            parse_consume(p, TOKEN_IDENTIFIER);
-            if (parse_match(p, TOKEN_EQ)) {
+        switch (k) {
+            case TOKEN_FUNC:
+                vec_push(funcs, parse_func_decl_signature(p));
+                break;
+            case TOKEN_IMPL:
+                var impl_funcs: u64 = parse_impl_block_signature(p);
+                var num_impl_funcs: u64 = vec_len(impl_funcs);
+                for (var i: u64 = 0; i < num_impl_funcs; i++) {
+                    vec_push(funcs, vec_get(impl_funcs, i));
+                }
+                break;
+            case TOKEN_STRUCT:
+                parse_consume(p, TOKEN_STRUCT);
+                parse_consume(p, TOKEN_IDENTIFIER);
+                parse_skip_block(p);
+                break;
+            case TOKEN_PACKED:
+                parse_adv(p);
+                parse_consume(p, TOKEN_STRUCT);
+                parse_consume(p, TOKEN_IDENTIFIER);
+                parse_skip_block(p);
+                break;
+            case TOKEN_ENUM:
+                parse_consume(p, TOKEN_ENUM);
+                parse_consume(p, TOKEN_IDENTIFIER);
+                parse_skip_block(p);
+                break;
+            case TOKEN_CONST:
+                // const 선언은 ; 까지 스킵
+                parse_consume(p, TOKEN_CONST);
+                parse_consume(p, TOKEN_IDENTIFIER);
+                if (parse_match(p, TOKEN_EQ)) {
+                    while (parse_peek_kind(p) != TOKEN_SEMICOLON && parse_peek_kind(p) != TOKEN_EOF) {
+                        parse_adv(p);
+                    }
+                }
+                parse_consume(p, TOKEN_SEMICOLON);
+                break;
+            case TOKEN_IMPORT:
+                // import 선언은 ; 까지 스킵
+                parse_consume(p, TOKEN_IMPORT);
                 while (parse_peek_kind(p) != TOKEN_SEMICOLON && parse_peek_kind(p) != TOKEN_EOF) {
                     parse_adv(p);
                 }
-            }
-            parse_consume(p, TOKEN_SEMICOLON);
-        } else if (k == TOKEN_IMPORT) {
-            // import 선언은 ; 까지 스킵
-            parse_consume(p, TOKEN_IMPORT);
-            while (parse_peek_kind(p) != TOKEN_SEMICOLON && parse_peek_kind(p) != TOKEN_EOF) {
-                parse_adv(p);
-            }
-            parse_consume(p, TOKEN_SEMICOLON);
-        } else if (k == TOKEN_VAR) {
-            // 전역 var 선언은 ; 까지 스킵
-            parse_consume(p, TOKEN_VAR);
-            parse_consume(p, TOKEN_IDENTIFIER);
-            parse_consume(p, TOKEN_SEMICOLON);
-        } else {
-            emit_stderr("[ERROR] Expected function, const, or import\n", 45);
-            break;
+                parse_consume(p, TOKEN_SEMICOLON);
+                break;
+            case TOKEN_VAR:
+                // 전역 var 선언은 ; 까지 스킵
+                parse_consume(p, TOKEN_VAR);
+                parse_consume(p, TOKEN_IDENTIFIER);
+                parse_consume(p, TOKEN_SEMICOLON);
+                break;
+            default:
+                emit_stderr("[ERROR] Expected function, const, or import\n", 45);
+                break;
         }
     }
 

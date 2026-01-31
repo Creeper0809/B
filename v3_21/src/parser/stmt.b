@@ -92,18 +92,24 @@ func parse_var_decl(p: u64) -> u64 {
 
 func is_assignable_expr(expr: u64) -> u64 {
     var k: u64 = ast_kind(expr);
-    if (k == AST_IDENT) { return 1; }
-    if (k == AST_DEREF) { return 1; }
-    if (k == AST_DEREF8) { return 1; }
-    return 0;
+    switch (k) {
+        case AST_IDENT: return 1;
+        case AST_DEREF: return 1;
+        case AST_DEREF8: return 1;
+        default: return 0;
+    }
 }
 
 func make_incdec_rhs(incdec_kind: u64, target: u64) -> u64 {
     var one: u64 = ast_literal(1);
-    if (incdec_kind == TOKEN_PLUSPLUS) {
-        return ast_binary(TOKEN_PLUS, target, one);
+    switch (incdec_kind) {
+        case TOKEN_PLUSPLUS:
+            return ast_binary(TOKEN_PLUS, target, one);
+        case TOKEN_MINUSMINUS:
+            return ast_binary(TOKEN_MINUS, target, one);
+        default:
+            return ast_binary(TOKEN_MINUS, target, one);
     }
-    return ast_binary(TOKEN_MINUS, target, one);
 }
 
 func parse_prefix_incdec_assign(p: u64) -> u64 {
@@ -120,10 +126,12 @@ func parse_prefix_incdec_assign(p: u64) -> u64 {
 
 func parse_postfix_incdec_after_expr(p: u64, expr: u64) -> u64 {
     var k: u64 = parse_peek_kind(p);
-    if (k != TOKEN_PLUSPLUS) {
-        if (k != TOKEN_MINUSMINUS) {
+    switch (k) {
+        case TOKEN_PLUSPLUS:
+        case TOKEN_MINUSMINUS:
+            break;
+        default:
             return expr;
-        }
     }
     parse_consume(p, k);
     if (!is_assignable_expr(expr)) {
@@ -145,21 +153,22 @@ func parse_assign_or_expr(p: u64) -> u64 {
 
     // Compound assignment: x += 5  =>  x = x + 5
     var k: u64 = parse_peek_kind(p);
-    if (k == TOKEN_PLUS_EQ || k == TOKEN_MINUS_EQ || k == TOKEN_STAR_EQ || 
-        k == TOKEN_SLASH_EQ || k == TOKEN_PERCENT_EQ) {
+    var bin_op: u64 = 0;
+    switch (k) {
+        case TOKEN_PLUS_EQ: bin_op = TOKEN_PLUS; break;
+        case TOKEN_MINUS_EQ: bin_op = TOKEN_MINUS; break;
+        case TOKEN_STAR_EQ: bin_op = TOKEN_STAR; break;
+        case TOKEN_SLASH_EQ: bin_op = TOKEN_SLASH; break;
+        case TOKEN_PERCENT_EQ: bin_op = TOKEN_PERCENT; break;
+        default: bin_op = 0; break;
+    }
+    if (bin_op != 0) {
         parse_consume(p, k);
         if (!is_assignable_expr(expr)) {
             emit_stderr("[ERROR] Compound assignment requires assignable expression\n", 60);
             panic("Parse error");
         }
         var rhs: u64 = parse_expr(p);
-        
-        // Determine binary operator
-        var bin_op: u64 = TOKEN_PLUS;
-        if (k == TOKEN_MINUS_EQ) { bin_op = TOKEN_MINUS; }
-        if (k == TOKEN_STAR_EQ) { bin_op = TOKEN_STAR; }
-        if (k == TOKEN_SLASH_EQ) { bin_op = TOKEN_SLASH; }
-        if (k == TOKEN_PERCENT_EQ) { bin_op = TOKEN_PERCENT; }
         
         var new_val: u64 = ast_binary(bin_op, expr, rhs);
         parse_consume(p, TOKEN_SEMICOLON);
@@ -168,25 +177,19 @@ func parse_assign_or_expr(p: u64) -> u64 {
 
     // Postfix ++/-- statement sugar: x++; x--;  =>  x = x +/- 1;
     var post_k: u64 = parse_peek_kind(p);
-    if (post_k == TOKEN_PLUSPLUS) {
-        parse_consume(p, post_k);
-        if (!is_assignable_expr(expr)) {
-            emit_stderr("[ERROR] ++/-- requires assignable expression\n", 45);
-            panic("Parse error");
-        }
-        var rhs: u64 = make_incdec_rhs(post_k, expr);
-        parse_consume(p, TOKEN_SEMICOLON);
-        return ast_assign(expr, rhs);
-    }
-    if (post_k == TOKEN_MINUSMINUS) {
-        parse_consume(p, post_k);
-        if (!is_assignable_expr(expr)) {
-            emit_stderr("[ERROR] ++/-- requires assignable expression\n", 45);
-            panic("Parse error");
-        }
-        var rhs: u64 = make_incdec_rhs(post_k, expr);
-        parse_consume(p, TOKEN_SEMICOLON);
-        return ast_assign(expr, rhs);
+    switch (post_k) {
+        case TOKEN_PLUSPLUS:
+        case TOKEN_MINUSMINUS:
+            parse_consume(p, post_k);
+            if (!is_assignable_expr(expr)) {
+                emit_stderr("[ERROR] ++/-- requires assignable expression\n", 45);
+                panic("Parse error");
+            }
+            var rhs: u64 = make_incdec_rhs(post_k, expr);
+            parse_consume(p, TOKEN_SEMICOLON);
+            return ast_assign(expr, rhs);
+        default:
+            break;
     }
     
     parse_consume(p, TOKEN_SEMICOLON);
@@ -239,22 +242,28 @@ func parse_for_stmt(p: u64) -> u64 {
     var k: u64 = parse_peek_kind(p);
     
     // Parse init clause
-    if (k == TOKEN_SEMICOLON) {
-        parse_consume(p, TOKEN_SEMICOLON);
-    } else if (k == TOKEN_VAR) {
-        init = parse_var_decl(p);
-    } else if (k == TOKEN_PLUSPLUS || k == TOKEN_MINUSMINUS) {
-        init = parse_prefix_incdec_assign(p);
-        parse_consume(p, TOKEN_SEMICOLON);
-    } else {
-        var lhs: u64 = parse_expr(p);
-        if (parse_match(p, TOKEN_EQ)) {
-            var rhs: u64 = parse_expr(p);
-            init = ast_assign(lhs, rhs);
-        } else {
-            init = parse_postfix_incdec_after_expr(p, lhs);
-        }
-        parse_consume(p, TOKEN_SEMICOLON);
+    switch (k) {
+        case TOKEN_SEMICOLON:
+            parse_consume(p, TOKEN_SEMICOLON);
+            break;
+        case TOKEN_VAR:
+            init = parse_var_decl(p);
+            break;
+        case TOKEN_PLUSPLUS:
+        case TOKEN_MINUSMINUS:
+            init = parse_prefix_incdec_assign(p);
+            parse_consume(p, TOKEN_SEMICOLON);
+            break;
+        default:
+            var lhs: u64 = parse_expr(p);
+            if (parse_match(p, TOKEN_EQ)) {
+                var rhs: u64 = parse_expr(p);
+                init = ast_assign(lhs, rhs);
+            } else {
+                init = parse_postfix_incdec_after_expr(p, lhs);
+            }
+            parse_consume(p, TOKEN_SEMICOLON);
+            break;
     }
     
     var cond: u64 = 0;
@@ -267,18 +276,23 @@ func parse_for_stmt(p: u64) -> u64 {
     k = parse_peek_kind(p);
     
     // Parse update clause
-    if (k == TOKEN_RPAREN) {
-        // No update clause
-    } else if (k == TOKEN_PLUSPLUS || k == TOKEN_MINUSMINUS) {
-        update = parse_prefix_incdec_assign(p);
-    } else {
-        var upd_lhs: u64 = parse_expr(p);
-        if (parse_match(p, TOKEN_EQ)) {
-            var upd_rhs: u64 = parse_expr(p);
-            update = ast_assign(upd_lhs, upd_rhs);
-        } else {
-            update = parse_postfix_incdec_after_expr(p, upd_lhs);
-        }
+    switch (k) {
+        case TOKEN_RPAREN:
+            // No update clause
+            break;
+        case TOKEN_PLUSPLUS:
+        case TOKEN_MINUSMINUS:
+            update = parse_prefix_incdec_assign(p);
+            break;
+        default:
+            var upd_lhs: u64 = parse_expr(p);
+            if (parse_match(p, TOKEN_EQ)) {
+                var upd_rhs: u64 = parse_expr(p);
+                update = ast_assign(upd_lhs, upd_rhs);
+            } else {
+                update = parse_postfix_incdec_after_expr(p, upd_lhs);
+            }
+            break;
     }
     
     parse_consume(p, TOKEN_RPAREN);
@@ -302,18 +316,23 @@ func parse_switch_stmt(p: u64) -> u64 {
         
         var is_default: u64 = 0;
         var value: u64 = 0;
+        var matched: u64 = 0;
         
-        if (parse_peek_kind(p) == TOKEN_CASE) {
-            parse_consume(p, TOKEN_CASE);
-            value = parse_expr(p);
-        } else {
-            if (parse_peek_kind(p) == TOKEN_DEFAULT) {
+        switch (parse_peek_kind(p)) {
+            case TOKEN_CASE:
+                parse_consume(p, TOKEN_CASE);
+                value = parse_expr(p);
+                matched = 1;
+                break;
+            case TOKEN_DEFAULT:
                 parse_consume(p, TOKEN_DEFAULT);
                 is_default = 1;
-            } else {
+                matched = 1;
                 break;
-            }
+            default:
+                break;
         }
+        if (matched == 0) { break; }
         
         parse_consume(p, TOKEN_COLON);
         
@@ -430,67 +449,52 @@ func parse_block(p: u64) -> u64 {
 func parse_stmt(p: u64) -> u64 {
     push_trace("parse_stmt", "parser/stmt.b", 383);
     var k: u64 = parse_peek_kind(p);
-
-    if (k == TOKEN_PLUSPLUS) {
-        var stmt: u64 = parse_prefix_incdec_assign(p);
-        parse_consume(p, TOKEN_SEMICOLON);
-        pop_trace();
-        return stmt;
+    switch (k) {
+        case TOKEN_PLUSPLUS:
+        case TOKEN_MINUSMINUS:
+            var stmt: u64 = parse_prefix_incdec_assign(p);
+            parse_consume(p, TOKEN_SEMICOLON);
+            pop_trace();
+            return stmt;
+        case TOKEN_VAR:
+            var result: u64 = parse_var_decl(p);
+            pop_trace();
+            return result;
+        case TOKEN_IF:
+            var result2: u64 = parse_if_stmt(p);
+            pop_trace();
+            return result2;
+        case TOKEN_WHILE:
+            var result3: u64 = parse_while_stmt(p);
+            pop_trace();
+            return result3;
+        case TOKEN_FOR:
+            var result4: u64 = parse_for_stmt(p);
+            pop_trace();
+            return result4;
+        case TOKEN_SWITCH:
+            var result5: u64 = parse_switch_stmt(p);
+            pop_trace();
+            return result5;
+        case TOKEN_BREAK:
+            var result6: u64 = parse_break_stmt(p);
+            pop_trace();
+            return result6;
+        case TOKEN_CONTINUE:
+            var result7: u64 = parse_continue_stmt(p);
+            pop_trace();
+            return result7;
+        case TOKEN_ASM:
+            var result8: u64 = parse_asm_stmt(p);
+            pop_trace();
+            return result8;
+        case TOKEN_RETURN:
+            var result9: u64 = parse_return_stmt(p);
+            pop_trace();
+            return result9;
+        default:
+            var result10: u64 = parse_assign_or_expr(p);
+            pop_trace();
+            return result10;
     }
-    if (k == TOKEN_MINUSMINUS) {
-        var stmt: u64 = parse_prefix_incdec_assign(p);
-        parse_consume(p, TOKEN_SEMICOLON);
-        pop_trace();
-        return stmt;
-    }
-    
-    if (k == TOKEN_VAR) {
-        var result: u64 = parse_var_decl(p);
-        pop_trace();
-        return result;
-    }
-    if (k == TOKEN_IF) {
-        var result: u64 = parse_if_stmt(p);
-        pop_trace();
-        return result;
-    }
-    if (k == TOKEN_WHILE) {
-        var result: u64 = parse_while_stmt(p);
-        pop_trace();
-        return result;
-    }
-    if (k == TOKEN_FOR) {
-        var result: u64 = parse_for_stmt(p);
-        pop_trace();
-        return result;
-    }
-    if (k == TOKEN_SWITCH) {
-        var result: u64 = parse_switch_stmt(p);
-        pop_trace();
-        return result;
-    }
-    if (k == TOKEN_BREAK) {
-        var result: u64 = parse_break_stmt(p);
-        pop_trace();
-        return result;
-    }
-    if (k == TOKEN_CONTINUE) {
-        var result: u64 = parse_continue_stmt(p);
-        pop_trace();
-        return result;
-    }
-    if (k == TOKEN_ASM) {
-        var result: u64 = parse_asm_stmt(p);
-        pop_trace();
-        return result;
-    }
-    if (k == TOKEN_RETURN) {
-        var result: u64 = parse_return_stmt(p);
-        pop_trace();
-        return result;
-    }
-    
-    var result: u64 = parse_assign_or_expr(p);
-    pop_trace();
-    return result;
 }

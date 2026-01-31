@@ -1969,7 +1969,12 @@ std_hashmap__hashmap_new:
     pop rax
     imul rax, rbx
     mov [rbp-32], rax
-    mov rax, [rbp-32]
+    mov rax, [rbp-16]
+    push rax
+    mov rax, 40
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc
@@ -2267,7 +2272,12 @@ std_hashmap__hashmap_grow:
     pop rax
     imul rax, rbx
     mov [rbp-48], rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-40]
+    push rax
+    mov rax, 40
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc

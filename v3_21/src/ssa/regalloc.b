@@ -632,10 +632,9 @@ func ssa_regalloc_color_fn(fn: *SSAFunction, k: u64) -> u64 {
             }
         }
 
-        var color: u64 = 1;
-        while (color <= k) {
-            if (*(*u64)(used + color * 8) == 0) { break; }
-            color = color + 1;
+        var color: u64 = k + 1;
+        for (var c: u64 = 1; c <= k; c++) {
+            if (*(*u64)(used + c * 8) == 0) { color = c; break; }
         }
 
         if (color > k) { color = 0; }
@@ -650,15 +649,17 @@ func ssa_regalloc_color_fn(fn: *SSAFunction, k: u64) -> u64 {
 }
 
 func _ssa_regalloc_color_to_phys(color: u64) -> u64 {
-    if (color == 1) { return SSA_PHYS_RAX; }
-    if (color == 2) { return SSA_PHYS_RBX; }
-    if (color == 3) { return SSA_PHYS_RCX; }
-    if (color == 4) { return SSA_PHYS_RDX; }
-    if (color == 5) { return SSA_PHYS_R8; }
-    if (color == 6) { return SSA_PHYS_R9; }
-    if (color == 7) { return SSA_PHYS_R10; }
-    if (color == 8) { return SSA_PHYS_R11; }
-    return 0;
+    switch (color) {
+        case 1: return SSA_PHYS_RAX;
+        case 2: return SSA_PHYS_RBX;
+        case 3: return SSA_PHYS_RCX;
+        case 4: return SSA_PHYS_RDX;
+        case 5: return SSA_PHYS_R8;
+        case 6: return SSA_PHYS_R9;
+        case 7: return SSA_PHYS_R10;
+        case 8: return SSA_PHYS_R11;
+        default: return 0;
+    }
 }
 
 func ssa_regalloc_map_fn(fn: *SSAFunction, k: u64) -> u64 {

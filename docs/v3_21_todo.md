@@ -72,3 +72,13 @@
 - [x] Refactor emitter/gen_stmt heap_brk GlobalInfo + packed flag struct access.
 - [x] Refactor ssa/codegen heap_brk GlobalInfo struct access.
 - [x] Refactor codegen const info allocation to ConstInfo struct.
+- [x] Refactor parser/decl token-kind dispatch to switch (packed fields + program passes).
+- [x] Refactor main output-mode dispatch to switch.
+- [x] Refactor compiler stat access to struct and config parser loops to for.
+- [x] Refactor ssa/regalloc color selection loop and color-to-phys switch.
+- [x] Convert compiler file-read loop to for.
+- [x] Refactor parser/type token-kind dispatch to switch.
+- [x] Refactor parser/expr token-kind dispatch to switch.
+- [x] Refactor parser/stmt token-kind dispatch to switch.
+- [x] Refactor parser/decl skip-block and packed handling to switch.
+- [x] Normalize remaining heap_alloc sizeof usage in std/hashmap, main, and parser/decl.

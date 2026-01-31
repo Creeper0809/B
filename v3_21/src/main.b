@@ -89,58 +89,62 @@ func main(argc: u64, argv: u64) -> u64 {
     var o_ext: u64 = ".o";
     var out_ext: u64 = ".out";
 
-    if (out_mode == OUT_IR) {
-        cg_program_with_sigs_ir(merged_prog, get_func_sigs());
-    } else if (out_mode == OUT_ASM) {
-        cg_program_with_sigs(merged_prog, get_func_sigs());
-    } else {
-        var asm_path: u64 = str_concat(base_name, base_len, s_ext, 2);
-        var obj_path: u64 = str_concat(base_name, base_len, o_ext, 2);
-        var exe_path: u64 = str_concat(base_name, base_len, out_ext, 4);
+    switch (out_mode) {
+        case OUT_IR:
+            cg_program_with_sigs_ir(merged_prog, get_func_sigs());
+            break;
+        case OUT_ASM:
+            cg_program_with_sigs(merged_prog, get_func_sigs());
+            break;
+        default:
+            var asm_path: u64 = str_concat(base_name, base_len, s_ext, 2);
+            var obj_path: u64 = str_concat(base_name, base_len, o_ext, 2);
+            var exe_path: u64 = str_concat(base_name, base_len, out_ext, 4);
 
-        var flags: u64 = OS_O_WRONLY + OS_O_CREAT + OS_O_TRUNC;
-        var fd: u64 = sys_open(asm_path, flags, 420);
-        if (fd < 0) { pop_trace(); return 1; }
+            var flags: u64 = OS_O_WRONLY + OS_O_CREAT + OS_O_TRUNC;
+            var fd: u64 = sys_open(asm_path, flags, 420);
+            if (fd < 0) { pop_trace(); return 1; }
 
-        var saved_fd: u64 = 100;
-        var dup_res: i64 = (i64)os_sys_dup2(1, saved_fd);
-        if (dup_res < 0) { sys_close(fd); pop_trace(); return 1; }
+            var saved_fd: u64 = 100;
+            var dup_res: i64 = (i64)os_sys_dup2(1, saved_fd);
+            if (dup_res < 0) { sys_close(fd); pop_trace(); return 1; }
 
-        os_sys_dup2(fd, 1);
-        cg_program_with_sigs(merged_prog, get_func_sigs());
-        sys_close(fd);
+            os_sys_dup2(fd, 1);
+            cg_program_with_sigs(merged_prog, get_func_sigs());
+            sys_close(fd);
 
-        os_sys_dup2(saved_fd, 1);
-        sys_close(saved_fd);
+            os_sys_dup2(saved_fd, 1);
+            sys_close(saved_fd);
 
-        var nasm_argv: *Argv6 = (*Argv6)heap_alloc(argv6_size);
-        nasm_argv->a0 = (u64)"nasm";
-        nasm_argv->a1 = (u64)"-felf64";
-        nasm_argv->a2 = asm_path;
-        nasm_argv->a3 = (u64)"-o";
-        nasm_argv->a4 = obj_path;
-        nasm_argv->a5 = 0;
-        os_execute((u64)"/usr/bin/nasm", (u64)nasm_argv);
+            var nasm_argv: *Argv6 = (*Argv6)heap_alloc(sizeof(Argv6));
+            nasm_argv->a0 = (u64)"nasm";
+            nasm_argv->a1 = (u64)"-felf64";
+            nasm_argv->a2 = asm_path;
+            nasm_argv->a3 = (u64)"-o";
+            nasm_argv->a4 = obj_path;
+            nasm_argv->a5 = 0;
+            os_execute((u64)"/usr/bin/nasm", (u64)nasm_argv);
 
-        var ld_argv: *Argv5 = (*Argv5)heap_alloc(argv5_size);
-        ld_argv->a0 = (u64)"ld";
-        ld_argv->a1 = obj_path;
-        ld_argv->a2 = (u64)"-o";
-        ld_argv->a3 = exe_path;
-        ld_argv->a4 = 0;
-        os_execute((u64)"/usr/bin/ld", (u64)ld_argv);
+            var ld_argv: *Argv5 = (*Argv5)heap_alloc(sizeof(Argv5));
+            ld_argv->a0 = (u64)"ld";
+            ld_argv->a1 = obj_path;
+            ld_argv->a2 = (u64)"-o";
+            ld_argv->a3 = exe_path;
+            ld_argv->a4 = 0;
+            os_execute((u64)"/usr/bin/ld", (u64)ld_argv);
 
-        emit("[OK] output: ", 14);
-        emit(exe_path, str_len(exe_path));
-        emit("\n", 1);
+            emit("[OK] output: ", 14);
+            emit(exe_path, str_len(exe_path));
+            emit("\n", 1);
 
-        var exe_argv: *Argv2 = (*Argv2)heap_alloc(argv2_size);
-        exe_argv->a0 = exe_path;
-        exe_argv->a1 = 0;
-        var status: i64 = os_execute(exe_path, (u64)exe_argv);
-        emit("[RUN] exit=", 11);
-        print_i64(status);
-        emit("\n", 1);
+            var exe_argv: *Argv2 = (*Argv2)heap_alloc(sizeof(Argv2));
+            exe_argv->a0 = exe_path;
+            exe_argv->a1 = 0;
+            var status: i64 = os_execute(exe_path, (u64)exe_argv);
+            emit("[RUN] exit=", 11);
+            print_i64(status);
+            emit("\n", 1);
+            break;
     }
     
     pop_trace();

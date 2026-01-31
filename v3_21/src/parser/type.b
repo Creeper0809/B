@@ -33,20 +33,20 @@ struct TypeInfoLocal {
 
 func parse_base_type(p: u64) -> u64 {
     var k: u64 = parse_peek_kind(p);
-    if (k == TOKEN_U8) { parse_adv(p); return TYPE_U8; }
-    if (k == TOKEN_CHAR) { parse_adv(p); return TYPE_U8; }
-    if (k == TOKEN_U16) { parse_adv(p); return TYPE_U16; }
-    if (k == TOKEN_U32) { parse_adv(p); return TYPE_U32; }
-    if (k == TOKEN_U64) { parse_adv(p); return TYPE_U64; }
-    if (k == TOKEN_I64) { parse_adv(p); return TYPE_I64; }
-
-    // Check for struct type name (allow any identifier in type position)
-    if (k == TOKEN_IDENTIFIER) {
-        parse_adv(p);
-        return TYPE_STRUCT;
+    switch (k) {
+        case TOKEN_U8: parse_adv(p); return TYPE_U8;
+        case TOKEN_CHAR: parse_adv(p); return TYPE_U8;
+        case TOKEN_U16: parse_adv(p); return TYPE_U16;
+        case TOKEN_U32: parse_adv(p); return TYPE_U32;
+        case TOKEN_U64: parse_adv(p); return TYPE_U64;
+        case TOKEN_I64: parse_adv(p); return TYPE_I64;
+        case TOKEN_IDENTIFIER:
+            // Check for struct type name (allow any identifier in type position)
+            parse_adv(p);
+            return TYPE_STRUCT;
+        default:
+            return TYPE_VOID;
     }
-
-    return TYPE_VOID;
 }
 
 func parse_type(p: u64) -> u64 {
@@ -191,20 +191,43 @@ func parse_type_ex(p: u64) -> u64 {
     var struct_name_len: u64 = 0;
 
     var k: u64 = parse_peek_kind(p);
-    if (k == TOKEN_U8) { parse_adv(p); base = TYPE_U8; }
-    else if (k == TOKEN_CHAR) { parse_adv(p); base = TYPE_U8; }
-    else if (k == TOKEN_U16) { parse_adv(p); base = TYPE_U16; }
-    else if (k == TOKEN_U32) { parse_adv(p); base = TYPE_U32; }
-    else if (k == TOKEN_U64) { parse_adv(p); base = TYPE_U64; }
-    else if (k == TOKEN_I64) { parse_adv(p); base = TYPE_I64; }
-    else if (k == TOKEN_IDENTIFIER) {
-        var tok: u64 = parse_peek(p);
-        var name_ptr: u64 = ((*Token)tok)->ptr;
-        var name_len: u64 = ((*Token)tok)->len;
-        parse_adv(p);
-        base = TYPE_STRUCT;
-        struct_name_ptr = name_ptr;
-        struct_name_len = name_len;
+    switch (k) {
+        case TOKEN_U8:
+            parse_adv(p);
+            base = TYPE_U8;
+            break;
+        case TOKEN_CHAR:
+            parse_adv(p);
+            base = TYPE_U8;
+            break;
+        case TOKEN_U16:
+            parse_adv(p);
+            base = TYPE_U16;
+            break;
+        case TOKEN_U32:
+            parse_adv(p);
+            base = TYPE_U32;
+            break;
+        case TOKEN_U64:
+            parse_adv(p);
+            base = TYPE_U64;
+            break;
+        case TOKEN_I64:
+            parse_adv(p);
+            base = TYPE_I64;
+            break;
+        case TOKEN_IDENTIFIER:
+            var tok: u64 = parse_peek(p);
+            var name_ptr: u64 = ((*Token)tok)->ptr;
+            var name_len: u64 = ((*Token)tok)->len;
+            parse_adv(p);
+            base = TYPE_STRUCT;
+            struct_name_ptr = name_ptr;
+            struct_name_len = name_len;
+            break;
+        default:
+            base = 0;
+            break;
     }
 
     if (base == TYPE_STRUCT && tag_layout_ptr != 0) {
