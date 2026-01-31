@@ -1257,7 +1257,8 @@ std_str__str_len:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L41
+    jz .L42
+.L41:
     mov rax, [rbp-16]
     push rax
     mov rax, 1
@@ -1269,7 +1270,7 @@ std_str__str_len:
     pop rbx
     mov [rax], rbx
     jmp .L40
-.L41:
+.L42:
     mov rax, [rbp-16]
     mov rsp, rbp
     pop rbp
@@ -1468,11 +1469,11 @@ main:
     sub rsp, 2048
     mov rax, 3
     push rax
-    lea rax, [rel _str44]
+    lea rax, [rel _str45]
     push rax
     mov rax, 3
     push rax
-    lea rax, [rel _str44]
+    lea rax, [rel _str45]
     push rax
     pop rdi
     pop rsi
@@ -1483,19 +1484,19 @@ main:
     setz al
     movzx rax, al
     test rax, rax
-    jz .L42
+    jz .L43
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L42:
-    mov rax, 1
-    push rax
-    lea rax, [rel _str45]
-    push rax
+.L43:
     mov rax, 1
     push rax
     lea rax, [rel _str46]
+    push rax
+    mov rax, 1
+    push rax
+    lea rax, [rel _str47]
     push rax
     pop rdi
     pop rsi
@@ -1508,7 +1509,7 @@ main:
     mov [rax], rbx
     mov rax, 2
     push rax
-    lea rax, [rel _str49]
+    lea rax, [rel _str50]
     push rax
     mov rax, 2
     push rax
@@ -1523,12 +1524,12 @@ main:
     setz al
     movzx rax, al
     test rax, rax
-    jz .L47
+    jz .L48
     mov rax, 2
     mov rsp, rbp
     pop rbp
     ret
-.L47:
+.L48:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -1542,10 +1543,10 @@ section .data
 _str12: db 10,0
 _str20: db 48,0
 _str29: db 45,0
-_str44: db 97,98,99,0
-_str45: db 98,0
-_str46: db 97,0
-_str49: db 97,98,0
+_str45: db 97,98,99,0
+_str46: db 98,0
+_str47: db 97,0
+_str50: db 97,98,0
 
 section .bss
 _gvar_std_os__g_syscall_arg0: resq 1

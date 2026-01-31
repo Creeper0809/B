@@ -31,7 +31,7 @@ func sb_ensure_cap(sb: *StringBuilder, add_len: u64) -> u64 {
     
     var new_cap: u64 = sb->cap;
     if (new_cap < 8) { new_cap = 8; }
-    while (new_cap < need) { new_cap = new_cap * 2; }
+    for (; new_cap < need; new_cap = new_cap * 2) { }
     
     var new_buf: u64 = heap_alloc((new_cap + 1) * sizeof(u8));
     if (new_buf == 0) { return 0; }
@@ -120,9 +120,8 @@ impl StringBuilder {
             i = 1;
         } else {
             var t: u64 = x;
-            while (t > 0) {
+            for (; t > 0; t = t / 10) {
                 *(*u8)(buf + i) = 48 + (t % 10);
-                t = t / 10;
                 i = i + 1;
             }
         }

@@ -16,8 +16,7 @@ func str_copy(dst, src, len) {
 
 func str_len(s) {
     var i = 0;
-    while (*(*u8)(s + i) != 0) {
-        i = i + 1;
+    for (; *(*u8)(s + i) != 0; i++) {
     }
     return i;
 }

@@ -459,11 +459,10 @@ func _ssa_mem2reg_rename_block(fn: *SSAFunction, block: *SSABlock, max_var: u64,
     }
 
     var pcount: u64 = vec_len(pushed);
-    while (pcount > 0) {
+    for (var pi: u64 = 0; pi < pcount; pi++) {
         var var_id5: u64 = vec_pop(pushed);
         var stack5: u64 = *(stack_arr_u64 + var_id5);
         vec_pop(stack5);
-        pcount = pcount - 1;
     }
 
     return 0;

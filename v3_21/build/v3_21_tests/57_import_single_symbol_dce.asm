@@ -20,7 +20,7 @@ std_os__os_sys_brk:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_5_20:
+.Lssa_5_21:
     mov rax, [rbp-1032]
     lea rbx, [rel _gvar_std_os__g_syscall_arg0]
     mov [rbx], rax
@@ -47,7 +47,7 @@ std_os__os_sys_write:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_6_21:
+.Lssa_6_22:
     mov rax, [rbp-1048]
     mov rbx, [rbp-1040]
     mov rcx, [rbp-1032]
@@ -82,22 +82,22 @@ std_io__io_get_output_fd:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_24_43:
+.Lssa_24_44:
     lea rax, [rel _gvar_std_io__g_out_fd]
     mov rax, [rax]
     cmp rax, 0
     sete al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_24_44
-    jmp .Lssa_24_45
-.Lssa_24_44:
+    jne .Lssa_24_45
+    jmp .Lssa_24_46
+.Lssa_24_45:
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_24_45
-.Lssa_24_45:
+    jmp .Lssa_24_46
+.Lssa_24_46:
     lea rax, [rel _gvar_std_io__g_out_fd]
     mov rax, [rax]
     mov rsp, rbp
@@ -117,7 +117,7 @@ std_io__heap_alloc:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_25_46:
+.Lssa_25_47:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -125,16 +125,16 @@ std_io__heap_alloc:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_25_47
-    jmp .Lssa_25_48
-.Lssa_25_47:
+    jne .Lssa_25_48
+    jmp .Lssa_25_49
+.Lssa_25_48:
     mov rbx, 0
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_25_48
-.Lssa_25_48:
+    jmp .Lssa_25_49
+.Lssa_25_49:
     mov rbx, 9223372036854775800
     mov rax, rax
     add rax, 7
@@ -148,9 +148,9 @@ std_io__heap_alloc:
     movzx rcx, al
     pop rax
     cmp rcx, 0
-    jne .Lssa_25_49
-    jmp .Lssa_25_50
-.Lssa_25_49:
+    jne .Lssa_25_50
+    jmp .Lssa_25_51
+.Lssa_25_50:
     lea rcx, [rel _gvar_std_io__heap_brk]
     mov rdx, 0
     push rax
@@ -167,8 +167,8 @@ std_io__heap_alloc:
     lea rcx, [rel _gvar_std_io__heap_inited]
     mov rdx, 1
     mov [rcx], rdx
-    jmp .Lssa_25_50
-.Lssa_25_50:
+    jmp .Lssa_25_51
+.Lssa_25_51:
     lea rcx, [rel _gvar_std_io__heap_brk]
     mov rcx, [rcx]
     mov rcx, rcx
@@ -189,16 +189,16 @@ std_io__heap_alloc:
     movzx rcx, al
     pop rax
     cmp rcx, 0
-    jne .Lssa_25_51
-    jmp .Lssa_25_52
-.Lssa_25_51:
+    jne .Lssa_25_52
+    jmp .Lssa_25_53
+.Lssa_25_52:
     mov rcx, 0
     mov rax, rcx
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_25_52
-.Lssa_25_52:
+    jmp .Lssa_25_53
+.Lssa_25_53:
     lea rcx, [rel _gvar_std_io__heap_brk]
     mov [rcx], rax
     mov rax, rbx
@@ -219,7 +219,7 @@ std_io__print_u64:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_31_65:
+.Lssa_31_66:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -227,9 +227,9 @@ std_io__print_u64:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_31_66
-    jmp .Lssa_31_67
-.Lssa_31_66:
+    jne .Lssa_31_67
+    jmp .Lssa_31_68
+.Lssa_31_67:
     push rax
     call std_io__io_get_output_fd
     mov rbx, rax
@@ -251,8 +251,8 @@ std_io__print_u64:
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_31_67
-.Lssa_31_67:
+    jmp .Lssa_31_68
+.Lssa_31_68:
     mov rbx, 32
     push rax
     push rbx
@@ -264,15 +264,15 @@ std_io__print_u64:
     mov r8, rax
     mov r9, rax
     mov r8, rcx
-    jmp .Lssa_31_68
-.Lssa_31_68:
+    jmp .Lssa_31_69
+.Lssa_31_69:
     cmp r9, 0
     setg al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_31_69
-    jmp .Lssa_31_71
-.Lssa_31_69:
+    jne .Lssa_31_70
+    jmp .Lssa_31_72
+.Lssa_31_70:
     push rdx
     mov rax, r9
     cqo
@@ -298,26 +298,26 @@ std_io__print_u64:
     pop rax
     mov rdx, r8
     add rdx, 1
-    jmp .Lssa_31_70
-.Lssa_31_70:
+    jmp .Lssa_31_71
+.Lssa_31_71:
     mov r8, rax
     mov r9, rcx
     mov r8, rdx
-    jmp .Lssa_31_68
-.Lssa_31_71:
+    jmp .Lssa_31_69
+.Lssa_31_72:
     mov rax, r8
     sub rax, 1
     mov rdx, rax
     mov r8, rax
-    jmp .Lssa_31_72
-.Lssa_31_72:
+    jmp .Lssa_31_73
+.Lssa_31_73:
     cmp r8, 0
     setge al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_31_73
-    jmp .Lssa_31_75
-.Lssa_31_73:
+    jne .Lssa_31_74
+    jmp .Lssa_31_76
+.Lssa_31_74:
     push rbx
     push r8
     call std_io__io_get_output_fd
@@ -339,19 +339,19 @@ std_io__print_u64:
     pop r8
     pop rbx
     pop rax
-    jmp .Lssa_31_74
-.Lssa_31_74:
+    jmp .Lssa_31_75
+.Lssa_31_75:
     mov rcx, r8
     sub rcx, 1
     mov rdx, rax
     mov r8, rcx
-    jmp .Lssa_31_72
-.Lssa_31_75:
+    jmp .Lssa_31_73
+.Lssa_31_76:
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_31_83:
+.Lssa_31_84:
     mov rbx, rax
     xor eax, eax
     mov rsp, rbp
@@ -367,7 +367,7 @@ main:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_33_80:
+.Lssa_33_81:
     mov rax, 123
     push rax
     pop rdi

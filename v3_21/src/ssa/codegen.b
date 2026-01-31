@@ -323,14 +323,12 @@ func _ssa_emit_call_slice_store(info_ptr: u64, addr_opr: u64, live_mask: u64) ->
     _ssa_emit_push_reg(ssa_operand_value(addr_opr));
 
     var stack_args: u64 = 0;
-    var si: i64 = (i64)nargs - 1;
-    while (si >= 0) {
+    for (var si: i64 = (i64)nargs - 1; si >= 0; si = si - 1) {
         var sreg: u64 = vec_get(args_vec, (u64)si);
         emit("    push ", 9);
         _ssa_emit_reg_name(sreg);
         emit_nl();
         stack_args = stack_args + 1;
-        si = si - 1;
     }
 
     var reg_count: u64 = nargs;

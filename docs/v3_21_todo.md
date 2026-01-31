@@ -82,3 +82,9 @@
 - [x] Refactor parser/stmt token-kind dispatch to switch.
 - [x] Refactor parser/decl skip-block and packed handling to switch.
 - [x] Normalize remaining heap_alloc sizeof usage in std/hashmap, main, and parser/decl.
+- [x] Refactor std/hashmap capacity growth loop and reuse entry helper.
+- [x] Refactor std/str str_len counted loop to for.
+- [x] Refactor std/string_builder growth loop to for.
+- [x] Refactor ssa/mem2reg pushed-pop loop to for.
+- [x] Refactor ssa/codegen reverse arg push loop to for.
+- [x] Refactor std/string_builder decimal loop to for.

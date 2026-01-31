@@ -31,8 +31,7 @@ func fnv1a_hash(ptr, len) {
 
 func hashmap_new(capacity) {
     var cap: u64 = 16;
-    while (cap < capacity) {
-        cap = cap * 2;
+    for (; cap < capacity; cap = cap * 2) {
     }
     var map: *HashMap = (*HashMap)heap_alloc(sizeof(HashMap));
     var bytes: u64 = cap * sizeof(HashEntry);
@@ -95,7 +94,7 @@ func hashmap_grow(map) {
     map_ptr->count = 0;
 
     for (var i: u64 = 0; i < old_cap; i++) {
-        var entry: *HashEntry = (*HashEntry)(old_entries + i * sizeof(HashEntry));
+        var entry: *HashEntry = hashmap_entry_ptr(old_entries, i);
         var used: u64 = entry->used;
         if (used != 0) {
             var kp: u64 = entry->key_ptr;
