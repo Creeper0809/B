@@ -793,7 +793,7 @@ std_os__os_execute:
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_16_99:
+.Lssa_16_102:
     mov rax, rax
     xor eax, eax
     mov rsp, rbp
@@ -1196,7 +1196,7 @@ std_io__emit:
     pop rax
     cmp rcx, 0
     jne .Lssa_27_56
-    jmp .Lssa_27_57
+    jmp .Lssa_27_58
 .Lssa_27_56:
     mov rcx, rbx
     add rcx, r8
@@ -1208,9 +1208,15 @@ std_io__emit:
     movzx rcx, al
     pop rax
     cmp rcx, 0
-    jne .Lssa_27_58
-    jmp .Lssa_27_59
+    jne .Lssa_27_59
+    jmp .Lssa_27_60
 .Lssa_27_57:
+    lea rcx, [rbp-8]
+    mov rcx, 1
+    add rcx, r8
+    mov r8, rcx
+    jmp .Lssa_27_55
+.Lssa_27_58:
     push rbx
     push rdx
     call std_io__io_get_output_fd
@@ -1227,19 +1233,15 @@ std_io__emit:
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_27_58:
+.Lssa_27_59:
     lea rax, [rbp+24]
     mov rdx, r8
-    jmp .Lssa_27_57
-.Lssa_27_59:
-    lea rcx, [rbp-8]
-    mov rcx, 1
-    add rcx, r8
-    mov r8, rcx
-    jmp .Lssa_27_55
+    jmp .Lssa_27_58
 .Lssa_27_60:
-    jmp .Lssa_27_59
-.Lssa_27_100:
+    jmp .Lssa_27_57
+.Lssa_27_61:
+    jmp .Lssa_27_60
+.Lssa_27_103:
     mov rdx, rax
     xor eax, eax
     mov rsp, rbp
@@ -1255,7 +1257,7 @@ std_io__print:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_28_61:
+.Lssa_28_62:
     mov rax, [rbp-1040]
     mov rbx, [rbp-1032]
     push rax
@@ -1289,7 +1291,7 @@ std_io__print_nl:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_29_62:
+.Lssa_29_63:
     call std_io__io_get_output_fd
     lea rbx, [rel _str0]
     mov rcx, 1
@@ -1318,7 +1320,7 @@ std_io__println:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_30_63:
+.Lssa_30_64:
     mov rax, [rbp-1040]
     mov rbx, [rbp-1032]
     push rax
@@ -1363,7 +1365,7 @@ std_io__print_u64:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_31_64:
+.Lssa_31_65:
     mov rax, [rbp-1032]
     mov rbx, 0
     push rax
@@ -1372,9 +1374,9 @@ std_io__print_u64:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_31_65
-    jmp .Lssa_31_66
-.Lssa_31_65:
+    jne .Lssa_31_66
+    jmp .Lssa_31_67
+.Lssa_31_66:
     push rax
     call std_io__io_get_output_fd
     mov rbx, rax
@@ -1396,9 +1398,12 @@ std_io__print_u64:
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_31_66
-.Lssa_31_66:
+    jmp .Lssa_31_67
+.Lssa_31_67:
     mov rbx, 32
+    mov rcx, 1
+    mov rbx, rbx
+    imul rbx, rcx
     push rax
     push rbx
     pop rdi
@@ -1409,16 +1414,16 @@ std_io__print_u64:
     mov r8, rax
     mov r9, rax
     mov r8, rcx
-    jmp .Lssa_31_67
-.Lssa_31_67:
+    jmp .Lssa_31_68
+.Lssa_31_68:
     mov rax, 0
     cmp r9, rax
     setg al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_31_68
-    jmp .Lssa_31_69
-.Lssa_31_68:
+    jne .Lssa_31_69
+    jmp .Lssa_31_71
+.Lssa_31_69:
     mov rax, 10
     push rdx
     mov rax, r9
@@ -1444,26 +1449,28 @@ std_io__print_u64:
     lea rdx, [rbp-24]
     mov rdx, 1
     add rdx, r8
+    jmp .Lssa_31_70
+.Lssa_31_70:
     mov r8, rax
     mov r9, rcx
     mov r8, rdx
-    jmp .Lssa_31_67
-.Lssa_31_69:
+    jmp .Lssa_31_68
+.Lssa_31_71:
     mov rax, 1
     mov rax, r8
     sub rax, rax
     mov rdx, rax
     mov r8, rax
-    jmp .Lssa_31_70
-.Lssa_31_70:
+    jmp .Lssa_31_72
+.Lssa_31_72:
     mov rax, 0
     cmp r8, rax
     setge al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_31_71
-    jmp .Lssa_31_72
-.Lssa_31_71:
+    jne .Lssa_31_73
+    jmp .Lssa_31_75
+.Lssa_31_73:
     push rbx
     push r8
     call std_io__io_get_output_fd
@@ -1485,19 +1492,21 @@ std_io__print_u64:
     pop r8
     pop rbx
     pop rax
+    jmp .Lssa_31_74
+.Lssa_31_74:
     lea rcx, [rbp-48]
     mov rcx, 1
     mov rcx, r8
     sub rcx, rcx
     mov rdx, rax
     mov r8, rcx
-    jmp .Lssa_31_70
-.Lssa_31_72:
+    jmp .Lssa_31_72
+.Lssa_31_75:
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_31_101:
+.Lssa_31_104:
     mov rbx, rax
     xor eax, eax
     mov rsp, rbp
@@ -1513,7 +1522,7 @@ std_io__print_i64:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_32_73:
+.Lssa_32_76:
     mov rax, [rbp-1032]
     mov rbx, 0
     push rax
@@ -1522,9 +1531,9 @@ std_io__print_i64:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_32_74
-    jmp .Lssa_32_76
-.Lssa_32_74:
+    jne .Lssa_32_77
+    jmp .Lssa_32_79
+.Lssa_32_77:
     push rax
     call std_io__io_get_output_fd
     mov rbx, rax
@@ -1551,18 +1560,18 @@ std_io__print_i64:
     call std_io__print_u64
     pop rbx
     mov rax, rbx
-    jmp .Lssa_32_75
-.Lssa_32_75:
+    jmp .Lssa_32_78
+.Lssa_32_78:
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_32_76:
+.Lssa_32_79:
     push rax
     pop rdi
     call std_io__print_u64
     mov rax, rax
-    jmp .Lssa_32_75
+    jmp .Lssa_32_78
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -1577,7 +1586,7 @@ _65_ssa_tagged_packed_bits__test_tagged_ptr_basic:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_33_77:
+.Lssa_33_80:
     lea rax, [rbp-8]
     mov rbx, 0
     mov rax, rax
@@ -1615,16 +1624,16 @@ _65_ssa_tagged_packed_bits__test_tagged_ptr_basic:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_33_78
-    jmp .Lssa_33_79
-.Lssa_33_78:
+    jne .Lssa_33_81
+    jmp .Lssa_33_82
+.Lssa_33_81:
     mov rbx, 1
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_33_79
-.Lssa_33_79:
+    jmp .Lssa_33_82
+.Lssa_33_82:
     mov rbx, 281474976710655
     mov rax, rax
     and rax, rbx
@@ -1637,15 +1646,15 @@ _65_ssa_tagged_packed_bits__test_tagged_ptr_basic:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_33_80
-    jmp .Lssa_33_81
-.Lssa_33_80:
+    jne .Lssa_33_83
+    jmp .Lssa_33_84
+.Lssa_33_83:
     mov rax, 2
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_33_81
-.Lssa_33_81:
+    jmp .Lssa_33_84
+.Lssa_33_84:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -1664,7 +1673,7 @@ _65_ssa_tagged_packed_bits__test_tagged_layout_packed_struct:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_34_82:
+.Lssa_34_85:
     lea rax, [rbp-8]
     mov rbx, 0
     mov rax, rax
@@ -1720,16 +1729,16 @@ _65_ssa_tagged_packed_bits__test_tagged_layout_packed_struct:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_34_83
-    jmp .Lssa_34_84
-.Lssa_34_83:
+    jne .Lssa_34_86
+    jmp .Lssa_34_87
+.Lssa_34_86:
     mov rbx, 3
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_34_84
-.Lssa_34_84:
+    jmp .Lssa_34_87
+.Lssa_34_87:
     mov rbx, 281474976710655
     mov rax, rax
     and rax, rbx
@@ -1739,15 +1748,15 @@ _65_ssa_tagged_packed_bits__test_tagged_layout_packed_struct:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_34_85
-    jmp .Lssa_34_86
-.Lssa_34_85:
+    jne .Lssa_34_88
+    jmp .Lssa_34_89
+.Lssa_34_88:
     mov rax, 4
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_34_86
-.Lssa_34_86:
+    jmp .Lssa_34_89
+.Lssa_34_89:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -1766,7 +1775,7 @@ _65_ssa_tagged_packed_bits__test_packed_bitfield_access:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_35_87:
+.Lssa_35_90:
     lea rax, [rbp-2]
     movzx rbx, word [rax]
     mov rcx, 3
@@ -1826,15 +1835,15 @@ _65_ssa_tagged_packed_bits__test_packed_bitfield_access:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_35_88
-    jmp .Lssa_35_89
-.Lssa_35_88:
+    jne .Lssa_35_91
+    jmp .Lssa_35_92
+.Lssa_35_91:
     mov rax, 5
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_35_89
-.Lssa_35_89:
+    jmp .Lssa_35_92
+.Lssa_35_92:
     lea rax, [rbp-2]
     movzx rax, word [rax]
     mov rbx, 4
@@ -1851,15 +1860,15 @@ _65_ssa_tagged_packed_bits__test_packed_bitfield_access:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_35_90
-    jmp .Lssa_35_91
-.Lssa_35_90:
+    jne .Lssa_35_93
+    jmp .Lssa_35_94
+.Lssa_35_93:
     mov rax, 6
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_35_91
-.Lssa_35_91:
+    jmp .Lssa_35_94
+.Lssa_35_94:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -1878,7 +1887,7 @@ main:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_36_92:
+.Lssa_36_95:
     mov rax, 0
     lea rax, [rbp-8]
     call _65_ssa_tagged_packed_bits__test_tagged_ptr_basic
@@ -1889,14 +1898,14 @@ main:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_36_93
-    jmp .Lssa_36_94
-.Lssa_36_93:
+    jne .Lssa_36_96
+    jmp .Lssa_36_97
+.Lssa_36_96:
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_36_94
-.Lssa_36_94:
+    jmp .Lssa_36_97
+.Lssa_36_97:
     lea rax, [rbp-8]
     call _65_ssa_tagged_packed_bits__test_tagged_layout_packed_struct
     mov rbx, 0
@@ -1906,14 +1915,14 @@ main:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_36_95
-    jmp .Lssa_36_96
-.Lssa_36_95:
+    jne .Lssa_36_98
+    jmp .Lssa_36_99
+.Lssa_36_98:
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_36_96
-.Lssa_36_96:
+    jmp .Lssa_36_99
+.Lssa_36_99:
     lea rax, [rbp-8]
     call _65_ssa_tagged_packed_bits__test_packed_bitfield_access
     mov rbx, 0
@@ -1923,14 +1932,14 @@ main:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_36_97
-    jmp .Lssa_36_98
-.Lssa_36_97:
+    jne .Lssa_36_100
+    jmp .Lssa_36_101
+.Lssa_36_100:
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_36_98
-.Lssa_36_98:
+    jmp .Lssa_36_101
+.Lssa_36_101:
     mov rax, 0
     mov rsp, rbp
     pop rbp

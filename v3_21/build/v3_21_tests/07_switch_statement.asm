@@ -20,7 +20,7 @@ _07_switch_statement__get_value:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_33_77:
+.Lssa_33_80:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -28,61 +28,61 @@ _07_switch_statement__get_value:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_33_78
-    jmp .Lssa_33_79
-.Lssa_33_78:
+    jne .Lssa_33_81
+    jmp .Lssa_33_82
+.Lssa_33_81:
     mov rbx, 10
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_33_79
-.Lssa_33_79:
+    jmp .Lssa_33_82
+.Lssa_33_82:
     push rax
     cmp rax, 1
     sete al
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_33_80
-    jmp .Lssa_33_81
-.Lssa_33_80:
+    jne .Lssa_33_83
+    jmp .Lssa_33_84
+.Lssa_33_83:
     mov rbx, 20
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_33_81
-.Lssa_33_81:
+    jmp .Lssa_33_84
+.Lssa_33_84:
     push rax
     cmp rax, 2
     sete al
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_33_82
-    jmp .Lssa_33_83
-.Lssa_33_82:
+    jne .Lssa_33_85
+    jmp .Lssa_33_86
+.Lssa_33_85:
     mov rbx, 30
     mov rax, rbx
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_33_83
-.Lssa_33_83:
+    jmp .Lssa_33_86
+.Lssa_33_86:
     cmp rax, 3
     sete al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_33_84
-    jmp .Lssa_33_85
-.Lssa_33_84:
+    jne .Lssa_33_87
+    jmp .Lssa_33_88
+.Lssa_33_87:
     mov rax, 40
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_33_85
-.Lssa_33_85:
+    jmp .Lssa_33_88
+.Lssa_33_88:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -101,7 +101,7 @@ _07_switch_statement__test_switch_int:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_34_86:
+.Lssa_34_89:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 1
@@ -109,45 +109,45 @@ _07_switch_statement__test_switch_int:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_34_88
-    jmp .Lssa_34_92
-.Lssa_34_87:
+    jne .Lssa_34_91
+    jmp .Lssa_34_95
+.Lssa_34_90:
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_34_88:
-    mov rax, 100
-    jmp .Lssa_34_87
-.Lssa_34_89:
-    mov rax, 200
-    jmp .Lssa_34_87
-.Lssa_34_90:
-    mov rax, 300
-    jmp .Lssa_34_87
 .Lssa_34_91:
-    mov rax, 999
-    jmp .Lssa_34_87
+    mov rax, 100
+    jmp .Lssa_34_90
 .Lssa_34_92:
+    mov rax, 200
+    jmp .Lssa_34_90
+.Lssa_34_93:
+    mov rax, 300
+    jmp .Lssa_34_90
+.Lssa_34_94:
+    mov rax, 999
+    jmp .Lssa_34_90
+.Lssa_34_95:
     push rax
     cmp rax, 2
     sete al
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_34_89
-    jmp .Lssa_34_93
-.Lssa_34_93:
+    jne .Lssa_34_92
+    jmp .Lssa_34_96
+.Lssa_34_96:
     cmp rax, 3
     sete al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_34_90
-    jmp .Lssa_34_94
-.Lssa_34_94:
-    jmp .Lssa_34_91
-.Lssa_34_95:
-.Lssa_34_96:
+    jne .Lssa_34_93
+    jmp .Lssa_34_97
 .Lssa_34_97:
+    jmp .Lssa_34_94
+.Lssa_34_98:
+.Lssa_34_99:
+.Lssa_34_100:
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -162,7 +162,7 @@ _07_switch_statement__test_switch_enum:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_35_98:
+.Lssa_35_101:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -170,58 +170,58 @@ _07_switch_statement__test_switch_enum:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_35_100
-    jmp .Lssa_35_105
-.Lssa_35_99:
+    jne .Lssa_35_103
+    jmp .Lssa_35_108
+.Lssa_35_102:
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_35_100:
-    mov rax, 1000
-    jmp .Lssa_35_99
-.Lssa_35_101:
-    mov rax, 2000
-    jmp .Lssa_35_99
-.Lssa_35_102:
-    mov rax, 3000
-    jmp .Lssa_35_99
 .Lssa_35_103:
-    mov rax, 4000
-    jmp .Lssa_35_99
+    mov rax, 1000
+    jmp .Lssa_35_102
 .Lssa_35_104:
-    mov rax, 9999
-    jmp .Lssa_35_99
+    mov rax, 2000
+    jmp .Lssa_35_102
 .Lssa_35_105:
+    mov rax, 3000
+    jmp .Lssa_35_102
+.Lssa_35_106:
+    mov rax, 4000
+    jmp .Lssa_35_102
+.Lssa_35_107:
+    mov rax, 9999
+    jmp .Lssa_35_102
+.Lssa_35_108:
     push rax
     cmp rax, 1
     sete al
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_35_101
-    jmp .Lssa_35_106
-.Lssa_35_106:
+    jne .Lssa_35_104
+    jmp .Lssa_35_109
+.Lssa_35_109:
     push rax
     cmp rax, 2
     sete al
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_35_102
-    jmp .Lssa_35_107
-.Lssa_35_107:
+    jne .Lssa_35_105
+    jmp .Lssa_35_110
+.Lssa_35_110:
     cmp rax, 3
     sete al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_35_103
-    jmp .Lssa_35_108
-.Lssa_35_108:
-    jmp .Lssa_35_104
-.Lssa_35_109:
-.Lssa_35_110:
+    jne .Lssa_35_106
+    jmp .Lssa_35_111
 .Lssa_35_111:
+    jmp .Lssa_35_107
 .Lssa_35_112:
+.Lssa_35_113:
+.Lssa_35_114:
+.Lssa_35_115:
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -236,16 +236,16 @@ _07_switch_statement__test_switch_default_only:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_36_113:
+.Lssa_36_116:
     mov rax, [rbp-1032]
-    jmp .Lssa_36_115
-.Lssa_36_114:
+    jmp .Lssa_36_118
+.Lssa_36_117:
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_36_115:
+.Lssa_36_118:
     mov rax, 777
-    jmp .Lssa_36_114
+    jmp .Lssa_36_117
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -260,7 +260,7 @@ _07_switch_statement__test_switch_nested:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_37_116:
+.Lssa_37_119:
     mov rax, [rbp-1040]
     mov rbx, [rbp-1032]
     push rax
@@ -269,36 +269,36 @@ _07_switch_statement__test_switch_nested:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_37_118
-    jmp .Lssa_37_120
-.Lssa_37_117:
+    jne .Lssa_37_121
+    jmp .Lssa_37_123
+.Lssa_37_120:
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_37_118:
+.Lssa_37_121:
     cmp rax, 2
     sete al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_37_122
-    jmp .Lssa_37_124
-.Lssa_37_119:
-    mov rax, 99
-    jmp .Lssa_37_117
-.Lssa_37_120:
-    jmp .Lssa_37_119
-.Lssa_37_121:
-    jmp .Lssa_37_117
+    jne .Lssa_37_125
+    jmp .Lssa_37_127
 .Lssa_37_122:
-    mov rax, 12
-    jmp .Lssa_37_121
+    mov rax, 99
+    jmp .Lssa_37_120
 .Lssa_37_123:
-    mov rax, 10
-    jmp .Lssa_37_121
+    jmp .Lssa_37_122
 .Lssa_37_124:
-    jmp .Lssa_37_123
+    jmp .Lssa_37_120
 .Lssa_37_125:
+    mov rax, 12
+    jmp .Lssa_37_124
 .Lssa_37_126:
+    mov rax, 10
+    jmp .Lssa_37_124
+.Lssa_37_127:
+    jmp .Lssa_37_126
+.Lssa_37_128:
+.Lssa_37_129:
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -313,7 +313,7 @@ _07_switch_statement__test_switch_string:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_38_127:
+.Lssa_38_130:
     mov rax, [rbp-1032]
     lea rbx, [rel _str0]
     push rax
@@ -322,34 +322,34 @@ _07_switch_statement__test_switch_string:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_38_129
-    jmp .Lssa_38_133
-.Lssa_38_128:
+    jne .Lssa_38_132
+    jmp .Lssa_38_136
+.Lssa_38_131:
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_38_129:
+.Lssa_38_132:
     mov rax, 100
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_38_130:
+.Lssa_38_133:
     mov rax, 200
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_38_131:
+.Lssa_38_134:
     mov rax, 300
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_38_132:
+.Lssa_38_135:
     mov rax, 999
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_38_133:
+.Lssa_38_136:
     lea rbx, [rel _str1]
     push rax
     cmp rax, rbx
@@ -357,18 +357,18 @@ _07_switch_statement__test_switch_string:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_38_130
-    jmp .Lssa_38_134
-.Lssa_38_134:
+    jne .Lssa_38_133
+    jmp .Lssa_38_137
+.Lssa_38_137:
     lea rbx, [rel _str2]
     cmp rax, rbx
     sete al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_38_131
+    jne .Lssa_38_134
+    jmp .Lssa_38_138
+.Lssa_38_138:
     jmp .Lssa_38_135
-.Lssa_38_135:
-    jmp .Lssa_38_132
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -383,20 +383,20 @@ main:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_39_136:
+.Lssa_39_139:
     mov rax, [rbp-1040]
     mov rax, [rbp-1032]
     mov rax, 0
     cmp rax, 0
-    jne .Lssa_39_137
-    jmp .Lssa_39_138
-.Lssa_39_137:
+    jne .Lssa_39_140
+    jmp .Lssa_39_141
+.Lssa_39_140:
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_138
-.Lssa_39_138:
+    jmp .Lssa_39_141
+.Lssa_39_141:
     mov rax, 0
     push rax
     pop rdi
@@ -440,26 +440,26 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_139
-    jmp .Lssa_39_140
-.Lssa_39_139:
+    jne .Lssa_39_142
+    jmp .Lssa_39_143
+.Lssa_39_142:
     mov rax, 2
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_140
-.Lssa_39_140:
+    jmp .Lssa_39_143
+.Lssa_39_143:
     mov rax, 0
     cmp rax, 0
-    jne .Lssa_39_141
-    jmp .Lssa_39_142
-.Lssa_39_141:
+    jne .Lssa_39_144
+    jmp .Lssa_39_145
+.Lssa_39_144:
     mov rax, 3
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_142
-.Lssa_39_142:
+    jmp .Lssa_39_145
+.Lssa_39_145:
     mov rax, 2
     push rax
     pop rdi
@@ -468,15 +468,15 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_143
-    jmp .Lssa_39_144
-.Lssa_39_143:
+    jne .Lssa_39_146
+    jmp .Lssa_39_147
+.Lssa_39_146:
     mov rax, 4
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_144
-.Lssa_39_144:
+    jmp .Lssa_39_147
+.Lssa_39_147:
     mov rax, 1
     push rax
     pop rdi
@@ -485,15 +485,15 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_145
-    jmp .Lssa_39_146
-.Lssa_39_145:
+    jne .Lssa_39_148
+    jmp .Lssa_39_149
+.Lssa_39_148:
     mov rax, 5
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_146
-.Lssa_39_146:
+    jmp .Lssa_39_149
+.Lssa_39_149:
     mov rax, 99
     push rax
     pop rdi
@@ -502,15 +502,15 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_147
-    jmp .Lssa_39_148
-.Lssa_39_147:
+    jne .Lssa_39_150
+    jmp .Lssa_39_151
+.Lssa_39_150:
     mov rax, 6
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_148
-.Lssa_39_148:
+    jmp .Lssa_39_151
+.Lssa_39_151:
     mov rax, 1
     push rax
     pop rdi
@@ -519,15 +519,15 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_149
-    jmp .Lssa_39_150
-.Lssa_39_149:
+    jne .Lssa_39_152
+    jmp .Lssa_39_153
+.Lssa_39_152:
     mov rax, 7
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_150
-.Lssa_39_150:
+    jmp .Lssa_39_153
+.Lssa_39_153:
     mov rax, 0
     push rax
     pop rdi
@@ -536,15 +536,15 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_151
-    jmp .Lssa_39_152
-.Lssa_39_151:
+    jne .Lssa_39_154
+    jmp .Lssa_39_155
+.Lssa_39_154:
     mov rax, 8
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_152
-.Lssa_39_152:
+    jmp .Lssa_39_155
+.Lssa_39_155:
     mov rax, 123
     push rax
     pop rdi
@@ -553,15 +553,15 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_153
-    jmp .Lssa_39_154
-.Lssa_39_153:
+    jne .Lssa_39_156
+    jmp .Lssa_39_157
+.Lssa_39_156:
     mov rax, 9
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_154
-.Lssa_39_154:
+    jmp .Lssa_39_157
+.Lssa_39_157:
     mov rax, 1
     mov rbx, 2
     push rbx
@@ -573,15 +573,15 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_155
-    jmp .Lssa_39_156
-.Lssa_39_155:
+    jne .Lssa_39_158
+    jmp .Lssa_39_159
+.Lssa_39_158:
     mov rax, 10
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_156
-.Lssa_39_156:
+    jmp .Lssa_39_159
+.Lssa_39_159:
     lea rax, [rel _str1]
     push rax
     pop rdi
@@ -590,15 +590,15 @@ main:
     setne al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_39_157
-    jmp .Lssa_39_158
-.Lssa_39_157:
+    jne .Lssa_39_160
+    jmp .Lssa_39_161
+.Lssa_39_160:
     mov rax, 11
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_39_158
-.Lssa_39_158:
+    jmp .Lssa_39_161
+.Lssa_39_161:
     mov rax, 0
     mov rsp, rbp
     pop rbp

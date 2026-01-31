@@ -18,10 +18,8 @@ struct StringBuilder {
 
 // 내부: 바이트 복사
 func sb_copy_bytes(dst: u64, src: u64, n: u64) -> u64 {
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         *(*u8)(dst + i) = *(*u8)(src + i);
-        i = i + 1;
     }
     return 0;
 }
@@ -114,7 +112,7 @@ impl StringBuilder {
     
     // u64 10진수 추가
     func append_u64_dec(self: *StringBuilder, x: u64) -> u64 {
-        var buf: u64 = heap_alloc(32);
+        var buf: u64 = heap_alloc(32 * sizeof(u8));
         var i: u64 = 0;
         
         if (x == 0) {
@@ -132,7 +130,7 @@ impl StringBuilder {
         // reverse in place
         var j: u64 = 0;
         var k: u64 = i - 1;
-        while (j < k) {
+        for (; j < k; ) {
             var a: u64 = *(*u8)(buf + j);
             var b: u64 = *(*u8)(buf + k);
             *(*u8)(buf + j) = b;

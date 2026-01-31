@@ -261,7 +261,7 @@ std_io__emit:
     pop rax
     cmp rcx, 0
     jne .Lssa_27_56
-    jmp .Lssa_27_57
+    jmp .Lssa_27_58
 .Lssa_27_56:
     mov rcx, rbx
     add rcx, rdx
@@ -272,9 +272,14 @@ std_io__emit:
     movzx rcx, al
     pop rax
     cmp rcx, 0
-    jne .Lssa_27_58
-    jmp .Lssa_27_59
+    jne .Lssa_27_59
+    jmp .Lssa_27_60
 .Lssa_27_57:
+    mov rcx, rdx
+    add rcx, 1
+    mov rdx, rcx
+    jmp .Lssa_27_55
+.Lssa_27_58:
     push rbx
     push rcx
     call std_io__io_get_output_fd
@@ -291,17 +296,14 @@ std_io__emit:
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_27_58:
-    mov rcx, rdx
-    jmp .Lssa_27_57
 .Lssa_27_59:
     mov rcx, rdx
-    add rcx, 1
-    mov rdx, rcx
-    jmp .Lssa_27_55
+    jmp .Lssa_27_58
 .Lssa_27_60:
-    jmp .Lssa_27_59
-.Lssa_27_215:
+    jmp .Lssa_27_57
+.Lssa_27_61:
+    jmp .Lssa_27_60
+.Lssa_27_220:
     mov rcx, rax
     xor eax, eax
     mov rsp, rbp
@@ -317,7 +319,7 @@ std_util__emit_u64:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_55_182:
+.Lssa_55_187:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -325,9 +327,9 @@ std_util__emit_u64:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_55_183
-    jmp .Lssa_55_184
-.Lssa_55_183:
+    jne .Lssa_55_188
+    jmp .Lssa_55_189
+.Lssa_55_188:
     lea rbx, [rel _str0]
     mov rcx, 1
     push rax
@@ -341,8 +343,8 @@ std_util__emit_u64:
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_55_184
-.Lssa_55_184:
+    jmp .Lssa_55_189
+.Lssa_55_189:
     mov rbx, 32
     push rax
     push rbx
@@ -353,15 +355,15 @@ std_util__emit_u64:
     mov rcx, 0
     mov r8, rax
     mov rdx, rcx
-    jmp .Lssa_55_185
-.Lssa_55_185:
+    jmp .Lssa_55_190
+.Lssa_55_190:
     cmp r8, 0
     setg al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_55_186
-    jmp .Lssa_55_188
-.Lssa_55_186:
+    jne .Lssa_55_191
+    jmp .Lssa_55_193
+.Lssa_55_191:
     mov rax, rbx
     add rax, rdx
     push rax
@@ -385,24 +387,24 @@ std_util__emit_u64:
     pop rdx
     mov rcx, rdx
     add rcx, 1
-    jmp .Lssa_55_187
-.Lssa_55_187:
+    jmp .Lssa_55_192
+.Lssa_55_192:
     mov r8, rax
     mov rdx, rcx
-    jmp .Lssa_55_185
-.Lssa_55_188:
+    jmp .Lssa_55_190
+.Lssa_55_193:
     mov rax, rdx
     sub rax, 1
     mov r8, rax
-    jmp .Lssa_55_189
-.Lssa_55_189:
+    jmp .Lssa_55_194
+.Lssa_55_194:
     cmp r8, 0
     setge al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_55_190
-    jmp .Lssa_55_192
-.Lssa_55_190:
+    jne .Lssa_55_195
+    jmp .Lssa_55_197
+.Lssa_55_195:
     mov rax, 1
     mov rcx, rbx
     add rcx, r8
@@ -418,13 +420,13 @@ std_util__emit_u64:
     call std_io__sys_write
     pop r8
     pop rbx
-    jmp .Lssa_55_191
-.Lssa_55_191:
+    jmp .Lssa_55_196
+.Lssa_55_196:
     mov rax, r8
     sub rax, 1
     mov r8, rax
-    jmp .Lssa_55_189
-.Lssa_55_192:
+    jmp .Lssa_55_194
+.Lssa_55_197:
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -443,7 +445,7 @@ std_util__emit_i64:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_57_204:
+.Lssa_57_209:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -451,9 +453,9 @@ std_util__emit_i64:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_57_205
-    jmp .Lssa_57_207
-.Lssa_57_205:
+    jne .Lssa_57_210
+    jmp .Lssa_57_212
+.Lssa_57_210:
     lea rbx, [rel _str1]
     mov rcx, 1
     push rax
@@ -468,17 +470,17 @@ std_util__emit_i64:
     push rax
     pop rdi
     call std_util__emit_u64
-    jmp .Lssa_57_206
-.Lssa_57_206:
+    jmp .Lssa_57_211
+.Lssa_57_211:
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_57_207:
+.Lssa_57_212:
     push rax
     pop rdi
     call std_util__emit_u64
-    jmp .Lssa_57_206
+    jmp .Lssa_57_211
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -493,7 +495,7 @@ std_util__emit_nl:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_59_212:
+.Lssa_59_217:
     mov rax, 1
     push rax
     pop rdi
@@ -527,7 +529,7 @@ main:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_60_213:
+.Lssa_60_218:
     mov rax, [rbp-1040]
     mov rax, [rbp-1032]
     lea rax, [rel _str2]

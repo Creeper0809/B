@@ -20,20 +20,20 @@ main:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_33_77:
+.Lssa_33_80:
     mov rax, [rbp-1040]
     mov rax, [rbp-1032]
     mov rax, 0
     cmp rax, 0
-    jne .Lssa_33_78
-    jmp .Lssa_33_79
-.Lssa_33_78:
+    jne .Lssa_33_81
+    jmp .Lssa_33_82
+.Lssa_33_81:
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_33_79
-.Lssa_33_79:
+    jmp .Lssa_33_82
+.Lssa_33_82:
     mov rax, 0
     mov rsp, rbp
     pop rbp

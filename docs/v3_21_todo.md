@@ -12,3 +12,9 @@
 - [x] Replace SIZEOF_SSA_* usages with sizeof and remove unused constants.
 - [x] Refactor std/vec to struct access and for-loop copy (sizeof(u64) elements).
 - [x] Refactor std/hashmap to struct-based layout and sizeof allocations.
+- [x] Refactor std/util stack trace to StackFrame struct + for-loops.
+- [x] Normalize std/string_builder loop styles and sizeof(u8) buffers.
+- [x] Refactor std/io print loops and remove tmp usage.
+- [x] Refactor emitter/emitter state allocations and loop styles.
+- [x] Normalize std/path allocations with sizeof(u8).
+- [x] Convert compiler module-id helper loops to for.

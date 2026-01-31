@@ -1121,7 +1121,7 @@ std_io__emit:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L26
+    jz .L27
     mov rax, [rbp-8]
     push rax
     mov rax, [rbp-24]
@@ -1137,14 +1137,15 @@ std_io__emit:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L27
+    jz .L28
     mov rax, [rbp-24]
     push rax
     lea rax, [rbp-16]
     pop rbx
     mov [rax], rbx
-    jmp .L26
-.L27:
+    jmp .L27
+.L28:
+.L26:
     mov rax, [rbp-24]
     push rax
     mov rax, 1
@@ -1156,7 +1157,7 @@ std_io__emit:
     pop rbx
     mov [rax], rbx
     jmp .L25
-.L26:
+.L27:
     call std_io__io_get_output_fd
     mov [rbp-32], rax
     mov rax, [rbp-16]
@@ -1261,12 +1262,12 @@ std_io__print_u64:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L29
+    jz .L30
     call std_io__io_get_output_fd
     mov [rbp-16], rax
     mov rax, 1
     push rax
-    lea rax, [rel _str31]
+    lea rax, [rel _str32]
     push rax
     mov rax, [rbp-16]
     push rax
@@ -1278,8 +1279,13 @@ std_io__print_u64:
     mov rsp, rbp
     pop rbp
     ret
-.L29:
+.L30:
     mov rax, 32
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc
@@ -1288,7 +1294,7 @@ std_io__print_u64:
     mov [rbp-32], rax
     mov rax, [rbp-8]
     mov [rbp-40], rax
-.L32:
+.L33:
     mov rax, [rbp-40]
     push rax
     mov rax, 0
@@ -1298,7 +1304,7 @@ std_io__print_u64:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L33
+    jz .L35
     mov rax, [rbp-40]
     push rax
     mov rax, 10
@@ -1344,8 +1350,9 @@ std_io__print_u64:
     lea rax, [rbp-32]
     pop rbx
     mov [rax], rbx
-    jmp .L32
-.L33:
+.L34:
+    jmp .L33
+.L35:
     mov rax, [rbp-32]
     push rax
     mov rax, 1
@@ -1353,7 +1360,7 @@ std_io__print_u64:
     pop rax
     sub rax, rbx
     mov [rbp-56], rax
-.L34:
+.L36:
     mov rax, [rbp-56]
     push rax
     mov rax, 0
@@ -1363,7 +1370,7 @@ std_io__print_u64:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L35
+    jz .L38
     call std_io__io_get_output_fd
     mov [rbp-64], rax
     mov rax, 1
@@ -1381,6 +1388,7 @@ std_io__print_u64:
     pop rsi
     pop rdx
     call std_os__os_sys_write
+.L37:
     mov rax, [rbp-56]
     push rax
     mov rax, 1
@@ -1391,8 +1399,8 @@ std_io__print_u64:
     lea rax, [rbp-56]
     pop rbx
     mov [rax], rbx
-    jmp .L34
-.L35:
+    jmp .L36
+.L38:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -1411,12 +1419,12 @@ std_io__print_i64:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L36
+    jz .L39
     call std_io__io_get_output_fd
     mov [rbp-16], rax
     mov rax, 1
     push rax
-    lea rax, [rel _str38]
+    lea rax, [rel _str41]
     push rax
     mov rax, [rbp-16]
     push rax
@@ -1433,13 +1441,13 @@ std_io__print_i64:
     push rax
     pop rdi
     call std_io__print_u64
-    jmp .L37
-.L36:
+    jmp .L40
+.L39:
     mov rax, [rbp-8]
     push rax
     pop rdi
     call std_io__print_u64
-.L37:
+.L40:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -1559,12 +1567,12 @@ _28_type_basics__test_array_basic:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L39
+    jz .L42
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L39:
+.L42:
     mov rax, 100
     push rax
     lea rax, [rbp-40]
@@ -1590,12 +1598,12 @@ _28_type_basics__test_array_basic:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L41
+    jz .L44
     mov rax, 2
     mov rsp, rbp
     pop rbp
     ret
-.L41:
+.L44:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -1621,12 +1629,12 @@ _28_type_basics__test_char_type:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L43
+    jz .L46
     mov rax, 10
     mov rsp, rbp
     pop rbp
     ret
-.L43:
+.L46:
     movzx rax, byte [rbp-2]
     push rax
     mov rax, 66
@@ -1636,12 +1644,12 @@ _28_type_basics__test_char_type:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L45
+    jz .L48
     mov rax, 11
     mov rsp, rbp
     pop rbp
     ret
-.L45:
+.L48:
     movzx rax, byte [rbp-1]
     push rax
     movzx rax, byte [rbp-2]
@@ -1658,12 +1666,12 @@ _28_type_basics__test_char_type:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L47
+    jz .L50
     mov rax, 12
     mov rsp, rbp
     pop rbp
     ret
-.L47:
+.L50:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -1744,12 +1752,12 @@ _28_type_basics__test_char_array:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L49
+    jz .L52
     mov rax, 20
     mov rsp, rbp
     pop rbp
     ret
-.L49:
+.L52:
     lea rax, [rbp-6]
     push rax
     mov rax, 4
@@ -1764,12 +1772,12 @@ _28_type_basics__test_char_array:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L51
+    jz .L54
     mov rax, 21
     mov rsp, rbp
     pop rbp
     ret
-.L51:
+.L54:
     mov rax, 0
     mov [rbp-14], rax
     mov rax, 0
@@ -1779,7 +1787,7 @@ _28_type_basics__test_char_array:
     lea rax, [rbp-22]
     pop rbx
     mov [rax], rbx
-.L53:
+.L56:
     mov rax, [rbp-22]
     push rax
     mov rax, 5
@@ -1789,7 +1797,7 @@ _28_type_basics__test_char_array:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L55
+    jz .L58
     mov rax, [rbp-14]
     push rax
     lea rax, [rbp-6]
@@ -1805,7 +1813,7 @@ _28_type_basics__test_char_array:
     lea rax, [rbp-14]
     pop rbx
     mov [rax], rbx
-.L54:
+.L57:
     mov rax, [rbp-22]
     push rax
     mov rax, 1
@@ -1816,8 +1824,8 @@ _28_type_basics__test_char_array:
     lea rax, [rbp-22]
     pop rbx
     mov [rax], rbx
-    jmp .L53
-.L55:
+    jmp .L56
+.L58:
     mov rax, [rbp-14]
     push rax
     mov rax, 500
@@ -1827,12 +1835,12 @@ _28_type_basics__test_char_array:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L56
+    jz .L59
     mov rax, 22
     mov rsp, rbp
     pop rbp
     ret
-.L56:
+.L59:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -1854,7 +1862,7 @@ _28_type_basics__test_multidim_simulation:
     lea rax, [rbp-88]
     pop rbx
     mov [rax], rbx
-.L58:
+.L61:
     mov rax, [rbp-88]
     push rax
     mov rax, 9
@@ -1864,7 +1872,7 @@ _28_type_basics__test_multidim_simulation:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L60
+    jz .L63
     mov rax, [rbp-80]
     push rax
     lea rax, [rbp-72]
@@ -1885,7 +1893,7 @@ _28_type_basics__test_multidim_simulation:
     lea rax, [rbp-80]
     pop rbx
     mov [rax], rbx
-.L59:
+.L62:
     mov rax, [rbp-88]
     push rax
     mov rax, 1
@@ -1896,8 +1904,8 @@ _28_type_basics__test_multidim_simulation:
     lea rax, [rbp-88]
     pop rbx
     mov [rax], rbx
-    jmp .L58
-.L60:
+    jmp .L61
+.L63:
     lea rax, [rbp-72]
     push rax
     mov rax, 5
@@ -1913,12 +1921,12 @@ _28_type_basics__test_multidim_simulation:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L61
+    jz .L64
     mov rax, 30
     mov rsp, rbp
     pop rbp
     ret
-.L61:
+.L64:
     lea rax, [rbp-72]
     push rax
     mov rax, 0
@@ -1958,12 +1966,12 @@ _28_type_basics__test_multidim_simulation:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L63
+    jz .L66
     mov rax, 31
     mov rsp, rbp
     pop rbp
     ret
-.L63:
+.L66:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -1983,7 +1991,7 @@ _28_type_basics__test_nested_array_access:
     lea rax, [rbp-88]
     pop rbx
     mov [rax], rbx
-.L65:
+.L68:
     mov rax, [rbp-88]
     push rax
     mov rax, 10
@@ -1993,7 +2001,7 @@ _28_type_basics__test_nested_array_access:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L67
+    jz .L70
     mov rax, [rbp-88]
     push rax
     mov rax, 10
@@ -2009,7 +2017,7 @@ _28_type_basics__test_nested_array_access:
     add rax, rbx
     pop rbx
     mov [rax], rbx
-.L66:
+.L69:
     mov rax, [rbp-88]
     push rax
     mov rax, 1
@@ -2020,8 +2028,8 @@ _28_type_basics__test_nested_array_access:
     lea rax, [rbp-88]
     pop rbx
     mov [rax], rbx
-    jmp .L65
-.L67:
+    jmp .L68
+.L70:
     mov rax, 5
     mov [rbp-96], rax
     lea rax, [rbp-80]
@@ -2039,12 +2047,12 @@ _28_type_basics__test_nested_array_access:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L68
+    jz .L71
     mov rax, 40
     mov rsp, rbp
     pop rbp
     ret
-.L68:
+.L71:
     mov rax, 3
     push rax
     lea rax, [rbp-80]
@@ -2078,12 +2086,12 @@ _28_type_basics__test_nested_array_access:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L70
+    jz .L73
     mov rax, 41
     mov rsp, rbp
     pop rbp
     ret
-.L70:
+.L73:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2168,12 +2176,12 @@ _28_type_basics__test_slice_basic:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L72
+    jz .L75
     mov rax, 50
     mov rsp, rbp
     pop rbp
     ret
-.L72:
+.L75:
     lea rax, [rbp-64]
     mov rax, [rax]
     push rax
@@ -2190,12 +2198,12 @@ _28_type_basics__test_slice_basic:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L74
+    jz .L77
     mov rax, 51
     mov rsp, rbp
     pop rbp
     ret
-.L74:
+.L77:
     mov rax, 0
     mov [rbp-72], rax
     mov rax, 0
@@ -2205,7 +2213,7 @@ _28_type_basics__test_slice_basic:
     lea rax, [rbp-80]
     pop rbx
     mov [rax], rbx
-.L76:
+.L79:
     mov rax, [rbp-80]
     push rax
     mov rax, 5
@@ -2215,7 +2223,7 @@ _28_type_basics__test_slice_basic:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L78
+    jz .L81
     mov rax, [rbp-72]
     push rax
     lea rax, [rbp-64]
@@ -2233,7 +2241,7 @@ _28_type_basics__test_slice_basic:
     lea rax, [rbp-72]
     pop rbx
     mov [rax], rbx
-.L77:
+.L80:
     mov rax, [rbp-80]
     push rax
     mov rax, 1
@@ -2244,8 +2252,8 @@ _28_type_basics__test_slice_basic:
     lea rax, [rbp-80]
     pop rbx
     mov [rax], rbx
-    jmp .L76
-.L78:
+    jmp .L79
+.L81:
     mov rax, [rbp-72]
     push rax
     mov rax, 150
@@ -2255,12 +2263,12 @@ _28_type_basics__test_slice_basic:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L79
+    jz .L82
     mov rax, 52
     mov rsp, rbp
     pop rbp
     ret
-.L79:
+.L82:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2285,7 +2293,7 @@ _28_type_basics__sum_slice:
     lea rax, [rbp-40]
     pop rbx
     mov [rax], rbx
-.L81:
+.L84:
     mov rax, [rbp-40]
     push rax
     mov rax, [rbp-24]
@@ -2295,7 +2303,7 @@ _28_type_basics__sum_slice:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L83
+    jz .L86
     mov rax, [rbp-32]
     push rax
     lea rax, [rbp-16]
@@ -2313,7 +2321,7 @@ _28_type_basics__sum_slice:
     lea rax, [rbp-32]
     pop rbx
     mov [rax], rbx
-.L82:
+.L85:
     mov rax, [rbp-40]
     push rax
     mov rax, 1
@@ -2324,8 +2332,8 @@ _28_type_basics__sum_slice:
     lea rax, [rbp-40]
     pop rbx
     mov [rax], rbx
-    jmp .L81
-.L83:
+    jmp .L84
+.L86:
     mov rax, [rbp-32]
     mov rsp, rbp
     pop rbp
@@ -2440,12 +2448,12 @@ _28_type_basics__test_slice_struct_fields:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L84
+    jz .L87
     mov rax, 60
     mov rsp, rbp
     pop rbp
     ret
-.L84:
+.L87:
     lea rax, [rbp-16]
     mov rax, [rax]
     push rax
@@ -2462,12 +2470,12 @@ _28_type_basics__test_slice_struct_fields:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L86
+    jz .L89
     mov rax, 61
     mov rsp, rbp
     pop rbp
     ret
-.L86:
+.L89:
     mov rax, 3
     push rax
     mov rax, [rbp-72]
@@ -2498,12 +2506,12 @@ _28_type_basics__test_slice_struct_fields:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L88
+    jz .L91
     mov rax, 62
     mov rsp, rbp
     pop rbp
     ret
-.L88:
+.L91:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2614,12 +2622,12 @@ _28_type_basics__test_array_param_return:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L90
+    jz .L93
     mov rax, 70
     mov rsp, rbp
     pop rbp
     ret
-.L90:
+.L93:
     lea rax, [rbp-24]
     push rax
     pop rdi
@@ -2640,12 +2648,12 @@ _28_type_basics__test_array_param_return:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L92
+    jz .L95
     mov rax, 71
     mov rsp, rbp
     pop rbp
     ret
-.L92:
+.L95:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2708,12 +2716,12 @@ _28_type_basics__test_tagged_ptr_basic:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L94
+    jz .L97
     mov rax, 80
     mov rsp, rbp
     pop rbp
     ret
-.L94:
+.L97:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2781,12 +2789,12 @@ _28_type_basics__test_tagged_layout_packed_struct:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L96
+    jz .L99
     mov rax, 90
     mov rsp, rbp
     pop rbp
     ret
-.L96:
+.L99:
     mov rax, [rbp-24]
     mov rbx, 281474976710655
     and rax, rbx
@@ -2799,12 +2807,12 @@ _28_type_basics__test_tagged_layout_packed_struct:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L98
+    jz .L101
     mov rax, 91
     mov rsp, rbp
     pop rbp
     ret
-.L98:
+.L101:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2874,12 +2882,12 @@ _28_type_basics__test_packed_bitfield_access:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L100
+    jz .L103
     mov rax, 100
     mov rsp, rbp
     pop rbp
     ret
-.L100:
+.L103:
     lea rax, [rbp-2]
     movzx rax, word [rax]
     mov rcx, 4
@@ -2897,12 +2905,12 @@ _28_type_basics__test_packed_bitfield_access:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L102
+    jz .L105
     mov rax, 101
     mov rsp, rbp
     pop rbp
     ret
-.L102:
+.L105:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2931,12 +2939,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L104
+    jz .L107
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L104:
+.L107:
     call _28_type_basics__test_char_type
     push rax
     lea rax, [rbp-8]
@@ -2951,12 +2959,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L106
+    jz .L109
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L106:
+.L109:
     call _28_type_basics__test_char_array
     push rax
     lea rax, [rbp-8]
@@ -2971,12 +2979,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L108
+    jz .L111
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L108:
+.L111:
     call _28_type_basics__test_multidim_simulation
     push rax
     lea rax, [rbp-8]
@@ -2991,12 +2999,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L110
+    jz .L113
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L110:
+.L113:
     call _28_type_basics__test_nested_array_access
     push rax
     lea rax, [rbp-8]
@@ -3011,12 +3019,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L112
+    jz .L115
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L112:
+.L115:
     call _28_type_basics__test_slice_basic
     push rax
     lea rax, [rbp-8]
@@ -3031,12 +3039,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L114
+    jz .L117
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L114:
+.L117:
     call _28_type_basics__test_slice_struct_fields
     push rax
     lea rax, [rbp-8]
@@ -3051,12 +3059,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L116
+    jz .L119
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L116:
+.L119:
     call _28_type_basics__test_array_param_return
     push rax
     lea rax, [rbp-8]
@@ -3071,12 +3079,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L118
+    jz .L121
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L118:
+.L121:
     call _28_type_basics__test_tagged_ptr_basic
     push rax
     lea rax, [rbp-8]
@@ -3091,12 +3099,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L120
+    jz .L123
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L120:
+.L123:
     call _28_type_basics__test_tagged_layout_packed_struct
     push rax
     lea rax, [rbp-8]
@@ -3111,12 +3119,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L122
+    jz .L125
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L122:
+.L125:
     call _28_type_basics__test_packed_bitfield_access
     push rax
     lea rax, [rbp-8]
@@ -3131,12 +3139,12 @@ main:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L124
+    jz .L127
     mov rax, [rbp-8]
     mov rsp, rbp
     pop rbp
     ret
-.L124:
+.L127:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -3148,8 +3156,8 @@ main:
 
 section .data
 _str24: db 10,0
-_str31: db 48,0
-_str38: db 45,0
+_str32: db 48,0
+_str41: db 45,0
 
 section .bss
 _gvar_std_os__g_syscall_arg0: resq 1

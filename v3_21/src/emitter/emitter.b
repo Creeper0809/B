@@ -13,6 +13,32 @@ import std.util;
 import std.str;
 import types;
 
+// Local layout structs for sizeof during bootstrap
+struct SymtabLocal {
+    names_vec: u64;
+    offsets_vec: u64;
+    types_vec: u64;
+    count: u64;
+    stack_offset: u64;
+}
+
+struct ConstInfoLocal {
+    name_ptr: u64;
+    name_len: u64;
+    value: u64;
+}
+
+struct ConstResultLocal {
+    found: u64;
+    value: u64;
+}
+
+struct StringEntryLocal {
+    str_ptr: u64;
+    str_len: u64;
+    label_id: u64;
+}
+
 // ============================================
 // Global Codegen State
 // ============================================
@@ -66,7 +92,7 @@ func emitter_get_ret_struct_name_len() -> u64 { return g_current_func_ret_struct
 func emitter_init() -> u64 {
     // Create symtab inline instead of calling symtab_new
     // symtab = [names_vec, offsets_vec, types_vec, count, stack_offset]
-    g_symtab = heap_alloc(40);
+    g_symtab = heap_alloc(sizeof(SymtabLocal));
     var symtab: *Symtab = (*Symtab)g_symtab;
     symtab->names_vec = vec_new(64);
     symtab->offsets_vec = vec_new(64);
@@ -92,17 +118,15 @@ func emitter_set_globals_from_prog(globals: u64) -> u64 {
 func emitter_load_consts(consts: u64) -> u64 {
     g_consts = vec_new(64);
     var clen: u64 = vec_len(consts);
-    var ci: u64 = 0;
-    while (ci < clen) {
+    for (var ci: u64 = 0; ci < clen; ci++) {
         var c: u64 = vec_get(consts, ci);
         var const_decl: *AstConstDecl = (*AstConstDecl)c;
-        var cinfo: u64 = heap_alloc(24);
+        var cinfo: u64 = heap_alloc(sizeof(ConstInfoLocal));
         var cinfo_struct: *ConstInfo = (*ConstInfo)cinfo;
         cinfo_struct->name_ptr = const_decl->name_ptr;
         cinfo_struct->name_len = const_decl->name_len;
         cinfo_struct->value = const_decl->value;
         vec_push(g_consts, cinfo);
-        ci = ci + 1;
     }
 }
 
@@ -112,13 +136,11 @@ func emitter_load_consts(consts: u64) -> u64 {
 
 func is_global_var(name_ptr: u64, name_len: u64) -> u64 {
     var len: u64 = vec_len(g_globals);
-    var i: u64 = 0;
-    while (i < len) {
+    for (var i: u64 = 0; i < len; i++) {
         var ginfo: *GlobalInfo = (*GlobalInfo)vec_get(g_globals, i);
         if (str_eq(ginfo->name_ptr, ginfo->name_len, name_ptr, name_len)) {
             return 1;
         }
-        i = i + 1;
     }
     return 0;
 }
@@ -129,20 +151,18 @@ func is_global_var(name_ptr: u64, name_len: u64) -> u64 {
 
 func const_find(name_ptr: u64, name_len: u64) -> u64 {
     var len: u64 = vec_len(g_consts);
-    var i: u64 = 0;
-    while (i < len) {
+    for (var i: u64 = 0; i < len; i++) {
         var c: u64 = vec_get(g_consts, i);
         var cinfo: *ConstInfo = (*ConstInfo)c;
         if (str_eq(cinfo->name_ptr, cinfo->name_len, name_ptr, name_len)) {
-            var result: u64 = heap_alloc(16);
+            var result: u64 = heap_alloc(sizeof(ConstResultLocal));
             var result_struct: *ConstResult = (*ConstResult)result;
             result_struct->found = 1;
             result_struct->value = cinfo->value;
             return result;
         }
-        i = i + 1;
     }
-    var result: u64 = heap_alloc(16);
+    var result: u64 = heap_alloc(sizeof(ConstResultLocal));
     var result_struct: *ConstResult = (*ConstResult)result;
     result_struct->found = 0;
     return result;
@@ -178,23 +198,21 @@ func string_table_init() -> u64 {
 }
 
 func string_get_label(str_ptr: u64, str_len: u64) -> u64 {
-    var i: u64 = 0;
     var count: u64 = vec_len(g_strings);
-    
-    while (i < count) {
+
+    for (var i: u64 = 0; i < count; i++) {
         var entry: u64 = vec_get(g_strings, i);
         var str_entry: *StringEntry = (*StringEntry)entry;
         
         if (str_eq(str_entry->str_ptr, str_entry->str_len, str_ptr, str_len)) {
             return str_entry->label_id;
         }
-        i = i + 1;
     }
     
     var label_id: u64 = g_label_counter;
     g_label_counter = g_label_counter + 1;
     
-    var entry: u64 = heap_alloc(24);
+    var entry: u64 = heap_alloc(sizeof(StringEntryLocal));
     var str_entry: *StringEntry = (*StringEntry)entry;
     str_entry->str_ptr = str_ptr;
     str_entry->str_len = str_len;
@@ -211,8 +229,7 @@ func string_emit_data() -> u64 {
     
     emitln("\nsection .data");
     
-    var i: u64 = 0;
-    while (i < count) {
+    for (var i: u64 = 0; i < count; i++) {
         var entry: u64 = vec_get(g_strings, i);
         var str_entry: *StringEntry = (*StringEntry)entry;
         var str_ptr: u64 = str_entry->str_ptr;
@@ -223,8 +240,7 @@ func string_emit_data() -> u64 {
         emit_u64(label_id);
         emit(": db ", 5);
         
-        var j: u64 = 1;
-        while (j < str_len - 1) {
+        for (var j: u64 = 1; j < str_len - 1; ) {
             var c: u64 = *(*u8)(str_ptr + j);
             
             if (c == 92) {  // backslash
@@ -241,13 +257,12 @@ func string_emit_data() -> u64 {
             } else {
                 emit_u64(c);
             }
-            
+
             j = j + 1;
             if (j < str_len - 1) { emit(",", 1); }
         }
         
         emitln(",0");
-        i = i + 1;
     }
 }
 

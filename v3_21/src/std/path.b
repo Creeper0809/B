@@ -12,26 +12,26 @@ func path_dirname(path, path_len) {
     }
 
     if (last_slash < 0) {
-        var result = heap_alloc(2);
+        var result = heap_alloc(2 * sizeof(u8));
         *(*u8)result = 46;
         *(*u8)(result + 1) = 0;
         return result;
     }
 
-    var result = heap_alloc(last_slash + 2);
+    var result = heap_alloc((last_slash + 2) * sizeof(u8));
     str_copy(result, path, last_slash);
     *(*u8)(result + last_slash) = 0;
     return result;
 }
 
 func path_join(dir, dir_len, name, name_len) {
-    var slash = heap_alloc(1);
+    var slash = heap_alloc(sizeof(u8));
     *(*u8)slash = 47;
     return str_concat3(dir, dir_len, slash, 1, name, name_len);
 }
 
 func module_to_path(name, name_len) {
-    var ext = heap_alloc(2);
+    var ext = heap_alloc(2 * sizeof(u8));
     *(*u8)ext = 46;
     *(*u8)(ext + 1) = 98;
     return str_concat(name, name_len, ext, 2);
@@ -56,7 +56,7 @@ func path_basename_noext(path, path_len) {
     if (end < start) { end = start; }
 
     var out_len: u64 = end - start;
-    var out = heap_alloc(out_len + 1);
+    var out = heap_alloc((out_len + 1) * sizeof(u8));
     if (out_len > 0) {
         str_copy(out, path + start, out_len);
     }

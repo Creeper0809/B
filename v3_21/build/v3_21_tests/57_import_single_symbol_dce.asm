@@ -219,7 +219,7 @@ std_io__print_u64:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_31_64:
+.Lssa_31_65:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -227,9 +227,9 @@ std_io__print_u64:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_31_65
-    jmp .Lssa_31_66
-.Lssa_31_65:
+    jne .Lssa_31_66
+    jmp .Lssa_31_67
+.Lssa_31_66:
     push rax
     call std_io__io_get_output_fd
     mov rbx, rax
@@ -251,8 +251,8 @@ std_io__print_u64:
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_31_66
-.Lssa_31_66:
+    jmp .Lssa_31_67
+.Lssa_31_67:
     mov rbx, 32
     push rax
     push rbx
@@ -264,15 +264,15 @@ std_io__print_u64:
     mov r8, rax
     mov r9, rax
     mov r8, rcx
-    jmp .Lssa_31_67
-.Lssa_31_67:
+    jmp .Lssa_31_68
+.Lssa_31_68:
     cmp r9, 0
     setg al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_31_68
-    jmp .Lssa_31_69
-.Lssa_31_68:
+    jne .Lssa_31_69
+    jmp .Lssa_31_71
+.Lssa_31_69:
     push rdx
     mov rax, r9
     cqo
@@ -298,24 +298,26 @@ std_io__print_u64:
     pop rax
     mov rdx, r8
     add rdx, 1
+    jmp .Lssa_31_70
+.Lssa_31_70:
     mov r8, rax
     mov r9, rcx
     mov r8, rdx
-    jmp .Lssa_31_67
-.Lssa_31_69:
+    jmp .Lssa_31_68
+.Lssa_31_71:
     mov rax, r8
     sub rax, 1
     mov rdx, rax
     mov r8, rax
-    jmp .Lssa_31_70
-.Lssa_31_70:
+    jmp .Lssa_31_72
+.Lssa_31_72:
     cmp r8, 0
     setge al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_31_71
-    jmp .Lssa_31_72
-.Lssa_31_71:
+    jne .Lssa_31_73
+    jmp .Lssa_31_75
+.Lssa_31_73:
     push rbx
     push r8
     call std_io__io_get_output_fd
@@ -337,17 +339,19 @@ std_io__print_u64:
     pop r8
     pop rbx
     pop rax
+    jmp .Lssa_31_74
+.Lssa_31_74:
     mov rcx, r8
     sub rcx, 1
     mov rdx, rax
     mov r8, rcx
-    jmp .Lssa_31_70
-.Lssa_31_72:
+    jmp .Lssa_31_72
+.Lssa_31_75:
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_31_80:
+.Lssa_31_83:
     mov rbx, rax
     xor eax, eax
     mov rsp, rbp
@@ -363,7 +367,7 @@ main:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_33_77:
+.Lssa_33_80:
     mov rax, 123
     push rax
     pop rdi

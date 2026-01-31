@@ -61,10 +61,8 @@ func emitln(s: u64) {
 }
 
 func emit(s: u64, len: u64) {
-    var i: u64 = 0;
-    while (i < len) {
+    for (var i: u64 = 0; i < len; i++) {
         if (*(*u8)(s + i) == 0) { len = i; break; }
-        i = i + 1;
     }
     var fd2: u64 = io_get_output_fd();
     os_sys_write(fd2, s, len);
@@ -92,20 +90,19 @@ func print_u64(n) {
         os_sys_write(fd6, "0", 1);
         return;
     }
-    var buf = heap_alloc(32);
-    var i = 0;
-    var tmp = n;
-    while (tmp > 0) {
-        var digit = tmp % 10;
+    var buf = heap_alloc(32 * sizeof(u8));
+    var i: u64 = 0;
+    var value: u64 = n;
+    for (; value > 0; ) {
+        var digit: u64 = value % 10;
         *(*u8)(buf + i) = digit + 48;
-        tmp = tmp / 10;
+        value = value / 10;
         i = i + 1;
     }
-    var j = i - 1;
-    while (j >= 0) {
+    var j: i64 = (i64)i - 1;
+    for (; j >= 0; j = j - 1) {
         var fd7: u64 = io_get_output_fd();
-        os_sys_write(fd7, buf + j, 1);
-        j = j - 1;
+        os_sys_write(fd7, buf + (u64)j, 1);
     }
 }
 

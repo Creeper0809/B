@@ -1121,7 +1121,7 @@ std_io__emit:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L26
+    jz .L27
     mov rax, [rbp-8]
     push rax
     mov rax, [rbp-24]
@@ -1137,14 +1137,15 @@ std_io__emit:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L27
+    jz .L28
     mov rax, [rbp-24]
     push rax
     lea rax, [rbp-16]
     pop rbx
     mov [rax], rbx
-    jmp .L26
-.L27:
+    jmp .L27
+.L28:
+.L26:
     mov rax, [rbp-24]
     push rax
     mov rax, 1
@@ -1156,7 +1157,7 @@ std_io__emit:
     pop rbx
     mov [rax], rbx
     jmp .L25
-.L26:
+.L27:
     call std_io__io_get_output_fd
     mov [rbp-32], rax
     mov rax, [rbp-16]
@@ -1261,12 +1262,12 @@ std_io__print_u64:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L29
+    jz .L30
     call std_io__io_get_output_fd
     mov [rbp-16], rax
     mov rax, 1
     push rax
-    lea rax, [rel _str31]
+    lea rax, [rel _str32]
     push rax
     mov rax, [rbp-16]
     push rax
@@ -1278,8 +1279,13 @@ std_io__print_u64:
     mov rsp, rbp
     pop rbp
     ret
-.L29:
+.L30:
     mov rax, 32
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc
@@ -1288,7 +1294,7 @@ std_io__print_u64:
     mov [rbp-32], rax
     mov rax, [rbp-8]
     mov [rbp-40], rax
-.L32:
+.L33:
     mov rax, [rbp-40]
     push rax
     mov rax, 0
@@ -1298,7 +1304,7 @@ std_io__print_u64:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L33
+    jz .L35
     mov rax, [rbp-40]
     push rax
     mov rax, 10
@@ -1344,8 +1350,9 @@ std_io__print_u64:
     lea rax, [rbp-32]
     pop rbx
     mov [rax], rbx
-    jmp .L32
-.L33:
+.L34:
+    jmp .L33
+.L35:
     mov rax, [rbp-32]
     push rax
     mov rax, 1
@@ -1353,7 +1360,7 @@ std_io__print_u64:
     pop rax
     sub rax, rbx
     mov [rbp-56], rax
-.L34:
+.L36:
     mov rax, [rbp-56]
     push rax
     mov rax, 0
@@ -1363,7 +1370,7 @@ std_io__print_u64:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L35
+    jz .L38
     call std_io__io_get_output_fd
     mov [rbp-64], rax
     mov rax, 1
@@ -1381,6 +1388,7 @@ std_io__print_u64:
     pop rsi
     pop rdx
     call std_os__os_sys_write
+.L37:
     mov rax, [rbp-56]
     push rax
     mov rax, 1
@@ -1391,8 +1399,8 @@ std_io__print_u64:
     lea rax, [rbp-56]
     pop rbx
     mov [rax], rbx
-    jmp .L34
-.L35:
+    jmp .L36
+.L38:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -1411,12 +1419,12 @@ std_io__print_i64:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L36
+    jz .L39
     call std_io__io_get_output_fd
     mov [rbp-16], rax
     mov rax, 1
     push rax
-    lea rax, [rel _str38]
+    lea rax, [rel _str41]
     push rax
     mov rax, [rbp-16]
     push rax
@@ -1433,13 +1441,13 @@ std_io__print_i64:
     push rax
     pop rdi
     call std_io__print_u64
-    jmp .L37
-.L36:
+    jmp .L40
+.L39:
     mov rax, [rbp-8]
     push rax
     pop rdi
     call std_io__print_u64
-.L37:
+.L40:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -1459,7 +1467,7 @@ std_path__path_dirname:
     mov [rbp-24], rax
     mov rax, 0
     mov [rbp-32], rax
-.L39:
+.L42:
     mov rax, [rbp-32]
     push rax
     mov rax, [rbp-16]
@@ -1469,7 +1477,7 @@ std_path__path_dirname:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L41
+    jz .L44
     mov rax, [rbp-8]
     push rax
     mov rax, [rbp-32]
@@ -1485,14 +1493,14 @@ std_path__path_dirname:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L42
+    jz .L45
     mov rax, [rbp-32]
     push rax
     lea rax, [rbp-24]
     pop rbx
     mov [rax], rbx
-.L42:
-.L40:
+.L45:
+.L43:
     mov rax, [rbp-32]
     push rax
     mov rax, 1
@@ -1503,8 +1511,8 @@ std_path__path_dirname:
     lea rax, [rbp-32]
     pop rbx
     mov [rax], rbx
-    jmp .L39
-.L41:
+    jmp .L42
+.L44:
     mov rax, [rbp-24]
     push rax
     mov rax, 0
@@ -1514,8 +1522,13 @@ std_path__path_dirname:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L44
+    jz .L47
     mov rax, 2
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc
@@ -1539,13 +1552,18 @@ std_path__path_dirname:
     mov rsp, rbp
     pop rbp
     ret
-.L44:
+.L47:
     mov rax, [rbp-24]
     push rax
     mov rax, 2
     mov rbx, rax
     pop rax
     add rax, rbx
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc
@@ -1630,6 +1648,11 @@ std_path__module_to_path:
     mov [rbp-16], rsi
     mov rax, 2
     push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
+    push rax
     pop rdi
     call std_io__heap_alloc
     mov [rbp-24], rax
@@ -1683,7 +1706,7 @@ std_path__path_basename_noext:
     mov [rbp-24], rax
     mov rax, 0
     mov [rbp-32], rax
-.L46:
+.L49:
     mov rax, [rbp-32]
     push rax
     mov rax, [rbp-16]
@@ -1693,7 +1716,7 @@ std_path__path_basename_noext:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L48
+    jz .L51
     mov rax, [rbp-8]
     push rax
     mov rax, [rbp-32]
@@ -1709,14 +1732,14 @@ std_path__path_basename_noext:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L49
+    jz .L52
     mov rax, [rbp-32]
     push rax
     lea rax, [rbp-24]
     pop rbx
     mov [rax], rbx
-.L49:
-.L47:
+.L52:
+.L50:
     mov rax, [rbp-32]
     push rax
     mov rax, 1
@@ -1727,8 +1750,8 @@ std_path__path_basename_noext:
     lea rax, [rbp-32]
     pop rbx
     mov [rax], rbx
-    jmp .L46
-.L48:
+    jmp .L49
+.L51:
     mov rax, 0
     mov [rbp-40], rax
     mov rax, [rbp-24]
@@ -1740,7 +1763,7 @@ std_path__path_basename_noext:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L51
+    jz .L54
     mov rax, [rbp-24]
     push rax
     mov rax, 1
@@ -1751,7 +1774,7 @@ std_path__path_basename_noext:
     lea rax, [rbp-40]
     pop rbx
     mov [rax], rbx
-.L51:
+.L54:
     mov rax, 0
     push rax
     mov rax, 1
@@ -1761,7 +1784,7 @@ std_path__path_basename_noext:
     mov [rbp-48], rax
     mov rax, [rbp-40]
     mov [rbp-56], rax
-.L53:
+.L56:
     mov rax, [rbp-56]
     push rax
     mov rax, [rbp-16]
@@ -1771,7 +1794,7 @@ std_path__path_basename_noext:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L55
+    jz .L58
     mov rax, [rbp-8]
     push rax
     mov rax, [rbp-56]
@@ -1787,14 +1810,14 @@ std_path__path_basename_noext:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L56
+    jz .L59
     mov rax, [rbp-56]
     push rax
     lea rax, [rbp-48]
     pop rbx
     mov [rax], rbx
-.L56:
-.L54:
+.L59:
+.L57:
     mov rax, [rbp-56]
     push rax
     mov rax, 1
@@ -1805,8 +1828,8 @@ std_path__path_basename_noext:
     lea rax, [rbp-56]
     pop rbx
     mov [rax], rbx
-    jmp .L53
-.L55:
+    jmp .L56
+.L58:
     mov rax, [rbp-16]
     mov [rbp-64], rax
     mov rax, [rbp-48]
@@ -1818,13 +1841,13 @@ std_path__path_basename_noext:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L58
+    jz .L61
     mov rax, [rbp-48]
     push rax
     lea rax, [rbp-64]
     pop rbx
     mov [rax], rbx
-.L58:
+.L61:
     mov rax, [rbp-64]
     push rax
     mov rax, [rbp-40]
@@ -1834,13 +1857,13 @@ std_path__path_basename_noext:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L60
+    jz .L63
     mov rax, [rbp-40]
     push rax
     lea rax, [rbp-64]
     pop rbx
     mov [rax], rbx
-.L60:
+.L63:
     mov rax, [rbp-64]
     push rax
     mov rax, [rbp-40]
@@ -1855,6 +1878,11 @@ std_path__path_basename_noext:
     pop rax
     add rax, rbx
     push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
+    push rax
     pop rdi
     call std_io__heap_alloc
     mov [rbp-80], rax
@@ -1867,7 +1895,7 @@ std_path__path_basename_noext:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L62
+    jz .L65
     mov rax, [rbp-72]
     push rax
     mov rax, [rbp-8]
@@ -1883,7 +1911,7 @@ std_path__path_basename_noext:
     pop rsi
     pop rdx
     call std_str__str_copy
-.L62:
+.L65:
     mov rax, 0
     push rax
     mov rax, [rbp-80]
@@ -1916,7 +1944,7 @@ std_char__is_alpha:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L66
+    jz .L69
     mov rax, [rbp-8]
     push rax
     mov rax, 90
@@ -1928,17 +1956,17 @@ std_char__is_alpha:
     test rax, rax
     setne al
     movzx rax, al
-    jmp .L67
-.L66:
+    jmp .L70
+.L69:
     xor eax, eax
-.L67:
+.L70:
     test rax, rax
-    jz .L64
+    jz .L67
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L64:
+.L67:
     mov rax, [rbp-8]
     push rax
     mov rax, 97
@@ -1948,7 +1976,7 @@ std_char__is_alpha:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L70
+    jz .L73
     mov rax, [rbp-8]
     push rax
     mov rax, 122
@@ -1960,17 +1988,17 @@ std_char__is_alpha:
     test rax, rax
     setne al
     movzx rax, al
-    jmp .L71
-.L70:
+    jmp .L74
+.L73:
     xor eax, eax
-.L71:
+.L74:
     test rax, rax
-    jz .L68
+    jz .L71
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L68:
+.L71:
     mov rax, [rbp-8]
     push rax
     mov rax, 95
@@ -1980,12 +2008,12 @@ std_char__is_alpha:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L72
+    jz .L75
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L72:
+.L75:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2008,7 +2036,7 @@ std_char__is_digit:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L76
+    jz .L79
     mov rax, [rbp-8]
     push rax
     mov rax, 57
@@ -2020,17 +2048,17 @@ std_char__is_digit:
     test rax, rax
     setne al
     movzx rax, al
-    jmp .L77
-.L76:
+    jmp .L80
+.L79:
     xor eax, eax
-.L77:
+.L80:
     test rax, rax
-    jz .L74
+    jz .L77
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L74:
+.L77:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2049,23 +2077,23 @@ std_char__is_alnum:
     pop rdi
     call std_char__is_alpha
     test rax, rax
-    jz .L78
+    jz .L81
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L78:
+.L81:
     mov rax, [rbp-8]
     push rax
     pop rdi
     call std_char__is_digit
     test rax, rax
-    jz .L80
+    jz .L83
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L80:
+.L83:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2088,12 +2116,12 @@ std_char__is_whitespace:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L82
+    jz .L85
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L82:
+.L85:
     mov rax, [rbp-8]
     push rax
     mov rax, 9
@@ -2103,12 +2131,12 @@ std_char__is_whitespace:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L84
+    jz .L87
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L84:
+.L87:
     mov rax, [rbp-8]
     push rax
     mov rax, 10
@@ -2118,12 +2146,12 @@ std_char__is_whitespace:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L86
+    jz .L89
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L86:
+.L89:
     mov rax, [rbp-8]
     push rax
     mov rax, 13
@@ -2133,12 +2161,12 @@ std_char__is_whitespace:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L88
+    jz .L91
     mov rax, 1
     mov rsp, rbp
     pop rbp
     ret
-.L88:
+.L91:
     mov rax, 0
     mov rsp, rbp
     pop rbp
@@ -2153,12 +2181,12 @@ std_util__init_stack_trace:
     sub rsp, 2048
     mov rax, [rel _gvar_std_util__g_stack_initialized]
     test rax, rax
-    jz .L90
+    jz .L93
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.L90:
+.L93:
     mov rax, 128
     push rax
     mov rax, 40
@@ -2198,9 +2226,9 @@ std_util__push_trace:
     setz al
     movzx rax, al
     test rax, rax
-    jz .L92
+    jz .L95
     call std_util__init_stack_trace
-.L92:
+.L95:
     mov rax, [rel _gvar_std_util__g_stack_depth]
     push rax
     mov rax, 128
@@ -2210,12 +2238,12 @@ std_util__push_trace:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L94
+    jz .L97
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.L94:
+.L97:
     mov rax, [rbp-8]
     push rax
     pop rdi
@@ -2238,54 +2266,45 @@ std_util__push_trace:
     pop rax
     add rax, rbx
     mov [rbp-48], rax
+    mov rax, [rbp-48]
+    mov [rbp-56], rax
     mov rax, [rbp-8]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     push rax
-    mov rax, 0
-    mov rbx, rax
     pop rax
-    add rax, rbx
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-32]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 8
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-16]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-40]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     push rax
-    mov rax, 24
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 24
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-24]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     push rax
-    mov rax, 32
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 32
     pop rbx
     mov [rax], rbx
     mov rax, [rel _gvar_std_util__g_stack_depth]
@@ -2315,7 +2334,7 @@ std_util__pop_trace:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L96
+    jz .L99
     mov rax, [rel _gvar_std_util__g_stack_depth]
     push rax
     mov rax, 1
@@ -2326,7 +2345,7 @@ std_util__pop_trace:
     lea rax, [rel _gvar_std_util__g_stack_depth]
     pop rbx
     mov [rax], rbx
-.L96:
+.L99:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -2340,31 +2359,8 @@ std_util__print_stack_trace:
     setz al
     movzx rax, al
     test rax, rax
-    jz .L98
-    mov rax, 28
-    push rax
-    lea rax, [rel _str100]
-    push rax
-    pop rdi
-    pop rsi
-    call std_util__emit_stderr
-    call std_util__emit_stderr_nl
-    xor eax, eax
-    mov rsp, rbp
-    pop rbp
-    ret
-.L98:
-    mov rax, [rel _gvar_std_util__g_stack_depth]
-    push rax
-    mov rax, 0
-    mov rbx, rax
-    pop rax
-    cmp rax, rbx
-    sete al
-    movzx rax, al
-    test rax, rax
     jz .L101
-    mov rax, 24
+    mov rax, 28
     push rax
     lea rax, [rel _str103]
     push rax
@@ -2377,9 +2373,32 @@ std_util__print_stack_trace:
     pop rbp
     ret
 .L101:
+    mov rax, [rel _gvar_std_util__g_stack_depth]
+    push rax
+    mov rax, 0
+    mov rbx, rax
+    pop rax
+    cmp rax, rbx
+    sete al
+    movzx rax, al
+    test rax, rax
+    jz .L104
+    mov rax, 24
+    push rax
+    lea rax, [rel _str106]
+    push rax
+    pop rdi
+    pop rsi
+    call std_util__emit_stderr
+    call std_util__emit_stderr_nl
+    xor eax, eax
+    mov rsp, rbp
+    pop rbp
+    ret
+.L104:
     mov rax, 38
     push rax
-    lea rax, [rel _str104]
+    lea rax, [rel _str107]
     push rax
     pop rdi
     pop rsi
@@ -2387,7 +2406,7 @@ std_util__print_stack_trace:
     call std_util__emit_stderr_nl
     mov rax, [rel _gvar_std_util__g_stack_depth]
     mov [rbp-8], rax
-.L105:
+.L108:
     mov rax, [rbp-8]
     push rax
     mov rax, 0
@@ -2397,20 +2416,17 @@ std_util__print_stack_trace:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L106
+    jz .L110
     mov rax, [rbp-8]
     push rax
     mov rax, 1
     mov rbx, rax
     pop rax
     sub rax, rbx
-    push rax
-    lea rax, [rbp-8]
-    pop rbx
-    mov [rax], rbx
+    mov [rbp-16], rax
     mov rax, [rel _gvar_std_util__g_stack_frames]
     push rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-16]
     push rax
     mov rax, 40
     mov rbx, rax
@@ -2419,64 +2435,41 @@ std_util__print_stack_trace:
     mov rbx, rax
     pop rax
     add rax, rbx
-    mov [rbp-16], rax
-    mov rax, [rbp-16]
-    push rax
-    mov rax, 0
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
     mov [rbp-24], rax
-    mov rax, [rbp-16]
-    push rax
-    mov rax, 8
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
+    mov rax, [rbp-24]
     mov [rbp-32], rax
-    mov rax, [rbp-16]
-    push rax
-    mov rax, 16
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
-    mov [rbp-40], rax
-    mov rax, [rbp-16]
-    push rax
-    mov rax, 24
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
-    mov [rbp-48], rax
-    mov rax, [rbp-16]
-    push rax
-    mov rax, 32
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
-    mov [rbp-56], rax
-    mov rax, 5
-    push rax
-    lea rax, [rel _str107]
-    push rax
-    pop rdi
-    pop rsi
-    call std_util__emit_stderr
     mov rax, [rbp-32]
     push rax
-    mov rax, [rbp-24]
+    pop rax
+    mov rax, [rax]
+    mov [rbp-40], rax
+    mov rax, [rbp-32]
     push rax
-    pop rdi
-    pop rsi
-    call std_util__emit_stderr
-    mov rax, 2
+    pop rax
+    add rax, 8
+    mov rax, [rax]
+    mov [rbp-48], rax
+    mov rax, [rbp-32]
     push rax
-    lea rax, [rel _str108]
+    pop rax
+    add rax, 16
+    mov rax, [rax]
+    mov [rbp-56], rax
+    mov rax, [rbp-32]
+    push rax
+    pop rax
+    add rax, 24
+    mov rax, [rax]
+    mov [rbp-64], rax
+    mov rax, [rbp-32]
+    push rax
+    pop rax
+    add rax, 32
+    mov rax, [rax]
+    mov [rbp-72], rax
+    mov rax, 5
+    push rax
+    lea rax, [rel _str111]
     push rax
     pop rdi
     pop rsi
@@ -2488,27 +2481,52 @@ std_util__print_stack_trace:
     pop rdi
     pop rsi
     call std_util__emit_stderr
-    mov rax, 1
+    mov rax, 2
     push rax
-    lea rax, [rel _str109]
+    lea rax, [rel _str112]
     push rax
     pop rdi
     pop rsi
     call std_util__emit_stderr
+    mov rax, [rbp-64]
+    push rax
     mov rax, [rbp-56]
+    push rax
+    pop rdi
+    pop rsi
+    call std_util__emit_stderr
+    mov rax, 1
+    push rax
+    lea rax, [rel _str113]
+    push rax
+    pop rdi
+    pop rsi
+    call std_util__emit_stderr
+    mov rax, [rbp-72]
     push rax
     pop rdi
     call std_util__emit_i64_stderr
     mov rax, 1
     push rax
-    lea rax, [rel _str110]
+    lea rax, [rel _str114]
     push rax
     pop rdi
     pop rsi
     call std_util__emit_stderr
     call std_util__emit_stderr_nl
-    jmp .L105
-.L106:
+.L109:
+    mov rax, [rbp-8]
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    sub rax, rbx
+    push rax
+    lea rax, [rbp-8]
+    pop rbx
+    mov [rax], rbx
+    jmp .L108
+.L110:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -2552,7 +2570,7 @@ std_util__begin_error_capture:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L111
+    jz .L115
     mov rax, 512
     push rax
     pop rdi
@@ -2561,7 +2579,7 @@ std_util__begin_error_capture:
     lea rax, [rel _gvar_std_util__g_error_buffer]
     pop rbx
     mov [rax], rbx
-.L111:
+.L115:
     mov rax, 0
     push rax
     lea rax, [rel _gvar_std_util__g_error_buffer_pos]
@@ -2617,7 +2635,7 @@ std_util__emit_error:
     mov [rbp-16], rsi
     mov rax, 8
     push rax
-    lea rax, [rel _str113]
+    lea rax, [rel _str117]
     push rax
     pop rdi
     pop rsi
@@ -2658,11 +2676,11 @@ std_util__panic:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L114
+    jz .L118
     call std_util__emit_stderr_nl
     mov rax, 16
     push rax
-    lea rax, [rel _str116]
+    lea rax, [rel _str120]
     push rax
     pop rdi
     pop rsi
@@ -2670,7 +2688,7 @@ std_util__panic:
     call std_util__emit_stderr_nl
     mov rax, 18
     push rax
-    lea rax, [rel _str117]
+    lea rax, [rel _str121]
     push rax
     pop rdi
     pop rsi
@@ -2684,7 +2702,7 @@ std_util__panic:
     call std_util__emit_stderr
     mov rax, 7
     push rax
-    lea rax, [rel _str118]
+    lea rax, [rel _str122]
     push rax
     pop rdi
     pop rsi
@@ -2695,17 +2713,17 @@ std_util__panic:
     call std_util__emit_i64_stderr
     mov rax, 1
     push rax
-    lea rax, [rel _str110]
+    lea rax, [rel _str114]
     push rax
     pop rdi
     pop rsi
     call std_util__emit_stderr
     call std_util__emit_stderr_nl
-.L114:
+.L118:
     call std_util__emit_stderr_nl
     mov rax, 24
     push rax
-    lea rax, [rel _str119]
+    lea rax, [rel _str123]
     push rax
     pop rdi
     pop rsi
@@ -2721,11 +2739,11 @@ std_util__panic:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L120
+    jz .L124
     call std_util__emit_stderr_nl
     mov rax, 14
     push rax
-    lea rax, [rel _str122]
+    lea rax, [rel _str126]
     push rax
     pop rdi
     pop rsi
@@ -2742,7 +2760,7 @@ std_util__panic:
     pop rdx
     call std_io__sys_write
     call std_util__emit_stderr_nl
-.L120:
+.L124:
     call std_util__emit_stderr_nl
     mov rax, 0
     mov rax, [rax]
@@ -2766,7 +2784,7 @@ std_util__emit_stderr:
     setne al
     movzx rax, al
     test rax, rax
-    jz .L123
+    jz .L127
     mov rax, [rel _gvar_std_util__g_error_buffer_pos]
     push rax
     mov rax, [rbp-16]
@@ -2781,10 +2799,10 @@ std_util__emit_stderr:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L125
+    jz .L129
     mov rax, 0
     mov [rbp-24], rax
-.L127:
+.L131:
     mov rax, [rbp-24]
     push rax
     mov rax, [rbp-16]
@@ -2794,7 +2812,7 @@ std_util__emit_stderr:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L128
+    jz .L133
     mov rax, [rbp-8]
     push rax
     mov rax, [rbp-24]
@@ -2821,6 +2839,7 @@ std_util__emit_stderr:
     lea rax, [rel _gvar_std_util__g_error_buffer_pos]
     pop rbx
     mov [rax], rbx
+.L132:
     mov rax, [rbp-24]
     push rax
     mov rax, 1
@@ -2831,11 +2850,11 @@ std_util__emit_stderr:
     lea rax, [rbp-24]
     pop rbx
     mov [rax], rbx
-    jmp .L127
-.L128:
-.L125:
-    jmp .L124
-.L123:
+    jmp .L131
+.L133:
+.L129:
+    jmp .L128
+.L127:
     mov rax, [rbp-16]
     push rax
     mov rax, [rbp-8]
@@ -2846,7 +2865,7 @@ std_util__emit_stderr:
     pop rsi
     pop rdx
     call std_io__sys_write
-.L124:
+.L128:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -2887,7 +2906,7 @@ std_util__warn:
     mov [rbp-16], rsi
     mov rax, 7
     push rax
-    lea rax, [rel _str129]
+    lea rax, [rel _str134]
     push rax
     pop rdi
     pop rsi
@@ -2947,10 +2966,10 @@ std_util__emit_u64:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L130
+    jz .L135
     mov rax, 1
     push rax
-    lea rax, [rel _str31]
+    lea rax, [rel _str32]
     push rax
     pop rdi
     pop rsi
@@ -2959,7 +2978,7 @@ std_util__emit_u64:
     mov rsp, rbp
     pop rbp
     ret
-.L130:
+.L135:
     mov rax, 32
     push rax
     pop rdi
@@ -2969,7 +2988,7 @@ std_util__emit_u64:
     mov [rbp-24], rax
     mov rax, [rbp-8]
     mov [rbp-32], rax
-.L132:
+.L137:
     mov rax, [rbp-32]
     push rax
     mov rax, 0
@@ -2979,7 +2998,7 @@ std_util__emit_u64:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L134
+    jz .L139
     mov rax, 48
     push rax
     mov rax, [rbp-32]
@@ -3023,9 +3042,9 @@ std_util__emit_u64:
     lea rax, [rbp-24]
     pop rbx
     mov [rax], rbx
-.L133:
-    jmp .L132
-.L134:
+.L138:
+    jmp .L137
+.L139:
     mov rax, [rbp-24]
     push rax
     mov rax, 1
@@ -3033,7 +3052,7 @@ std_util__emit_u64:
     pop rax
     sub rax, rbx
     mov [rbp-40], rax
-.L135:
+.L140:
     mov rax, [rbp-40]
     push rax
     mov rax, 0
@@ -3043,7 +3062,7 @@ std_util__emit_u64:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L137
+    jz .L142
     mov rax, 1
     push rax
     mov rax, [rbp-16]
@@ -3059,7 +3078,7 @@ std_util__emit_u64:
     pop rsi
     pop rdx
     call std_io__sys_write
-.L136:
+.L141:
     mov rax, [rbp-40]
     push rax
     mov rax, 1
@@ -3070,8 +3089,8 @@ std_util__emit_u64:
     lea rax, [rbp-40]
     pop rbx
     mov [rax], rbx
-    jmp .L135
-.L137:
+    jmp .L140
+.L142:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -3090,10 +3109,10 @@ std_util__emit_u64_stderr:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L138
+    jz .L143
     mov rax, 1
     push rax
-    lea rax, [rel _str31]
+    lea rax, [rel _str32]
     push rax
     pop rdi
     pop rsi
@@ -3102,7 +3121,7 @@ std_util__emit_u64_stderr:
     mov rsp, rbp
     pop rbp
     ret
-.L138:
+.L143:
     mov rax, 32
     push rax
     pop rdi
@@ -3112,7 +3131,7 @@ std_util__emit_u64_stderr:
     mov [rbp-24], rax
     mov rax, [rbp-8]
     mov [rbp-32], rax
-.L140:
+.L145:
     mov rax, [rbp-32]
     push rax
     mov rax, 0
@@ -3122,7 +3141,7 @@ std_util__emit_u64_stderr:
     setg al
     movzx rax, al
     test rax, rax
-    jz .L142
+    jz .L147
     mov rax, 48
     push rax
     mov rax, [rbp-32]
@@ -3166,9 +3185,9 @@ std_util__emit_u64_stderr:
     lea rax, [rbp-24]
     pop rbx
     mov [rax], rbx
-.L141:
-    jmp .L140
-.L142:
+.L146:
+    jmp .L145
+.L147:
     mov rax, [rbp-24]
     push rax
     mov rax, 1
@@ -3176,7 +3195,7 @@ std_util__emit_u64_stderr:
     pop rax
     sub rax, rbx
     mov [rbp-40], rax
-.L143:
+.L148:
     mov rax, [rbp-40]
     push rax
     mov rax, 0
@@ -3186,7 +3205,7 @@ std_util__emit_u64_stderr:
     setge al
     movzx rax, al
     test rax, rax
-    jz .L145
+    jz .L150
     mov rax, 1
     push rax
     mov rax, [rbp-16]
@@ -3199,7 +3218,7 @@ std_util__emit_u64_stderr:
     pop rdi
     pop rsi
     call std_util__emit_stderr
-.L144:
+.L149:
     mov rax, [rbp-40]
     push rax
     mov rax, 1
@@ -3210,8 +3229,8 @@ std_util__emit_u64_stderr:
     lea rax, [rbp-40]
     pop rbx
     mov [rax], rbx
-    jmp .L143
-.L145:
+    jmp .L148
+.L150:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -3230,10 +3249,10 @@ std_util__emit_i64:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L146
+    jz .L151
     mov rax, 1
     push rax
-    lea rax, [rel _str38]
+    lea rax, [rel _str41]
     push rax
     pop rdi
     pop rsi
@@ -3247,13 +3266,13 @@ std_util__emit_i64:
     push rax
     pop rdi
     call std_util__emit_u64
-    jmp .L147
-.L146:
+    jmp .L152
+.L151:
     mov rax, [rbp-8]
     push rax
     pop rdi
     call std_util__emit_u64
-.L147:
+.L152:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -3272,10 +3291,10 @@ std_util__emit_i64_stderr:
     setl al
     movzx rax, al
     test rax, rax
-    jz .L148
+    jz .L153
     mov rax, 1
     push rax
-    lea rax, [rel _str38]
+    lea rax, [rel _str41]
     push rax
     pop rdi
     pop rsi
@@ -3289,13 +3308,13 @@ std_util__emit_i64_stderr:
     push rax
     pop rdi
     call std_util__emit_u64_stderr
-    jmp .L149
-.L148:
+    jmp .L154
+.L153:
     mov rax, [rbp-8]
     push rax
     pop rdi
     call std_util__emit_u64_stderr
-.L149:
+.L154:
    xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -3400,10 +3419,10 @@ _08_multiple_functions__divide:
     sete al
     movzx rax, al
     test rax, rax
-    jz .L150
+    jz .L155
     mov rax, 24
     push rax
-    lea rax, [rel _str152]
+    lea rax, [rel _str157]
     push rax
     pop rdi
     pop rsi
@@ -3412,7 +3431,7 @@ _08_multiple_functions__divide:
     mov rsp, rbp
     pop rbp
     ret
-.L150:
+.L155:
     mov rax, [rbp-8]
     push rax
     mov rax, [rbp-16]
@@ -3440,7 +3459,7 @@ _08_multiple_functions__calculator:
     call std_util__emit_i64
     mov rax, 1
     push rax
-    lea rax, [rel _str153]
+    lea rax, [rel _str158]
     push rax
     pop rdi
     pop rsi
@@ -3457,7 +3476,7 @@ _08_multiple_functions__calculator:
     call std_io__emit
     mov rax, 1
     push rax
-    lea rax, [rel _str153]
+    lea rax, [rel _str158]
     push rax
     pop rdi
     pop rsi
@@ -3468,71 +3487,11 @@ _08_multiple_functions__calculator:
     call std_util__emit_i64
     mov rax, 3
     push rax
-    lea rax, [rel _str154]
+    lea rax, [rel _str159]
     push rax
     pop rdi
     pop rsi
     call std_io__emit
-    mov rax, 1
-    push rax
-    lea rax, [rel _str157]
-    push rax
-    mov rax, [rbp-8]
-    push rax
-    pop rdi
-    call std_str__str_len
-    push rax
-    mov rax, [rbp-8]
-    push rax
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    call std_str__str_eq
-    test rax, rax
-    jz .L155
-    mov rax, [rbp-24]
-    push rax
-    mov rax, [rbp-16]
-    push rax
-    pop rdi
-    pop rsi
-    call _08_multiple_functions__add
-    push rax
-    pop rdi
-    call std_util__emit_i64
-    jmp .L156
-.L155:
-    mov rax, 1
-    push rax
-    lea rax, [rel _str38]
-    push rax
-    mov rax, [rbp-8]
-    push rax
-    pop rdi
-    call std_str__str_len
-    push rax
-    mov rax, [rbp-8]
-    push rax
-    pop rdi
-    pop rsi
-    pop rdx
-    pop rcx
-    call std_str__str_eq
-    test rax, rax
-    jz .L158
-    mov rax, [rbp-24]
-    push rax
-    mov rax, [rbp-16]
-    push rax
-    pop rdi
-    pop rsi
-    call _08_multiple_functions__subtract
-    push rax
-    pop rdi
-    call std_util__emit_i64
-    jmp .L159
-.L158:
     mov rax, 1
     push rax
     lea rax, [rel _str162]
@@ -3557,7 +3516,7 @@ _08_multiple_functions__calculator:
     push rax
     pop rdi
     pop rsi
-    call _08_multiple_functions__multiply
+    call _08_multiple_functions__add
     push rax
     pop rdi
     call std_util__emit_i64
@@ -3565,7 +3524,7 @@ _08_multiple_functions__calculator:
 .L160:
     mov rax, 1
     push rax
-    lea rax, [rel _str165]
+    lea rax, [rel _str41]
     push rax
     mov rax, [rbp-8]
     push rax
@@ -3587,14 +3546,74 @@ _08_multiple_functions__calculator:
     push rax
     pop rdi
     pop rsi
+    call _08_multiple_functions__subtract
+    push rax
+    pop rdi
+    call std_util__emit_i64
+    jmp .L164
+.L163:
+    mov rax, 1
+    push rax
+    lea rax, [rel _str167]
+    push rax
+    mov rax, [rbp-8]
+    push rax
+    pop rdi
+    call std_str__str_len
+    push rax
+    mov rax, [rbp-8]
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    call std_str__str_eq
+    test rax, rax
+    jz .L165
+    mov rax, [rbp-24]
+    push rax
+    mov rax, [rbp-16]
+    push rax
+    pop rdi
+    pop rsi
+    call _08_multiple_functions__multiply
+    push rax
+    pop rdi
+    call std_util__emit_i64
+    jmp .L166
+.L165:
+    mov rax, 1
+    push rax
+    lea rax, [rel _str170]
+    push rax
+    mov rax, [rbp-8]
+    push rax
+    pop rdi
+    call std_str__str_len
+    push rax
+    mov rax, [rbp-8]
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    call std_str__str_eq
+    test rax, rax
+    jz .L168
+    mov rax, [rbp-24]
+    push rax
+    mov rax, [rbp-16]
+    push rax
+    pop rdi
+    pop rsi
     call _08_multiple_functions__divide
     push rax
     pop rdi
     call std_util__emit_i64
-.L163:
+.L168:
+.L166:
+.L164:
 .L161:
-.L159:
-.L156:
     call std_util__emit_nl
    xor eax, eax
     mov rsp, rbp
@@ -3608,31 +3627,11 @@ main:
     mov [rbp-16], rsi
     mov rax, 17
     push rax
-    lea rax, [rel _str166]
+    lea rax, [rel _str171]
     push rax
     pop rdi
     pop rsi
     call std_io__emit
-    mov rax, 5
-    push rax
-    mov rax, 10
-    push rax
-    lea rax, [rel _str157]
-    push rax
-    pop rdi
-    pop rsi
-    pop rdx
-    call _08_multiple_functions__calculator
-    mov rax, 5
-    push rax
-    mov rax, 10
-    push rax
-    lea rax, [rel _str38]
-    push rax
-    pop rdi
-    pop rsi
-    pop rdx
-    call _08_multiple_functions__calculator
     mov rax, 5
     push rax
     mov rax, 10
@@ -3647,7 +3646,27 @@ main:
     push rax
     mov rax, 10
     push rax
-    lea rax, [rel _str165]
+    lea rax, [rel _str41]
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
+    call _08_multiple_functions__calculator
+    mov rax, 5
+    push rax
+    mov rax, 10
+    push rax
+    lea rax, [rel _str167]
+    push rax
+    pop rdi
+    pop rsi
+    pop rdx
+    call _08_multiple_functions__calculator
+    mov rax, 5
+    push rax
+    mov rax, 10
+    push rax
+    lea rax, [rel _str170]
     push rax
     pop rdi
     pop rsi
@@ -3657,7 +3676,7 @@ main:
     push rax
     mov rax, 10
     push rax
-    lea rax, [rel _str165]
+    lea rax, [rel _str170]
     push rax
     pop rdi
     pop rsi
@@ -3674,29 +3693,29 @@ main:
 
 section .data
 _str24: db 10,0
-_str31: db 48,0
-_str38: db 45,0
-_str100: db 32,32,40,110,111,32,115,116,97,99,107,32,116,114,97,99,101,32,97,118,97,105,108,97,98,108,101,41,0
-_str103: db 32,32,40,115,116,97,99,107,32,116,114,97,99,101,32,105,115,32,101,109,112,116,121,41,0
-_str104: db 83,116,97,99,107,32,116,114,97,99,101,32,40,109,111,115,116,32,114,101,99,101,110,116,32,99,97,108,108,32,102,105,114,115,116,41,58,0
-_str107: db 32,32,97,116,32,0
-_str108: db 32,40,0
-_str109: db 58,0
-_str110: db 41,0
-_str113: db 91,69,82,82,79,82,93,32,0
-_str116: db 80,97,114,115,105,110,103,32,99,111,110,116,101,120,116,58,0
-_str117: db 32,32,45,62,32,73,110,32,102,117,110,99,116,105,111,110,58,32,0
-_str118: db 32,40,108,105,110,101,32,0
-_str119: db 67,111,109,112,105,108,101,114,32,105,110,116,101,114,110,97,108,32,116,114,97,99,101,58,0
-_str122: db 69,114,114,111,114,32,100,101,116,97,105,108,115,58,0
-_str129: db 91,87,65,82,78,93,32,0
-_str152: db 69,114,114,111,114,58,32,68,105,118,105,115,105,111,110,32,98,121,32,122,101,114,111,10,0
-_str153: db 32,0
-_str154: db 32,61,32,0
-_str157: db 43,0
-_str162: db 42,0
-_str165: db 47,0
-_str166: db 67,97,108,99,117,108,97,116,111,114,32,116,101,115,116,58,10,0
+_str32: db 48,0
+_str41: db 45,0
+_str103: db 32,32,40,110,111,32,115,116,97,99,107,32,116,114,97,99,101,32,97,118,97,105,108,97,98,108,101,41,0
+_str106: db 32,32,40,115,116,97,99,107,32,116,114,97,99,101,32,105,115,32,101,109,112,116,121,41,0
+_str107: db 83,116,97,99,107,32,116,114,97,99,101,32,40,109,111,115,116,32,114,101,99,101,110,116,32,99,97,108,108,32,102,105,114,115,116,41,58,0
+_str111: db 32,32,97,116,32,0
+_str112: db 32,40,0
+_str113: db 58,0
+_str114: db 41,0
+_str117: db 91,69,82,82,79,82,93,32,0
+_str120: db 80,97,114,115,105,110,103,32,99,111,110,116,101,120,116,58,0
+_str121: db 32,32,45,62,32,73,110,32,102,117,110,99,116,105,111,110,58,32,0
+_str122: db 32,40,108,105,110,101,32,0
+_str123: db 67,111,109,112,105,108,101,114,32,105,110,116,101,114,110,97,108,32,116,114,97,99,101,58,0
+_str126: db 69,114,114,111,114,32,100,101,116,97,105,108,115,58,0
+_str134: db 91,87,65,82,78,93,32,0
+_str157: db 69,114,114,111,114,58,32,68,105,118,105,115,105,111,110,32,98,121,32,122,101,114,111,10,0
+_str158: db 32,0
+_str159: db 32,61,32,0
+_str162: db 43,0
+_str167: db 42,0
+_str170: db 47,0
+_str171: db 67,97,108,99,117,108,97,116,111,114,32,116,101,115,116,58,10,0
 
 section .bss
 _gvar_std_os__g_syscall_arg0: resq 1

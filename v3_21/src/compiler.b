@@ -144,10 +144,8 @@ func read_version_from_config(config_path: u64) -> u64 {
 // Return 1 if s starts with prefix
 func str_has_prefix(s: u64, s_len: u64, prefix: u64, prefix_len: u64) -> u64 {
     if (s_len < prefix_len) { return 0; }
-    var i: u64 = 0;
-    while (i < prefix_len) {
+    for (var i: u64 = 0; i < prefix_len; i++) {
         if (*(*u8)(s + i) != *(*u8)(prefix + i)) { return 0; }
-        i = i + 1;
     }
     return 1;
 }
@@ -176,10 +174,8 @@ func module_id_from_path(path: u64, path_len: u64) -> u64 {
     var id_len: u64 = 0;
     if (end > start) { id_len = end - start; }
     var id_ptr: u64 = heap_alloc(id_len + 1);
-    var i: u64 = 0;
-    while (i < id_len) {
+    for (var i: u64 = 0; i < id_len; i++) {
         *(*u8)(id_ptr + i) = *(*u8)(path + start + i);
-        i = i + 1;
     }
     *(*u8)(id_ptr + id_len) = 0;
 
@@ -192,10 +188,8 @@ func module_id_from_path(path: u64, path_len: u64) -> u64 {
 // Import path already normalized to "a/b" without extension
 func module_id_from_import(path: u64, path_len: u64) -> u64 {
     var id_ptr: u64 = heap_alloc(path_len + 1);
-    var i: u64 = 0;
-    while (i < path_len) {
+    for (var i: u64 = 0; i < path_len; i++) {
         *(*u8)(id_ptr + i) = *(*u8)(path + i);
-        i = i + 1;
     }
     *(*u8)(id_ptr + path_len) = 0;
     var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
@@ -215,12 +209,10 @@ func module_prefix_from_id(id_ptr: u64, id_len: u64) -> u64 {
     if (extra == 1) {
         *(*u8)(pref_ptr) = 95;
     }
-    var i: u64 = 0;
-    while (i < id_len) {
+    for (var i: u64 = 0; i < id_len; i++) {
         var c: u64 = *(*u8)(id_ptr + i);
         if (c == 47 || c == 46) { c = 95; }
         *(*u8)(pref_ptr + extra + i) = c;
-        i = i + 1;
     }
     *(*u8)(pref_ptr + id_len + extra) = 0;
     var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));

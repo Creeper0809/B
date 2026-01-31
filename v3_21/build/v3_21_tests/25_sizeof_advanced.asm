@@ -219,7 +219,7 @@ std_io__print:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_28_61:
+.Lssa_28_62:
     mov rax, [rbp-1040]
     mov rbx, [rbp-1032]
     push rax
@@ -253,7 +253,7 @@ std_io__println:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_30_63:
+.Lssa_30_64:
     mov rax, [rbp-1040]
     mov rbx, [rbp-1032]
     push rax
@@ -298,7 +298,7 @@ std_io__print_u64:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_31_64:
+.Lssa_31_65:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -306,9 +306,9 @@ std_io__print_u64:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_31_65
-    jmp .Lssa_31_66
-.Lssa_31_65:
+    jne .Lssa_31_66
+    jmp .Lssa_31_67
+.Lssa_31_66:
     push rax
     call std_io__io_get_output_fd
     mov rbx, rax
@@ -330,8 +330,8 @@ std_io__print_u64:
     mov rsp, rbp
     pop rbp
     ret
-    jmp .Lssa_31_66
-.Lssa_31_66:
+    jmp .Lssa_31_67
+.Lssa_31_67:
     mov rbx, 32
     push rax
     push rbx
@@ -343,15 +343,15 @@ std_io__print_u64:
     mov r8, rax
     mov r9, rax
     mov r8, rcx
-    jmp .Lssa_31_67
-.Lssa_31_67:
+    jmp .Lssa_31_68
+.Lssa_31_68:
     cmp r9, 0
     setg al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_31_68
-    jmp .Lssa_31_69
-.Lssa_31_68:
+    jne .Lssa_31_69
+    jmp .Lssa_31_71
+.Lssa_31_69:
     push rdx
     mov rax, r9
     cqo
@@ -377,24 +377,26 @@ std_io__print_u64:
     pop rax
     mov rdx, r8
     add rdx, 1
+    jmp .Lssa_31_70
+.Lssa_31_70:
     mov r8, rax
     mov r9, rcx
     mov r8, rdx
-    jmp .Lssa_31_67
-.Lssa_31_69:
+    jmp .Lssa_31_68
+.Lssa_31_71:
     mov rax, r8
     sub rax, 1
     mov rdx, rax
     mov r8, rax
-    jmp .Lssa_31_70
-.Lssa_31_70:
+    jmp .Lssa_31_72
+.Lssa_31_72:
     cmp r8, 0
     setge al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_31_71
-    jmp .Lssa_31_72
-.Lssa_31_71:
+    jne .Lssa_31_73
+    jmp .Lssa_31_75
+.Lssa_31_73:
     push rbx
     push r8
     call std_io__io_get_output_fd
@@ -416,17 +418,19 @@ std_io__print_u64:
     pop r8
     pop rbx
     pop rax
+    jmp .Lssa_31_74
+.Lssa_31_74:
     mov rcx, r8
     sub rcx, 1
     mov rdx, rax
     mov r8, rcx
-    jmp .Lssa_31_70
-.Lssa_31_72:
+    jmp .Lssa_31_72
+.Lssa_31_75:
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_31_92:
+.Lssa_31_95:
     mov rbx, rax
     xor eax, eax
     mov rsp, rbp
@@ -442,7 +446,7 @@ _25_sizeof_advanced__test_sizeof_in_expr:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_33_77:
+.Lssa_33_80:
     lea rax, [rel _str2]
     mov rbx, 32
     push rbx
@@ -472,9 +476,9 @@ _25_sizeof_advanced__test_sizeof_in_expr:
     call std_io__println
     mov rax, 1
     cmp rax, 0
-    jne .Lssa_33_78
-    jmp .Lssa_33_80
-.Lssa_33_78:
+    jne .Lssa_33_81
+    jmp .Lssa_33_83
+.Lssa_33_81:
     lea rax, [rel _str5]
     mov rbx, 36
     push rbx
@@ -482,8 +486,8 @@ _25_sizeof_advanced__test_sizeof_in_expr:
     pop rdi
     pop rsi
     call std_io__println
-    jmp .Lssa_33_79
-.Lssa_33_79:
+    jmp .Lssa_33_82
+.Lssa_33_82:
     mov rax, 16
     lea rbx, [rel _str6]
     mov rcx, 8
@@ -508,7 +512,7 @@ _25_sizeof_advanced__test_sizeof_in_expr:
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_33_80:
+.Lssa_33_83:
     lea rax, [rel _str8]
     mov rbx, 31
     push rbx
@@ -516,7 +520,7 @@ _25_sizeof_advanced__test_sizeof_in_expr:
     pop rdi
     pop rsi
     call std_io__println
-    jmp .Lssa_33_79
+    jmp .Lssa_33_82
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -531,7 +535,7 @@ _25_sizeof_advanced__test_nested_structs:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_34_81:
+.Lssa_34_84:
     lea rax, [rel _str9]
     mov rbx, 30
     push rbx
@@ -585,9 +589,9 @@ _25_sizeof_advanced__test_nested_structs:
     pop rax
     mov rbx, 1
     cmp rbx, 0
-    jne .Lssa_34_82
-    jmp .Lssa_34_84
-.Lssa_34_82:
+    jne .Lssa_34_85
+    jmp .Lssa_34_87
+.Lssa_34_85:
     lea rbx, [rel _str14]
     mov rcx, 21
     push rax
@@ -597,15 +601,15 @@ _25_sizeof_advanced__test_nested_structs:
     pop rsi
     call std_io__println
     pop rax
-    jmp .Lssa_34_83
-.Lssa_34_83:
+    jmp .Lssa_34_86
+.Lssa_34_86:
     cmp rax, 22
     sete al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_34_85
-    jmp .Lssa_34_87
-.Lssa_34_84:
+    jne .Lssa_34_88
+    jmp .Lssa_34_90
+.Lssa_34_87:
     lea rbx, [rel _str15]
     mov rcx, 27
     push rax
@@ -615,8 +619,8 @@ _25_sizeof_advanced__test_nested_structs:
     pop rsi
     call std_io__println
     pop rax
-    jmp .Lssa_34_83
-.Lssa_34_85:
+    jmp .Lssa_34_86
+.Lssa_34_88:
     lea rax, [rel _str16]
     mov rbx, 21
     push rbx
@@ -624,13 +628,13 @@ _25_sizeof_advanced__test_nested_structs:
     pop rdi
     pop rsi
     call std_io__println
-    jmp .Lssa_34_86
-.Lssa_34_86:
+    jmp .Lssa_34_89
+.Lssa_34_89:
     mov rax, 0
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_34_87:
+.Lssa_34_90:
     lea rax, [rel _str17]
     mov rbx, 27
     push rbx
@@ -638,7 +642,7 @@ _25_sizeof_advanced__test_nested_structs:
     pop rdi
     pop rsi
     call std_io__println
-    jmp .Lssa_34_86
+    jmp .Lssa_34_89
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -653,7 +657,7 @@ _25_sizeof_advanced__test_pointer_arithmetic:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_35_88:
+.Lssa_35_91:
     lea rax, [rel _str18]
     mov rbx, 41
     push rbx
@@ -771,7 +775,7 @@ main:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_36_89:
+.Lssa_36_92:
     lea rax, [rel _str25]
     mov rbx, 42
     push rbx
