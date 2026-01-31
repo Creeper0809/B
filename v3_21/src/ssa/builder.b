@@ -769,9 +769,10 @@ func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
         if (struct_size_lit == 0) { return 0; }
 
         if (lit->struct_def != 0 && struct_size_lit <= 16) {
-            var packed_flag: u64 = *(lit->struct_def + 32);
+            var struct_info: *AstStructDef = (*AstStructDef)lit->struct_def;
+            var packed_flag: u64 = struct_info->is_packed;
             if (packed_flag == 0) {
-                var fields: u64 = *(lit->struct_def + 24);
+                var fields: u64 = struct_info->fields_vec;
                 var num_fields: u64 = 0;
                 if (fields != 0) { num_fields = vec_len(fields); }
                 if (num_fields >= 1 && num_fields <= 2 && lit->values_vec != 0) {
@@ -1130,7 +1131,7 @@ func builder_assign_slice_to_addr(ctx: *BuilderCtx, value: u64, base_addr: u64) 
 
 func builder_build_method_name(struct_ptr: u64, struct_len: u64, method_ptr: u64, method_len: u64) -> u64 {
     var full_len: u64 = struct_len + 1 + method_len;
-    var full_ptr: u64 = heap_alloc(full_len);
+    var full_ptr: u64 = heap_alloc((full_len + 1) * sizeof(u8));
     for (var i: u64 = 0; i < struct_len; i++) {
         *(*u8)(full_ptr + i) = *(*u8)(struct_ptr + i);
     }
@@ -1138,6 +1139,7 @@ func builder_build_method_name(struct_ptr: u64, struct_len: u64, method_ptr: u64
     for (var j: u64 = 0; j < method_len; j++) {
         *(*u8)(full_ptr + struct_len + 1 + j) = *(*u8)(method_ptr + j);
     }
+    *(*u8)(full_ptr + full_len) = 0;
     return full_ptr;
 }
 
@@ -1153,8 +1155,9 @@ func builder_emit_call(ctx: *BuilderCtx, call: *AstCall, dst: u64, extra_dst: u6
     var resolved_len: u64 = name_len;
     var resolved: u64 = resolve_name(name_ptr, name_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
 
     var args: u64 = call->args_vec;
@@ -1210,8 +1213,9 @@ func builder_emit_call_sret(ctx: *BuilderCtx, call: *AstCall, addr_reg: u64) -> 
     var resolved_len: u64 = name_len;
     var resolved: u64 = resolve_name(name_ptr, name_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
 
     var args: u64 = call->args_vec;
@@ -1265,8 +1269,9 @@ func builder_emit_call_slice_store(ctx: *BuilderCtx, call: *AstCall, addr_reg: u
     var resolved_len: u64 = name_len;
     var resolved: u64 = resolve_name(name_ptr, name_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
 
     var args: u64 = call->args_vec;
@@ -1323,8 +1328,9 @@ func builder_emit_method_call(ctx: *BuilderCtx, mc: *AstMethodCall, dst: u64, ex
     var resolved_len: u64 = full_len;
     var resolved: u64 = resolve_name(full_ptr, full_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
 
     var args: u64 = mc->args_vec;
@@ -1385,8 +1391,9 @@ func builder_emit_method_call_sret(ctx: *BuilderCtx, mc: *AstMethodCall, addr_re
     var resolved_len: u64 = full_len;
     var resolved: u64 = resolve_name(full_ptr, full_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
 
     var args: u64 = mc->args_vec;
@@ -1445,8 +1452,9 @@ func builder_emit_method_call_slice_store(ctx: *BuilderCtx, mc: *AstMethodCall, 
     var resolved_len: u64 = full_len;
     var resolved: u64 = resolve_name(full_ptr, full_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
 
     var args: u64 = mc->args_vec;
@@ -1510,8 +1518,9 @@ func builder_emit_call_ptr(ctx: *BuilderCtx, cp: *AstCallPtr, dst: u64, extra_ds
             var resolved_len: u64 = idn->name_len;
             var resolved: u64 = resolve_name(idn->name_ptr, idn->name_len);
             if (resolved != 0) {
-                resolved_ptr = *(resolved);
-                resolved_len = *(resolved + 8);
+                var resolved_info: *NameInfo = (*NameInfo)resolved;
+                resolved_ptr = resolved_info->ptr;
+                resolved_len = resolved_info->len;
             }
             callee_reg = builder_new_lea_func(ctx, resolved_ptr, resolved_len);
         } else {
@@ -1611,8 +1620,9 @@ func builder_emit_call_ptr_slice_store(ctx: *BuilderCtx, cp: *AstCallPtr, addr_r
             var resolved_len: u64 = idn->name_len;
             var resolved: u64 = resolve_name(idn->name_ptr, idn->name_len);
             if (resolved != 0) {
-                resolved_ptr = *(resolved);
-                resolved_len = *(resolved + 8);
+                var resolved_info: *NameInfo = (*NameInfo)resolved;
+                resolved_ptr = resolved_info->ptr;
+                resolved_len = resolved_info->len;
             }
             callee_reg = builder_new_lea_func(ctx, resolved_ptr, resolved_len);
         } else {
@@ -1672,8 +1682,9 @@ func builder_lvalue_addr(ctx: *BuilderCtx, node: u64) -> u64 {
             var resolved_len2: u64 = idn->name_len;
             var resolved2: u64 = resolve_name(idn->name_ptr, idn->name_len);
             if (resolved2 != 0) {
-                resolved_ptr2 = *(resolved2);
-                resolved_len2 = *(resolved2 + 8);
+                var resolved_info2: *NameInfo = (*NameInfo)resolved2;
+                resolved_ptr2 = resolved_info2->ptr;
+                resolved_len2 = resolved_info2->len;
             }
             return builder_new_lea_func(ctx, resolved_ptr2, resolved_len2);
         }
@@ -1681,8 +1692,9 @@ func builder_lvalue_addr(ctx: *BuilderCtx, node: u64) -> u64 {
         var resolved_len: u64 = idn->name_len;
         var resolved: u64 = resolve_name(idn->name_ptr, idn->name_len);
         if (resolved != 0) {
-            resolved_ptr = *(resolved);
-            resolved_len = *(resolved + 8);
+            var resolved_info: *NameInfo = (*NameInfo)resolved;
+            resolved_ptr = resolved_info->ptr;
+            resolved_len = resolved_info->len;
         }
         return builder_new_lea_global(ctx, resolved_ptr, resolved_len);
     }
@@ -1959,8 +1971,9 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
         var resolved_len: u64 = idn->name_len;
         var resolved: u64 = resolve_name(idn->name_ptr, idn->name_len);
         if (resolved != 0) {
-            resolved_ptr = *(resolved);
-            resolved_len = *(resolved + 8);
+            var resolved_info: *NameInfo = (*NameInfo)resolved;
+            resolved_ptr = resolved_info->ptr;
+            resolved_len = resolved_info->len;
         }
         var c_result: u64 = compiler_find_const(resolved_ptr, resolved_len);
         var c: *ConstResult = (*ConstResult)c_result;
@@ -2239,8 +2252,9 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
                             var resolved_len_obj: u64 = name_len_obj;
                             var resolved_obj: u64 = resolve_name(name_ptr_obj, name_len_obj);
                             if (resolved_obj != 0) {
-                                resolved_ptr_obj = *(resolved_obj);
-                                resolved_len_obj = *(resolved_obj + 8);
+                                var resolved_info_obj: *NameInfo = (*NameInfo)resolved_obj;
+                                resolved_ptr_obj = resolved_info_obj->ptr;
+                                resolved_len_obj = resolved_info_obj->len;
                             }
                             var fn_ptr_obj2: u64 = compiler_get_func(resolved_ptr_obj, resolved_len_obj);
                             if (fn_ptr_obj2 != 0) {
@@ -2335,7 +2349,8 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
             if (ti->ptr_depth > 0 && ti->is_tagged == 1 && ti->tag_layout_ptr != 0) {
                 var layout_def: u64 = get_struct_def(ti->tag_layout_ptr, ti->tag_layout_len);
                 if (layout_def != 0) {
-                    var packed_flag: u64 = *(layout_def + 32);
+                    var layout_info: *AstStructDef = (*AstStructDef)layout_def;
+                    var packed_flag: u64 = layout_info->is_packed;
                     if (packed_flag == 1) {
                         var total_bits: u64 = builder_get_packed_layout_total_bits(layout_def);
                         var field_offset: u64 = builder_get_packed_field_bit_offset(layout_def, m->member_ptr, m->member_len);
@@ -2355,7 +2370,8 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
                     struct_def2 = get_struct_def(ti->struct_name_ptr, ti->struct_name_len);
                 }
                 if (struct_def2 != 0) {
-                    var packed_flag2: u64 = *(struct_def2 + 32);
+                    var struct_info2: *AstStructDef = (*AstStructDef)struct_def2;
+                    var packed_flag2: u64 = struct_info2->is_packed;
                     if (packed_flag2 == 1) {
                         var total_bits2: u64 = builder_get_packed_layout_total_bits(struct_def2);
                         var field_offset2: u64 = builder_get_packed_field_bit_offset(struct_def2, m->member_ptr, m->member_len);
@@ -3075,8 +3091,9 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                     var resolved_len: u64 = idn_init->name_len;
                     var resolved: u64 = resolve_name(idn_init->name_ptr, idn_init->name_len);
                     if (resolved != 0) {
-                        resolved_ptr = *(resolved);
-                        resolved_len = *(resolved + 8);
+                        var resolved_info: *NameInfo = (*NameInfo)resolved;
+                        resolved_ptr = resolved_info->ptr;
+                        resolved_len = resolved_info->len;
                     }
                     var fn_ptr_map: u64 = compiler_get_func(resolved_ptr, resolved_len);
                     if (fn_ptr_map != 0) {
@@ -3204,8 +3221,9 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                     var resolved_len: u64 = idn_val->name_len;
                     var resolved: u64 = resolve_name(idn_val->name_ptr, idn_val->name_len);
                     if (resolved != 0) {
-                        resolved_ptr = *(resolved);
-                        resolved_len = *(resolved + 8);
+                        var resolved_info: *NameInfo = (*NameInfo)resolved;
+                        resolved_ptr = resolved_info->ptr;
+                        resolved_len = resolved_info->len;
                     }
                     var fn_ptr_map2: u64 = compiler_get_func(resolved_ptr, resolved_len);
                     if (fn_ptr_map2 != 0) {
@@ -3251,7 +3269,8 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                 if (ot->ptr_depth > 0 && ot->is_tagged == 1 && ot->tag_layout_ptr != 0) {
                     var layout_def: u64 = get_struct_def(ot->tag_layout_ptr, ot->tag_layout_len);
                     if (layout_def != 0) {
-                        var packed_flag: u64 = *(layout_def + 32);
+                        var layout_info: *AstStructDef = (*AstStructDef)layout_def;
+                        var packed_flag: u64 = layout_info->is_packed;
                         if (packed_flag == 1) {
                             var total_bits: u64 = builder_get_packed_layout_total_bits(layout_def);
                             var field_offset: u64 = builder_get_packed_field_bit_offset(layout_def, m->member_ptr, m->member_len);
@@ -3300,7 +3319,8 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                         struct_def2 = get_struct_def(ot->struct_name_ptr, ot->struct_name_len);
                     }
                     if (struct_def2 != 0) {
-                        var packed_flag2: u64 = *(struct_def2 + 32);
+                        var struct_info2: *AstStructDef = (*AstStructDef)struct_def2;
+                        var packed_flag2: u64 = struct_info2->is_packed;
                         if (packed_flag2 == 1) {
                             var total_bits2: u64 = builder_get_packed_layout_total_bits(struct_def2);
                             var field_offset2: u64 = builder_get_packed_field_bit_offset(struct_def2, m->member_ptr, m->member_len);
@@ -3485,8 +3505,9 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                 struct_name_ptr = ret_expr_struct_name_ptr;
                 struct_name_len = ret_expr_struct_name_len;
                 if ((struct_name_ptr == 0 || struct_name_len == 0) && ret_expr_struct_def != 0) {
-                    struct_name_ptr = *(ret_expr_struct_def + 8);
-                    struct_name_len = *(ret_expr_struct_def + 16);
+                    var ret_expr_struct_info: *AstStructDef = (*AstStructDef)ret_expr_struct_def;
+                    struct_name_ptr = ret_expr_struct_info->name_ptr;
+                    struct_name_len = ret_expr_struct_info->name_len;
                 }
             }
         } else if (ret_expr_is_struct != 0) {
@@ -3494,8 +3515,9 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
             struct_name_ptr = ret_expr_struct_name_ptr;
             struct_name_len = ret_expr_struct_name_len;
             if ((struct_name_ptr == 0 || struct_name_len == 0) && ret_expr_struct_def != 0) {
-                struct_name_ptr = *(ret_expr_struct_def + 8);
-                struct_name_len = *(ret_expr_struct_def + 16);
+                var ret_expr_struct_info2: *AstStructDef = (*AstStructDef)ret_expr_struct_def;
+                struct_name_ptr = ret_expr_struct_info2->name_ptr;
+                struct_name_len = ret_expr_struct_info2->name_len;
             }
         }
         if (ctx->sret_addr_reg != 0) {

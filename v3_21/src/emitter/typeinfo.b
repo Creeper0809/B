@@ -140,7 +140,8 @@ func sizeof_field_desc(field: *FieldDesc) -> u64 {
 }
 
 func get_field_desc(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
-    var fields: u64 = *(struct_def + 24);
+    var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+    var fields: u64 = struct_info->fields_vec;
     var num_fields: u64 = vec_len(fields);
     for (var i: u64 = 0; i < num_fields; i++) {
         var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
@@ -208,21 +209,22 @@ func sizeof_type(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_na
         var struct_def: u64 = 0;
         
         for (var si: u64 = 0; si < num_structs; si++) {
-            var candidate: u64 = vec_get(g_structs_vec, si);
-            var candidate_name_ptr: u64 = *(candidate + 8);
-            var candidate_name_len: u64 = *(candidate + 16);
+            var candidate: *AstStructDef = (*AstStructDef)vec_get(g_structs_vec, si);
+            var candidate_name_ptr: u64 = candidate->name_ptr;
+            var candidate_name_len: u64 = candidate->name_len;
             
             if (str_eq(candidate_name_ptr, candidate_name_len, struct_name_ptr, struct_name_len)) {
-                struct_def = candidate;
+                struct_def = (u64)candidate;
                 break;
             }
         }
         
         if (struct_def == 0) { return 8; }
 
-        var packed_flag: u64 = *(struct_def + 32);
+        var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+        var packed_flag: u64 = struct_info->is_packed;
         if (packed_flag == 1) {
-            var fields_p: u64 = *(struct_def + 24);
+            var fields_p: u64 = struct_info->fields_vec;
             var num_fields_p: u64 = vec_len(fields_p);
             var total_bits: u64 = 0;
             for (var pi: u64 = 0; pi < num_fields_p; pi++) {
@@ -237,7 +239,7 @@ func sizeof_type(type_kind: u64, ptr_depth: u64, struct_name_ptr: u64, struct_na
             return (total_bits + 7) / 8;
         }
         
-        var fields: u64 = *(struct_def + 24);
+        var fields: u64 = struct_info->fields_vec;
         var num_fields: u64 = vec_len(fields);
         var total_size: u64 = 0;
         
@@ -261,9 +263,10 @@ func sizeof_type_ex(ti: u64) -> u64 {
     if (info->type_kind == TYPE_STRUCT && info->ptr_depth == 0) {
         if (info->struct_name_ptr == 0 && info->struct_def != 0) {
             var struct_def: u64 = info->struct_def;
-            var packed_flag: u64 = *(struct_def + 32);
+            var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+            var packed_flag: u64 = struct_info->is_packed;
             if (packed_flag == 1) {
-                var fields_p: u64 = *(struct_def + 24);
+                var fields_p: u64 = struct_info->fields_vec;
                 var num_fields_p: u64 = vec_len(fields_p);
                 var total_bits: u64 = 0;
                 for (var pi: u64 = 0; pi < num_fields_p; pi++) {
@@ -278,7 +281,7 @@ func sizeof_type_ex(ti: u64) -> u64 {
                 return (total_bits + 7) / 8;
             }
 
-            var fields: u64 = *(struct_def + 24);
+            var fields: u64 = struct_info->fields_vec;
             var num_fields: u64 = vec_len(fields);
             var total_size: u64 = 0;
             for (var i: u64 = 0; i < num_fields; i++) {
@@ -303,12 +306,13 @@ func sizeof_type_ex(ti: u64) -> u64 {
 // Get field offset in bytes from struct definition
 // Returns 0 if field not found (caller must handle)
 func get_field_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
-    var packed_flag2: u64 = *(struct_def + 32);
+    var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+    var packed_flag2: u64 = struct_info->is_packed;
     if (packed_flag2 == 1) {
         emit_stderr("[ERROR] Packed struct field address is not supported\n", 56);
         panic("Codegen error");
     }
-    var fields: u64 = *(struct_def + 24);
+    var fields: u64 = struct_info->fields_vec;
     var num_fields: u64 = vec_len(fields);
     var offset: u64 = 0;
     
@@ -350,8 +354,9 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             var resolved_len: u64 = name_len;
             var resolved: u64 = resolve_name(name_ptr, name_len);
             if (resolved != 0) {
-                resolved_ptr = *(resolved);
-                resolved_len = *(resolved + 8);
+                var resolved_info: *NameInfo = (*NameInfo)resolved;
+                resolved_ptr = resolved_info->ptr;
+                resolved_len = resolved_info->len;
             }
             var num_funcs: u64 = vec_len(g_funcs_vec);
             for (var i: u64 = 0; i < num_funcs; i++) {
@@ -413,8 +418,9 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var resolved_len2: u64 = name_len2;
                 var resolved2: u64 = resolve_name(name_ptr2, name_len2);
                 if (resolved2 != 0) {
-                    resolved_ptr2 = *(resolved2);
-                    resolved_len2 = *(resolved2 + 8);
+                    var resolved_info2: *NameInfo = (*NameInfo)resolved2;
+                    resolved_ptr2 = resolved_info2->ptr;
+                    resolved_len2 = resolved_info2->len;
                 }
                 var num_funcs2: u64 = vec_len(g_funcs_vec);
                 for (var j: u64 = 0; j < num_funcs2; j++) {
@@ -461,25 +467,23 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             var struct_ptr: u64 = recv_ti->struct_name_ptr;
             var struct_len: u64 = recv_ti->struct_name_len;
             var full_len: u64 = struct_len + 1 + mc->method_len;
-            var full_ptr: u64 = heap_alloc(full_len);
-            var i2: u64 = 0;
-            while (i2 < struct_len) {
+            var full_ptr: u64 = heap_alloc((full_len + 1) * sizeof(u8));
+            for (var i2: u64 = 0; i2 < struct_len; i2++) {
                 *(*u8)(full_ptr + i2) = *(*u8)(struct_ptr + i2);
-                i2 = i2 + 1;
             }
             *(*u8)(full_ptr + struct_len) = 95;
-            var j2: u64 = 0;
-            while (j2 < mc->method_len) {
+            for (var j2: u64 = 0; j2 < mc->method_len; j2++) {
                 *(*u8)(full_ptr + struct_len + 1 + j2) = *(*u8)(mc->method_ptr + j2);
-                j2 = j2 + 1;
             }
+            *(*u8)(full_ptr + full_len) = 0;
 
             var resolved_ptr2: u64 = full_ptr;
             var resolved_len2: u64 = full_len;
             var resolved2: u64 = resolve_name(full_ptr, full_len);
             if (resolved2 != 0) {
-                resolved_ptr2 = *(resolved2);
-                resolved_len2 = *(resolved2 + 8);
+                var resolved_info2: *NameInfo = (*NameInfo)resolved2;
+                resolved_ptr2 = resolved_info2->ptr;
+                resolved_len2 = resolved_info2->len;
             }
 
             var num_funcs2: u64 = vec_len(g_funcs_vec);
@@ -515,12 +519,14 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
     
     if (kind == AST_IDENT) {
-        var name_ptr: u64 = *(node + 8);
-        var name_len: u64 = *(node + 16);
+        var ident: *AstIdent = (*AstIdent)node;
+        var name_ptr: u64 = ident->name_ptr;
+        var name_len: u64 = ident->name_len;
         // Need to call symtab_get_type - done by caller with symtab param
-        var names: u64 = *(symtab);
-        var types: u64 = *(symtab + 16);
-        var count: u64 = *(symtab + 24);
+        var sym: *Symtab = (*Symtab)symtab;
+        var names: u64 = sym->names_vec;
+        var types: u64 = sym->types_vec;
+        var count: u64 = sym->count;
 
         if (count == 0) {
             return typeinfo_make(TYPE_I64, 0);
@@ -529,9 +535,9 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var idx: i64 = (i64)count - 1;
         while (idx >= 0) {
             var i: u64 = (u64)idx;
-            var name_info: u64 = vec_get(names, i);
-            var n_ptr: u64 = *(name_info);
-            var n_len: u64 = *(name_info + 8);
+            var name_info: *NameInfo = (*NameInfo)vec_get(names, i);
+            var n_ptr: u64 = name_info->ptr;
+            var n_len: u64 = name_info->len;
             
             if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
                 return vec_get(types, i);
@@ -569,7 +575,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
     
     if (kind == AST_ADDR_OF) {
-        var operand: u64 = *(node + 8);
+        var addr_of: *AstAddrOf = (*AstAddrOf)node;
+        var operand: u64 = addr_of->operand;
         var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
         if (op_type != 0) {
             var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
@@ -591,7 +598,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
     
     if (kind == AST_DEREF) {
-        var operand: u64 = *(node + 8);
+        var deref: *AstDeref = (*AstDeref)node;
+        var operand: u64 = deref->operand;
         var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
         if (op_type != 0) {
             var op_ti: *TypeInfo = (*TypeInfo)op_type;
@@ -620,7 +628,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
 
     if (kind == AST_INDEX) {
-        var base: u64 = *(node + 8);
+        var index: *AstIndex = (*AstIndex)node;
+        var base: u64 = index->base;
         var base_type: u64 = get_expr_type_with_symtab(base, symtab);
         if (base_type != 0) {
             var bt: *TypeInfo = (*TypeInfo)base_type;
@@ -641,7 +650,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
 
     if (kind == AST_SLICE) {
-        var ptr_expr: u64 = *(node + 8);
+        var slice: *AstSlice = (*AstSlice)node;
+        var ptr_expr: u64 = slice->ptr_expr;
         var ptr_type: u64 = get_expr_type_with_symtab(ptr_expr, symtab);
         if (ptr_type != 0) {
             var pt: *TypeInfo = (*TypeInfo)ptr_type;
@@ -656,9 +666,10 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
     
     if (kind == AST_MEMBER_ACCESS) {
-        var object: u64 = *(node + 8);
-        var member_ptr: u64 = *(node + 16);
-        var member_len: u64 = *(node + 24);
+        var member_access: *AstMemberAccess = (*AstMemberAccess)node;
+        var object: u64 = member_access->object;
+        var member_ptr: u64 = member_access->member_ptr;
+        var member_len: u64 = member_access->member_len;
         
         // Get the type of the object
         var obj_type: u64 = get_expr_type_with_symtab(object, symtab);
@@ -684,7 +695,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         if (struct_def == 0) { return 0; }
         
         // Find the field in the struct
-        var fields: u64 = *(struct_def + 24);
+        var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+        var fields: u64 = struct_info->fields_vec;
         var num_fields: u64 = vec_len(fields);
         
         for (var i: u64 = 0; i < num_fields; i++) {
@@ -697,11 +709,11 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                     if (g_structs_vec != 0) {
                         var num_structs: u64 = vec_len(g_structs_vec);
                         for (var j: u64 = 0; j < num_structs; j++) {
-                            var sd: u64 = vec_get(g_structs_vec, j);
-                            var sname_ptr: u64 = *(sd + 8);
-                            var sname_len: u64 = *(sd + 16);
+                            var sd: *AstStructDef = (*AstStructDef)vec_get(g_structs_vec, j);
+                            var sname_ptr: u64 = sd->name_ptr;
+                            var sname_len: u64 = sd->name_len;
                             if (str_eq(sname_ptr, sname_len, field->struct_name_ptr, field->struct_name_len)) {
-                                field_struct_def = sd;
+                                field_struct_def = (u64)sd;
                                 break;
                             }
                         }
@@ -740,12 +752,14 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
     }
     
     if (kind == AST_STRUCT_LITERAL) {
-        var struct_def: u64 = *(node + 8);
+        var lit: *AstStructLiteral = (*AstStructLiteral)node;
+        var struct_def: u64 = lit->struct_def;
         return typeinfo_make_struct(0, 0, 0, struct_def);
     }
     
     if (kind == AST_BINARY) {
-        var op: u64 = *(node + 8);
+        var binary: *AstBinary = (*AstBinary)node;
+        var op: u64 = binary->op;
 
         // Logical/comparison operators return i64
         if (op == TOKEN_ANDAND || op == TOKEN_OROR ||
@@ -755,8 +769,8 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             return typeinfo_make(TYPE_I64, 0);
         }
 
-        var left: u64 = *(node + 16);
-        var right: u64 = *(node + 24);
+        var left: u64 = binary->left;
+        var right: u64 = binary->right;
         
         if (op == TOKEN_PLUS || op == TOKEN_MINUS) {
             var left_type: u64 = get_expr_type_with_symtab(left, symtab);

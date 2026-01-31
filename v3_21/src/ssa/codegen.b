@@ -567,8 +567,9 @@ func _ssa_codegen_call_ptr_returns_large_struct(cp_ptr: u64) -> u64 {
     var resolved_len: u64 = name_len;
     var resolved: u64 = resolve_name(name_ptr, name_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
     var fn_ptr: u64 = compiler_get_func(resolved_ptr, resolved_len);
     if (fn_ptr == 0) { return 0; }
@@ -1815,8 +1816,9 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_LEA_STR) {
         var info_ptr: u64 = ssa_operand_value(inst->src1);
-        var str_ptr: u64 = *(info_ptr);
-        var str_len: u64 = *(info_ptr + 8);
+        var info: *NameInfo = (*NameInfo)info_ptr;
+        var str_ptr: u64 = info->ptr;
+        var str_len: u64 = info->len;
         var label_id: u64 = string_get_label(str_ptr, str_len);
         emit("    lea ", 8);
         _ssa_emit_reg_name(inst->dest);
@@ -1837,16 +1839,18 @@ func _ssa_emit_inst(fn_id: u64, inst: *SSAInstruction) -> u64 {
 
     if (op == SSA_OP_LEA_GLOBAL) {
         var info_ptr2: u64 = ssa_operand_value(inst->src1);
-        var name_ptr: u64 = *(info_ptr2);
-        var name_len: u64 = *(info_ptr2 + 8);
+        var info: *NameInfo = (*NameInfo)info_ptr2;
+        var name_ptr: u64 = info->ptr;
+        var name_len: u64 = info->len;
         _ssa_emit_lea_global(inst->dest, name_ptr, name_len);
         return 0;
     }
 
     if (op == SSA_OP_LEA_FUNC) {
         var info_ptr2b: u64 = ssa_operand_value(inst->src1);
-        var name_ptr2: u64 = *(info_ptr2b);
-        var name_len2: u64 = *(info_ptr2b + 8);
+        var info: *NameInfo = (*NameInfo)info_ptr2b;
+        var name_ptr2: u64 = info->ptr;
+        var name_len2: u64 = info->len;
         _ssa_emit_lea_func(inst->dest, name_ptr2, name_len2);
         return 0;
     }

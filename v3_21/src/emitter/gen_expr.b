@@ -36,7 +36,8 @@ func emit_mask_to_rdx(bit_width: u64) -> u64 {
 }
 
 func get_packed_layout_total_bits(struct_def: u64) -> u64 {
-    var fields: u64 = *(struct_def + 24);
+    var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+    var fields: u64 = struct_info->fields_vec;
     var num_fields: u64 = vec_len(fields);
     var total_bits: u64 = 0;
     for (var i: u64 = 0; i < num_fields; i++) {
@@ -52,7 +53,8 @@ func get_packed_layout_total_bits(struct_def: u64) -> u64 {
 }
 
 func get_packed_field_bit_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
-    var fields: u64 = *(struct_def + 24);
+    var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+    var fields: u64 = struct_info->fields_vec;
     var num_fields: u64 = vec_len(fields);
     var bit_cursor: u64 = 0;
     for (var i: u64 = 0; i < num_fields; i++) {
@@ -73,7 +75,8 @@ func get_packed_field_bit_offset(struct_def: u64, field_name_ptr: u64, field_nam
 }
 
 func get_packed_field_bit_width(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
-    var fields: u64 = *(struct_def + 24);
+    var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+    var fields: u64 = struct_info->fields_vec;
     var num_fields: u64 = vec_len(fields);
     for (var i: u64 = 0; i < num_fields; i++) {
         var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
@@ -90,8 +93,7 @@ func get_packed_field_bit_width(struct_def: u64, field_name_ptr: u64, field_name
 func _cg_sysv_pop_arg_regs(total_words: u64) -> u64 {
     var reg_count: u64 = total_words;
     if (reg_count > 6) { reg_count = 6; }
-    var i: u64 = 0;
-    while (i < reg_count) {
+    for (var i: u64 = 0; i < reg_count; i++) {
         emit("    pop ", 8);
         if (i == 0) { emit("rdi", 3); }
         else if (i == 1) { emit("rsi", 3); }
@@ -100,7 +102,6 @@ func _cg_sysv_pop_arg_regs(total_words: u64) -> u64 {
         else if (i == 4) { emit("r8", 2); }
         else if (i == 5) { emit("r9", 2); }
         emit_nl();
-        i = i + 1;
     }
     if (total_words > 6) { return total_words - 6; }
     return 0;
@@ -109,8 +110,7 @@ func _cg_sysv_pop_arg_regs(total_words: u64) -> u64 {
 func _cg_sysv_pop_arg_regs_sret(total_words: u64) -> u64 {
     var reg_count: u64 = total_words;
     if (reg_count > 5) { reg_count = 5; }
-    var i: u64 = 0;
-    while (i < reg_count) {
+    for (var i: u64 = 0; i < reg_count; i++) {
         emit("    pop ", 8);
         if (i == 0) { emit("rsi", 3); }
         else if (i == 1) { emit("rdx", 3); }
@@ -118,7 +118,6 @@ func _cg_sysv_pop_arg_regs_sret(total_words: u64) -> u64 {
         else if (i == 3) { emit("r8", 2); }
         else if (i == 4) { emit("r9", 2); }
         emit_nl();
-        i = i + 1;
     }
     if (total_words > 5) { return total_words - 5; }
     return 0;
@@ -299,8 +298,9 @@ func cg_expr(node: u64) -> u64 {
         var resolved_len: u64 = name_len;
         var resolved: u64 = resolve_name(name_ptr, name_len);
         if (resolved != 0) {
-            resolved_ptr = *(resolved);
-            resolved_len = *(resolved + 8);
+            var resolved_info: *NameInfo = (*NameInfo)resolved;
+            resolved_ptr = resolved_info->ptr;
+            resolved_len = resolved_info->len;
         }
 
         var c_result: u64 = const_find(resolved_ptr, resolved_len);
@@ -375,8 +375,9 @@ func cg_expr(node: u64) -> u64 {
             var resolved_len: u64 = name_len;
             var resolved: u64 = resolve_name(name_ptr, name_len);
             if (resolved != 0) {
-                resolved_ptr = *(resolved);
-                resolved_len = *(resolved + 8);
+                var resolved_info: *NameInfo = (*NameInfo)resolved;
+                resolved_ptr = resolved_info->ptr;
+                resolved_len = resolved_info->len;
             }
             emit("    lea rax, [rel ", 19);
             emit(resolved_ptr, resolved_len);
@@ -389,8 +390,9 @@ func cg_expr(node: u64) -> u64 {
             var resolved_len2: u64 = name_len;
             var resolved2: u64 = resolve_name(name_ptr, name_len);
             if (resolved2 != 0) {
-                resolved_ptr2 = *(resolved2);
-                resolved_len2 = *(resolved2 + 8);
+                var resolved_info2: *NameInfo = (*NameInfo)resolved2;
+                resolved_ptr2 = resolved_info2->ptr;
+                resolved_len2 = resolved_info2->len;
             }
             emit("    lea rax, [rel _gvar_", 22);
             emit(resolved_ptr2, resolved_len2);
@@ -522,8 +524,9 @@ func cg_expr(node: u64) -> u64 {
         var resolved_len: u64 = name_len;
         var resolved: u64 = resolve_name(name_ptr, name_len);
         if (resolved != 0) {
-            resolved_ptr = *(resolved);
-            resolved_len = *(resolved + 8);
+            var resolved_info: *NameInfo = (*NameInfo)resolved;
+            resolved_ptr = resolved_info->ptr;
+            resolved_len = resolved_info->len;
         }
         var args: u64 = call->args_vec;
         var nargs: u64 = 0;
@@ -644,7 +647,8 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
     
     // Handle ptr->field (object is AST_DEREF)
     if (obj_kind == AST_DEREF) {
-        var ptr_expr: u64 = *(object + 8);
+        var deref_obj: *AstDeref = (*AstDeref)object;
+        var ptr_expr: u64 = deref_obj->operand;
         
         // Evaluate pointer expression to get pointer value
         cg_expr(ptr_expr);
@@ -754,8 +758,9 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
         return;
     }
     
-    var obj_name_ptr: u64 = *(object + 8);
-    var obj_name_len: u64 = *(object + 16);
+    var obj_ident: *AstIdent = (*AstIdent)object;
+    var obj_name_ptr: u64 = obj_ident->name_ptr;
+    var obj_name_len: u64 = obj_ident->name_len;
     
     // Get variable info from symtab
     var var_offset: u64 = symtab_find(symtab, obj_name_ptr, obj_name_len);
@@ -957,8 +962,9 @@ func cg_lvalue(node: u64) -> u64 {
         var resolved_len: u64 = name_len;
         var resolved: u64 = resolve_name(name_ptr, name_len);
         if (resolved != 0) {
-            resolved_ptr = *(resolved);
-            resolved_len = *(resolved + 8);
+            var resolved_info: *NameInfo = (*NameInfo)resolved;
+            resolved_ptr = resolved_info->ptr;
+            resolved_len = resolved_info->len;
         }
 
         if (is_global_var(resolved_ptr, resolved_len)) {
@@ -1030,7 +1036,8 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
     
     // Handle ptr->field (object is AST_DEREF)
     if (obj_kind == AST_DEREF) {
-        var ptr_expr: u64 = *(object + 8);
+        var deref_obj: *AstDeref = (*AstDeref)object;
+        var ptr_expr: u64 = deref_obj->operand;
         
         // Evaluate pointer expression to get pointer value
         cg_expr(ptr_expr);
@@ -1118,8 +1125,9 @@ func cg_member_access_lvalue(node: u64, symtab: u64) -> u64 {
         return;
     }
     
-    var obj_name_ptr: u64 = *(object + 8);
-    var obj_name_len: u64 = *(object + 16);
+    var obj_ident: *AstIdent = (*AstIdent)object;
+    var obj_name_ptr: u64 = obj_ident->name_ptr;
+    var obj_name_len: u64 = obj_ident->name_len;
     
     // Get variable info from symtab
     var var_offset: u64 = symtab_find(symtab, obj_name_ptr, obj_name_len);
@@ -1197,8 +1205,9 @@ func cg_method_call(node: u64, symtab: u64) -> u64 {
     var resolved_len: u64 = full_len;
     var resolved: u64 = resolve_name(full_ptr, full_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
 
     var stack_words: u64 = _cg_sysv_pop_arg_regs(total_arg_words);

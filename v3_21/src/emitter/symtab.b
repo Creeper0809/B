@@ -37,11 +37,14 @@ func symtab_clear(s: u64) -> u64 {
     symtab->stack_offset = 0;
 
     var names_vec: u64 = symtab->names_vec;
-    *(names_vec + 8) = 0;
+    var names: *Vec = (*Vec)names_vec;
+    names->length = 0;
     var offsets_vec: u64 = symtab->offsets_vec;
-    *(offsets_vec + 8) = 0;
+    var offsets: *Vec = (*Vec)offsets_vec;
+    offsets->length = 0;
     var types_vec: u64 = symtab->types_vec;
-    *(types_vec + 8) = 0;
+    var types: *Vec = (*Vec)types_vec;
+    types->length = 0;
 }
 
 func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth: u64, size: u64) -> u64 {
@@ -82,18 +85,19 @@ func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth:
 }
 
 func symtab_find(s: u64, name_ptr: u64, name_len: u64) -> u64 {
-    var names: u64 = *(s);
-    var offsets: u64 = *(s + 8);
-    var count: u64 = *(s + 24);
+    var symtab: *Symtab = (*Symtab)s;
+    var names: u64 = symtab->names_vec;
+    var offsets: u64 = symtab->offsets_vec;
+    var count: u64 = symtab->count;
     
     if (count == 0) { return 0; }
 
     var idx: i64 = (i64)count - 1;
     while (idx >= 0) {
         var i: u64 = (u64)idx;
-        var name_info: u64 = vec_get(names, i);
-        var n_ptr: u64 = *(name_info);
-        var n_len: u64 = *(name_info + 8);
+        var name_info: *NameInfo = (*NameInfo)vec_get(names, i);
+        var n_ptr: u64 = name_info->ptr;
+        var n_len: u64 = name_info->len;
         
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
             return vec_get(offsets, i);
@@ -106,18 +110,19 @@ func symtab_find(s: u64, name_ptr: u64, name_len: u64) -> u64 {
 }
 
 func symtab_get_type(s: u64, name_ptr: u64, name_len: u64) -> u64 {
-    var names: u64 = *(s);
-    var types: u64 = *(s + 16);
-    var count: u64 = *(s + 24);
+    var symtab: *Symtab = (*Symtab)s;
+    var names: u64 = symtab->names_vec;
+    var types: u64 = symtab->types_vec;
+    var count: u64 = symtab->count;
     
     if (count == 0) { return 0; }
 
     var idx: i64 = (i64)count - 1;
     while (idx >= 0) {
         var i: u64 = (u64)idx;
-        var name_info: u64 = vec_get(names, i);
-        var n_ptr: u64 = *(name_info);
-        var n_len: u64 = *(name_info + 8);
+        var name_info: *NameInfo = (*NameInfo)vec_get(names, i);
+        var n_ptr: u64 = name_info->ptr;
+        var n_len: u64 = name_info->len;
         
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
             return vec_get(types, i);
@@ -130,18 +135,19 @@ func symtab_get_type(s: u64, name_ptr: u64, name_len: u64) -> u64 {
 }
 
 func symtab_update_type(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth: u64) -> u64 {
-    var names: u64 = *(s);
-    var types: u64 = *(s + 16);
-    var count: u64 = *(s + 24);
+    var symtab: *Symtab = (*Symtab)s;
+    var names: u64 = symtab->names_vec;
+    var types: u64 = symtab->types_vec;
+    var count: u64 = symtab->count;
     
     if (count == 0) { return; }
 
     var idx: i64 = (i64)count - 1;
     while (idx >= 0) {
         var i: u64 = (u64)idx;
-        var name_info: u64 = vec_get(names, i);
-        var n_ptr: u64 = *(name_info);
-        var n_len: u64 = *(name_info + 8);
+        var name_info: *NameInfo = (*NameInfo)vec_get(names, i);
+        var n_ptr: u64 = name_info->ptr;
+        var n_len: u64 = name_info->len;
         
         if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
             var type_info: u64 = vec_get(types, i);

@@ -44,32 +44,30 @@ func _cg_used_mark_flag(flags_ptr: u64, mask: u64) -> u64 {
 func _cg_used_has_name(used: u64, name_ptr: u64, name_len: u64) -> u64 {
     if (used == 0) { return 0; }
     var n: u64 = vec_len(used);
-    var i: u64 = 0;
-    while (i < n) {
-        var info: u64 = vec_get(used, i);
-        var ptr: u64 = *(info);
-        var len: u64 = *(info + 8);
+    for (var i: u64 = 0; i < n; i++) {
+        var info: *NameInfo = (*NameInfo)vec_get(used, i);
+        var ptr: u64 = info->ptr;
+        var len: u64 = info->len;
         if (len == name_len && str_eq(ptr, len, name_ptr, name_len) != 0) { return 1; }
-        i = i + 1;
     }
     return 0;
 }
 
 func _cg_used_add_name(used: u64, name_ptr: u64, name_len: u64) -> u64 {
     if (_cg_used_has_name(used, name_ptr, name_len) != 0) { return 0; }
-    var info: u64 = heap_alloc(2 * sizeof(u64));
-    var info_u64: *u64 = (*u64)info;
-    *(info_u64 + 0) = name_ptr;
-    *(info_u64 + 1) = name_len;
-    vec_push(used, info);
+    var info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfo));
+    info->ptr = name_ptr;
+    info->len = name_len;
+    vec_push(used, (u64)info);
     return 1;
 }
 
 func _cg_used_add_resolved_name(used: u64, name_ptr: u64, name_len: u64) -> u64 {
     var resolved: u64 = resolve_name(name_ptr, name_len);
     if (resolved != 0) {
-        name_ptr = *(resolved);
-        name_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        name_ptr = resolved_info->ptr;
+        name_len = resolved_info->len;
     }
     return _cg_used_add_name(used, name_ptr, name_len);
 }
@@ -84,10 +82,8 @@ func _cg_collect_calls_in_expr(node: u64, used: u64, flags_ptr: u64) -> u64 {
         var args: u64 = call->args_vec;
         if (args != 0) {
             var n: u64 = vec_len(args);
-            var i: u64 = 0;
-            while (i < n) {
+            for (var i: u64 = 0; i < n; i++) {
                 _cg_collect_calls_in_expr(vec_get(args, i), used, flags_ptr);
-                i = i + 1;
             }
         }
         return 0;
@@ -100,10 +96,8 @@ func _cg_collect_calls_in_expr(node: u64, used: u64, flags_ptr: u64) -> u64 {
         var args2: u64 = cp->args_vec;
         if (args2 != 0) {
             var n2: u64 = vec_len(args2);
-            var j: u64 = 0;
-            while (j < n2) {
+            for (var j: u64 = 0; j < n2; j++) {
                 _cg_collect_calls_in_expr(vec_get(args2, j), used, flags_ptr);
-                j = j + 1;
             }
         }
         return 0;
@@ -116,10 +110,8 @@ func _cg_collect_calls_in_expr(node: u64, used: u64, flags_ptr: u64) -> u64 {
         var args3: u64 = mc->args_vec;
         if (args3 != 0) {
             var n3: u64 = vec_len(args3);
-            var k: u64 = 0;
-            while (k < n3) {
+            for (var k: u64 = 0; k < n3; k++) {
                 _cg_collect_calls_in_expr(vec_get(args3, k), used, flags_ptr);
-                k = k + 1;
             }
         }
         return 0;
@@ -194,10 +186,8 @@ func _cg_collect_calls_in_expr(node: u64, used: u64, flags_ptr: u64) -> u64 {
         var vals: u64 = st->values_vec;
         if (vals != 0) {
             var n4: u64 = vec_len(vals);
-            var t: u64 = 0;
-            while (t < n4) {
+            for (var t: u64 = 0; t < n4; t++) {
                 _cg_collect_calls_in_expr(vec_get(vals, t), used, flags_ptr);
-                t = t + 1;
             }
         }
         return 0;
@@ -315,8 +305,7 @@ func _cg_collect_used_func_names(program: *AstProgram, used: u64, flags_ptr: u64
     while (changed != 0) {
         changed = 0;
         var n: u64 = vec_len(funcs);
-        var i: u64 = 0;
-        while (i < n) {
+        for (var i: u64 = 0; i < n; i++) {
             var fn_ptr: u64 = vec_get(funcs, i);
             var fn: *AstFunc = (*AstFunc)fn_ptr;
             if (_cg_used_has_name(used, fn->name_ptr, fn->name_len) != 0) {
@@ -325,7 +314,6 @@ func _cg_collect_used_func_names(program: *AstProgram, used: u64, flags_ptr: u64
                 _cg_collect_calls_in_func(fn, used, flags_ptr);
                 if (vec_len(used) != before) { changed = 1; }
             }
-            i = i + 1;
         }
     }
     return 0;

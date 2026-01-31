@@ -230,17 +230,13 @@ func mangle_name(prefix_ptr: u64, prefix_len: u64, name_ptr: u64, name_len: u64)
     var sep_len: u64 = 2;
     var total: u64 = prefix_len + sep_len + name_len;
     var buf: u64 = heap_alloc((total + 1) * sizeof(u8));
-    var i: u64 = 0;
-    while (i < prefix_len) {
+    for (var i: u64 = 0; i < prefix_len; i++) {
         *(*u8)(buf + i) = *(*u8)(prefix_ptr + i);
-        i = i + 1;
     }
-    *(*u8)(buf + i) = 95;
-    *(*u8)(buf + i + 1) = 95;
-    var j: u64 = 0;
-    while (j < name_len) {
-        *(*u8)(buf + i + sep_len + j) = *(*u8)(name_ptr + j);
-        j = j + 1;
+    *(*u8)(buf + prefix_len) = 95;
+    *(*u8)(buf + prefix_len + 1) = 95;
+    for (var j: u64 = 0; j < name_len; j++) {
+        *(*u8)(buf + prefix_len + sep_len + j) = *(*u8)(name_ptr + j);
     }
     *(*u8)(buf + total) = 0;
     var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
@@ -379,8 +375,9 @@ func add_import_alias(module_ptr: u64, module_len: u64, alias_ptr: u64, alias_le
     var alias_map: u64 = module_aliases_ensure(module_ptr, module_len);
     var existing: u64 = hashmap_get(alias_map, alias_ptr, alias_len);
     if (existing != 0) {
-        var ex_ptr: u64 = *(existing);
-        var ex_len: u64 = *(existing + 8);
+        var ex_info: *NameInfo = (*NameInfo)existing;
+        var ex_ptr: u64 = ex_info->ptr;
+        var ex_len: u64 = ex_info->len;
         if (ex_ptr == mangled_ptr && ex_len == mangled_len) {
             return 0;
         }
@@ -402,8 +399,9 @@ func add_prelude_alias(alias_ptr: u64, alias_len: u64, mangled_ptr: u64, mangled
     }
     var existing: u64 = hashmap_get(g_prelude_aliases, alias_ptr, alias_len);
     if (existing != 0) {
-        var ex_ptr: u64 = *(existing);
-        var ex_len: u64 = *(existing + 8);
+        var ex_info: *NameInfo = (*NameInfo)existing;
+        var ex_ptr: u64 = ex_info->ptr;
+        var ex_len: u64 = ex_info->len;
         if (ex_ptr == mangled_ptr && ex_len == mangled_len) {
             return 0;
         }
@@ -436,8 +434,9 @@ func compiler_func_exists(name_ptr: u64, name_len: u64) -> u64 {
     var resolved_len: u64 = name_len;
     var resolved: u64 = resolve_name(name_ptr, name_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
     var n: u64 = vec_len(g_all_funcs);
     for (var i: u64 = 0; i < n; i++) {
@@ -454,8 +453,9 @@ func compiler_get_func(name_ptr: u64, name_len: u64) -> u64 {
     var resolved_len: u64 = name_len;
     var resolved: u64 = resolve_name(name_ptr, name_len);
     if (resolved != 0) {
-        resolved_ptr = *(resolved);
-        resolved_len = *(resolved + 8);
+        var resolved_info: *NameInfo = (*NameInfo)resolved;
+        resolved_ptr = resolved_info->ptr;
+        resolved_len = resolved_info->len;
     }
     var n: u64 = vec_len(g_all_funcs);
     for (var i: u64 = 0; i < n; i++) {
@@ -479,25 +479,25 @@ func compiler_global_exists(name_ptr: u64, name_len: u64) -> u64 {
 func prelude_try_symbol(module_path: u64, module_len: u64, name_ptr: u64, name_len: u64) -> u64 {
     var mod_id: u64 = module_id_from_import(module_path, module_len);
     if (mod_id == 0) { return 0; }
-    var mod_ptr: u64 = *(mod_id);
-    var mod_len: u64 = *(mod_id + 8);
+    var mod_info: *NameInfo = (*NameInfo)mod_id;
+    var mod_ptr: u64 = mod_info->ptr;
+    var mod_len: u64 = mod_info->len;
     var exports: u64 = module_exports_get(mod_ptr, mod_len);
     if (exports == 0) { return 0; }
 
     var n: u64 = vec_len(exports);
     for (var i: u64 = 0; i < n; i++) {
-        var e: u64 = vec_get(exports, i);
-        var sym_ptr: u64 = *(e);
-        var sym_len: u64 = *(e + 8);
+        var e: *ExportEntry = (*ExportEntry)vec_get(exports, i);
+        var sym_ptr: u64 = e->name_ptr;
+        var sym_len: u64 = e->name_len;
         if (str_eq(sym_ptr, sym_len, name_ptr, name_len) != 0) {
-            var mangled_ptr: u64 = *(e + 16);
-            var mangled_len: u64 = *(e + 24);
+            var mangled_ptr: u64 = e->mangled_ptr;
+            var mangled_len: u64 = e->mangled_len;
             add_prelude_alias(name_ptr, name_len, mangled_ptr, mangled_len);
-            var info: u64 = heap_alloc(2 * sizeof(u64));
-            var info_u64: *u64 = (*u64)info;
-            *(info_u64 + 0) = mangled_ptr;
-            *(info_u64 + 1) = mangled_len;
-            return info;
+            var info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+            info->ptr = mangled_ptr;
+            info->len = mangled_len;
+            return (u64)info;
         }
     }
     return 0;
@@ -540,14 +540,15 @@ func resolve_name(name_ptr: u64, name_len: u64) -> u64 {
         if (exports != 0) {
             var n: u64 = vec_len(exports);
             for (var i: u64 = 0; i < n; i++) {
-                var e: u64 = vec_get(exports, i);
-                var n_ptr: u64 = *(e);
-                var n_len: u64 = *(e + 8);
+                var e: *ExportEntry = (*ExportEntry)vec_get(exports, i);
+                var n_ptr: u64 = e->name_ptr;
+                var n_len: u64 = e->name_len;
                 if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
-                                var info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
-                                info->ptr = *(e + 16);
-                                info->len = *(e + 24);
-                                return (u64)info;                }
+                    var info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+                    info->ptr = e->mangled_ptr;
+                    info->len = e->mangled_len;
+                    return (u64)info;
+                }
             }
         }
     }
@@ -567,8 +568,7 @@ func compiler_find_const(name_ptr: u64, name_len: u64) -> u64 {
 
     if (g_all_consts == 0) { return result; }
     var n: u64 = vec_len(g_all_consts);
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         var c_ptr: u64 = vec_get(g_all_consts, i);
         var c: *AstConstDecl = (*AstConstDecl)c_ptr;
         if (str_eq(c->name_ptr, c->name_len, name_ptr, name_len)) {
@@ -576,7 +576,6 @@ func compiler_find_const(name_ptr: u64, name_len: u64) -> u64 {
             res->value = c->value;
             return result;
         }
-        i = i + 1;
     }
     return result;
 }
@@ -586,11 +585,11 @@ func import_all_from_module(importer_ptr: u64, importer_len: u64, module_ptr: u6
     if (exports == 0) { return 0; }
     var n: u64 = vec_len(exports);
     for (var i: u64 = 0; i < n; i++) {
-        var e: u64 = vec_get(exports, i);
-        var name_ptr: u64 = *(e);
-        var name_len: u64 = *(e + 8);
-        var mangled_ptr: u64 = *(e + 16);
-        var mangled_len: u64 = *(e + 24);
+        var e: *ExportEntry = (*ExportEntry)vec_get(exports, i);
+        var name_ptr: u64 = e->name_ptr;
+        var name_len: u64 = e->name_len;
+        var mangled_ptr: u64 = e->mangled_ptr;
+        var mangled_len: u64 = e->mangled_len;
         add_import_alias(importer_ptr, importer_len, name_ptr, name_len, mangled_ptr, mangled_len);
     }
     return 1;
@@ -601,12 +600,12 @@ func import_symbol_from_module(importer_ptr: u64, importer_len: u64, module_ptr:
     if (exports == 0) { return 0; }
     var n: u64 = vec_len(exports);
     for (var i: u64 = 0; i < n; i++) {
-        var e: u64 = vec_get(exports, i);
-        var name_ptr: u64 = *(e);
-        var name_len: u64 = *(e + 8);
+        var e: *ExportEntry = (*ExportEntry)vec_get(exports, i);
+        var name_ptr: u64 = e->name_ptr;
+        var name_len: u64 = e->name_len;
         if (str_eq(name_ptr, name_len, symbol_ptr, symbol_len)) {
-            var mangled_ptr: u64 = *(e + 16);
-            var mangled_len: u64 = *(e + 24);
+            var mangled_ptr: u64 = e->mangled_ptr;
+            var mangled_len: u64 = e->mangled_len;
             add_import_alias(importer_ptr, importer_len, alias_ptr, alias_len, mangled_ptr, mangled_len);
             return 1;
         }
@@ -623,11 +622,11 @@ func prelude_import_all_from_module(module_ptr: u64, module_len: u64) -> u64 {
     if (exports == 0) { return 0; }
     var n: u64 = vec_len(exports);
     for (var i: u64 = 0; i < n; i++) {
-        var e: u64 = vec_get(exports, i);
-        var name_ptr: u64 = *(e);
-        var name_len: u64 = *(e + 8);
-        var mangled_ptr: u64 = *(e + 16);
-        var mangled_len: u64 = *(e + 24);
+        var e: *ExportEntry = (*ExportEntry)vec_get(exports, i);
+        var name_ptr: u64 = e->name_ptr;
+        var name_len: u64 = e->name_len;
+        var mangled_ptr: u64 = e->mangled_ptr;
+        var mangled_len: u64 = e->mangled_len;
         add_prelude_alias(name_ptr, name_len, mangled_ptr, mangled_len);
     }
     return 1;
@@ -639,8 +638,9 @@ func set_current_module_for_func(func_ptr: u64, func_len: u64) -> u64 {
     if (g_func_module_map == 0) { return 0; }
     var info: u64 = hashmap_get(g_func_module_map, func_ptr, func_len);
     if (info != 0) {
-        g_current_module_ptr = *(info);
-        g_current_module_len = *(info + 8);
+        var info_name: *NameInfo = (*NameInfo)info;
+        g_current_module_ptr = info_name->ptr;
+        g_current_module_len = info_name->len;
     }
     return 0;
 }
@@ -650,7 +650,8 @@ func set_current_module_for_func(func_ptr: u64, func_len: u64) -> u64 {
 // ============================================
 
 func register_module_exports(prog: u64, module_ptr: u64, module_len: u64, prefix_ptr: u64, prefix_len: u64) -> u64 {
-    var funcs: u64 = *(prog + 8);
+    var prog_info: *AstProgram = (*AstProgram)prog;
+    var funcs: u64 = prog_info->funcs_vec;
     if (funcs != 0) {
         var num_funcs: u64 = vec_len(funcs);
         for (var i: u64 = 0; i < num_funcs; i++) {
@@ -663,8 +664,9 @@ func register_module_exports(prog: u64, module_ptr: u64, module_len: u64, prefix
 
             if (prefix_len != 0 && !(orig_len == 4 && str_eq(orig_ptr, orig_len, "main", 4))) {
                 var m: u64 = mangle_name(prefix_ptr, prefix_len, orig_ptr, orig_len);
-                mangled_ptr = *(m);
-                mangled_len = *(m + 8);
+                var mangled_info: *NameInfo = (*NameInfo)m;
+                mangled_ptr = mangled_info->ptr;
+                mangled_len = mangled_info->len;
                 fn->name_ptr = mangled_ptr;
                 fn->name_len = mangled_len;
             }
@@ -681,7 +683,7 @@ func register_module_exports(prog: u64, module_ptr: u64, module_len: u64, prefix
         }
     }
 
-    var consts: u64 = *(prog + 16);
+    var consts: u64 = prog_info->consts_vec;
     if (consts != 0) {
         var num_consts: u64 = vec_len(consts);
         for (var ci: u64 = 0; ci < num_consts; ci++) {
@@ -694,8 +696,9 @@ func register_module_exports(prog: u64, module_ptr: u64, module_len: u64, prefix
 
             if (prefix_len != 0) {
                 var m2: u64 = mangle_name(prefix_ptr, prefix_len, orig_ptr, orig_len);
-                mangled_ptr = *(m2);
-                mangled_len = *(m2 + 8);
+                var mangled_info2: *NameInfo = (*NameInfo)m2;
+                mangled_ptr = mangled_info2->ptr;
+                mangled_len = mangled_info2->len;
                 c->name_ptr = mangled_ptr;
                 c->name_len = mangled_len;
             }
@@ -703,7 +706,7 @@ func register_module_exports(prog: u64, module_ptr: u64, module_len: u64, prefix
         }
     }
 
-    var globals: u64 = *(prog + 32);
+    var globals: u64 = prog_info->globals_vec;
     if (globals != 0) {
         var num_globals: u64 = vec_len(globals);
         for (var gi: u64 = 0; gi < num_globals; gi++) {
@@ -715,8 +718,9 @@ func register_module_exports(prog: u64, module_ptr: u64, module_len: u64, prefix
 
             if (prefix_len != 0) {
                 var m3: u64 = mangle_name(prefix_ptr, prefix_len, orig_ptr, orig_len);
-                mangled_ptr = *(m3);
-                mangled_len = *(m3 + 8);
+                var mangled_info3: *NameInfo = (*NameInfo)m3;
+                mangled_ptr = mangled_info3->ptr;
+                mangled_len = mangled_info3->len;
                 ginfo->name_ptr = mangled_ptr;
                 ginfo->name_len = mangled_len;
             }
@@ -735,27 +739,33 @@ func load_module_by_name(module_path: u64, module_len: u64) -> u64 {
 func load_std_prelude() -> u64 {
     if (!load_module_by_name("std/io", 6)) { return 0; }
     var id_io: u64 = module_id_from_import("std/io", 6);
-    prelude_import_all_from_module(*(id_io), *(id_io + 8));
+    var io_info: *NameInfo = (*NameInfo)id_io;
+    prelude_import_all_from_module(io_info->ptr, io_info->len);
 
     if (!load_module_by_name("std/str", 7)) { return 0; }
     var id_str: u64 = module_id_from_import("std/str", 7);
-    prelude_import_all_from_module(*(id_str), *(id_str + 8));
+    var str_info: *NameInfo = (*NameInfo)id_str;
+    prelude_import_all_from_module(str_info->ptr, str_info->len);
 
     if (!load_module_by_name("std/char", 8)) { return 0; }
     var id_char: u64 = module_id_from_import("std/char", 8);
-    prelude_import_all_from_module(*(id_char), *(id_char + 8));
+    var char_info: *NameInfo = (*NameInfo)id_char;
+    prelude_import_all_from_module(char_info->ptr, char_info->len);
 
     if (!load_module_by_name("std/util", 8)) { return 0; }
     var id_util: u64 = module_id_from_import("std/util", 8);
-    prelude_import_all_from_module(*(id_util), *(id_util + 8));
+    var util_info: *NameInfo = (*NameInfo)id_util;
+    prelude_import_all_from_module(util_info->ptr, util_info->len);
 
     if (!load_module_by_name("std/vec", 7)) { return 0; }
     var id_vec: u64 = module_id_from_import("std/vec", 7);
-    prelude_import_all_from_module(*(id_vec), *(id_vec + 8));
+    var vec_info: *NameInfo = (*NameInfo)id_vec;
+    prelude_import_all_from_module(vec_info->ptr, vec_info->len);
 
     if (!load_module_by_name("std/hashmap", 11)) { return 0; }
     var id_hm: u64 = module_id_from_import("std/hashmap", 11);
-    prelude_import_all_from_module(*(id_hm), *(id_hm + 8));
+    var hm_info: *NameInfo = (*NameInfo)id_hm;
+    prelude_import_all_from_module(hm_info->ptr, hm_info->len);
     return 1;
 }
 
@@ -783,17 +793,20 @@ func load_module(file_path: u64, file_path_len: u64) -> u64 {
     
     // Module identity for mangling
     var module_id: u64 = module_id_from_path(file_path, file_path_len);
-    var module_ptr: u64 = *(module_id);
-    var module_len: u64 = *(module_id + 8);
+    var module_info: *NameInfo = (*NameInfo)module_id;
+    var module_ptr: u64 = module_info->ptr;
+    var module_len: u64 = module_info->len;
     var module_prefix: u64 = module_prefix_from_id(module_ptr, module_len);
-    var prefix_ptr: u64 = *(module_prefix);
-    var prefix_len: u64 = *(module_prefix + 8);
+    var prefix_info: *NameInfo = (*NameInfo)module_prefix;
+    var prefix_ptr: u64 = prefix_info->ptr;
+    var prefix_len: u64 = prefix_info->len;
     
     // Pass 1: collect function signatures only
     var p1: u64 = parse_new(tokens);
     var prog_sig: u64 = parse_program_pass1(p1);
 
-    var sig_funcs: u64 = *(prog_sig + 8);
+    var prog_sig_info: *AstProgram = (*AstProgram)prog_sig;
+    var sig_funcs: u64 = prog_sig_info->funcs_vec;
     var num_sig_funcs: u64 = vec_len(sig_funcs);
     for (var sfi: u64 = 0; sfi < num_sig_funcs; sfi++) {
         vec_push(g_all_func_sigs, vec_get(sig_funcs, sfi));
@@ -807,16 +820,17 @@ func load_module(file_path: u64, file_path_len: u64) -> u64 {
     register_module_exports(prog, module_ptr, module_len, prefix_ptr, prefix_len);
 
     // Process imports recursively
-    var imports: u64  = *(prog + 24);
+    var prog_info2: *AstProgram = (*AstProgram)prog;
+    var imports: u64  = prog_info2->imports_vec;
     var num_imports: u64 = vec_len(imports);
     for (var ii: u64 = 0; ii<num_imports;ii++){
-        var imp: u64 = vec_get(imports, ii);
-        var imp_path: u64 = *(imp + 8);
-        var imp_len: u64 = *(imp + 16);
-        var imp_sym_ptr: u64 = *(imp + 24);
-        var imp_sym_len: u64 = *(imp + 32);
-        var imp_alias_ptr: u64 = *(imp + 40);
-        var imp_alias_len: u64 = *(imp + 48);
+        var imp: *AstImport = (*AstImport)vec_get(imports, ii);
+        var imp_path: u64 = imp->path_ptr;
+        var imp_len: u64 = imp->path_len;
+        var imp_sym_ptr: u64 = imp->symbol_ptr;
+        var imp_sym_len: u64 = imp->symbol_len;
+        var imp_alias_ptr: u64 = imp->alias_ptr;
+        var imp_alias_len: u64 = imp->alias_len;
 
         var resolved: u64 = resolve_module_path(imp_path, imp_len);
         var resolved_len: u64 = str_len(resolved);
@@ -826,8 +840,9 @@ func load_module(file_path: u64, file_path_len: u64) -> u64 {
         }
 
         var imp_mod_id: u64 = module_id_from_import(imp_path, imp_len);
-        var imp_mod_ptr: u64 = *(imp_mod_id);
-        var imp_mod_len: u64 = *(imp_mod_id + 8);
+        var imp_mod_info: *NameInfo = (*NameInfo)imp_mod_id;
+        var imp_mod_ptr: u64 = imp_mod_info->ptr;
+        var imp_mod_len: u64 = imp_mod_info->len;
 
         if (imp_sym_ptr == 0) {
             import_all_from_module(module_ptr, module_len, imp_mod_ptr, imp_mod_len);
@@ -837,21 +852,21 @@ func load_module(file_path: u64, file_path_len: u64) -> u64 {
     }
 
     // Add consts
-    var consts: u64 = *(prog + 16);
+    var consts: u64 = prog_info2->consts_vec;
     var num_consts: u64  = vec_len(consts);
     for (var ci: u64 = 0; ci < num_consts; ci++){
         vec_push(g_all_consts, vec_get(consts, ci));
     }
 
     // Add funcs
-    var funcs: u64 = *(prog + 8);
+        var funcs: u64 = prog_info2->funcs_vec;
     var num_funcs: u64 = vec_len(funcs);
     for (var fi: u64 = 0;fi < num_funcs; fi++){
          vec_push(g_all_funcs, vec_get(funcs, fi));
     }
 
     // Add globals
-    var globals: u64  = *(prog + 32);
+    var globals: u64  = prog_info2->globals_vec;
     if (globals != 0) {
         var num_globals: u64  = vec_len(globals);
         for (var gi: u64 = 0; gi < num_globals; gi++){
@@ -860,13 +875,14 @@ func load_module(file_path: u64, file_path_len: u64) -> u64 {
     }
 
     // Register structs
-    var structs: u64 = *(prog + 40);
+    var structs: u64 = prog_info2->structs_vec;
     if (structs != 0) {
         var num_structs: u64 = vec_len(structs);
         for (var si: u64 = 0; si < num_structs; si++){
             var struct_def: u64 = vec_get(structs, si);
-            var struct_name_ptr: u64 = *(struct_def + 8);
-            var struct_name_len: u64 = *(struct_def + 16);
+            var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+            var struct_name_ptr: u64 = struct_info->name_ptr;
+            var struct_name_len: u64 = struct_info->name_len;
             hashmap_put(g_all_structs, struct_name_ptr, struct_name_len, struct_def);
         }
     }
@@ -900,8 +916,9 @@ func register_struct_type(struct_def: u64) -> u64 {
     if (g_all_structs_vec == 0) {
         g_all_structs_vec = vec_new(16);
     }
-    var struct_name_ptr: u64 = *(struct_def + 8);
-    var struct_name_len: u64 = *(struct_def + 16);
+    var struct_info: *AstStructDef = (*AstStructDef)struct_def;
+    var struct_name_ptr: u64 = struct_info->name_ptr;
+    var struct_name_len: u64 = struct_info->name_len;
     hashmap_put(g_all_structs, struct_name_ptr, struct_name_len, struct_def);
     vec_push(g_all_structs_vec, struct_def);
 }
@@ -936,8 +953,7 @@ func extract_version_from_compiler_path(path: u64, path_len: u64) -> u64 {
     var base: u64 = path_basename_noext(path, path_len);
     var base_len: u64 = str_len(base);
     var needle: u64 = "_stage";
-    var i: u64 = 0;
-    while (i + 6 <= base_len) {
+    for (var i: u64 = 0; i + 6 <= base_len; i++) {
         if (str_eq(base + i, 6, needle, 6)) {
             var vlen: u64 = i;
             if (vlen == 0) { return 0; }
@@ -949,7 +965,6 @@ func extract_version_from_compiler_path(path: u64, path_len: u64) -> u64 {
             out->len = vlen;
             return (u64)out;
         }
-        i = i + 1;
     }
     // Fallback: accept direct version name (e.g., v3_20.out -> v3_20)
     if (base_len >= 2) {
@@ -974,8 +989,9 @@ func setup_paths_with_compiler(compiler_path: u64, compiler_len: u64, filename: 
 
     var version_info: u64 = extract_version_from_compiler_path(compiler_path, compiler_len);
     if (version_info != 0) {
-        var version_ptr: u64 = *(version_info);
-        var version_len: u64 = *(version_info + 8);
+        var version_name: *NameInfo = (*NameInfo)version_info;
+        var version_ptr: u64 = version_name->ptr;
+        var version_len: u64 = version_name->len;
         var compiler_dir: u64 = path_dirname(compiler_path, compiler_len);
         var compiler_dir_len: u64 = str_len(compiler_dir);
         var project_root: u64 = path_dirname(compiler_dir, compiler_dir_len);
@@ -1019,8 +1035,9 @@ func setup_paths_with_compiler(compiler_path: u64, compiler_len: u64, filename: 
 func build_merged_program() -> u64 {
     var dummy_imports: u64 = vec_new(1);
     var merged_prog: u64 = ast_program(g_all_funcs, g_all_consts, dummy_imports);
-    *(merged_prog + 32) = g_all_globals;
-    *(merged_prog + 40) = g_all_structs_vec;
+    var merged_info: *AstProgram = (*AstProgram)merged_prog;
+    merged_info->globals_vec = g_all_globals;
+    merged_info->structs_vec = g_all_structs_vec;
     return merged_prog;
 }
 

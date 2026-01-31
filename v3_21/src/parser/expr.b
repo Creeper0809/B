@@ -80,11 +80,11 @@ func parse_primary(p: u64) -> u64 {
 
         if (is_type != 0) {
             // Parse type: sizeof(u64), sizeof(*u8), sizeof(StructName), sizeof(*StructName)
-            var ty: u64 = parse_type_ex(p);
-            var type_kind: u64 = *(*u64)ty;
-            var ptr_depth: u64 = *(*u64)(ty + 8);
-            var struct_name_ptr: u64 = *(*u64)(ty + 24);
-            var struct_name_len: u64 = *(*u64)(ty + 32);
+            var ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
+            var type_kind: u64 = ty->type_kind;
+            var ptr_depth: u64 = ty->ptr_depth;
+            var struct_name_ptr: u64 = ty->struct_name_ptr;
+            var struct_name_len: u64 = ty->struct_name_len;
 
             parse_consume(p, TOKEN_RPAREN);
 
@@ -125,14 +125,14 @@ func parse_primary(p: u64) -> u64 {
             next_k == TOKEN_U32 || next_k == TOKEN_U64 || next_k == TOKEN_I64) {
             // Use parse_type_ex to get struct name directly
             // TypeInfo layout: [type_kind:8][ptr_depth:8][is_tagged:8][struct_name_ptr:8][struct_name_len:8][tag_layout_ptr:8][tag_layout_len:8]
-            var ty: u64 = parse_type_ex(p);
-            var type_kind: u64 = *(*u64)ty;
-            var ptr_depth: u64 = *(*u64)(ty + 8);
-            var is_tagged: u64 = *(*u64)(ty + 16);
-            var struct_name_ptr: u64 = *(*u64)(ty + 24);
-            var struct_name_len: u64 = *(*u64)(ty + 32);
-            var tag_layout_ptr: u64 = *(*u64)(ty + 40);
-            var tag_layout_len: u64 = *(*u64)(ty + 48);
+            var ty: *TypeInfo = (*TypeInfo)parse_type_ex(p);
+            var type_kind: u64 = ty->type_kind;
+            var ptr_depth: u64 = ty->ptr_depth;
+            var is_tagged: u64 = ty->is_tagged;
+            var struct_name_ptr: u64 = ty->struct_name_ptr;
+            var struct_name_len: u64 = ty->struct_name_len;
+            var tag_layout_ptr: u64 = ty->tag_layout_ptr;
+            var tag_layout_len: u64 = ty->tag_layout_len;
             
             parse_consume(p, TOKEN_RPAREN);
             var operand: u64 = parse_unary(p);
@@ -175,8 +175,9 @@ func parse_primary(p: u64) -> u64 {
             if (struct_def == 0) {
                 var resolved: u64 = resolve_name(name_ptr, name_len);
                 if (resolved != 0) {
-                    var resolved_ptr: u64 = *(resolved);
-                    var resolved_len: u64 = *(resolved + 8);
+                    var resolved_info: *NameInfo = (*NameInfo)resolved;
+                    var resolved_ptr: u64 = resolved_info->ptr;
+                    var resolved_len: u64 = resolved_info->len;
                     struct_def = get_struct_def(resolved_ptr, resolved_len);
                 }
             }
