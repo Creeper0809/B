@@ -45,3 +45,6 @@
 - [x] Normalize std/util byte buffer heap_alloc sizes with sizeof(u8).
 - [x] Normalize compiler byte buffers and prelude info allocations.
 - [x] Normalize codegen used-name info allocation with sizeof(u64).
+- [x] Normalize std/string_builder buffer allocations with sizeof(u8).
+- [x] Refactor codegen call-collector counted loops to for.
+- [x] Normalize emitter/gen_stmt heap_brk global info allocation.

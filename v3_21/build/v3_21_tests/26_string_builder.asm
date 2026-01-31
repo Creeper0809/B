@@ -1607,6 +1607,11 @@ std_string_builder__sb_ensure_cap:
     pop rax
     add rax, rbx
     push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
+    push rax
     pop rdi
     call std_io__heap_alloc
     mov [rbp-40], rax
@@ -1724,6 +1729,11 @@ std_string_builder__StringBuilder_init:
     mov rbx, rax
     pop rax
     add rax, rbx
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc

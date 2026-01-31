@@ -271,15 +271,13 @@ func _cg_collect_calls_in_stmt(node: u64, used: u64, flags_ptr: u64) -> u64 {
         var cases: u64 = sw->cases_vec;
         if (cases != 0) {
             var n5: u64 = vec_len(cases);
-            var c: u64 = 0;
-            while (c < n5) {
+            for (var c: u64 = 0; c < n5; c++) {
                 var case_ptr: u64 = vec_get(cases, c);
                 var cs: *AstCase = (*AstCase)case_ptr;
                 if (cs->is_default == 0) {
                     _cg_collect_calls_in_expr(cs->value, used, flags_ptr);
                 }
                 _cg_collect_calls_in_stmt(cs->body, used, flags_ptr);
-                c = c + 1;
             }
         }
         return 0;
@@ -290,10 +288,8 @@ func _cg_collect_calls_in_stmt(node: u64, used: u64, flags_ptr: u64) -> u64 {
         var stmts: u64 = blk->stmts_vec;
         if (stmts != 0) {
             var n6: u64 = vec_len(stmts);
-            var s: u64 = 0;
-            while (s < n6) {
+            for (var s: u64 = 0; s < n6; s++) {
                 _cg_collect_calls_in_stmt(vec_get(stmts, s), used, flags_ptr);
-                s = s + 1;
             }
         }
         return 0;
