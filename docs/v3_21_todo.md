@@ -34,3 +34,10 @@
 - [x] Refactor ssa/regalloc _ssa_reg_max block iteration.
 - [x] Refactor ssa/regalloc use/def and liveness arrays.
 - [x] Repair ssa/regalloc liveness/interference corruption and restore test pass.
+- [x] Normalize ssa/regalloc heap_alloc sizes with sizeof(u64).
+- [x] Refactor ssa/core pointer list indexing to typed arrays.
+- [x] Refactor ssa/mem2reg_df loops to typed indexing.
+- [ ] Investigate safe typed-indexing refactor for ssa/codegen live map loops (regression found).
+- [x] Refactor codegen SSA funcs indexing with safe typed access.
+- [x] Normalize codegen const metadata allocation with sizeof(u64).
+- [x] Refactor regalloc use/def block iteration to typed indexing.

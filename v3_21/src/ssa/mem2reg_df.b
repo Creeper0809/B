@@ -15,14 +15,13 @@ func ssa_mem2reg_compute_df(fn: *SSAFunction) -> u64 {
     if (fn == 0) { pop_trace(); return 0; }
 
     var blocks: u64 = fn->blocks_data;
+    var blocks_u64: *u64 = (*u64)blocks;
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+    for (var i: u64 = 0; i < n; i++) {
+        var b_ptr: u64 = *(blocks_u64 + i);
         var b: *SSABlock = (*SSABlock)b_ptr;
 
         if (b->preds_len < 2) {
-            i = i + 1;
             continue;
         }
 
@@ -30,20 +29,16 @@ func ssa_mem2reg_compute_df(fn: *SSAFunction) -> u64 {
         var preds: u64 = b->preds_data;
         var pcount: u64 = b->preds_len;
 
-        var j: u64 = 0;
-        while (j < pcount) {
-            var p_ptr: u64 = *(*u64)(preds + j * 8);
+        var preds_u64: *u64 = (*u64)preds;
+        for (var j: u64 = 0; j < pcount; j++) {
+            var p_ptr: u64 = *(preds_u64 + j);
             var runner: *SSABlock = (*SSABlock)p_ptr;
 
             while (runner != 0 && runner != idom_b) {
                 ssa_block_add_df(runner, b);
                 runner = runner->dom_parent;
             }
-
-            j = j + 1;
         }
-
-        i = i + 1;
     }
 
     if (MEM2REG_DF_DEBUG != 0) {
@@ -57,12 +52,11 @@ func ssa_mem2reg_run_df(ctx: *SSAContext) -> u64 {
     push_trace("ssa_mem2reg_run_df", "ssa_mem2reg_df.b", __LINE__);
     if (ctx == 0) { pop_trace(); return 0; }
     var funcs: u64 = ctx->funcs_data;
+    var funcs_u64: *u64 = (*u64)funcs;
     var n: u64 = ctx->funcs_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var f_ptr: u64 = *(*u64)(funcs + i * 8);
+    for (var i: u64 = 0; i < n; i++) {
+        var f_ptr: u64 = *(funcs_u64 + i);
         ssa_mem2reg_compute_df((*SSAFunction)f_ptr);
-        i = i + 1;
     }
     pop_trace();
     return 0;

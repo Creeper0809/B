@@ -568,10 +568,11 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     for(var ci: u64 = 0;ci < vec_len(program->consts_vec) ;ci++){
         var c_ptr: u64 = vec_get(program->consts_vec, ci);
         var c: *AstConstDecl = (*AstConstDecl)c_ptr;
-        var cinfo: u64 = heap_alloc(24);
-        *(cinfo) = c->name_ptr;
-        *(cinfo + 8) = c->name_len;
-        *(cinfo + 16) = c->value;
+        var cinfo: u64 = heap_alloc(3 * sizeof(u64));
+        var cinfo_u64: *u64 = (*u64)cinfo;
+        *(cinfo_u64 + 0) = c->name_ptr;
+        *(cinfo_u64 + 1) = c->name_len;
+        *(cinfo_u64 + 2) = c->value;
         vec_push(g_consts, cinfo);
     }
     
@@ -588,6 +589,10 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     emitln("    mov rax, 60");
     emitln("    syscall");
     
+    var ssa_funcs_u64: *u64 = 0;
+    if (use_ssa != 0) {
+        ssa_funcs_u64 = (*u64)ssa_ctx->funcs_data;
+    }
     for(var i : u64 = 0; i < vec_len(program->funcs_vec);i++){
         var fn_ptr: u64 = vec_get(program->funcs_vec, i);
         var fn: *AstFunc = (*AstFunc)fn_ptr;
@@ -595,7 +600,7 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
             continue;
         }
         if (use_ssa != 0) {
-            var ssa_fn_ptr: u64 = *(*u64)(ssa_ctx->funcs_data + i * 8);
+            var ssa_fn_ptr: u64 = *(ssa_funcs_u64 + i);
             if (ssa_codegen_is_supported_func(fn_ptr, program->globals_vec) != 0) {
                 ssa_codegen_emit_func(fn_ptr, ssa_fn_ptr);
             } else {

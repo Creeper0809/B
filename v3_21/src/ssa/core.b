@@ -362,12 +362,13 @@ func ssa_ret_slice_heap_remap_ex(inst_ptr: u64, map: u64, map_len: u64) -> u64 {
             var len_val: u64 = vec_get(g_ret_slice_heap_map_ex, i + 3);
             var ptr_is_reg: u64 = vec_get(g_ret_slice_heap_map_ex, i + 4);
             var len_is_reg: u64 = vec_get(g_ret_slice_heap_map_ex, i + 5);
+            var map_u64: *u64 = (*u64)map;
             if (ptr_is_reg != 0 && ptr_val < map_len) {
-                var pptr: u64 = *(*u64)(map + ptr_val * 8);
+                var pptr: u64 = *(map_u64 + ptr_val);
                 if (pptr != 0) { vec_set(g_ret_slice_heap_map_ex, i + 2, pptr); }
             }
             if (len_is_reg != 0 && len_val < map_len) {
-                var plen: u64 = *(*u64)(map + len_val * 8);
+                var plen: u64 = *(map_u64 + len_val);
                 if (plen != 0) { vec_set(g_ret_slice_heap_map_ex, i + 3, plen); }
             }
             return 1;
@@ -398,11 +399,10 @@ func ssa_block_add_df(block: *SSABlock, target: *SSABlock) -> u64 {
     pop_trace();
     var data: u64 = block->df_data;
     var len: u64 = block->df_len;
-    var i: u64 = 0;
-    while (i < len) {
-        var cur: u64 = *(*u64)(data + i * 8);
+    var data_u64: *u64 = (*u64)data;
+    for (var i: u64 = 0; i < len; i++) {
+        var cur: u64 = *(data_u64 + i);
         if (cur == (u64)target) { return 0; }
-        i = i + 1;
     }
 
     // SSABlock: ..., df_data, df_len, df_cap, dom_parent
@@ -415,14 +415,13 @@ func ssa_block_replace_succ(block: *SSABlock, old_succ: *SSABlock, new_succ: *SS
     pop_trace();
     var data: u64 = block->succs_data;
     var len: u64 = block->succs_len;
-    var i: u64 = 0;
-    while (i < len) {
-        var cur: u64 = *(*u64)(data + i * 8);
+    var data_u64: *u64 = (*u64)data;
+    for (var i: u64 = 0; i < len; i++) {
+        var cur: u64 = *(data_u64 + i);
         if (cur == (u64)old_succ) {
-            *(*u64)(data + i * 8) = (u64)new_succ;
+            *(data_u64 + i) = (u64)new_succ;
             return 1;
         }
-        i = i + 1;
     }
     return 0;
 }
@@ -432,14 +431,13 @@ func ssa_block_replace_pred(block: *SSABlock, old_pred: *SSABlock, new_pred: *SS
     pop_trace();
     var data: u64 = block->preds_data;
     var len: u64 = block->preds_len;
-    var i: u64 = 0;
-    while (i < len) {
-        var cur: u64 = *(*u64)(data + i * 8);
+    var data_u64: *u64 = (*u64)data;
+    for (var i: u64 = 0; i < len; i++) {
+        var cur: u64 = *(data_u64 + i);
         if (cur == (u64)old_pred) {
-            *(*u64)(data + i * 8) = (u64)new_pred;
+            *(data_u64 + i) = (u64)new_pred;
             return 1;
         }
-        i = i + 1;
     }
     return 0;
 }

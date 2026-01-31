@@ -223,9 +223,9 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
 func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u64) -> u64 {
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+    var blocks_u64: *u64 = (*u64)blocks;
+    for (var i: u64 = 0; i < n; i++) {
+        var b_ptr: u64 = *(blocks_u64 + i);
         var b: *SSABlock = (*SSABlock)b_ptr;
 
         var use: u64 = _ssa_bitset_new(max_reg + 1);
@@ -346,7 +346,6 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
 
         *(*u64)(use_arr + i * 8) = use;
         *(*u64)(def_arr + i * 8) = def;
-        i = i + 1;
     }
     return 0;
 }
@@ -360,8 +359,8 @@ func _ssa_liveness(fn: *SSAFunction, max_reg: u64, live_in: u64, live_out: u64) 
         i = i + 1;
     }
 
-    var use_arr: u64 = heap_alloc(n * 8);
-    var def_arr: u64 = heap_alloc(n * 8);
+    var use_arr: u64 = heap_alloc(n * sizeof(u64));
+    var def_arr: u64 = heap_alloc(n * sizeof(u64));
     _ssa_build_use_def(fn, max_reg, use_arr, def_arr);
 
     var changed: u64 = 1;
@@ -630,7 +629,7 @@ func ssa_regalloc_color_fn(fn: *SSAFunction, k: u64) -> u64 {
     if (max_reg == 0) { return 0; }
 
     var adj: u64 = _ssa_interference_build(fn, max_reg);
-    var colors: u64 = heap_alloc((max_reg + 1) * 8);
+    var colors: u64 = heap_alloc((max_reg + 1) * sizeof(u64));
     var i: u64 = 0;
     while (i <= max_reg) {
         *(*u64)(colors + i * 8) = 0;
@@ -639,7 +638,7 @@ func ssa_regalloc_color_fn(fn: *SSAFunction, k: u64) -> u64 {
 
     var r: u64 = 1;
     while (r <= max_reg) {
-        var used: u64 = heap_alloc((k + 1) * 8);
+        var used: u64 = heap_alloc((k + 1) * sizeof(u64));
         var j: u64 = 0;
         while (j <= k) {
             *(*u64)(used + j * 8) = 0;
@@ -693,7 +692,7 @@ func ssa_regalloc_map_fn(fn: *SSAFunction, k: u64) -> u64 {
     var colors: u64 = ssa_regalloc_color_fn(fn, k);
     if (colors == 0) { return 0; }
 
-    var map: u64 = heap_alloc((max_reg + 1) * 8);
+    var map: u64 = heap_alloc((max_reg + 1) * sizeof(u64));
     var i: u64 = 0;
     while (i <= max_reg) {
         *(*u64)(map + i * 8) = 0;
