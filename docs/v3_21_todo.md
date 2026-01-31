@@ -19,3 +19,12 @@
 - [x] Normalize std/path allocations with sizeof(u8).
 - [x] Convert compiler module-id helper loops to for.
 - [x] Normalize std/str concat allocations with sizeof(u8).
+- [x] Refactor parser/type sizeof(TypeInfoLocal) allocations.
+- [x] Refactor ssa/destroy counted loops and pointer indexing.
+- [x] Refactor ssa/lower_phys counted loops and pointer indexing.
+- [x] Refactor ssa/dump array access to typed indexing.
+- [x] Refactor ssa/opt_o1 array access to typed indexing.
+- [x] Refactor ssa/core pointer list to sizeof(u64) indexing.
+- [x] Refactor ssa/mem2reg helper arrays (dom/map/max) to typed indexing.
+- [x] Refactor ssa/mem2reg def/phi helpers and rewrite_opr indexing.
+- [x] Normalize parser/decl import path allocations and variable names.

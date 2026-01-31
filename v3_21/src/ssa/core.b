@@ -27,12 +27,12 @@ func _ssa_ptr_list_push(base_ptr: u64, data_offset: u64, len_offset: u64, cap_of
         var new_cap: u64 = cap * 2;
         if (new_cap == 0) { new_cap = initial_cap; }
 
-        var new_data: u64 = heap_alloc(new_cap * 8);
+        var new_data: u64 = heap_alloc(new_cap * sizeof(u64));
         if (len > 0) {
-            var i: u64 = 0;
-            while (i < len) {
-                *(*u64)(new_data + i * 8) = *(*u64)(data + i * 8);
-                i = i + 1;
+            var old_u64: *u64 = (*u64)data;
+            var new_u64: *u64 = (*u64)new_data;
+            for (var i: u64 = 0; i < len; i++) {
+                *(new_u64 + i) = *(old_u64 + i);
             }
         }
         // TODO: 이전 'data' 블록을 해제해야 할 수 있습니다 (메모리 누수 가능성).
@@ -40,7 +40,8 @@ func _ssa_ptr_list_push(base_ptr: u64, data_offset: u64, len_offset: u64, cap_of
         cap = new_cap;
     }
 
-    *(*u64)(data + len * 8) = item;
+    var data_u64: *u64 = (*u64)data;
+    *(data_u64 + len) = item;
     len = len + 1;
 
     *data_ptr = data;

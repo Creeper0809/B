@@ -132,11 +132,11 @@ func parse_import_decl(p: u64) -> u64 {
             }
             parse_adv(p);
 
-            var slash: u64 = heap_alloc(1);
+            var slash: u64 = heap_alloc(sizeof(u8));
             *(*u8)slash = 47;
 
-            var tmp: u64 = str_concat(path_ptr, path_len, slash, 1);
-            path_ptr = str_concat(tmp, path_len + 1, ((*Token)next_tok)->ptr, ((*Token)next_tok)->len);
+            var joined_path: u64 = str_concat(path_ptr, path_len, slash, 1);
+            path_ptr = str_concat(joined_path, path_len + 1, ((*Token)next_tok)->ptr, ((*Token)next_tok)->len);
             path_len = path_len + 1 + ((*Token)next_tok)->len;
         }
 
@@ -158,11 +158,11 @@ func parse_import_decl(p: u64) -> u64 {
         }
         parse_adv(p);
         
-        var slash2: u64 = heap_alloc(1);
+        var slash2: u64 = heap_alloc(sizeof(u8));
         *(*u8)slash2 = 47;
         
-        var tmp2: u64 = str_concat(path_ptr, path_len, slash2, 1);
-        path_ptr = str_concat(tmp2, path_len + 1, ((*Token)next_tok)->ptr, ((*Token)next_tok)->len);
+        var joined_path2: u64 = str_concat(path_ptr, path_len, slash2, 1);
+        path_ptr = str_concat(joined_path2, path_len + 1, ((*Token)next_tok)->ptr, ((*Token)next_tok)->len);
         path_len = path_len + 1 + ((*Token)next_tok)->len;
     }
     

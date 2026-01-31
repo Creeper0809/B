@@ -11,12 +11,11 @@ func _ssa_destroy_find_pred(block: *SSABlock, pred_id: u64) -> u64 {
     push_trace("_ssa_destroy_find_pred", "ssa_destroy.b", __LINE__);
     var preds: u64 = block->preds_data;
     var n: u64 = block->preds_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var p_ptr: u64 = *(*u64)(preds + i * 8);
+    var preds_u64: *u64 = (*u64)preds;
+    for (var i: u64 = 0; i < n; i++) {
+        var p_ptr: u64 = *(preds_u64 + i);
         var p: *SSABlock = (*SSABlock)p_ptr;
         if (p->id == pred_id) { pop_trace(); return p_ptr; }
-        i = i + 1;
     }
     pop_trace();
     return 0;
@@ -25,15 +24,13 @@ func _ssa_destroy_find_pred(block: *SSABlock, pred_id: u64) -> u64 {
 func _ssa_destroy_get_split(map_pred: u64, map_block: u64, pred: *SSABlock, block: *SSABlock) -> u64 {
     push_trace("_ssa_destroy_get_split", "ssa_destroy.b", __LINE__);
     var n: u64 = vec_len(map_pred);
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         var p_ptr: u64 = vec_get(map_pred, i);
         if (p_ptr == (u64)pred) {
             var b_ptr: u64 = vec_get(map_block, i);
             pop_trace();
             return b_ptr;
         }
-        i = i + 1;
     }
     pop_trace();
     return 0;
@@ -91,21 +88,18 @@ func ssa_destroy_run(ctx: *SSAContext) -> u64 {
     if (ctx == 0) { pop_trace(); return 0; }
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var f_ptr: u64 = *(*u64)(funcs + i * 8);
+    var funcs_u64: *u64 = (*u64)funcs;
+    for (var i: u64 = 0; i < n; i++) {
+        var f_ptr: u64 = *(funcs_u64 + i);
         var fn: *SSAFunction = (*SSAFunction)f_ptr;
 
         var blocks: u64 = fn->blocks_data;
         var bcount: u64 = fn->blocks_len;
-        var bi: u64 = 0;
-        while (bi < bcount) {
-            var b_ptr: u64 = *(*u64)(blocks + bi * 8);
+        var blocks_u64: *u64 = (*u64)blocks;
+        for (var bi: u64 = 0; bi < bcount; bi++) {
+            var b_ptr: u64 = *(blocks_u64 + bi);
             ssa_destroy_block(ctx, fn, (*SSABlock)b_ptr);
-            bi = bi + 1;
         }
-
-        i = i + 1;
     }
     pop_trace();
     return 0;

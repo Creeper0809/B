@@ -25,10 +25,9 @@ func _ssa_dom_undef() -> u64 {
 func _ssa_zero_u64(buf: u64, count: u64) -> u64 {
     push_trace("_ssa_zero_u64", "ssa_mem2reg.b", __LINE__);
     pop_trace();
-    var i: u64 = 0;
-    while (i < count) {
-        *(*u64)(buf + i * 8) = 0;
-        i = i + 1;
+    var buf_u64: *u64 = (*u64)buf;
+    for (var i: u64 = 0; i < count; i++) {
+        *(buf_u64 + i) = 0;
     }
     return 0;
 }
@@ -36,13 +35,15 @@ func _ssa_zero_u64(buf: u64, count: u64) -> u64 {
 func _ssa_dom_get(idom: u64, id: u64) -> u64 {
     push_trace("_ssa_dom_get", "ssa_mem2reg.b", __LINE__);
     pop_trace();
-    return *(*u64)(idom + id * 8);
+    var idom_u64: *u64 = (*u64)idom;
+    return *(idom_u64 + id);
 }
 
 func _ssa_dom_set(idom: u64, id: u64, val: u64) -> u64 {
     push_trace("_ssa_dom_set", "ssa_mem2reg.b", __LINE__);
     pop_trace();
-    *(*u64)(idom + id * 8) = val;
+    var idom_u64: *u64 = (*u64)idom;
+    *(idom_u64 + id) = val;
     return 0;
 }
 
@@ -106,17 +107,17 @@ func _ssa_dom_build_block_map(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
     push_trace("_ssa_dom_build_block_map", "ssa_mem2reg.b", __LINE__);
     pop_trace();
     var total: u64 = ctx->next_block_id;
-    var map: u64 = heap_alloc(total * 8);
+    var map: u64 = heap_alloc(total * sizeof(u64));
     _ssa_zero_u64(map, total);
 
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+    var blocks_u64: *u64 = (*u64)blocks;
+    var map_u64: *u64 = (*u64)map;
+    for (var i: u64 = 0; i < n; i++) {
+        var b_ptr: u64 = *(blocks_u64 + i);
         var b: *SSABlock = (*SSABlock)b_ptr;
-        *(*u64)(map + b->id * 8) = b_ptr;
-        i = i + 1;
+        *(map_u64 + b->id) = b_ptr;
     }
     return map;
 }
@@ -127,9 +128,9 @@ func _ssa_mem2reg_max_var(fn: *SSAFunction) -> u64 {
     var max_id: u64 = 0;
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+    var blocks_u64: *u64 = (*u64)blocks;
+    for (var i: u64 = 0; i < n; i++) {
+        var b_ptr: u64 = *(blocks_u64 + i);
         var b: *SSABlock = (*SSABlock)b_ptr;
 
         var cur: *SSAInstruction = b->inst_head;
@@ -142,7 +143,6 @@ func _ssa_mem2reg_max_var(fn: *SSAFunction) -> u64 {
             cur = cur->next;
         }
 
-        i = i + 1;
     }
     return max_id;
 }
@@ -153,9 +153,9 @@ func _ssa_mem2reg_max_reg(fn: *SSAFunction) -> u64 {
     var max_id: u64 = 0;
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+    var blocks_u64: *u64 = (*u64)blocks;
+    for (var i: u64 = 0; i < n; i++) {
+        var b_ptr: u64 = *(blocks_u64 + i);
         var b: *SSABlock = (*SSABlock)b_ptr;
 
         var phi: *SSAInstruction = b->phi_head;
@@ -181,7 +181,6 @@ func _ssa_mem2reg_max_reg(fn: *SSAFunction) -> u64 {
             cur = cur->next;
         }
 
-        i = i + 1;
     }
     return max_id;
 }
@@ -192,12 +191,11 @@ func _ssa_mem2reg_max_block_id(fn: *SSAFunction) -> u64 {
     var max_id: u64 = 0;
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+    var blocks_u64: *u64 = (*u64)blocks;
+    for (var i: u64 = 0; i < n; i++) {
+        var b_ptr: u64 = *(blocks_u64 + i);
         var b: *SSABlock = (*SSABlock)b_ptr;
         if (b->id > max_id) { max_id = b->id; }
-        i = i + 1;
     }
     return max_id;
 }
@@ -208,9 +206,9 @@ func _ssa_mem2reg_def_blocks(fn: *SSAFunction, var_id: u64) -> u64 {
     var defs: u64 = vec_new(4);
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var b_ptr: u64 = *(*u64)(blocks + i * 8);
+    var blocks_u64: *u64 = (*u64)blocks;
+    for (var i: u64 = 0; i < n; i++) {
+        var b_ptr: u64 = *(blocks_u64 + i);
         var b: *SSABlock = (*SSABlock)b_ptr;
 
         var cur: *SSAInstruction = b->inst_head;
@@ -226,7 +224,6 @@ func _ssa_mem2reg_def_blocks(fn: *SSAFunction, var_id: u64) -> u64 {
             cur = cur->next;
         }
 
-        i = i + 1;
     }
     return defs;
 }
@@ -238,23 +235,22 @@ func _ssa_mem2reg_insert_phi(ctx: *SSAContext, fn: *SSAFunction, max_var: u64, n
 
     var total_blocks: u64 = ctx->next_block_id;
 
-    var v: u64 = 1;
-    while (v <= max_var) {
+    for (var v: u64 = 1; v <= max_var; v++) {
         var defs: u64 = _ssa_mem2reg_def_blocks(fn, v);
-        var def_mark: u64 = heap_alloc(total_blocks * 8);
+        var def_mark: u64 = heap_alloc(total_blocks * sizeof(u64));
         _ssa_zero_u64(def_mark, total_blocks);
-        var phi_mark: u64 = heap_alloc(total_blocks * 8);
+        var phi_mark: u64 = heap_alloc(total_blocks * sizeof(u64));
         _ssa_zero_u64(phi_mark, total_blocks);
+        var def_mark_u64: *u64 = (*u64)def_mark;
+        var phi_mark_u64: *u64 = (*u64)phi_mark;
 
         var wlist: u64 = vec_new(4);
         var dcount: u64 = vec_len(defs);
-        var i: u64 = 0;
-        while (i < dcount) {
+        for (var i: u64 = 0; i < dcount; i++) {
             var b_ptr: u64 = vec_get(defs, i);
             var b: *SSABlock = (*SSABlock)b_ptr;
-            *(*u64)(def_mark + b->id * 8) = 1;
+            *(def_mark_u64 + b->id) = 1;
             vec_push(wlist, b_ptr);
-            i = i + 1;
         }
 
         while (vec_len(wlist) > 0) {
@@ -263,27 +259,24 @@ func _ssa_mem2reg_insert_phi(ctx: *SSAContext, fn: *SSAFunction, max_var: u64, n
 
             var df: u64 = cur->df_data;
             var dflen: u64 = cur->df_len;
-            var j: u64 = 0;
-            while (j < dflen) {
-                var y_ptr: u64 = *(*u64)(df + j * 8);
+            var df_u64: *u64 = (*u64)df;
+            for (var j: u64 = 0; j < dflen; j++) {
+                var y_ptr: u64 = *(df_u64 + j);
                 var y: *SSABlock = (*SSABlock)y_ptr;
-                if (*(*u64)(phi_mark + y->id * 8) == 0) {
+                if (*(phi_mark_u64 + y->id) == 0) {
                     var reg_id: u64 = *next_reg_ptr;
                     *next_reg_ptr = reg_id + 1;
                     var phi_ptr: u64 = ssa_new_inst(ctx, SSA_OP_PHI, reg_id, 0, ssa_operand_const(v));
                     ssa_phi_append(y, (*SSAInstruction)phi_ptr);
-                    *(*u64)(phi_mark + y->id * 8) = 1;
+                    *(phi_mark_u64 + y->id) = 1;
 
-                    if (*(*u64)(def_mark + y->id * 8) == 0) {
-                        *(*u64)(def_mark + y->id * 8) = 1;
+                    if (*(def_mark_u64 + y->id) == 0) {
+                        *(def_mark_u64 + y->id) = 1;
                         vec_push(wlist, y_ptr);
                     }
                 }
-                j = j + 1;
             }
         }
-
-        v = v + 1;
     }
 
     return 0;
@@ -303,8 +296,10 @@ func _ssa_mem2reg_rewrite_opr(map_val: u64, map_set: u64, map_cap: u64, opr: u64
     if (ssa_operand_is_const(opr)) { return opr; }
     var reg: u64 = ssa_operand_value(opr);
     if (reg >= map_cap) { return opr; }
-    if (*(*u64)(map_set + reg * 8) == 0) { return opr; }
-    var mapped: u64 = *(*u64)(map_val + reg * 8);
+    var map_set_u64: *u64 = (*u64)map_set;
+    var map_val_u64: *u64 = (*u64)map_val;
+    if (*(map_set_u64 + reg) == 0) { return opr; }
+    var mapped: u64 = *(map_val_u64 + reg);
     return ssa_operand_reg(mapped);
 }
 

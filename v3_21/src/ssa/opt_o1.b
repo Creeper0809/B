@@ -111,10 +111,11 @@ func _ssa_opt_collect_uses(fn: *SSAFunction) -> u64 {
     var uses: u64 = vec_new(64);
     var blocks: u64 = fn->blocks_data;
     var bcount: u64 = fn->blocks_len;
+    var blocks_u64: *u64 = (*u64)blocks;
 
     var bi: u64 = 0;
     for (bi = 0; bi < bcount; bi = bi + 1) {
-        var b_ptr: u64 = *(*u64)(blocks + bi * 8);
+        var b_ptr: u64 = *(blocks_u64 + bi);
         var b: *SSABlock = (*SSABlock)b_ptr;
 
         var phi: *SSAInstruction = b->phi_head;
@@ -200,9 +201,10 @@ func _ssa_opt_dce_run(fn: *SSAFunction) -> u64 {
 
         var blocks: u64 = fn->blocks_data;
         var bcount: u64 = fn->blocks_len;
+        var blocks_u64: *u64 = (*u64)blocks;
         var bi: u64 = 0;
         for (bi = 0; bi < bcount; bi = bi + 1) {
-            var b_ptr: u64 = *(*u64)(blocks + bi * 8);
+            var b_ptr: u64 = *(blocks_u64 + bi);
             var b: *SSABlock = (*SSABlock)b_ptr;
 
             var cur: *SSAInstruction = b->inst_head;
@@ -223,9 +225,10 @@ func _ssa_opt_dce_run(fn: *SSAFunction) -> u64 {
 
     var blocks2: u64 = fn->blocks_data;
     var bcount2: u64 = fn->blocks_len;
+    var blocks2_u64: *u64 = (*u64)blocks2;
     var bi2: u64 = 0;
     for (bi2 = 0; bi2 < bcount2; bi2 = bi2 + 1) {
-        var b_ptr2: u64 = *(*u64)(blocks2 + bi2 * 8);
+        var b_ptr2: u64 = *(blocks2_u64 + bi2);
         var b2: *SSABlock = (*SSABlock)b_ptr2;
         _ssa_opt_remove_nops(b2);
     }
@@ -336,16 +339,18 @@ func ssa_opt_o1_run(ctx: *SSAContext) -> u64 {
 
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
+    var funcs_u64: *u64 = (*u64)funcs;
     var i: u64 = 0;
     for (i = 0; i < n; i = i + 1) {
-        var f_ptr: u64 = *(*u64)(funcs + i * 8);
+        var f_ptr: u64 = *(funcs_u64 + i);
         var fn: *SSAFunction = (*SSAFunction)f_ptr;
 
         var blocks: u64 = fn->blocks_data;
         var bcount: u64 = fn->blocks_len;
+        var blocks_u64: *u64 = (*u64)blocks;
         var bi: u64 = 0;
         for (bi = 0; bi < bcount; bi = bi + 1) {
-            var b_ptr: u64 = *(*u64)(blocks + bi * 8);
+            var b_ptr: u64 = *(blocks_u64 + bi);
             var b: *SSABlock = (*SSABlock)b_ptr;
 
             var reg_consts: u64 = vec_new(32);

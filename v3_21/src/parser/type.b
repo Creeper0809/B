@@ -12,6 +12,21 @@ import types;
 import lexer;
 import parser.util;
 
+// Local layout mirror for sizeof during bootstrap.
+struct TypeInfoLocal {
+    type_kind: u64;
+    ptr_depth: u64;
+    is_tagged: u64;
+    struct_name_ptr: u64;
+    struct_name_len: u64;
+    tag_layout_ptr: u64;
+    tag_layout_len: u64;
+    struct_def: u64;
+    elem_type_kind: u64;
+    elem_ptr_depth: u64;
+    array_len: u64;
+}
+
 // ============================================
 // Type Parsing
 // ============================================
@@ -24,13 +39,13 @@ func parse_base_type(p: u64) -> u64 {
     if (k == TOKEN_U32) { parse_adv(p); return TYPE_U32; }
     if (k == TOKEN_U64) { parse_adv(p); return TYPE_U64; }
     if (k == TOKEN_I64) { parse_adv(p); return TYPE_I64; }
-    
+
     // Check for struct type name (allow any identifier in type position)
     if (k == TOKEN_IDENTIFIER) {
         parse_adv(p);
         return TYPE_STRUCT;
     }
-    
+
     return TYPE_VOID;
 }
 
@@ -69,7 +84,7 @@ func parse_type(p: u64) -> u64 {
         emit_stderr("[ERROR] tagged layout on struct pointers is not supported\n", 63);
         panic("Parse error");
     }
-    var result: *TypeInfo = (*TypeInfo)heap_alloc(SIZEOF_TYPEINFO);
+    var result: *TypeInfo = (*TypeInfo)heap_alloc(sizeof(TypeInfoLocal));
     result->type_kind = base;
     result->ptr_depth = depth;
     result->is_tagged = is_tagged;
@@ -151,7 +166,7 @@ func parse_type_ex(p: u64) -> u64 {
             panic("Parse error");
         }
 
-        var result_arr: *TypeInfo = (*TypeInfo)heap_alloc(SIZEOF_TYPEINFO);
+        var result_arr: *TypeInfo = (*TypeInfo)heap_alloc(sizeof(TypeInfoLocal));
         if (is_slice == 1) { result_arr->type_kind = TYPE_SLICE; }
         else { result_arr->type_kind = TYPE_ARRAY; }
         result_arr->ptr_depth = depth;
@@ -197,7 +212,7 @@ func parse_type_ex(p: u64) -> u64 {
         panic("Parse error");
     }
 
-    var result: *TypeInfo = (*TypeInfo)heap_alloc(SIZEOF_TYPEINFO);
+    var result: *TypeInfo = (*TypeInfo)heap_alloc(sizeof(TypeInfoLocal));
     result->type_kind = base;
     result->ptr_depth = depth;
     result->is_tagged = is_tagged;

@@ -11,16 +11,16 @@ func ssa_lower_phys_run(ctx: *SSAContext) -> u64 {
     if (ctx == 0) { pop_trace(); return 0; }
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var f_ptr: u64 = *(*u64)(funcs + i * 8);
+    var funcs_u64: *u64 = (*u64)funcs;
+    for (var i: u64 = 0; i < n; i++) {
+        var f_ptr: u64 = *(funcs_u64 + i);
         var fn: *SSAFunction = (*SSAFunction)f_ptr;
 
         var blocks: u64 = fn->blocks_data;
         var bcount: u64 = fn->blocks_len;
-        var bi: u64 = 0;
-        while (bi < bcount) {
-            var b_ptr: u64 = *(*u64)(blocks + bi * 8);
+        var blocks_u64: *u64 = (*u64)blocks;
+        for (var bi: u64 = 0; bi < bcount; bi++) {
+            var b_ptr: u64 = *(blocks_u64 + bi);
             var b: *SSABlock = (*SSABlock)b_ptr;
 
             var cur: *SSAInstruction = b->inst_head;
@@ -42,10 +42,7 @@ func ssa_lower_phys_run(ctx: *SSAContext) -> u64 {
                 cur = cur->next;
             }
 
-            bi = bi + 1;
         }
-
-        i = i + 1;
     }
     pop_trace();
     return 0;
