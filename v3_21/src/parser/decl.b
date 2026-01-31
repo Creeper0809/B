@@ -538,12 +538,13 @@ func parse_enum_def(p: u64) -> u64 {
         
         // Copy to permanent heap storage
         var full_name_len: u64 = vec_len(full_name);
-        var full_name_ptr: u64 = heap_alloc(full_name_len);
+        var full_name_ptr: u64 = heap_alloc((full_name_len + 1) * sizeof(u8));
         var full_name_buf: u64 = *(full_name);  // vec buf_ptr (array of i64)
         for (var i: u64 = 0; i < full_name_len; i++) {
             var ch: u64 = vec_get(full_name, i);  // Get i64 value
             *(*u8)(full_name_ptr + i) = ch;  // Store as u8
         }
+        *(*u8)(full_name_ptr + full_name_len) = 0;
         
         var const_node: u64 = ast_const_decl(full_name_ptr, full_name_len, current_value);
         vec_push(consts, const_node);
@@ -608,11 +609,12 @@ func parse_impl_block(p: u64) -> u64 {
             
             // Copy to permanent heap storage
             var new_name_len: u64 = vec_len(new_name);
-            var new_name_ptr: u64 = heap_alloc(new_name_len);
+            var new_name_ptr: u64 = heap_alloc((new_name_len + 1) * sizeof(u8));
             for (var i: u64 = 0; i < new_name_len; i++) {
                 var ch: u64 = vec_get(new_name, i);
                 *(*u8)(new_name_ptr + i) = ch;
             }
+            *(*u8)(new_name_ptr + new_name_len) = 0;
             
             // Update function name
             func_node->name_ptr = new_name_ptr;
@@ -668,11 +670,12 @@ func parse_impl_block_signature(p: u64) -> u64 {
             }
 
             var new_name_len: u64 = vec_len(new_name);
-            var new_name_ptr: u64 = heap_alloc(new_name_len);
+            var new_name_ptr: u64 = heap_alloc((new_name_len + 1) * sizeof(u8));
             for (var i: u64 = 0; i < new_name_len; i++) {
                 var ch: u64 = vec_get(new_name, i);
                 *(*u8)(new_name_ptr + i) = ch;
             }
+            *(*u8)(new_name_ptr + new_name_len) = 0;
 
             func_node->name_ptr = new_name_ptr;
             func_node->name_len = new_name_len;

@@ -52,3 +52,9 @@
 - [x] Normalize ssa/codegen heap_brk global info allocation.
 - [x] Normalize parser/decl global info allocation with sizeof(GlobalInfo).
 - [x] Convert compiler config copy loop to for.
+- [x] Refactor emitter/gen_stmt dispatch to switch and replace loop-label vec pops with vec_pop.
+- [x] Refactor emitter/gen_expr NameInfo resolution and member-access struct usage; convert simple while loops to for.
+- [x] Refactor compiler/codegen/ssa/codegen NameInfo/ExportEntry struct access for resolve_name paths.
+- [x] Normalize parser/expr and parser/decl combined-name heap_alloc sizing with sizeof(u8) + null terminators.
+- [x] Refactor ssa/builder packed-struct checks and resolve_name paths to struct access; normalize method name allocation.
+- [x] Refactor emitter/typeinfo and emitter/symtab to struct-based access and loop cleanup.

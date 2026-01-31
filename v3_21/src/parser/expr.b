@@ -229,10 +229,11 @@ func parse_primary(p: u64) -> u64 {
                     }
                     
                     var combined_len: u64 = vec_len(combined_name);
-                    var combined_ptr: u64 = heap_alloc(combined_len);
+                    var combined_ptr: u64 = heap_alloc((combined_len + 1) * sizeof(u8));
                     for (var i: u64 = 0; i < combined_len; i++) {
                         *(*u8)(combined_ptr + i) = vec_get(combined_name, i);
                     }
+                    *(*u8)(combined_ptr + combined_len) = 0;
                     
                     parse_adv(p);  // consume '('
                     var args: u64 = vec_new(8);
