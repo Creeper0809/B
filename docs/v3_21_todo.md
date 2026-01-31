@@ -41,3 +41,4 @@
 - [x] Refactor codegen SSA funcs indexing with safe typed access.
 - [x] Normalize codegen const metadata allocation with sizeof(u64).
 - [x] Refactor regalloc use/def block iteration to typed indexing.
+- [ ] Investigate safe typed-indexing refactor for regalloc arrays (regression found).

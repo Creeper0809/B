@@ -224,6 +224,8 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
     var blocks_u64: *u64 = (*u64)blocks;
+    var use_arr_u64: *u64 = (*u64)use_arr;
+    var def_arr_u64: *u64 = (*u64)def_arr;
     for (var i: u64 = 0; i < n; i++) {
         var b_ptr: u64 = *(blocks_u64 + i);
         var b: *SSABlock = (*SSABlock)b_ptr;
@@ -344,8 +346,8 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
             cur = cur->next;
         }
 
-        *(*u64)(use_arr + i * 8) = use;
-        *(*u64)(def_arr + i * 8) = def;
+        *(use_arr_u64 + i) = use;
+        *(def_arr_u64 + i) = def;
     }
     return 0;
 }
@@ -778,13 +780,13 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
                 var p: u64 = *(*u64)(map + phi->dest * 8);
                 if (p != 0) { phi->dest = p; }
             }
-            var arg: *SSAPhiArg = (*SSAPhiArg)phi->src1;
-            while (arg != 0) {
-                if (arg->val < map_len) {
-                    var p2: u64 = *(*u64)(map + arg->val * 8);
-                    if (p2 != 0) { arg->val = p2; }
+            var args: *SSAPhiArg = (*SSAPhiArg)phi->src1;
+            while (args != 0) {
+                if (args->val < map_len) {
+                    var p2: u64 = *(*u64)(map + args->val * 8);
+                    if (p2 != 0) { args->val = p2; }
                 }
-                arg = arg->next;
+                args = args->next;
             }
             phi = phi->next;
         }
@@ -869,8 +871,8 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
             if (!ssa_operand_is_const(cur->src1)) {
                 var r1: u64 = ssa_operand_value(cur->src1);
                 if (r1 < map_len) {
-                    var p1: u64 = *(*u64)(map + r1 * 8);
-                    if (p1 != 0) { cur->src1 = ssa_operand_reg(p1); }
+                    var p: u64 = *(*u64)(map + r1 * 8);
+                    if (p != 0) { cur->src1 = ssa_operand_reg(p); }
                 }
             }
             if (!ssa_operand_is_const(cur->src2)) {
