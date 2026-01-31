@@ -372,13 +372,11 @@ func parse_uwidth_from_ident(ptr: u64, len: u64) -> u64 {
     if (len < 2) { return 0; }
     var first: u64 = *(*u8)ptr;
     if (first != 117) { return 0; }
-    var i: u64 = 1;
     var value: u64 = 0;
-    while (i < len) {
+    for (var i: u64 = 1; i < len; i++) {
         var c: u64 = *(*u8)(ptr + i);
         if (c < 48 || c > 57) { return 0; }
         value = value * 10 + (c - 48);
-        i = i + 1;
     }
     return value;
 }

@@ -58,3 +58,17 @@
 - [x] Normalize parser/expr and parser/decl combined-name heap_alloc sizing with sizeof(u8) + null terminators.
 - [x] Refactor ssa/builder packed-struct checks and resolve_name paths to struct access; normalize method name allocation.
 - [x] Refactor emitter/typeinfo and emitter/symtab to struct-based access and loop cleanup.
+- [x] Normalize emitter/typeinfo TypeInfo allocations with sizeof(TypeInfo).
+- [x] Normalize emitter/symtab TypeInfo allocation and convert reverse lookup loops to for.
+- [x] Normalize ssa/builder TypeInfo allocation with sizeof(TypeInfo).
+- [x] Convert emitter/emitter globals BSS loop to for.
+- [x] Refactor emitter/gen_expr reverse-arg loops to for and remove packed-flag pointer arithmetic.
+- [x] Convert emitter/gen_stmt sret arg reverse loop to for.
+- [x] Convert emitter/typeinfo symtab reverse lookup to for.
+- [x] Convert parser/decl parse_uwidth_from_ident digit loop to for.
+- [x] Convert ssa/core ret-slice heap helper loops to for.
+- [x] Convert ssa/regalloc counted loops to for (liveness/interference/color/apply).
+- [x] Convert ssa/codegen counted loops to for (live-map/build/support/emit).
+- [x] Refactor emitter/gen_stmt heap_brk GlobalInfo + packed flag struct access.
+- [x] Refactor ssa/codegen heap_brk GlobalInfo struct access.
+- [x] Refactor codegen const info allocation to ConstInfo struct.

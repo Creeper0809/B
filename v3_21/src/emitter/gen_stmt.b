@@ -119,11 +119,9 @@ func cg_call_sret(call: *AstCall, dest_offset: u64, symtab: u64) -> u64 {
     if (args != 0) { nargs = vec_len(args); }
     var total_arg_words: u64 = 0;
     if (nargs > 0) {
-        var i: i64 = (i64)nargs - 1;
-        while (i >= 0) {
+        for (var i: i64 = (i64)nargs - 1; i >= 0; i = i - 1) {
             var arg: u64 = vec_get(args, (u64)i);
             total_arg_words = total_arg_words + _cg_sysv_push_call_arg(arg, symtab);
-            i = i - 1;
         }
     }
 
@@ -146,11 +144,10 @@ func cg_ensure_heap_brk_global() -> u64 {
     var globals: u64 = emitter_get_globals();
     if (globals == 0) { return 0; }
     if (is_global_var("__cg_heap_brk", 13) != 0) { return 0; }
-    var ginfo: u64 = heap_alloc(2 * sizeof(u64));
-    var ginfo_u64: *u64 = (*u64)ginfo;
-    *(ginfo_u64 + 0) = "__cg_heap_brk";
-    *(ginfo_u64 + 1) = 13;
-    vec_push(globals, ginfo);
+    var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(sizeof(GlobalInfo));
+    ginfo->name_ptr = "__cg_heap_brk";
+    ginfo->name_len = 13;
+    vec_push(globals, (u64)ginfo);
     return 0;
 }
 
@@ -659,7 +656,8 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
                     emit("[ERROR] Tagged layout struct not found\n", 41);
                     panic("Codegen error");
                 }
-                var packed_flag: u64 = *(layout_def + 32);
+                var layout_info: *AstStructDef = (*AstStructDef)layout_def;
+                var packed_flag: u64 = layout_info->is_packed;
                 if (packed_flag == 0) {
                     emit("[ERROR] Tagged layout must be packed struct\n", 49);
                     panic("Codegen error");
@@ -714,7 +712,8 @@ func cg_assign_stmt(node: u64, symtab: u64) -> u64 {
                 return;
             }
             if (ot->ptr_depth == 0 && ot->type_kind == TYPE_STRUCT && ot->struct_def != 0) {
-                var packed_flag2: u64 = *(ot->struct_def + 32);
+                var struct_info: *AstStructDef = (*AstStructDef)ot->struct_def;
+                var packed_flag2: u64 = struct_info->is_packed;
                 if (packed_flag2 == 1) {
                     var total_bits2: u64 = get_packed_layout_total_bits(ot->struct_def);
                     var field_offset2: u64 = get_packed_field_bit_offset(ot->struct_def, member_ptr, member_len);

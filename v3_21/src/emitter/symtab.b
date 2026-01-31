@@ -64,7 +64,7 @@ func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth:
     vec_push(symtab->offsets_vec, offset);
     
     // Add type info
-    var type_info: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var type_info: u64 = heap_alloc(sizeof(TypeInfo));
     var ti: *TypeInfo = (*TypeInfo)type_info;
     ti->type_kind = type_kind;
     ti->ptr_depth = ptr_depth;
@@ -92,8 +92,7 @@ func symtab_find(s: u64, name_ptr: u64, name_len: u64) -> u64 {
     
     if (count == 0) { return 0; }
 
-    var idx: i64 = (i64)count - 1;
-    while (idx >= 0) {
+    for (var idx: i64 = (i64)count - 1; idx >= 0; idx = idx - 1) {
         var i: u64 = (u64)idx;
         var name_info: *NameInfo = (*NameInfo)vec_get(names, i);
         var n_ptr: u64 = name_info->ptr;
@@ -103,7 +102,6 @@ func symtab_find(s: u64, name_ptr: u64, name_len: u64) -> u64 {
             return vec_get(offsets, i);
         }
 
-        idx = idx - 1;
     }
     
     return 0;
@@ -117,8 +115,7 @@ func symtab_get_type(s: u64, name_ptr: u64, name_len: u64) -> u64 {
     
     if (count == 0) { return 0; }
 
-    var idx: i64 = (i64)count - 1;
-    while (idx >= 0) {
+    for (var idx: i64 = (i64)count - 1; idx >= 0; idx = idx - 1) {
         var i: u64 = (u64)idx;
         var name_info: *NameInfo = (*NameInfo)vec_get(names, i);
         var n_ptr: u64 = name_info->ptr;
@@ -128,7 +125,6 @@ func symtab_get_type(s: u64, name_ptr: u64, name_len: u64) -> u64 {
             return vec_get(types, i);
         }
 
-        idx = idx - 1;
     }
     
     return 0;
@@ -142,8 +138,7 @@ func symtab_update_type(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, pt
     
     if (count == 0) { return; }
 
-    var idx: i64 = (i64)count - 1;
-    while (idx >= 0) {
+    for (var idx: i64 = (i64)count - 1; idx >= 0; idx = idx - 1) {
         var i: u64 = (u64)idx;
         var name_info: *NameInfo = (*NameInfo)vec_get(names, i);
         var n_ptr: u64 = name_info->ptr;
@@ -157,6 +152,5 @@ func symtab_update_type(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, pt
             return;
         }
 
-        idx = idx - 1;
     }
 }

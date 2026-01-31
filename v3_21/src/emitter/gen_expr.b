@@ -533,11 +533,9 @@ func cg_expr(node: u64) -> u64 {
         if (args != 0) { nargs = vec_len(args); }
         var total_arg_words: u64 = 0;
         if (nargs != 0) {
-            var i: i64 = (i64)nargs - 1;
-            while (i >= 0) {
+            for (var i: i64 = (i64)nargs - 1; i >= 0; i = i - 1) {
                 var arg: u64 = vec_get(args, (u64)i);
                 total_arg_words = total_arg_words + _cg_sysv_push_call_arg(arg, symtab);
-                i = i - 1;
             }
         }
         var stack_words: u64 = _cg_sysv_pop_arg_regs(total_arg_words);
@@ -585,7 +583,8 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
                 emit("[ERROR] Tagged layout struct not found\n", 41);
                 panic("Codegen error");
             }
-            var packed_flag: u64 = *(layout_def + 32);
+            var layout_info: *AstStructDef = (*AstStructDef)layout_def;
+            var packed_flag: u64 = layout_info->is_packed;
             if (packed_flag == 0) {
                 emit("[ERROR] Tagged layout must be packed struct\n", 49);
                 panic("Codegen error");
@@ -610,7 +609,8 @@ func cg_member_access_expr(node: u64, symtab: u64) -> u64 {
             return;
         }
         if (ot->ptr_depth == 0 && ot->type_kind == TYPE_STRUCT && ot->struct_def != 0) {
-            var packed_flag2: u64 = *(ot->struct_def + 32);
+            var struct_info: *AstStructDef = (*AstStructDef)ot->struct_def;
+            var packed_flag2: u64 = struct_info->is_packed;
             if (packed_flag2 == 1) {
                 var total_bits2: u64 = get_packed_layout_total_bits(ot->struct_def);
                 var field_offset2: u64 = get_packed_field_bit_offset(ot->struct_def, member_ptr, member_len);
@@ -1171,10 +1171,8 @@ func cg_method_call(node: u64, symtab: u64) -> u64 {
     
     // Push user args (in reverse order)
     if (nargs != 0) {
-        var i: i64 = (i64)nargs - 1;
-        while (i >= 0) {
+        for (var i: i64 = (i64)nargs - 1; i >= 0; i = i - 1) {
             total_arg_words = total_arg_words + _cg_sysv_push_call_arg(vec_get(args, (u64)i), symtab);
-            i = i - 1;
         }
     }
     

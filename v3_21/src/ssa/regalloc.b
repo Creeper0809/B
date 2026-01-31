@@ -354,11 +354,9 @@ func _ssa_build_use_def(fn: *SSAFunction, max_reg: u64, use_arr: u64, def_arr: u
 
 func _ssa_liveness(fn: *SSAFunction, max_reg: u64, live_in: u64, live_out: u64) -> u64 {
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         *(*u64)(live_in + i * 8) = _ssa_bitset_new(max_reg + 1);
         *(*u64)(live_out + i * 8) = _ssa_bitset_new(max_reg + 1);
-        i = i + 1;
     }
 
     var use_arr: u64 = heap_alloc(n * sizeof(u64));
@@ -368,26 +366,21 @@ func _ssa_liveness(fn: *SSAFunction, max_reg: u64, live_in: u64, live_out: u64) 
     var changed: u64 = 1;
     while (changed != 0) {
         changed = 0;
-        var bi: u64 = 0;
-        while (bi < n) {
+        for (var bi: u64 = 0; bi < n; bi++) {
             var b_ptr: u64 = *(*u64)(fn->blocks_data + bi * 8);
             var b: *SSABlock = (*SSABlock)b_ptr;
 
             var out: u64 = _ssa_bitset_new(max_reg + 1);
-            var si: u64 = 0;
-            while (si < b->succs_len) {
+            for (var si: u64 = 0; si < b->succs_len; si++) {
                 var s_ptr: u64 = *(*u64)(b->succs_data + si * 8);
                 var s: *SSABlock = (*SSABlock)s_ptr;
                 var s_idx: u64 = 0;
-                var bj: u64 = 0;
-                while (bj < n) {
+                for (var bj: u64 = 0; bj < n; bj++) {
                     var bb_ptr: u64 = *(*u64)(fn->blocks_data + bj * 8);
                     var bb: *SSABlock = (*SSABlock)bb_ptr;
                     if (bb->id == s->id) { s_idx = bj; break; }
-                    bj = bj + 1;
                 }
                 _ssa_bitset_or(out, *(*u64)(live_in + s_idx * 8), max_reg + 1);
-                si = si + 1;
             }
 
             var in: u64 = _ssa_bitset_new(max_reg + 1);
@@ -399,14 +392,12 @@ func _ssa_liveness(fn: *SSAFunction, max_reg: u64, live_in: u64, live_out: u64) 
             var words: u64 = _ssa_bits_len(max_reg + 1);
             var live_in_ptr: u64 = *(*u64)(live_in + bi * 8);
             var live_out_ptr: u64 = *(*u64)(live_out + bi * 8);
-            var wi: u64 = 0;
-            while (wi < words) {
+            for (var wi: u64 = 0; wi < words; wi++) {
                 var old_in: u64 = *(*u64)(live_in_ptr + wi * 8);
                 var old_out: u64 = *(*u64)(live_out_ptr + wi * 8);
                 var new_in: u64 = *(*u64)(in + wi * 8);
                 var new_out: u64 = *(*u64)(out + wi * 8);
                 if (old_in != new_in || old_out != new_out) { changed_local = 1; }
-                wi = wi + 1;
             }
 
             if (changed_local != 0) {
@@ -415,7 +406,6 @@ func _ssa_liveness(fn: *SSAFunction, max_reg: u64, live_in: u64, live_out: u64) 
                 changed = 1;
             }
 
-            bi = bi + 1;
         }
     }
 
@@ -425,18 +415,15 @@ func _ssa_liveness(fn: *SSAFunction, max_reg: u64, live_in: u64, live_out: u64) 
 func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
     var nregs: u64 = max_reg + 1;
     var adj: u64 = heap_alloc(nregs * sizeof(u64));
-    var r: u64 = 0;
-    while (r < nregs) {
+    for (var r: u64 = 0; r < nregs; r++) {
         *(*u64)(adj + r * 8) = _ssa_bitset_new(nregs);
-        r = r + 1;
     }
 
     var live_in: u64 = heap_alloc(fn->blocks_len * sizeof(u64));
     var live_out: u64 = heap_alloc(fn->blocks_len * sizeof(u64));
     _ssa_liveness(fn, max_reg, live_in, live_out);
 
-    var bi: u64 = 0;
-    while (bi < fn->blocks_len) {
+    for (var bi: u64 = 0; bi < fn->blocks_len; bi++) {
         var b_ptr: u64 = *(*u64)(fn->blocks_data + bi * 8);
         var b: *SSABlock = (*SSABlock)b_ptr;
         var live: u64 = _ssa_bitset_new(nregs);
@@ -449,23 +436,19 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
             cur = cur->next;
         }
 
-        var ilen: u64 = vec_len(insts);
-        while (ilen > 0) {
-            ilen = ilen - 1;
-            var iptr: u64 = vec_get(insts, ilen);
+        for (var ilen: u64 = vec_len(insts); ilen > 0; ilen = ilen - 1) {
+            var iptr: u64 = vec_get(insts, ilen - 1);
             var inst: *SSAInstruction = (*SSAInstruction)iptr;
             var op: u64 = ssa_inst_get_op(inst);
 
             if (inst->dest != 0) {
                 var d: u64 = inst->dest;
                 if (d < nregs && op != SSA_OP_BR && op != SSA_OP_JMP && op != SSA_OP_RET_SLICE_HEAP) {
-                    var i2: u64 = 1;
-                    while (i2 < nregs) {
+                    for (var i2: u64 = 1; i2 < nregs; i2++) {
                         if (_ssa_bitset_test(live, i2) != 0 && i2 != d) {
                             _ssa_bitset_set(*(*u64)(adj + d * 8), i2);
                             _ssa_bitset_set(*(*u64)(adj + i2 * 8), d);
                         }
-                        i2 = i2 + 1;
                     }
                     _ssa_bitset_clear(live, d);
                 }
@@ -620,7 +603,6 @@ func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
             }
         }
 
-        bi = bi + 1;
     }
 
     return adj;
@@ -632,29 +614,22 @@ func ssa_regalloc_color_fn(fn: *SSAFunction, k: u64) -> u64 {
 
     var adj: u64 = _ssa_interference_build(fn, max_reg);
     var colors: u64 = heap_alloc((max_reg + 1) * sizeof(u64));
-    var i: u64 = 0;
-    while (i <= max_reg) {
+    for (var i: u64 = 0; i <= max_reg; i++) {
         *(*u64)(colors + i * 8) = 0;
-        i = i + 1;
     }
 
-    var r: u64 = 1;
-    while (r <= max_reg) {
+    for (var r: u64 = 1; r <= max_reg; r++) {
         var used: u64 = heap_alloc((k + 1) * sizeof(u64));
-        var j: u64 = 0;
-        while (j <= k) {
+        for (var j: u64 = 0; j <= k; j++) {
             *(*u64)(used + j * 8) = 0;
-            j = j + 1;
         }
 
         var neigh: u64 = *(*u64)(adj + r * 8);
-        var n: u64 = 1;
-        while (n <= max_reg) {
+        for (var n: u64 = 1; n <= max_reg; n++) {
             if (_ssa_bitset_test(neigh, n) != 0) {
                 var c: u64 = *(*u64)(colors + n * 8);
                 if (c <= k) { *(*u64)(used + c * 8) = 1; }
             }
-            n = n + 1;
         }
 
         var color: u64 = 1;
@@ -665,7 +640,6 @@ func ssa_regalloc_color_fn(fn: *SSAFunction, k: u64) -> u64 {
 
         if (color > k) { color = 0; }
         *(*u64)(colors + r * 8) = color;
-        r = r + 1;
     }
 
     if (SSA_REGALLOC_DEBUG != 0) {
@@ -695,17 +669,13 @@ func ssa_regalloc_map_fn(fn: *SSAFunction, k: u64) -> u64 {
     if (colors == 0) { return 0; }
 
     var map: u64 = heap_alloc((max_reg + 1) * sizeof(u64));
-    var i: u64 = 0;
-    while (i <= max_reg) {
+    for (var i: u64 = 0; i <= max_reg; i++) {
         *(*u64)(map + i * 8) = 0;
-        i = i + 1;
     }
 
-    var r: u64 = 1;
-    while (r <= max_reg) {
+    for (var r: u64 = 1; r <= max_reg; r++) {
         var c: u64 = *(*u64)(colors + r * 8);
         *(*u64)(map + r * 8) = _ssa_regalloc_color_to_phys(c);
-        r = r + 1;
     }
 
     fn->reg_map_data = map;
@@ -719,8 +689,7 @@ func ssa_regalloc_run(ctx: *SSAContext, k: u64) -> u64 {
     g_regalloc_ctx = (u64)ctx;
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         var f_ptr: u64 = *(*u64)(funcs + i * 8);
         if (SSA_REGALLOC_DEBUG != 0) {
             println("[DEBUG] ssa_regalloc_run", 26);
@@ -728,7 +697,6 @@ func ssa_regalloc_run(ctx: *SSAContext, k: u64) -> u64 {
         var fn: *SSAFunction = (*SSAFunction)f_ptr;
         ssa_regalloc_map_fn(fn, k);
         ssa_regalloc_apply_fn(fn);
-        i = i + 1;
     }
     pop_trace();
     return 0;
@@ -755,10 +723,9 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
         print_u64(map_len);
         print_nl();
     }
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         var b_ptr: u64 = *(*u64)(blocks + i * 8);
-        if (b_ptr == 0) { i = i + 1; continue; }
+        if (b_ptr == 0) { continue; }
         var b: *SSABlock = (*SSABlock)b_ptr;
         if (SSA_REGALLOC_DEBUG != 0) {
             print("  block idx=", 12);
@@ -888,7 +855,6 @@ func ssa_regalloc_apply_fn(fn: *SSAFunction) -> u64 {
             cur = cur->next;
         }
 
-        i = i + 1;
     }
 
     pop_trace();
@@ -906,11 +872,9 @@ func ssa_regalloc_apply_run(ctx: *SSAContext) -> u64 {
     }
     var funcs: u64 = ctx->funcs_data;
     var n: u64 = ctx->funcs_len;
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         var f_ptr: u64 = *(*u64)(funcs + i * 8);
         ssa_regalloc_apply_fn((*SSAFunction)f_ptr);
-        i = i + 1;
     }
     pop_trace();
     return 0;

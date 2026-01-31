@@ -553,12 +553,11 @@ func cg_program_with_sigs(prog: u64, sigs: u64) -> u64 {
     for(var ci: u64 = 0;ci < vec_len(program->consts_vec) ;ci++){
         var c_ptr: u64 = vec_get(program->consts_vec, ci);
         var c: *AstConstDecl = (*AstConstDecl)c_ptr;
-        var cinfo: u64 = heap_alloc(3 * sizeof(u64));
-        var cinfo_u64: *u64 = (*u64)cinfo;
-        *(cinfo_u64 + 0) = c->name_ptr;
-        *(cinfo_u64 + 1) = c->name_len;
-        *(cinfo_u64 + 2) = c->value;
-        vec_push(g_consts, cinfo);
+        var cinfo: *ConstInfo = (*ConstInfo)heap_alloc(sizeof(ConstInfo));
+        cinfo->name_ptr = c->name_ptr;
+        cinfo->name_len = c->name_len;
+        cinfo->value = c->value;
+        vec_push(g_consts, (u64)cinfo);
     }
     
     emitln("default rel");

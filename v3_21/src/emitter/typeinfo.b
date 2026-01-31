@@ -15,7 +15,7 @@ import ast;
 import compiler;
 
 func typeinfo_make(base_type: u64, ptr_depth: u64) -> u64 {
-    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var result: u64 = heap_alloc(sizeof(TypeInfo));
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = base_type;
     ti->ptr_depth = ptr_depth;
@@ -32,7 +32,7 @@ func typeinfo_make(base_type: u64, ptr_depth: u64) -> u64 {
 }
 
 func typeinfo_make_struct(ptr_depth: u64, struct_name_ptr: u64, struct_name_len: u64, struct_def: u64) -> u64 {
-    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var result: u64 = heap_alloc(sizeof(TypeInfo));
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = TYPE_STRUCT;
     ti->ptr_depth = ptr_depth;
@@ -49,7 +49,7 @@ func typeinfo_make_struct(ptr_depth: u64, struct_name_ptr: u64, struct_name_len:
 }
 
 func typeinfo_make_array(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u64, elem_struct_name_ptr: u64, elem_struct_name_len: u64, elem_struct_def: u64, array_len: u64) -> u64 {
-    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var result: u64 = heap_alloc(sizeof(TypeInfo));
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = TYPE_ARRAY;
     ti->ptr_depth = ptr_depth;
@@ -66,7 +66,7 @@ func typeinfo_make_array(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u6
 }
 
 func typeinfo_make_slice(ptr_depth: u64, elem_type_kind: u64, elem_ptr_depth: u64, elem_struct_name_ptr: u64, elem_struct_name_len: u64, elem_struct_def: u64) -> u64 {
-    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var result: u64 = heap_alloc(sizeof(TypeInfo));
     var ti: *TypeInfo = (*TypeInfo)result;
     ti->type_kind = TYPE_SLICE;
     ti->ptr_depth = ptr_depth;
@@ -532,8 +532,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             return typeinfo_make(TYPE_I64, 0);
         }
 
-        var idx: i64 = (i64)count - 1;
-        while (idx >= 0) {
+        for (var idx: i64 = (i64)count - 1; idx >= 0; idx = idx - 1) {
             var i: u64 = (u64)idx;
             var name_info: *NameInfo = (*NameInfo)vec_get(names, i);
             var n_ptr: u64 = name_info->ptr;
@@ -543,7 +542,6 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 return vec_get(types, i);
             }
 
-            idx = idx - 1;
         }
 
         // Not found - return default type
@@ -579,7 +577,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
         var operand: u64 = addr_of->operand;
         var op_type: u64 = get_expr_type_with_symtab(operand, symtab);
         if (op_type != 0) {
-            var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+            var result: u64 = heap_alloc(sizeof(TypeInfo));
             var op_ti: *TypeInfo = (*TypeInfo)op_type;
             var res_ti: *TypeInfo = (*TypeInfo)result;
             res_ti->type_kind = op_ti->type_kind;
@@ -605,7 +603,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
             var op_ti: *TypeInfo = (*TypeInfo)op_type;
             var depth: u64 = op_ti->ptr_depth;
             if (depth > 0) {
-                var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+                var result: u64 = heap_alloc(sizeof(TypeInfo));
                 var res_ti: *TypeInfo = (*TypeInfo)result;
                 res_ti->type_kind = op_ti->type_kind;
                 res_ti->ptr_depth = depth - 1;
@@ -778,7 +776,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var left_ti: *TypeInfo = (*TypeInfo)left_type;
                 var l_depth: u64 = left_ti->ptr_depth;
                 if (l_depth > 0) {
-                    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+                    var result: u64 = heap_alloc(sizeof(TypeInfo));
                     var res_ti: *TypeInfo = (*TypeInfo)result;
                     res_ti->type_kind = left_ti->type_kind;
                     res_ti->ptr_depth = l_depth;
@@ -798,7 +796,7 @@ func get_expr_type_with_symtab(node: u64, symtab: u64) -> u64 {
                 var right_ti: *TypeInfo = (*TypeInfo)right_type;
                 var r_depth: u64 = right_ti->ptr_depth;
                 if (r_depth > 0) {
-                    var result: u64 = heap_alloc(SIZEOF_TYPEINFO);
+                    var result: u64 = heap_alloc(sizeof(TypeInfo));
                     var res_ti: *TypeInfo = (*TypeInfo)result;
                     res_ti->type_kind = right_ti->type_kind;
                     res_ti->ptr_depth = r_depth;

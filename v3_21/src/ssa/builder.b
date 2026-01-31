@@ -266,7 +266,7 @@ func builder_symtab_add_param(ctx: *BuilderCtx, p: *Param, offset: u64) -> u64 {
     vec_push(names, (u64)name_info);
     vec_push(offsets, offset);
 
-    var type_info: u64 = heap_alloc(SIZEOF_TYPEINFO);
+    var type_info: u64 = heap_alloc(sizeof(TypeInfo));
     var ti: *TypeInfo = (*TypeInfo)type_info;
     ti->type_kind = p->type_kind;
     ti->ptr_depth = p->ptr_depth;

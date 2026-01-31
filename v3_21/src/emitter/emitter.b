@@ -277,14 +277,12 @@ func globals_emit_bss() -> u64 {
     
     emitln("\nsection .bss");
     
-    var i: u64 = 0;
-    while (i < count) {
+    for (var i: u64 = 0; i < count; i++) {
         var ginfo: *GlobalInfo = (*GlobalInfo)vec_get(g_globals, i);
         
         emit("_gvar_", 6);
         emit(ginfo->name_ptr, ginfo->name_len);
         emitln(": resq 1");
         
-        i = i + 1;
     }
 }

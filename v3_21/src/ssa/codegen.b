@@ -56,12 +56,10 @@ func _ssa_operand_use_mask(opr: u64) -> u64 {
 }
 
 func _ssa_block_index(blocks: u64, bcount: u64, id: u64) -> u64 {
-    var i: u64 = 0;
-    while (i < bcount) {
+    for (var i: u64 = 0; i < bcount; i++) {
         var b_ptr: u64 = *(*u64)(blocks + i * 8);
         var b: *SSABlock = (*SSABlock)b_ptr;
         if (b->id == id) { return i + 1; }
-        i = i + 1;
     }
     return 0;
 }
@@ -271,11 +269,10 @@ func _ssa_ensure_heap_brk_global() -> u64 {
     var globals: u64 = emitter_get_globals();
     if (globals == 0) { return 0; }
     if (is_global_var("__cg_heap_brk", 13) != 0) { return 0; }
-    var ginfo: u64 = heap_alloc(2 * sizeof(u64));
-    var ginfo_u64: *u64 = (*u64)ginfo;
-    *(ginfo_u64 + 0) = "__cg_heap_brk";
-    *(ginfo_u64 + 1) = 13;
-    vec_push(globals, ginfo);
+    var ginfo: *GlobalInfo = (*GlobalInfo)heap_alloc(sizeof(GlobalInfo));
+    ginfo->name_ptr = "__cg_heap_brk";
+    ginfo->name_len = 13;
+    vec_push(globals, (u64)ginfo);
     return 0;
 }
 
@@ -390,10 +387,8 @@ func _ssa_live_map_put(map: u64, inst_ptr: u64, mask: u64) -> u64 {
 func _ssa_live_map_get(map: u64, inst_ptr: u64) -> u64 {
     if (map == 0) { return 0; }
     var n: u64 = vec_len(map);
-    var i: u64 = 0;
-    while (i + 1 < n) {
+    for (var i: u64 = 0; i + 1 < n; i = i + 2) {
         if (vec_get(map, i) == inst_ptr) { return vec_get(map, i + 1); }
-        i = i + 2;
     }
     return 0;
 }
@@ -416,27 +411,23 @@ func _ssa_build_live_map(fn: *SSAFunction) -> u64 {
     var live_out: u64 = vec_new(bcount + 1);
     var phi_use: u64 = vec_new(bcount + 1);
 
-    var i: u64 = 0;
-    while (i < bcount) {
+    for (var i: u64 = 0; i < bcount; i++) {
         vec_push(live_in, 0);
         vec_push(live_out, 0);
         var b_ptr: u64 = *(*u64)(blocks + i * 8);
         var b: *SSABlock = (*SSABlock)b_ptr;
         vec_push(phi_use, _ssa_phi_use_mask(b));
-        i = i + 1;
     }
 
     var changed: u64 = 1;
     while (changed != 0) {
         changed = 0;
-        var bi: i64 = (i64)bcount - 1;
-        while (bi >= 0) {
+        for (var bi: i64 = (i64)bcount - 1; bi >= 0; bi = bi - 1) {
             var b_ptr2: u64 = *(*u64)(blocks + (u64)bi * 8);
             var b2: *SSABlock = (*SSABlock)b_ptr2;
 
             var out_mask: u64 = 0;
-            var si: u64 = 0;
-            while (si < b2->succs_len) {
+            for (var si: u64 = 0; si < b2->succs_len; si++) {
                 var succ_ptr: u64 = *(*u64)(b2->succs_data + si * 8);
                 var succ: *SSABlock = (*SSABlock)succ_ptr;
                 var sidx: u64 = _ssa_block_index(blocks, bcount, succ->id);
@@ -444,19 +435,16 @@ func _ssa_build_live_map(fn: *SSAFunction) -> u64 {
                     out_mask = out_mask | vec_get(live_in, sidx - 1);
                     out_mask = out_mask | vec_get(phi_use, sidx - 1);
                 }
-                si = si + 1;
             }
 
             var live: u64 = out_mask;
             var insts: u64 = _ssa_block_collect_insts(b2);
-            var idx: i64 = (i64)vec_len(insts) - 1;
-            while (idx >= 0) {
+            for (var idx: i64 = (i64)vec_len(insts) - 1; idx >= 0; idx = idx - 1) {
                 var cur: *SSAInstruction = (*SSAInstruction)vec_get(insts, (u64)idx);
                 var use_mask: u64 = 0;
                 var def_mask: u64 = 0;
                 _ssa_inst_use_def_mask(cur, &use_mask, &def_mask);
                 live = (live & (_ssa_live_all_mask() ^ def_mask)) | use_mask;
-                idx = idx - 1;
             }
 
             if (vec_get(live_out, (u64)bi) != out_mask) {
@@ -468,28 +456,23 @@ func _ssa_build_live_map(fn: *SSAFunction) -> u64 {
                 changed = 1;
             }
 
-            bi = bi - 1;
         }
     }
 
     var map: u64 = vec_new(256);
-    var bi2: u64 = 0;
-    while (bi2 < bcount) {
+    for (var bi2: u64 = 0; bi2 < bcount; bi2++) {
         var b_ptr3: u64 = *(*u64)(blocks + bi2 * 8);
         var b3: *SSABlock = (*SSABlock)b_ptr3;
         var live2: u64 = vec_get(live_out, bi2);
         var insts2: u64 = _ssa_block_collect_insts(b3);
-        var idx2: i64 = (i64)vec_len(insts2) - 1;
-        while (idx2 >= 0) {
+        for (var idx2: i64 = (i64)vec_len(insts2) - 1; idx2 >= 0; idx2 = idx2 - 1) {
             var cur2: *SSAInstruction = (*SSAInstruction)vec_get(insts2, (u64)idx2);
             _ssa_live_map_put(map, (u64)cur2, live2);
             var use_mask2: u64 = 0;
             var def_mask2: u64 = 0;
             _ssa_inst_use_def_mask(cur2, &use_mask2, &def_mask2);
             live2 = (live2 & (_ssa_live_all_mask() ^ def_mask2)) | use_mask2;
-            idx2 = idx2 - 1;
         }
-        bi2 = bi2 + 1;
     }
 
     return map;
@@ -499,8 +482,7 @@ func _ssa_fn_has_ret_slice_heap(fn: *SSAFunction) -> u64 {
     if (fn == 0) { return 0; }
     var blocks: u64 = fn->blocks_data;
     var bcount: u64 = fn->blocks_len;
-    var bi: u64 = 0;
-    while (bi < bcount) {
+    for (var bi: u64 = 0; bi < bcount; bi++) {
         var b_ptr: u64 = *(*u64)(blocks + bi * 8);
         var b: *SSABlock = (*SSABlock)b_ptr;
         var cur: *SSAInstruction = b->inst_head;
@@ -508,7 +490,6 @@ func _ssa_fn_has_ret_slice_heap(fn: *SSAFunction) -> u64 {
             if (ssa_inst_get_op(cur) == SSA_OP_RET_SLICE_HEAP) { return 1; }
             cur = cur->next;
         }
-        bi = bi + 1;
     }
     return 0;
 }
@@ -520,11 +501,9 @@ func _ssa_fn_has_ret_slice_heap(fn: *SSAFunction) -> u64 {
 func _ssa_codegen_is_global(globals: u64, name_ptr: u64, name_len: u64) -> u64 {
     if (globals == 0) { return 0; }
     var n: u64 = vec_len(globals);
-    var i: u64 = 0;
-    while (i < n) {
+    for (var i: u64 = 0; i < n; i++) {
         var ginfo: *GlobalInfo = (*GlobalInfo)vec_get(globals, i);
         if (str_eq(ginfo->name_ptr, ginfo->name_len, name_ptr, name_len) != 0) { return 1; }
-        i = i + 1;
     }
     return 0;
 }
@@ -662,8 +641,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         var args: u64 = call->args_vec;
         var n: u64 = 0;
         if (args != 0) { n = vec_len(args); }
-        var i: u64 = 0;
-        while (i < n) {
+        for (var i: u64 = 0; i < n; i++) {
             var arg: u64 = vec_get(args, i);
             if (ast_kind(arg) == AST_SLICE) {
                 var s: *AstSlice = (*AstSlice)arg;
@@ -672,7 +650,6 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
             } else {
                 if (_ssa_codegen_expr_supported(arg, globals) == 0) { return 0; }
             }
-            i = i + 1;
         }
         var fn_ptr: u64 = compiler_get_func(call->name_ptr, call->name_len);
         if (fn_ptr != 0) {
@@ -697,8 +674,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         var args2: u64 = cp->args_vec;
         var n2: u64 = 0;
         if (args2 != 0) { n2 = vec_len(args2); }
-        var i2: u64 = 0;
-        while (i2 < n2) {
+        for (var i2: u64 = 0; i2 < n2; i2++) {
             var arg2: u64 = vec_get(args2, i2);
             if (ast_kind(arg2) == AST_SLICE) {
                 var s2: *AstSlice = (*AstSlice)arg2;
@@ -707,7 +683,6 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
             } else {
                 if (_ssa_codegen_expr_supported(arg2, globals) == 0) { return 0; }
             }
-            i2 = i2 + 1;
         }
         return 1;
     }
@@ -718,8 +693,7 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
         var args: u64 = mc->args_vec;
         var n: u64 = 0;
         if (args != 0) { n = vec_len(args); }
-        var i: u64 = 0;
-        while (i < n) {
+        for (var i: u64 = 0; i < n; i++) {
             var arg: u64 = vec_get(args, i);
             if (ast_kind(arg) == AST_SLICE) {
                 var s: *AstSlice = (*AstSlice)arg;
@@ -728,7 +702,6 @@ func _ssa_codegen_expr_supported(node: u64, globals: u64) -> u64 {
             } else {
                 if (_ssa_codegen_expr_supported(arg, globals) == 0) { return 0; }
             }
-            i = i + 1;
         }
         return 1;
     }
@@ -790,10 +763,8 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         var stmts: u64 = blk->stmts_vec;
         if (stmts == 0) { return 1; }
         var n: u64 = vec_len(stmts);
-        var i: u64 = 0;
-        while (i < n) {
+        for (var i: u64 = 0; i < n; i++) {
             if (_ssa_codegen_stmt_supported(vec_get(stmts, i), globals) == 0) { return 0; }
-            i = i + 1;
         }
         return 1;
     }
@@ -828,10 +799,8 @@ func _ssa_codegen_stmt_supported(node: u64, globals: u64) -> u64 {
         var cases: u64 = sw->cases_vec;
         var n: u64 = 0;
         if (cases != 0) { n = vec_len(cases); }
-        var i: u64 = 0;
-        while (i < n) {
+        for (var i: u64 = 0; i < n; i++) {
             if (_ssa_codegen_case_supported(vec_get(cases, i), globals) == 0) { return 0; }
-            i = i + 1;
         }
         return 1;
     }
@@ -934,14 +903,11 @@ func ssa_codegen_is_supported_func(fn_ptr: u64, globals: u64) -> u64 {
     var params: u64 = fn->params_vec;
     if (params != 0) {
         var pn: u64 = vec_len(params);
-        var pi: u64 = 0;
-        while (pi < pn) {
+        for (var pi: u64 = 0; pi < pn; pi++) {
             var p: *Param = (*Param)vec_get(params, pi);
             if (p->type_kind == TYPE_SLICE && p->ptr_depth == 0) {
-                pi = pi + 1;
                 continue;
             }
-            pi = pi + 1;
         }
     }
     if (fn->ret_type == TYPE_STRUCT && fn->ret_ptr_depth == 0) {
@@ -1102,20 +1068,17 @@ func _ssa_emit_call(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
 
     var stack_args: u64 = 0;
-    var si2: i64 = (i64)nargs - 1;
-    while (si2 >= 0) {
+    for (var si2: i64 = (i64)nargs - 1; si2 >= 0; si2 = si2 - 1) {
         var sreg2: u64 = vec_get(args_vec, (u64)si2);
         emit("    push ", 9);
         _ssa_emit_reg_name(sreg2);
         emit_nl();
         stack_args = stack_args + 1;
-        si2 = si2 - 1;
     }
 
     var reg_count2: u64 = nargs;
     if (reg_count2 > 6) { reg_count2 = 6; }
-    var i: u64 = 0;
-    while (i < reg_count2) {
+    for (var i: u64 = 0; i < reg_count2; i++) {
         emit("    pop ", 8);
         if (i == 0) { emit("rdi", 3); }
         else if (i == 1) { emit("rsi", 3); }
@@ -1124,7 +1087,6 @@ func _ssa_emit_call(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u64) -
         else if (i == 4) { emit("r8", 2); }
         else if (i == 5) { emit("r9", 2); }
         emit_nl();
-        i = i + 1;
     }
     stack_args = stack_args - reg_count2;
 
@@ -1208,20 +1170,17 @@ func _ssa_emit_call_ptr(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u6
     if ((save_mask & SSA_LIVE_R9) != 0) { _ssa_emit_push_reg(SSA_PHYS_R9); }
 
     var stack_args: u64 = 0;
-    var si3: i64 = (i64)nargs - 1;
-    while (si3 >= 0) {
+    for (var si3: i64 = (i64)nargs - 1; si3 >= 0; si3 = si3 - 1) {
         var sreg3: u64 = vec_get(args_vec, (u64)si3);
         emit("    push ", 9);
         _ssa_emit_reg_name(sreg3);
         emit_nl();
         stack_args = stack_args + 1;
-        si3 = si3 - 1;
     }
 
     var reg_count0: u64 = nargs;
     if (reg_count0 > 6) { reg_count0 = 6; }
-    var i: u64 = 0;
-    while (i < reg_count0) {
+    for (var i: u64 = 0; i < reg_count0; i++) {
         emit("    pop ", 8);
         if (i == 0) { emit("rdi", 3); }
         else if (i == 1) { emit("rsi", 3); }
@@ -1230,7 +1189,6 @@ func _ssa_emit_call_ptr(dest: u64, extra_dest: u64, info_ptr: u64, live_mask: u6
         else if (i == 4) { emit("r8", 2); }
         else if (i == 5) { emit("r9", 2); }
         emit_nl();
-        i = i + 1;
     }
     stack_args = stack_args - reg_count0;
 
@@ -2020,8 +1978,7 @@ func ssa_codegen_emit_func(fn_ptr: u64, ssa_fn_ptr: u64) -> u64 {
 
     var blocks: u64 = ssa_fn->blocks_data;
     var bcount: u64 = ssa_fn->blocks_len;
-    var bi: u64 = 0;
-    while (bi < bcount) {
+    for (var bi: u64 = 0; bi < bcount; bi++) {
         var b_ptr: u64 = *(*u64)(blocks + bi * 8);
         var b: *SSABlock = (*SSABlock)b_ptr;
 
@@ -2038,7 +1995,6 @@ func ssa_codegen_emit_func(fn_ptr: u64, ssa_fn_ptr: u64) -> u64 {
             cur = cur->next;
         }
 
-        bi = bi + 1;
     }
 
     emit("    xor eax, eax\n", 18);
