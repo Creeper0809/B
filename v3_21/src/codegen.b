@@ -57,9 +57,10 @@ func _cg_used_has_name(used: u64, name_ptr: u64, name_len: u64) -> u64 {
 
 func _cg_used_add_name(used: u64, name_ptr: u64, name_len: u64) -> u64 {
     if (_cg_used_has_name(used, name_ptr, name_len) != 0) { return 0; }
-    var info: u64 = heap_alloc(16);
-    *(info) = name_ptr;
-    *(info + 8) = name_len;
+    var info: u64 = heap_alloc(2 * sizeof(u64));
+    var info_u64: *u64 = (*u64)info;
+    *(info_u64 + 0) = name_ptr;
+    *(info_u64 + 1) = name_len;
     vec_push(used, info);
     return 1;
 }

@@ -123,7 +123,7 @@ func set_parsing_context(func_name, func_name_len, line) {
 
 func begin_error_capture() {
 	if (g_error_buffer == 0) {
-		g_error_buffer = heap_alloc(512);
+		g_error_buffer = heap_alloc(512 * sizeof(u8));
 	}
 	g_error_buffer_pos = 0;
 	g_capturing_error = 1;
@@ -219,7 +219,7 @@ func emit_u64(n) {
 		emit("0", 1);
 		return;
 	}
-	var buf = heap_alloc(32);
+	var buf = heap_alloc(32 * sizeof(u8));
 	var i = 0;
 	var t = n;
 	for (; t > 0; ) {
@@ -238,7 +238,7 @@ func emit_u64_stderr(n) {
 		emit_stderr("0", 1);
 		return;
 	}
-	var buf = heap_alloc(32);
+	var buf = heap_alloc(32 * sizeof(u8));
 	var i = 0;
 	var t = n;
 	for (; t > 0; ) {
@@ -271,7 +271,7 @@ func emit_i64_stderr(n) {
 }
 
 func emit_nl() {
-	var nl = heap_alloc(1);
+	var nl = heap_alloc(sizeof(u8));
 	*(*u8)nl = 10;
 	sys_write(1, nl, 1);
 }

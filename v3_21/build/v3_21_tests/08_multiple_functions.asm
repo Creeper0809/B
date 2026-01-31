@@ -2583,6 +2583,11 @@ std_util__begin_error_capture:
     jz .L115
     mov rax, 512
     push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
+    push rax
     pop rdi
     call std_io__heap_alloc
     push rax
@@ -2991,6 +2996,11 @@ std_util__emit_u64:
 .L135:
     mov rax, 32
     push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
+    push rax
     pop rdi
     call std_io__heap_alloc
     mov [rbp-16], rax
@@ -3133,6 +3143,11 @@ std_util__emit_u64_stderr:
     ret
 .L143:
     mov rax, 32
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
     push rax
     pop rdi
     call std_io__heap_alloc

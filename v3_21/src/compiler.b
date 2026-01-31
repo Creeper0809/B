@@ -49,11 +49,11 @@ func read_entire_file(path: u64) -> u64 {
     var fd: u64 = sys_open(path, 0, 0);
     if (fd < 0) { return 0; }
 
-    var statbuf: u64 = heap_alloc(144);
+    var statbuf: u64 = heap_alloc(144 * sizeof(u8));
     sys_fstat(fd, statbuf);
     var size: u64 = *(statbuf + 48);
 
-    var buf: u64 = heap_alloc(size + 1);
+    var buf: u64 = heap_alloc((size + 1) * sizeof(u8));
 
     var total: u64 = 0;
     while (total < size) {
@@ -109,7 +109,7 @@ func find_line_starting_with(content: u64, content_len: u64, prefix: u64, prefix
                 var value_len: u64 = line_len - prefix_len;
 
                 // Allocate and copy value
-                var value: u64 = heap_alloc(value_len + 1);
+                var value: u64 = heap_alloc((value_len + 1) * sizeof(u8));
                 var j: u64 = 0;
                 while (j < value_len) {
                     *(*u8)(value + j) = *(*u8)(content + value_start + j);
@@ -173,7 +173,7 @@ func module_id_from_path(path: u64, path_len: u64) -> u64 {
 
     var id_len: u64 = 0;
     if (end > start) { id_len = end - start; }
-    var id_ptr: u64 = heap_alloc(id_len + 1);
+    var id_ptr: u64 = heap_alloc((id_len + 1) * sizeof(u8));
     for (var i: u64 = 0; i < id_len; i++) {
         *(*u8)(id_ptr + i) = *(*u8)(path + start + i);
     }
@@ -187,7 +187,7 @@ func module_id_from_path(path: u64, path_len: u64) -> u64 {
 
 // Import path already normalized to "a/b" without extension
 func module_id_from_import(path: u64, path_len: u64) -> u64 {
-    var id_ptr: u64 = heap_alloc(path_len + 1);
+    var id_ptr: u64 = heap_alloc((path_len + 1) * sizeof(u8));
     for (var i: u64 = 0; i < path_len; i++) {
         *(*u8)(id_ptr + i) = *(*u8)(path + i);
     }
@@ -205,7 +205,7 @@ func module_prefix_from_id(id_ptr: u64, id_len: u64) -> u64 {
         if (c0 >= 48 && c0 <= 57) { extra = 1; }
     }
 
-    var pref_ptr: u64 = heap_alloc(id_len + extra + 1);
+    var pref_ptr: u64 = heap_alloc((id_len + extra + 1) * sizeof(u8));
     if (extra == 1) {
         *(*u8)(pref_ptr) = 95;
     }
@@ -231,7 +231,7 @@ func mangle_name(prefix_ptr: u64, prefix_len: u64, name_ptr: u64, name_len: u64)
     }
     var sep_len: u64 = 2;
     var total: u64 = prefix_len + sep_len + name_len;
-    var buf: u64 = heap_alloc(total + 1);
+    var buf: u64 = heap_alloc((total + 1) * sizeof(u8));
     var i: u64 = 0;
     while (i < prefix_len) {
         *(*u8)(buf + i) = *(*u8)(prefix_ptr + i);
@@ -303,7 +303,7 @@ func resolve_module_path(module_path: u64, module_len: u64) -> u64 {
         prefer_lib = 1;
     }
 
-    var ext: u64 = heap_alloc(3);
+    var ext: u64 = heap_alloc(3 * sizeof(u8));
     *(*u8)ext = 46;
     *(*u8)(ext + 1) = 98;
     *(*u8)(ext + 2) = 0;
@@ -311,7 +311,7 @@ func resolve_module_path(module_path: u64, module_len: u64) -> u64 {
     var with_ext: u64 = str_concat(eff_path, eff_len, ext, 2);
     var with_ext_len: u64 = eff_len + 2;
 
-    var slash: u64 = heap_alloc(1);
+    var slash: u64 = heap_alloc(sizeof(u8));
     *(*u8)slash = 47;
 
     var full1: u64;
@@ -495,9 +495,10 @@ func prelude_try_symbol(module_path: u64, module_len: u64, name_ptr: u64, name_l
             var mangled_ptr: u64 = *(e + 16);
             var mangled_len: u64 = *(e + 24);
             add_prelude_alias(name_ptr, name_len, mangled_ptr, mangled_len);
-            var info: u64 = heap_alloc(16);
-            *(info) = mangled_ptr;
-            *(info + 8) = mangled_len;
+            var info: u64 = heap_alloc(2 * sizeof(u64));
+            var info_u64: *u64 = (*u64)info;
+            *(info_u64 + 0) = mangled_ptr;
+            *(info_u64 + 1) = mangled_len;
             return info;
         }
     }
@@ -942,7 +943,7 @@ func extract_version_from_compiler_path(path: u64, path_len: u64) -> u64 {
         if (str_eq(base + i, 6, needle, 6)) {
             var vlen: u64 = i;
             if (vlen == 0) { return 0; }
-            var vptr: u64 = heap_alloc(vlen + 1);
+            var vptr: u64 = heap_alloc((vlen + 1) * sizeof(u8));
             str_copy(vptr, base, vlen);
             *(*u8)(vptr + vlen) = 0;
             var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
@@ -957,7 +958,7 @@ func extract_version_from_compiler_path(path: u64, path_len: u64) -> u64 {
         var c0: u64 = *(*u8)base;
         var c1: u64 = *(*u8)(base + 1);
         if (c0 == 118 && c1 >= 48 && c1 <= 57) { // 'v' + digit
-            var vptr2: u64 = heap_alloc(base_len + 1);
+            var vptr2: u64 = heap_alloc((base_len + 1) * sizeof(u8));
             str_copy(vptr2, base, base_len);
             *(*u8)(vptr2 + base_len) = 0;
             var out2: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));

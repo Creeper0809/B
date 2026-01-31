@@ -42,3 +42,6 @@
 - [x] Normalize codegen const metadata allocation with sizeof(u64).
 - [x] Refactor regalloc use/def block iteration to typed indexing.
 - [ ] Investigate safe typed-indexing refactor for regalloc arrays (regression found).
+- [x] Normalize std/util byte buffer heap_alloc sizes with sizeof(u8).
+- [x] Normalize compiler byte buffers and prelude info allocations.
+- [x] Normalize codegen used-name info allocation with sizeof(u64).
