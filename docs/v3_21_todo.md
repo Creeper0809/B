@@ -28,3 +28,9 @@
 - [x] Refactor ssa/mem2reg helper arrays (dom/map/max) to typed indexing.
 - [x] Refactor ssa/mem2reg def/phi helpers and rewrite_opr indexing.
 - [x] Normalize parser/decl import path allocations and variable names.
+- [x] Refactor ssa/mem2reg rename path arrays and indexing.
+- [x] Refactor ssa/mem2reg idom computation and run loop indexing.
+- [x] Refactor ssa/regalloc bitset helpers to typed indexing.
+- [x] Refactor ssa/regalloc _ssa_reg_max block iteration.
+- [x] Refactor ssa/regalloc use/def and liveness arrays.
+- [x] Repair ssa/regalloc liveness/interference corruption and restore test pass.

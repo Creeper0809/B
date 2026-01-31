@@ -39,11 +39,10 @@ func _ssa_bits_len(nbits: u64) -> u64 {
 
 func _ssa_bitset_new(nbits: u64) -> u64 {
     var words: u64 = _ssa_bits_len(nbits);
-    var buf: u64 = heap_alloc(words * 8);
-    var i: u64 = 0;
-    while (i < words) {
-        *(*u64)(buf + i * 8) = 0;
-        i = i + 1;
+    var buf: u64 = heap_alloc(words * sizeof(u64));
+    var buf_u64: *u64 = (*u64)buf;
+    for (var i: u64 = 0; i < words; i++) {
+        *(buf_u64 + i) = 0;
     }
     return buf;
 }
@@ -53,7 +52,8 @@ func _ssa_bitset_set(buf: u64, bit: u64) -> u64 {
     var off: u64 = bit % 64;
     var mask: u64 = 1;
     mask = mask << off;
-    *(*u64)(buf + idx * 8) = *(*u64)(buf + idx * 8) | mask;
+    var buf_u64: *u64 = (*u64)buf;
+    *(buf_u64 + idx) = *(buf_u64 + idx) | mask;
     return 0;
 }
 
@@ -63,7 +63,8 @@ func _ssa_bitset_clear(buf: u64, bit: u64) -> u64 {
     var mask: u64 = 1;
     mask = mask << off;
     var all: u64 = _ssa_all_ones();
-    *(*u64)(buf + idx * 8) = *(*u64)(buf + idx * 8) & (all ^ mask);
+    var buf_u64: *u64 = (*u64)buf;
+    *(buf_u64 + idx) = *(buf_u64 + idx) & (all ^ mask);
     return 0;
 }
 
@@ -72,7 +73,8 @@ func _ssa_bitset_test(buf: u64, bit: u64) -> u64 {
     var off: u64 = bit % 64;
     var mask: u64 = 1;
     mask = mask << off;
-    var v: u64 = *(*u64)(buf + idx * 8);
+    var buf_u64: *u64 = (*u64)buf;
+    var v: u64 = *(buf_u64 + idx);
     v = v & mask;
     if (v != 0) { return 1; }
     return 0;
@@ -80,20 +82,20 @@ func _ssa_bitset_test(buf: u64, bit: u64) -> u64 {
 
 func _ssa_bitset_or(dst: u64, src: u64, nbits: u64) -> u64 {
     var words: u64 = _ssa_bits_len(nbits);
-    var i: u64 = 0;
-    while (i < words) {
-        *(*u64)(dst + i * 8) = *(*u64)(dst + i * 8) | *(*u64)(src + i * 8);
-        i = i + 1;
+    var dst_u64: *u64 = (*u64)dst;
+    var src_u64: *u64 = (*u64)src;
+    for (var i: u64 = 0; i < words; i++) {
+        *(dst_u64 + i) = *(dst_u64 + i) | *(src_u64 + i);
     }
     return 0;
 }
 
 func _ssa_bitset_copy(dst: u64, src: u64, nbits: u64) -> u64 {
     var words: u64 = _ssa_bits_len(nbits);
-    var i: u64 = 0;
-    while (i < words) {
-        *(*u64)(dst + i * 8) = *(*u64)(src + i * 8);
-        i = i + 1;
+    var dst_u64: *u64 = (*u64)dst;
+    var src_u64: *u64 = (*u64)src;
+    for (var i: u64 = 0; i < words; i++) {
+        *(dst_u64 + i) = *(src_u64 + i);
     }
     return 0;
 }
@@ -101,10 +103,10 @@ func _ssa_bitset_copy(dst: u64, src: u64, nbits: u64) -> u64 {
 func _ssa_bitset_sub(dst: u64, sub: u64, nbits: u64) -> u64 {
     var words: u64 = _ssa_bits_len(nbits);
     var all: u64 = _ssa_all_ones();
-    var i: u64 = 0;
-    while (i < words) {
-        *(*u64)(dst + i * 8) = *(*u64)(dst + i * 8) & (all ^ *(*u64)(sub + i * 8));
-        i = i + 1;
+    var dst_u64: *u64 = (*u64)dst;
+    var sub_u64: *u64 = (*u64)sub;
+    for (var i: u64 = 0; i < words; i++) {
+        *(dst_u64 + i) = *(dst_u64 + i) & (all ^ *(sub_u64 + i));
     }
     return 0;
 }
@@ -122,10 +124,10 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
     var max_id: u64 = 0;
     var blocks: u64 = fn->blocks_data;
     var n: u64 = fn->blocks_len;
-    var i: u64 = 0;
-    while (i < n) {
-        var b_ptr: u64 = *(*u64)(blocks + i * 8);
-        if (b_ptr == 0) { i = i + 1; continue; }
+    var blocks_u64: *u64 = (*u64)blocks;
+    for (var i: u64 = 0; i < n; i++) {
+        var b_ptr: u64 = *(blocks_u64 + i);
+        if (b_ptr == 0) { continue; }
         var b: *SSABlock = (*SSABlock)b_ptr;
 
         var phi: *SSAInstruction = b->phi_head;
@@ -214,7 +216,6 @@ func _ssa_reg_max(fn: *SSAFunction) -> u64 {
             cur = cur->next;
         }
 
-        i = i + 1;
     }
     return max_id;
 }
@@ -422,15 +423,15 @@ func _ssa_liveness(fn: *SSAFunction, max_reg: u64, live_in: u64, live_out: u64) 
 
 func _ssa_interference_build(fn: *SSAFunction, max_reg: u64) -> u64 {
     var nregs: u64 = max_reg + 1;
-    var adj: u64 = heap_alloc(nregs * 8);
+    var adj: u64 = heap_alloc(nregs * sizeof(u64));
     var r: u64 = 0;
     while (r < nregs) {
         *(*u64)(adj + r * 8) = _ssa_bitset_new(nregs);
         r = r + 1;
     }
 
-    var live_in: u64 = heap_alloc(fn->blocks_len * 8);
-    var live_out: u64 = heap_alloc(fn->blocks_len * 8);
+    var live_in: u64 = heap_alloc(fn->blocks_len * sizeof(u64));
+    var live_out: u64 = heap_alloc(fn->blocks_len * sizeof(u64));
     _ssa_liveness(fn, max_reg, live_in, live_out);
 
     var bi: u64 = 0;
