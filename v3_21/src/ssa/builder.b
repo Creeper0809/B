@@ -1180,7 +1180,7 @@ func builder_emit_call(ctx: *BuilderCtx, call: *AstCall, dst: u64, extra_dst: u6
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallInfo));
     var info: *SSACallInfo = (*SSACallInfo)info_ptr;
     info->name_ptr = resolved_ptr;
     info->name_len = resolved_len;
@@ -1238,7 +1238,7 @@ func builder_emit_call_sret(ctx: *BuilderCtx, call: *AstCall, addr_reg: u64) -> 
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallInfo));
     var info: *SSACallInfo = (*SSACallInfo)info_ptr;
     info->name_ptr = resolved_ptr;
     info->name_len = resolved_len;
@@ -1292,7 +1292,7 @@ func builder_emit_call_slice_store(ctx: *BuilderCtx, call: *AstCall, addr_reg: u
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_SLICE_STORE_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallSliceStoreInfo));
     var info: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptr;
     info->is_ptr = 0;
     info->name_ptr = resolved_ptr;
@@ -1352,7 +1352,7 @@ func builder_emit_method_call(ctx: *BuilderCtx, mc: *AstMethodCall, dst: u64, ex
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallInfo));
     var info: *SSACallInfo = (*SSACallInfo)info_ptr;
     info->name_ptr = resolved_ptr;
     info->name_len = resolved_len;
@@ -1415,7 +1415,7 @@ func builder_emit_method_call_sret(ctx: *BuilderCtx, mc: *AstMethodCall, addr_re
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallInfo));
     var info: *SSACallInfo = (*SSACallInfo)info_ptr;
     info->name_ptr = resolved_ptr;
     info->name_len = resolved_len;
@@ -1474,7 +1474,7 @@ func builder_emit_method_call_slice_store(ctx: *BuilderCtx, mc: *AstMethodCall, 
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_SLICE_STORE_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallSliceStoreInfo));
     var info: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptr;
     info->is_ptr = 0;
     info->name_ptr = resolved_ptr;
@@ -1534,7 +1534,7 @@ func builder_emit_call_ptr(ctx: *BuilderCtx, cp: *AstCallPtr, dst: u64, extra_ds
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_PTR_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallPtrInfo));
     var info: *SSACallPtrInfo = (*SSACallPtrInfo)info_ptr;
     info->callee_reg = callee_reg;
     info->args_vec = arg_regs;
@@ -1577,7 +1577,7 @@ func builder_emit_call_ptr_sret(ctx: *BuilderCtx, cp: *AstCallPtr, addr_reg: u64
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_PTR_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallPtrInfo));
     var info: *SSACallPtrInfo = (*SSACallPtrInfo)info_ptr;
     info->callee_reg = callee_reg;
     info->args_vec = arg_regs;
@@ -1635,7 +1635,7 @@ func builder_emit_call_ptr_slice_store(ctx: *BuilderCtx, cp: *AstCallPtr, addr_r
         }
     }
 
-    var info_ptr: u64 = heap_alloc(SIZEOF_SSA_CALL_SLICE_STORE_INFO);
+    var info_ptr: u64 = heap_alloc(sizeof(SSACallSliceStoreInfo));
     var info: *SSACallSliceStoreInfo = (*SSACallSliceStoreInfo)info_ptr;
     info->is_ptr = 1;
     info->name_ptr = 0;

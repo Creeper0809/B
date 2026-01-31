@@ -9,14 +9,6 @@
 // Constants
 // ============================================
 
-const SIZEOF_SSA_INST = 48;   // 6 * u64 (op tagged in prev)
-const SIZEOF_SSA_BLOCK = 112;  // 14 * u64
-const SIZEOF_SSA_FUNC = 72;   // 9 * u64
-const SIZEOF_SSA_CTX = 40;    // 5 * u64
-const SIZEOF_SSA_PHI_ARG = 24; // 3 * u64
-const SIZEOF_SSA_CALL_INFO = 56; // 7 * u64
-const SIZEOF_SSA_CALL_PTR_INFO = 48; // 6 * u64
-const SIZEOF_SSA_CALL_SLICE_STORE_INFO = 64; // 8 * u64
 
 const SSA_OP_NOP = 0;
 const SSA_OP_ENTRY = 1;

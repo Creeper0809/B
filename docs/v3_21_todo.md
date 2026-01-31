@@ -9,3 +9,4 @@
 - [x] Stabilize SSA call_slice_store info across passes (builder/opt/mem2reg/regalloc/codegen/dump).
 - [x] Refactor v3_21 main argv handling to struct-based layouts and sizeof allocations.
 - [x] Fix bootstrap sizeof misparse with local layout structs; align heap_alloc; resolve runtime segfaults.
+- [x] Replace SIZEOF_SSA_* usages with sizeof and remove unused constants.
