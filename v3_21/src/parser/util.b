@@ -11,6 +11,9 @@ import std.util;
 import lexer;
 import compiler;
 
+// Local layout mirror for sizeof (avoid sizeof on imported types during bootstrap).
+struct ParserLocal { tokens_vec: u64; cur: u64; }
+
 // ============================================
 // Error Reporting Helpers
 // ============================================
@@ -196,7 +199,7 @@ func report_integer_overflow_error(tok: u64) -> u64 {
 // Parser structure: [tokens_vec, cur]
 
 func parse_new(tokens: u64) -> u64 {
-    var p: *Parser = (*Parser)heap_alloc(16);
+    var p: *Parser = (*Parser)heap_alloc(sizeof(ParserLocal));
     p->tokens_vec = tokens;
     p->cur = 0;
     return (u64)p;

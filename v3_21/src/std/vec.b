@@ -10,7 +10,7 @@ struct Vec {
 }
 
 func vec_new(cap) {
-    var v = heap_alloc(24);
+    var v = heap_alloc(sizeof(Vec));
     var buf = heap_alloc(cap * 8);
     *(v) = buf;
     *(v + 8) = 0;

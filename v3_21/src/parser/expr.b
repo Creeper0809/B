@@ -72,6 +72,10 @@ func parse_primary(p: u64) -> u64 {
             var n_ptr: u64 = ((*Token)t)->ptr;
             var n_len: u64 = ((*Token)t)->len;
             if (is_struct_type(n_ptr, n_len) != 0) { is_type = 1; }
+            else if (n_ptr != 0 && n_len > 0) {
+                var first_ch: u64 = *(*u8)(n_ptr);
+                if (first_ch >= 65 && first_ch <= 90) { is_type = 1; }
+            }
         }
 
         if (is_type != 0) {

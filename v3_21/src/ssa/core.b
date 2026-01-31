@@ -72,7 +72,7 @@ func ssa_func_list_push(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
 func ssa_context_new() -> u64 {
     push_trace("ssa_context_new", "ssa_core.b", __LINE__);
     pop_trace();
-    var ctx: u64 = heap_alloc(SIZEOF_SSA_CTX);
+    var ctx: u64 = heap_alloc(sizeof(SSAContext));
     var c: *SSAContext = (*SSAContext)ctx;
     c->funcs_data = 0;
     c->funcs_len = 0;
@@ -85,7 +85,7 @@ func ssa_context_new() -> u64 {
 func ssa_new_block(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
     push_trace("ssa_new_block", "ssa_core.b", __LINE__);
     pop_trace();
-    var b_ptr: u64 = heap_alloc(SIZEOF_SSA_BLOCK);
+    var b_ptr: u64 = heap_alloc(sizeof(SSABlock));
     var b: *SSABlock = (*SSABlock)b_ptr;
     b->id = ctx->next_block_id;
     ctx->next_block_id = ctx->next_block_id + 1;
@@ -109,7 +109,7 @@ func ssa_new_block(ctx: *SSAContext, fn: *SSAFunction) -> u64 {
 func ssa_new_inst(ctx: *SSAContext, op: u64, dest: u64, src1: u64, src2: u64) -> u64 {
     push_trace("ssa_new_inst", "ssa_core.b", __LINE__);
     pop_trace();
-    var i_ptr: u64 = heap_alloc(SIZEOF_SSA_INST);
+    var i_ptr: u64 = heap_alloc(sizeof(SSAInstruction));
     var inst: *SSAInstruction = (*SSAInstruction)i_ptr;
     var p: *tagged(InstMeta) u8 = (*tagged(InstMeta) u8)0;
     p.op = (u16)op;
@@ -228,7 +228,7 @@ func ssa_inst_set_prev(inst: *SSAInstruction, prev: *SSAInstruction) -> u64 {
 func ssa_phi_arg_new(val: u64, block_id: u64) -> u64 {
     push_trace("ssa_phi_arg_new", "ssa_core.b", __LINE__);
     pop_trace();
-    var a_ptr: u64 = heap_alloc(SIZEOF_SSA_PHI_ARG);
+    var a_ptr: u64 = heap_alloc(sizeof(SSAPhiArg));
     var a: *SSAPhiArg = (*SSAPhiArg)a_ptr;
     a->val = val;
     a->block_id = block_id;
@@ -454,7 +454,7 @@ func ssa_add_edge(src: *SSABlock, dst: *SSABlock) -> u64 {
 func ssa_new_function(ctx: *SSAContext, name_ptr: u64, name_len: u64) -> u64 {
     push_trace("ssa_new_function", "ssa_core.b", __LINE__);
     pop_trace();
-    var f_ptr: u64 = heap_alloc(SIZEOF_SSA_FUNC);
+    var f_ptr: u64 = heap_alloc(sizeof(SSAFunction));
     var f: *SSAFunction = (*SSAFunction)f_ptr;
     f->id = ctx->funcs_len;
     f->name_ptr = name_ptr;

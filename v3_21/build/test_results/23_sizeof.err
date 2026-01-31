@@ -1,0 +1,1 @@
+build/v3_21_tests/23_sizeof.asm:142: warning: signed dword value exceeds bounds [-w+number-overflow]

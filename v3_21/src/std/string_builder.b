@@ -66,7 +66,7 @@ impl StringBuilder {
 
     // 생성
     func new(cap: u64) -> u64 {
-        var sb: *StringBuilder = (*StringBuilder)heap_alloc(24);
+        var sb: *StringBuilder = (*StringBuilder)heap_alloc(sizeof(StringBuilder));
         if (sb == 0) { return 0; }
         if (!StringBuilder_init(sb, cap)) { return 0; }
         return (u64)sb;

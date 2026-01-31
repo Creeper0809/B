@@ -1,0 +1,1 @@
+build/v3_21_tests/09_const_variables.asm:170: warning: signed dword value exceeds bounds [-w+number-overflow]

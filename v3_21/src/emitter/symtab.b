@@ -12,12 +12,16 @@ import std.vec;
 import std.str;
 import types;
 
+// Local layout mirrors for sizeof (avoid sizeof on imported types during bootstrap).
+struct SymtabLocal { names_vec: u64; offsets_vec: u64; types_vec: u64; count: u64; stack_offset: u64; }
+struct NameInfoLocal { ptr: u64; len: u64; }
+
 // ============================================
 // Symbol Table
 // ============================================
 
 func symtab_new() -> u64 {
-    var s: u64 = heap_alloc(40);
+    var s: u64 = heap_alloc(sizeof(SymtabLocal));
     var symtab: *Symtab = (*Symtab)s;
     symtab->names_vec = vec_new(64);
     symtab->offsets_vec = vec_new(64);
@@ -48,10 +52,10 @@ func symtab_add(s: u64, name_ptr: u64, name_len: u64, type_kind: u64, ptr_depth:
     symtab->stack_offset = offset;
     
     // Add name info
-    var name_info: u64 = heap_alloc(16);
-    *(name_info) = name_ptr;
-    *(name_info + 8) = name_len;
-    vec_push(symtab->names_vec, name_info);
+    var name_info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+    name_info->ptr = name_ptr;
+    name_info->len = name_len;
+    vec_push(symtab->names_vec, (u64)name_info);
     
     // Add offset
     vec_push(symtab->offsets_vec, offset);

@@ -217,15 +217,14 @@ func emit_u64(n) {
 	var buf = heap_alloc(32);
 	var i = 0;
 	var t = n;
-	while (t > 0) {
+	for (; t > 0; ) {
 		*(*u8)(buf + i) = 48 + (t % 10);
 		t = t / 10;
 		i = i + 1;
 	}
-	var j = i - 1;
-	while (j >= 0) {
-		sys_write(1, buf + j, 1);
-		j = j - 1;
+	var j: i64 = (i64)i - 1;
+	for (; j >= 0; j = j - 1) {
+		sys_write(1, buf + (u64)j, 1);
 	}
 }
 
@@ -237,15 +236,14 @@ func emit_u64_stderr(n) {
 	var buf = heap_alloc(32);
 	var i = 0;
 	var t = n;
-	while (t > 0) {
+	for (; t > 0; ) {
 		*(*u8)(buf + i) = 48 + (t % 10);
 		t = t / 10;
 		i = i + 1;
 	}
-	var j = i - 1;
-	while (j >= 0) {
-		emit_stderr(buf + j, 1);
-		j = j - 1;
+	var j: i64 = (i64)i - 1;
+	for (; j >= 0; j = j - 1) {
+		emit_stderr(buf + (u64)j, 1);
 	}
 }
 

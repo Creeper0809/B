@@ -1039,36 +1039,54 @@ std_io__heap_alloc:
     ret
     jmp .Lssa_25_48
 .Lssa_25_48:
-    lea rbx, [rel _gvar_std_io__heap_inited]
-    mov rbx, [rbx]
-    mov rcx, 0
+    mov rbx, 0
+    lea rcx, [rbp-8]
+    mov rcx, 8
+    mov rbx, rbx
+    sub rbx, rcx
+    mov rcx, 7
+    mov rax, rax
+    add rax, rcx
+    lea rcx, [rbp-16]
+    mov rax, rax
+    and rax, rbx
+    lea rcx, [rel _gvar_std_io__heap_inited]
+    mov rcx, [rcx]
+    mov rdx, 0
     push rax
-    cmp rbx, rcx
+    cmp rcx, rdx
     sete al
-    movzx rbx, al
+    movzx rcx, al
     pop rax
-    cmp rbx, 0
+    cmp rcx, 0
     jne .Lssa_25_49
     jmp .Lssa_25_50
 .Lssa_25_49:
-    lea rbx, [rel _gvar_std_io__heap_brk]
-    mov rcx, 0
+    lea rcx, [rel _gvar_std_io__heap_brk]
+    mov rdx, 0
     push rax
     push rbx
     push rcx
+    push rdx
     pop rdi
     call std_os__os_sys_brk
-    mov rcx, rax
+    mov rdx, rax
+    pop rcx
     pop rbx
     pop rax
-    mov [rbx], rcx
-    lea rbx, [rel _gvar_std_io__heap_inited]
-    mov rcx, 1
-    mov [rbx], rcx
+    mov [rcx], rdx
+    lea rcx, [rel _gvar_std_io__heap_inited]
+    mov rdx, 1
+    mov [rcx], rdx
     jmp .Lssa_25_50
 .Lssa_25_50:
-    lea rbx, [rel _gvar_std_io__heap_brk]
-    mov rbx, [rbx]
+    lea rcx, [rel _gvar_std_io__heap_brk]
+    mov rcx, [rcx]
+    mov rdx, 7
+    mov rcx, rcx
+    add rcx, rdx
+    lea rdx, [rbp-24]
+    and rbx, rcx
     add rax, rbx
     push rax
     push rbx

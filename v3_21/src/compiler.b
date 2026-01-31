@@ -12,6 +12,11 @@ import ast;
 import parser.util;
 import parser.decl;
 
+// Local layout mirrors for sizeof (avoid sizeof on imported types during bootstrap).
+struct NameInfoLocal { ptr: u64; len: u64; }
+struct ExportEntryLocal { name_ptr: u64; name_len: u64; mangled_ptr: u64; mangled_len: u64; }
+struct ConstResultLocal { found: u64; value: u64; }
+
 // ============================================
 // Global Module State
 // ============================================
@@ -178,10 +183,10 @@ func module_id_from_path(path: u64, path_len: u64) -> u64 {
     }
     *(*u8)(id_ptr + id_len) = 0;
 
-    var out: u64 = heap_alloc(16);
-    *(out) = id_ptr;
-    *(out + 8) = id_len;
-    return out;
+    var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+    out->ptr = id_ptr;
+    out->len = id_len;
+    return (u64)out;
 }
 
 // Import path already normalized to "a/b" without extension
@@ -193,10 +198,10 @@ func module_id_from_import(path: u64, path_len: u64) -> u64 {
         i = i + 1;
     }
     *(*u8)(id_ptr + path_len) = 0;
-    var out: u64 = heap_alloc(16);
-    *(out) = id_ptr;
-    *(out + 8) = path_len;
-    return out;
+    var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+    out->ptr = id_ptr;
+    out->len = path_len;
+    return (u64)out;
 }
 
 func module_prefix_from_id(id_ptr: u64, id_len: u64) -> u64 {
@@ -218,19 +223,19 @@ func module_prefix_from_id(id_ptr: u64, id_len: u64) -> u64 {
         i = i + 1;
     }
     *(*u8)(pref_ptr + id_len + extra) = 0;
-    var out: u64 = heap_alloc(16);
-    *(out) = pref_ptr;
-    *(out + 8) = id_len + extra;
-    return out;
+    var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+    out->ptr = pref_ptr;
+    out->len = id_len + extra;
+    return (u64)out;
 }
 
 // Returns [ptr,len]
 func mangle_name(prefix_ptr: u64, prefix_len: u64, name_ptr: u64, name_len: u64) -> u64 {
     if (prefix_len == 0) {
-        var out0: u64 = heap_alloc(16);
-        *(out0) = name_ptr;
-        *(out0 + 8) = name_len;
-        return out0;
+        var out0: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+        out0->ptr = name_ptr;
+        out0->len = name_len;
+        return (u64)out0;
     }
     var sep_len: u64 = 2;
     var total: u64 = prefix_len + sep_len + name_len;
@@ -248,10 +253,10 @@ func mangle_name(prefix_ptr: u64, prefix_len: u64, name_ptr: u64, name_len: u64)
         j = j + 1;
     }
     *(*u8)(buf + total) = 0;
-    var out: u64 = heap_alloc(16);
-    *(out) = buf;
-    *(out + 8) = total;
-    return out;
+    var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+    out->ptr = buf;
+    out->len = total;
+    return (u64)out;
 }
 
 // ============================================
@@ -355,12 +360,12 @@ func module_exports_ensure(module_ptr: u64, module_len: u64) -> u64 {
 
 func add_module_export(module_ptr: u64, module_len: u64, name_ptr: u64, name_len: u64, mangled_ptr: u64, mangled_len: u64) -> u64 {
     var exports: u64 = module_exports_ensure(module_ptr, module_len);
-    var entry: u64 = heap_alloc(32);
-    *(entry) = name_ptr;
-    *(entry + 8) = name_len;
-    *(entry + 16) = mangled_ptr;
-    *(entry + 24) = mangled_len;
-    vec_push(exports, entry);
+    var entry: *ExportEntry = (*ExportEntry)heap_alloc(sizeof(ExportEntryLocal));
+    entry->name_ptr = name_ptr;
+    entry->name_len = name_len;
+    entry->mangled_ptr = mangled_ptr;
+    entry->mangled_len = mangled_len;
+    vec_push(exports, (u64)entry);
     return 0;
 }
 
@@ -394,10 +399,10 @@ func add_import_alias(module_ptr: u64, module_len: u64, alias_ptr: u64, alias_le
         emit_stderr_nl();
         panic("Parse error");
     }
-    var info: u64 = heap_alloc(16);
-    *(info) = mangled_ptr;
-    *(info + 8) = mangled_len;
-    hashmap_put(alias_map, alias_ptr, alias_len, info);
+    var info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+    info->ptr = mangled_ptr;
+    info->len = mangled_len;
+    hashmap_put(alias_map, alias_ptr, alias_len, (u64)info);
     return 0;
 }
 
@@ -417,10 +422,10 @@ func add_prelude_alias(alias_ptr: u64, alias_len: u64, mangled_ptr: u64, mangled
         emit_stderr_nl();
         panic("Parse error");
     }
-    var info: u64 = heap_alloc(16);
-    *(info) = mangled_ptr;
-    *(info + 8) = mangled_len;
-    hashmap_put(g_prelude_aliases, alias_ptr, alias_len, info);
+    var info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+    info->ptr = mangled_ptr;
+    info->len = mangled_len;
+    hashmap_put(g_prelude_aliases, alias_ptr, alias_len, (u64)info);
     return 0;
 }
 
@@ -548,11 +553,10 @@ func resolve_name(name_ptr: u64, name_len: u64) -> u64 {
                 var n_ptr: u64 = *(e);
                 var n_len: u64 = *(e + 8);
                 if (str_eq(n_ptr, n_len, name_ptr, name_len)) {
-                    var info: u64 = heap_alloc(16);
-                    *(info) = *(e + 16);
-                    *(info + 8) = *(e + 24);
-                    return info;
-                }
+                                var info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+                                info->ptr = *(e + 16);
+                                info->len = *(e + 24);
+                                return (u64)info;                }
             }
         }
     }
@@ -565,7 +569,7 @@ func resolve_name(name_ptr: u64, name_len: u64) -> u64 {
 // ============================================
 
 func compiler_find_const(name_ptr: u64, name_len: u64) -> u64 {
-    var result: u64 = heap_alloc(16);
+    var result: u64 = heap_alloc(sizeof(ConstResultLocal));
     var res: *ConstResult = (*ConstResult)result;
     res->found = 0;
     res->value = 0;
@@ -679,10 +683,10 @@ func register_module_exports(prog: u64, module_ptr: u64, module_len: u64, prefix
             if (g_func_module_map == 0) {
                 g_func_module_map = hashmap_new(128);
             }
-            var info: u64 = heap_alloc(16);
-            *(info) = module_ptr;
-            *(info + 8) = module_len;
-            hashmap_put(g_func_module_map, mangled_ptr, mangled_len, info);
+            var info: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+            info->ptr = module_ptr;
+            info->len = module_len;
+            hashmap_put(g_func_module_map, mangled_ptr, mangled_len, (u64)info);
         }
     }
 
@@ -949,10 +953,10 @@ func extract_version_from_compiler_path(path: u64, path_len: u64) -> u64 {
             var vptr: u64 = heap_alloc(vlen + 1);
             str_copy(vptr, base, vlen);
             *(*u8)(vptr + vlen) = 0;
-            var out: u64 = heap_alloc(16);
-            *(out) = vptr;
-            *(out + 8) = vlen;
-            return out;
+            var out: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+            out->ptr = vptr;
+            out->len = vlen;
+            return (u64)out;
         }
         i = i + 1;
     }
@@ -964,10 +968,10 @@ func extract_version_from_compiler_path(path: u64, path_len: u64) -> u64 {
             var vptr2: u64 = heap_alloc(base_len + 1);
             str_copy(vptr2, base, base_len);
             *(*u8)(vptr2 + base_len) = 0;
-            var out2: u64 = heap_alloc(16);
-            *(out2) = vptr2;
-            *(out2 + 8) = base_len;
-            return out2;
+            var out2: *NameInfo = (*NameInfo)heap_alloc(sizeof(NameInfoLocal));
+            out2->ptr = vptr2;
+            out2->len = base_len;
+            return (u64)out2;
         }
     }
     return 0;

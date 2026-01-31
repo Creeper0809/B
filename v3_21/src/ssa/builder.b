@@ -21,6 +21,18 @@ import ssa.codegen;
 const SSA_BUILDER_DEBUG = 0;
 const TAGGED_PTR_MASK = 281474976710655;
 
+// Simple pointer+length pair for name lookups and metadata.
+struct PtrLen {
+    ptr: u64;
+    len: u64;
+}
+
+// Slice register bundle (ptr,len) used in SSA builder.
+struct SliceRegs {
+    ptr_reg: u64;
+    len_reg: u64;
+}
+
 func builder_make_bitmask(bit_width: u64) -> u64 {
     if (bit_width >= 64) { return 0; }
     var one: u64 = 1;
@@ -74,7 +86,8 @@ func builder_all_ones_reg(ctx: *BuilderCtx) -> u64 {
 }
 
 func builder_get_packed_layout_total_bits(struct_def: u64) -> u64 {
-    var fields: u64 = *(struct_def + 24);
+    var sd: *AstStructDef = (*AstStructDef)struct_def;
+    var fields: u64 = sd->fields_vec;
     var num_fields: u64 = vec_len(fields);
     var total_bits: u64 = 0;
     for (var i: u64 = 0; i < num_fields; i++) {
@@ -90,7 +103,8 @@ func builder_get_packed_layout_total_bits(struct_def: u64) -> u64 {
 }
 
 func builder_get_packed_field_bit_offset(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
-    var fields: u64 = *(struct_def + 24);
+    var sd: *AstStructDef = (*AstStructDef)struct_def;
+    var fields: u64 = sd->fields_vec;
     var num_fields: u64 = vec_len(fields);
     var bit_cursor: u64 = 0;
     for (var i: u64 = 0; i < num_fields; i++) {
@@ -111,7 +125,8 @@ func builder_get_packed_field_bit_offset(struct_def: u64, field_name_ptr: u64, f
 }
 
 func builder_get_packed_field_bit_width(struct_def: u64, field_name_ptr: u64, field_name_len: u64) -> u64 {
-    var fields: u64 = *(struct_def + 24);
+    var sd: *AstStructDef = (*AstStructDef)struct_def;
+    var fields: u64 = sd->fields_vec;
     var num_fields: u64 = vec_len(fields);
     for (var i: u64 = 0; i < num_fields; i++) {
         var field: *FieldDesc = (*FieldDesc)vec_get(fields, i);
@@ -127,12 +142,12 @@ func builder_get_packed_field_bit_width(struct_def: u64, field_name_ptr: u64, fi
 
 func builder_struct_size_from_def(struct_def: u64) -> u64 {
     if (struct_def == 0) { return 0; }
-    var packed_flag: u64 = *(struct_def + 32);
-    if (packed_flag == 1) {
+    var sd: *AstStructDef = (*AstStructDef)struct_def;
+    if (sd->is_packed == 1) {
         var total_bits: u64 = builder_get_packed_layout_total_bits(struct_def);
         return (total_bits + 7) / 8;
     }
-    var fields: u64 = *(struct_def + 24);
+    var fields: u64 = sd->fields_vec;
     if (fields == 0) { return 0; }
     var num_fields: u64 = vec_len(fields);
     var total_size: u64 = 0;
@@ -166,8 +181,7 @@ struct BuilderCtx {
 func builder_ctx_new(ssa_ctx: *SSAContext) -> u64 {
     push_trace("builder_ctx_new", "ssa_builder.b", __LINE__);
     pop_trace();
-    // BuilderCtx = 13 * 8 bytes = 104 bytes
-    var p: u64 = heap_alloc(104);
+    var p: u64 = heap_alloc(sizeof(BuilderCtx));
     var ctx: *BuilderCtx = (*BuilderCtx)p;
     ctx->ssa_ctx = ssa_ctx;
     ctx->cur_func = 0;
@@ -225,8 +239,14 @@ func builder_reset_func(ctx: *BuilderCtx) -> u64 {
     ctx->symtab = symtab_new();
     ctx->next_reg = 1;
     ctx->next_var_id = 1;
-    *(*u64)(ctx->break_stack + 8) = 0;
-    *(*u64)(ctx->continue_stack + 8) = 0;
+    var break_len: u64 = vec_len(ctx->break_stack);
+    for (var bi: u64 = 0; bi < break_len; bi++) {
+        vec_pop(ctx->break_stack);
+    }
+    var continue_len: u64 = vec_len(ctx->continue_stack);
+    for (var ci: u64 = 0; ci < continue_len; ci++) {
+        vec_pop(ctx->continue_stack);
+    }
     return 0;
 }
 
@@ -235,16 +255,15 @@ func builder_reset_func(ctx: *BuilderCtx) -> u64 {
 // ============================================
 
 func builder_symtab_add_param(ctx: *BuilderCtx, p: *Param, offset: u64) -> u64 {
-    var symtab_ptr: u64 = ctx->symtab;
-    var names: u64 = *(symtab_ptr);
-    var offsets: u64 = *(symtab_ptr + 8);
-    var types: u64 = *(symtab_ptr + 16);
-    var count: u64 = *(symtab_ptr + 24);
+    var symtab: *Symtab = (*Symtab)ctx->symtab;
+    var names: u64 = symtab->names_vec;
+    var offsets: u64 = symtab->offsets_vec;
+    var types: u64 = symtab->types_vec;
 
-    var name_info: u64 = heap_alloc(16);
-    *(name_info) = p->name_ptr;
-    *(name_info + 8) = p->name_len;
-    vec_push(names, name_info);
+    var name_info: *PtrLen = (*PtrLen)heap_alloc(sizeof(PtrLen));
+    name_info->ptr = p->name_ptr;
+    name_info->len = p->name_len;
+    vec_push(names, (u64)name_info);
     vec_push(offsets, offset);
 
     var type_info: u64 = heap_alloc(SIZEOF_TYPEINFO);
@@ -286,7 +305,7 @@ func builder_symtab_add_param(ctx: *BuilderCtx, p: *Param, offset: u64) -> u64 {
     }
 
     vec_push(types, type_info);
-    *(symtab_ptr + 24) = count + 1;
+    symtab->count = symtab->count + 1;
     return 0;
 }
 
@@ -399,10 +418,10 @@ func builder_set_func_ptr(ctx: *BuilderCtx, name_ptr: u64, name_len: u64, func_p
         hashmap_put(ctx->func_ptr_map, name_ptr, name_len, 0);
         return 0;
     }
-    var info: u64 = heap_alloc(16);
-    *(info) = func_ptr;
-    *(info + 8) = func_len;
-    hashmap_put(ctx->func_ptr_map, name_ptr, name_len, info);
+    var info: *PtrLen = (*PtrLen)heap_alloc(sizeof(PtrLen));
+    info->ptr = func_ptr;
+    info->len = func_len;
+    hashmap_put(ctx->func_ptr_map, name_ptr, name_len, (u64)info);
     return 0;
 }
 
@@ -511,15 +530,14 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
         arg_idx = arg_idx + param_words;
     }
 
-    var i: u64 = n;
-    while (i > 0) {
-        i = i - 1;
-        var p2: *Param = (*Param)vec_get(params, i);
-        var start_idx: u64 = vec_get(param_arg_idx, i);
+    for (var i: u64 = n; i > 0; i--) {
+        var idx: u64 = i - 1;
+        var p2: *Param = (*Param)vec_get(params, idx);
+        var start_idx: u64 = vec_get(param_arg_idx, idx);
         if (p2->type_kind == TYPE_STRUCT && p2->ptr_depth == 0) {
             var struct_size2: u64 = sizeof_type(TYPE_STRUCT, 0, p2->struct_name_ptr, p2->struct_name_len);
             if (struct_size2 == 0) { return 0; }
-            var offset3: u64 = vec_get(param_offsets, i);
+            var offset3: u64 = vec_get(param_offsets, idx);
             var base_addr: u64 = builder_new_lea_local(ctx, offset3);
             if (struct_size2 <= 8) {
                 var reg0: u64 = builder_new_reg(ctx);
@@ -557,7 +575,7 @@ func builder_add_params(ctx: *BuilderCtx, fn: *AstFunc) -> u64 {
         }
 
         if (p2->type_kind == TYPE_SLICE && p2->ptr_depth == 0) {
-            var offset4: u64 = vec_get(param_offsets, i);
+            var offset4: u64 = vec_get(param_offsets, idx);
             var base_addr2: u64 = builder_new_lea_local(ctx, offset4);
             var ptr_reg: u64 = builder_new_reg(ctx);
             var ptr_param: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_PARAM, ptr_reg, ssa_operand_const(start_idx), 0);
@@ -608,21 +626,21 @@ func builder_new_lea_local(ctx: *BuilderCtx, offset: u64) -> u64 {
 }
 
 func builder_new_lea_global(ctx: *BuilderCtx, name_ptr: u64, name_len: u64) -> u64 {
-    var info: u64 = heap_alloc(16);
-    *(info) = name_ptr;
-    *(info + 8) = name_len;
+    var info: *PtrLen = (*PtrLen)heap_alloc(sizeof(PtrLen));
+    info->ptr = name_ptr;
+    info->len = name_len;
     var reg_id: u64 = builder_new_reg(ctx);
-    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_GLOBAL, reg_id, ssa_operand_const(info), 0);
+    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_GLOBAL, reg_id, ssa_operand_const((u64)info), 0);
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
     return reg_id;
 }
 
 func builder_new_lea_func(ctx: *BuilderCtx, name_ptr: u64, name_len: u64) -> u64 {
-    var info: u64 = heap_alloc(16);
-    *(info) = name_ptr;
-    *(info + 8) = name_len;
+    var info: *PtrLen = (*PtrLen)heap_alloc(sizeof(PtrLen));
+    info->ptr = name_ptr;
+    info->len = name_len;
     var reg_id: u64 = builder_new_reg(ctx);
-    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_FUNC, reg_id, ssa_operand_const(info), 0);
+    var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_FUNC, reg_id, ssa_operand_const((u64)info), 0);
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
     return reg_id;
 }
@@ -649,8 +667,7 @@ func builder_store_by_size(ctx: *BuilderCtx, addr_reg: u64, val_reg: u64, size: 
 }
 
 func builder_struct_copy(ctx: *BuilderCtx, dst_addr: u64, src_addr: u64, size: u64) -> u64 {
-    var offset: u64 = 0;
-    while (offset < size) {
+    for (var offset: u64 = 0; offset < size; ) {
         var chunk: u64 = size - offset;
         if (chunk > 8) { chunk = 8; }
         var src_reg: u64 = src_addr;
@@ -677,8 +694,9 @@ func builder_append_slice_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 
     var k: u64 = ast_kind(arg);
     if (k == AST_SLICE) {
         var slice_info: u64 = builder_slice_regs(ctx, arg);
-        var ptr_reg: u64 = *(*u64)(slice_info);
-        var len_reg: u64 = *(*u64)(slice_info + 8);
+        var slice_regs: *SliceRegs = (*SliceRegs)slice_info;
+        var ptr_reg: u64 = slice_regs->ptr_reg;
+        var len_reg: u64 = slice_regs->len_reg;
         vec_push(arg_regs, ptr_reg);
         vec_push(arg_regs, len_reg);
         return 0;
@@ -957,7 +975,7 @@ func builder_append_call_arg(ctx: *BuilderCtx, arg_regs: u64, arg: u64) -> u64 {
 }
 
 func builder_slice_regs(ctx: *BuilderCtx, expr: u64) -> u64 {
-    var info: u64 = heap_alloc(16);
+    var info: *SliceRegs = (*SliceRegs)heap_alloc(sizeof(SliceRegs));
     var k: u64 = ast_kind(expr);
     if (k == AST_SLICE) {
         var s: *AstSlice = (*AstSlice)expr;
@@ -978,9 +996,9 @@ func builder_slice_regs(ctx: *BuilderCtx, expr: u64) -> u64 {
             ptr_reg = build_expr(ctx, s->ptr_expr);
         }
         var len_reg: u64 = build_expr(ctx, s->len_expr);
-        *(*u64)(info) = ptr_reg;
-        *(*u64)(info + 8) = len_reg;
-        return info;
+        info->ptr_reg = ptr_reg;
+        info->len_reg = len_reg;
+        return (u64)info;
     }
 
     var addr_reg: u64 = builder_lvalue_addr(ctx, expr);
@@ -990,9 +1008,9 @@ func builder_slice_regs(ctx: *BuilderCtx, expr: u64) -> u64 {
     var add_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_ADD, addr2, ssa_operand_reg(addr_reg), ssa_operand_reg(off_reg));
     ssa_inst_append(ctx->cur_block, (*SSAInstruction)add_ptr);
     var len_reg2: u64 = builder_load_by_size(ctx, addr2, 8);
-    *(*u64)(info) = ptr_reg2;
-    *(*u64)(info + 8) = len_reg2;
-    return info;
+    info->ptr_reg = ptr_reg2;
+    info->len_reg = len_reg2;
+    return (u64)info;
 }
 
 func builder_struct_literal_init(ctx: *BuilderCtx, struct_def: u64, values: u64, base_addr: u64) -> u64 {
@@ -1048,8 +1066,9 @@ func builder_struct_literal_init(ctx: *BuilderCtx, struct_def: u64, values: u64,
             builder_struct_literal_init(ctx, lit_def, lit->values_vec, addr_reg);
         } else if (field->type_kind == TYPE_SLICE && field->ptr_depth == 0) {
             var slice_info: u64 = builder_slice_regs(ctx, value);
-            var ptr_reg: u64 = *(*u64)(slice_info);
-            var len_reg: u64 = *(*u64)(slice_info + 8);
+            var slice_regs: *SliceRegs = (*SliceRegs)slice_info;
+            var ptr_reg: u64 = slice_regs->ptr_reg;
+            var len_reg: u64 = slice_regs->len_reg;
             builder_store_by_size(ctx, addr_reg, ptr_reg, 8);
             var off8: u64 = build_const(ctx, 8);
             var addr3: u64 = builder_new_reg(ctx);
@@ -1071,8 +1090,9 @@ func builder_struct_literal_init(ctx: *BuilderCtx, struct_def: u64, values: u64,
 
 func builder_store_slice_regs(ctx: *BuilderCtx, base_addr: u64, slice_info: u64) -> u64 {
     if (base_addr == 0 || slice_info == 0) { return 0; }
-    var ptr_reg: u64 = *(*u64)(slice_info);
-    var len_reg: u64 = *(*u64)(slice_info + 8);
+    var regs: *SliceRegs = (*SliceRegs)slice_info;
+    var ptr_reg: u64 = regs->ptr_reg;
+    var len_reg: u64 = regs->len_reg;
     builder_store_by_size(ctx, base_addr, ptr_reg, 8);
     var off_reg: u64 = build_const(ctx, 8);
     var addr2: u64 = builder_new_reg(ctx);
@@ -1903,11 +1923,11 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
 
     if (kind == AST_STRING) {
         var s: *AstString = (*AstString)node;
-        var info: u64 = heap_alloc(16);
-        *(info) = s->str_ptr;
-        *(info + 8) = s->str_len;
+        var info: *PtrLen = (*PtrLen)heap_alloc(sizeof(PtrLen));
+        info->ptr = s->str_ptr;
+        info->len = s->str_len;
         var reg_id: u64 = builder_new_reg(ctx);
-        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_STR, reg_id, ssa_operand_const(info), 0);
+        var inst_ptr: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_LEA_STR, reg_id, ssa_operand_const((u64)info), 0);
         ssa_inst_append(ctx->cur_block, (*SSAInstruction)inst_ptr);
         return reg_id;
     }
@@ -2055,8 +2075,9 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
                 var idn_fp: *AstIdent = (*AstIdent)callee_fp;
                 var info_fp: u64 = builder_get_func_ptr(ctx, idn_fp->name_ptr, idn_fp->name_len);
                 if (info_fp != 0) {
-                    fp_struct_name_ptr = *(info_fp);
-                    fp_struct_name_len = *(info_fp + 8);
+                    var fp_info: *PtrLen = (*PtrLen)info_fp;
+                    fp_struct_name_ptr = fp_info->ptr;
+                    fp_struct_name_len = fp_info->len;
                     fp_struct_def = get_struct_def(fp_struct_name_ptr, fp_struct_name_len);
                 }
             }
@@ -2069,8 +2090,9 @@ func build_expr(ctx: *BuilderCtx, node: u64) -> u64 {
             if (fn_ptr == 0) {
                 var info_fp2: u64 = builder_get_func_ptr(ctx, call->name_ptr, call->name_len);
                 if (info_fp2 != 0) {
-                    var fp_struct_name_ptr2: u64 = *(info_fp2);
-                    var fp_struct_name_len2: u64 = *(info_fp2 + 8);
+                        var fp_info2: *PtrLen = (*PtrLen)info_fp2;
+                        var fp_struct_name_ptr2: u64 = fp_info2->ptr;
+                        var fp_struct_name_len2: u64 = fp_info2->len;
                     var fp_struct_def2: u64 = get_struct_def(fp_struct_name_ptr2, fp_struct_name_len2);
                     if (fp_struct_def2 != 0) {
                         var callee_tmp: u64 = ast_ident(call->name_ptr, call->name_len);
@@ -3614,8 +3636,9 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                 return builder_emit_return_slice_from_call(ctx, ret->expr);
             }
             var slice_info: u64 = builder_slice_regs(ctx, ret->expr);
-            var ptr_reg: u64 = *(*u64)(slice_info);
-            var len_reg: u64 = *(*u64)(slice_info + 8);
+            var slice_regs: *SliceRegs = (*SliceRegs)slice_info;
+            var ptr_reg: u64 = slice_regs->ptr_reg;
+            var len_reg: u64 = slice_regs->len_reg;
             var ret_ptr2: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET, 0, ssa_operand_reg(ptr_reg), ssa_operand_reg(len_reg));
             ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr2);
             return 0;
@@ -3665,8 +3688,9 @@ func build_stmt(ctx: *BuilderCtx, node: u64) -> u64 {
                     return builder_emit_return_slice_from_call(ctx, ret->expr);
                 }
                 var slice_info2: u64 = builder_slice_regs(ctx, ret->expr);
-                var ptr_reg2: u64 = *(*u64)(slice_info2);
-                var len_reg2: u64 = *(*u64)(slice_info2 + 8);
+                var slice_regs2: *SliceRegs = (*SliceRegs)slice_info2;
+                var ptr_reg2: u64 = slice_regs2->ptr_reg;
+                var len_reg2: u64 = slice_regs2->len_reg;
                 var ret_ptr3: u64 = ssa_new_inst(ctx->ssa_ctx, SSA_OP_RET, 0, ssa_operand_reg(ptr_reg2), ssa_operand_reg(len_reg2));
                 ssa_inst_append(ctx->cur_block, (*SSAInstruction)ret_ptr3);
                 return 0;

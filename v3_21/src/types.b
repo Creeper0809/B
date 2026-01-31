@@ -155,6 +155,7 @@ const TYPE_SLICE = 22;
 // ============================================
 
 // Parser state (16 bytes)
+const SIZEOF_PARSER = 16;
 struct Parser {
     tokens_vec: u64;
     cur: u64;
@@ -201,6 +202,22 @@ struct GlobalInfo {
     name_len: u64;
 }
 
+// Name info (16 bytes)
+const SIZEOF_NAME_INFO = 16;
+struct NameInfo {
+    ptr: u64;
+    len: u64;
+}
+
+// Export entry (32 bytes)
+const SIZEOF_EXPORT_ENTRY = 32;
+struct ExportEntry {
+    name_ptr: u64;
+    name_len: u64;
+    mangled_ptr: u64;
+    mangled_len: u64;
+}
+
 // Constant info (24 bytes)
 struct ConstInfo {
     name_ptr: u64;
@@ -209,6 +226,7 @@ struct ConstInfo {
 }
 
 // Constant lookup result (16 bytes)
+const SIZEOF_CONST_RESULT = 16;
 struct ConstResult {
     found: u64;
     value: u64;
@@ -222,6 +240,7 @@ struct StringEntry {
 }
 
 // Symbol table (40 bytes)
+const SIZEOF_SYMTAB = 40;
 struct Symtab {
     names_vec: u64;
     offsets_vec: u64;
@@ -235,6 +254,7 @@ struct Symtab {
 // ============================================
 
 // Token structure (40 bytes)
+const SIZEOF_TOKEN = 40;
 struct Token {
     kind: u64;
     ptr: u64;
@@ -244,6 +264,7 @@ struct Token {
 }
 
 // Lexer structure (40 bytes)
+const SIZEOF_LEXER = 40;
 struct Lexer {
     src_ptr: u64;
     src_len: u64;

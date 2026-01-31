@@ -204,35 +204,45 @@ std_io__heap_alloc:
     ret
     jmp .Lssa_25_48
 .Lssa_25_48:
-    lea rbx, [rel _gvar_std_io__heap_inited]
-    mov rbx, [rbx]
+    mov rbx, 9223372036854775800
+    mov rax, rax
+    add rax, 7
+    mov rax, rax
+    and rax, 9223372036854775800
+    lea rcx, [rel _gvar_std_io__heap_inited]
+    mov rcx, [rcx]
     push rax
-    cmp rbx, 0
+    cmp rcx, 0
     sete al
-    movzx rbx, al
+    movzx rcx, al
     pop rax
-    cmp rbx, 0
+    cmp rcx, 0
     jne .Lssa_25_49
     jmp .Lssa_25_50
 .Lssa_25_49:
-    lea rbx, [rel _gvar_std_io__heap_brk]
-    mov rcx, 0
+    lea rcx, [rel _gvar_std_io__heap_brk]
+    mov rdx, 0
     push rax
     push rbx
     push rcx
+    push rdx
     pop rdi
     call std_os__os_sys_brk
-    mov rcx, rax
+    mov rdx, rax
+    pop rcx
     pop rbx
     pop rax
-    mov [rbx], rcx
-    lea rbx, [rel _gvar_std_io__heap_inited]
-    mov rcx, 1
-    mov [rbx], rcx
+    mov [rcx], rdx
+    lea rcx, [rel _gvar_std_io__heap_inited]
+    mov rdx, 1
+    mov [rcx], rdx
     jmp .Lssa_25_50
 .Lssa_25_50:
-    lea rbx, [rel _gvar_std_io__heap_brk]
-    mov rbx, [rbx]
+    lea rcx, [rel _gvar_std_io__heap_brk]
+    mov rcx, [rcx]
+    mov rcx, rcx
+    add rcx, 7
+    and rbx, rcx
     add rax, rbx
     push rax
     push rbx
@@ -332,7 +342,7 @@ std_io__emit:
     jmp .Lssa_27_55
 .Lssa_27_60:
     jmp .Lssa_27_59
-.Lssa_27_215:
+.Lssa_27_219:
     mov rcx, rax
     xor eax, eax
     mov rsp, rbp
@@ -391,7 +401,7 @@ std_util__emit_u64:
     movzx rax, al
     cmp rax, 0
     jne .Lssa_55_186
-    jmp .Lssa_55_187
+    jmp .Lssa_55_188
 .Lssa_55_186:
     mov rax, rbx
     add rax, rdx
@@ -416,22 +426,24 @@ std_util__emit_u64:
     pop rdx
     mov rcx, rdx
     add rcx, 1
+    jmp .Lssa_55_187
+.Lssa_55_187:
     mov r8, rax
     mov rdx, rcx
     jmp .Lssa_55_185
-.Lssa_55_187:
+.Lssa_55_188:
     mov rax, rdx
     sub rax, 1
     mov r8, rax
-    jmp .Lssa_55_188
-.Lssa_55_188:
+    jmp .Lssa_55_189
+.Lssa_55_189:
     cmp r8, 0
     setge al
     movzx rax, al
     cmp rax, 0
-    jne .Lssa_55_189
-    jmp .Lssa_55_190
-.Lssa_55_189:
+    jne .Lssa_55_190
+    jmp .Lssa_55_192
+.Lssa_55_190:
     mov rax, 1
     mov rcx, rbx
     add rcx, r8
@@ -447,11 +459,13 @@ std_util__emit_u64:
     call std_io__sys_write
     pop r8
     pop rbx
+    jmp .Lssa_55_191
+.Lssa_55_191:
     mov rax, r8
     sub rax, 1
     mov r8, rax
-    jmp .Lssa_55_188
-.Lssa_55_190:
+    jmp .Lssa_55_189
+.Lssa_55_192:
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -470,7 +484,7 @@ std_util__emit_i64:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_57_200:
+.Lssa_57_204:
     mov rax, [rbp-1032]
     push rax
     cmp rax, 0
@@ -478,9 +492,9 @@ std_util__emit_i64:
     movzx rbx, al
     pop rax
     cmp rbx, 0
-    jne .Lssa_57_201
-    jmp .Lssa_57_203
-.Lssa_57_201:
+    jne .Lssa_57_205
+    jmp .Lssa_57_207
+.Lssa_57_205:
     lea rbx, [rel _str1]
     mov rcx, 1
     push rax
@@ -495,17 +509,17 @@ std_util__emit_i64:
     push rax
     pop rdi
     call std_util__emit_u64
-    jmp .Lssa_57_202
-.Lssa_57_202:
+    jmp .Lssa_57_206
+.Lssa_57_206:
     xor eax, eax
     mov rsp, rbp
     pop rbp
     ret
-.Lssa_57_203:
+.Lssa_57_207:
     push rax
     pop rdi
     call std_util__emit_u64
-    jmp .Lssa_57_202
+    jmp .Lssa_57_206
     xor eax, eax
     mov rsp, rbp
     pop rbp
@@ -520,7 +534,7 @@ std_util__emit_nl:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_59_208:
+.Lssa_59_212:
     mov rax, 1
     push rax
     pop rdi
@@ -554,7 +568,7 @@ main:
     mov [rbp-1056], rcx
     mov [rbp-1064], r8
     mov [rbp-1072], r9
-.Lssa_60_209:
+.Lssa_60_213:
     mov rax, [rbp-1040]
     mov rax, [rbp-1032]
     lea rax, [rel _str2]
@@ -678,9 +692,9 @@ main:
     call std_io__emit
     mov rax, 1
     cmp rax, 0
-    jne .Lssa_60_210
-    jmp .Lssa_60_211
-.Lssa_60_210:
+    jne .Lssa_60_214
+    jmp .Lssa_60_215
+.Lssa_60_214:
     lea rax, [rel _str14]
     mov rbx, 12
     push rbx
@@ -688,13 +702,13 @@ main:
     pop rdi
     pop rsi
     call std_io__emit
-    jmp .Lssa_60_211
-.Lssa_60_211:
+    jmp .Lssa_60_215
+.Lssa_60_215:
     mov rax, 1
     cmp rax, 0
-    jne .Lssa_60_212
-    jmp .Lssa_60_213
-.Lssa_60_212:
+    jne .Lssa_60_216
+    jmp .Lssa_60_217
+.Lssa_60_216:
     lea rax, [rel _str15]
     mov rbx, 13
     push rbx
@@ -702,8 +716,8 @@ main:
     pop rdi
     pop rsi
     call std_io__emit
-    jmp .Lssa_60_213
-.Lssa_60_213:
+    jmp .Lssa_60_217
+.Lssa_60_217:
     lea rax, [rel _str16]
     mov rbx, 23
     push rbx

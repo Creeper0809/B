@@ -7,6 +7,10 @@ import types;
 import std.vec;
 import std.char;
 
+// Local layout mirrors for sizeof (avoid sizeof on imported types during bootstrap).
+struct LexerLocal { src_ptr: u64; src_len: u64; pos: u64; line: u64; col: u64; }
+struct TokenLocal { kind: u64; ptr: u64; len: u64; line: u64; col: u64; }
+
 // ============================================
 // ASCII Character Constants
 // ============================================
@@ -41,7 +45,7 @@ const CHAR_TILDE = 126;
 // Lexer structure: [src_ptr, src_len, pos, line, col]
 
 func lex_new(src: u64, len: u64) -> u64 {
-    var l: *Lexer = (*Lexer)heap_alloc(40);
+    var l: *Lexer = (*Lexer)heap_alloc(sizeof(LexerLocal));
     l->src_ptr = src;
     l->src_len = len;
     l->pos = 0;
@@ -198,7 +202,7 @@ func lex_check_keyword(ptr: u64, len: u64) -> u64 {
 // Token structure: [kind, ptr, len, line, col]
 
 func tok_new(kind: u64, ptr: u64, len: u64, line: u64, col: u64) -> u64 {
-    var t: *Token = (*Token)heap_alloc(40);
+    var t: *Token = (*Token)heap_alloc(sizeof(TokenLocal));
     t->kind = kind;
     t->ptr = ptr;
     t->len = len;

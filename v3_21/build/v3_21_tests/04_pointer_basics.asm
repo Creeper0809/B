@@ -955,6 +955,35 @@ std_io__heap_alloc:
     pop rbp
     ret
 .L18:
+    mov rax, 0
+    mov [rbp-16], rax
+    mov rax, [rbp-16]
+    push rax
+    mov rax, 8
+    mov rbx, rax
+    pop rax
+    sub rax, rbx
+    push rax
+    lea rax, [rbp-16]
+    pop rbx
+    mov [rax], rbx
+    mov rax, [rbp-8]
+    push rax
+    mov rax, 7
+    mov rbx, rax
+    pop rax
+    add rax, rbx
+    mov [rbp-24], rax
+    mov rax, [rbp-24]
+    push rax
+    mov rax, [rbp-16]
+    mov rbx, rax
+    pop rax
+    and rax, rbx
+    push rax
+    lea rax, [rbp-24]
+    pop rbx
+    mov [rax], rbx
     mov rax, [rel _gvar_std_io__heap_inited]
     push rax
     mov rax, 0
@@ -980,22 +1009,39 @@ std_io__heap_alloc:
     mov [rax], rbx
 .L20:
     mov rax, [rel _gvar_std_io__heap_brk]
-    mov [rbp-16], rax
-    mov rax, [rbp-16]
     push rax
-    mov rax, [rbp-8]
+    mov rax, 7
     mov rbx, rax
     pop rax
     add rax, rbx
-    mov [rbp-24], rax
-    mov rax, [rbp-24]
-    push rax
-    pop rdi
-    call std_os__os_sys_brk
     mov [rbp-32], rax
     mov rax, [rbp-32]
     push rax
+    mov rax, [rbp-16]
+    mov rbx, rax
+    pop rax
+    and rax, rbx
+    push rax
+    lea rax, [rbp-32]
+    pop rbx
+    mov [rax], rbx
+    mov rax, [rbp-32]
+    mov [rbp-40], rax
+    mov rax, [rbp-40]
+    push rax
     mov rax, [rbp-24]
+    mov rbx, rax
+    pop rax
+    add rax, rbx
+    mov [rbp-48], rax
+    mov rax, [rbp-48]
+    push rax
+    pop rdi
+    call std_os__os_sys_brk
+    mov [rbp-56], rax
+    mov rax, [rbp-56]
+    push rax
+    mov rax, [rbp-48]
     mov rbx, rax
     pop rax
     cmp rax, rbx
@@ -1008,12 +1054,12 @@ std_io__heap_alloc:
     pop rbp
     ret
 .L22:
-    mov rax, [rbp-24]
+    mov rax, [rbp-48]
     push rax
     lea rax, [rel _gvar_std_io__heap_brk]
     pop rbx
     mov [rax], rbx
-    mov rax, [rbp-16]
+    mov rax, [rbp-40]
     mov rsp, rbp
     pop rbp
     ret

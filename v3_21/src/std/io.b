@@ -28,14 +28,23 @@ func heap_alloc(size) {
     if (size == 0) {
         return 0;
     }
+
+    // Align allocation size to 8 bytes to keep u64 stores within mapped pages.
+    var align_mask: u64 = 0;
+    align_mask = align_mask - 8; // ~7 via wrap-around
+    var aligned_size: u64 = size + 7;
+    aligned_size = aligned_size & align_mask;
     
     if (heap_inited == 0) {
         heap_brk = os_sys_brk(0);
         heap_inited = 1;
     }
     
-    var p = heap_brk;
-    var new_brk = p + size;
+    var aligned_brk: u64 = heap_brk + 7;
+    aligned_brk = aligned_brk & align_mask;
+
+    var p = aligned_brk;
+    var new_brk = p + aligned_size;
     var res = os_sys_brk(new_brk);
     if (res < new_brk) {
         return 0;
