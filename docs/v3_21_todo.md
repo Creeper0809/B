@@ -11,3 +11,4 @@
 - [x] Fix bootstrap sizeof misparse with local layout structs; align heap_alloc; resolve runtime segfaults.
 - [x] Replace SIZEOF_SSA_* usages with sizeof and remove unused constants.
 - [x] Refactor std/vec to struct access and for-loop copy (sizeof(u64) elements).
+- [x] Refactor std/hashmap to struct-based layout and sizeof allocations.

@@ -9,9 +9,16 @@ import std.char;
 // Stack Trace
 // ============================================
 
-// Stack frame: [func_name:8][func_name_len:8][file_name:8][file_name_len:8][line:8] = 40 bytes
+// Stack frame: [func_name, func_name_len, file_name, file_name_len, line]
 const STACK_TRACE_MAX_DEPTH = 128;
-const STACK_FRAME_SIZE = 40;
+
+struct StackFrame {
+	func_name: u64;
+	func_name_len: u64;
+	file_name: u64;
+	file_name_len: u64;
+	line: u64;
+}
 
 var g_stack_frames;
 var g_stack_depth;
@@ -33,7 +40,7 @@ func init_stack_trace() {
 	if (g_stack_initialized) {
 		return;
 	}
-	g_stack_frames = heap_alloc(STACK_TRACE_MAX_DEPTH * STACK_FRAME_SIZE);
+	g_stack_frames = heap_alloc(STACK_TRACE_MAX_DEPTH * sizeof(StackFrame));
 	g_stack_depth = 0;
 	g_stack_initialized = 1;
 }
@@ -50,12 +57,13 @@ func push_trace(func_name, file_name, line) {
 	var func_name_len = str_len(func_name);
 	var file_name_len = str_len(file_name);
     
-	var frame_ptr = g_stack_frames + (g_stack_depth * STACK_FRAME_SIZE);
-	*(*u64)(frame_ptr + 0) = func_name;
-	*(*u64)(frame_ptr + 8) = func_name_len;
-	*(*u64)(frame_ptr + 16) = file_name;
-	*(*u64)(frame_ptr + 24) = file_name_len;
-	*(*u64)(frame_ptr + 32) = line;
+	var frame_ptr: u64 = g_stack_frames + (g_stack_depth * sizeof(StackFrame));
+	var frame: *StackFrame = (*StackFrame)frame_ptr;
+	frame->func_name = func_name;
+	frame->func_name_len = func_name_len;
+	frame->file_name = file_name;
+	frame->file_name_len = file_name_len;
+	frame->line = line;
     
 	g_stack_depth = g_stack_depth + 1;
 }
@@ -82,16 +90,15 @@ func print_stack_trace() {
 	emit_stderr("Stack trace (most recent call first):", 38);
 	emit_stderr_nl();
     
-	var i = g_stack_depth;
-	while (i > 0) {
-		i = i - 1;
-        
-		var frame_ptr = g_stack_frames + (i * STACK_FRAME_SIZE);
-		var func_name = *(*u64)(frame_ptr + 0);
-		var func_name_len = *(*u64)(frame_ptr + 8);
-		var file_name = *(*u64)(frame_ptr + 16);
-		var file_name_len = *(*u64)(frame_ptr + 24);
-		var line = *(*u64)(frame_ptr + 32);
+	for (var i: u64 = g_stack_depth; i > 0; i = i - 1) {
+		var frame_index: u64 = i - 1;
+		var frame_ptr: u64 = g_stack_frames + (frame_index * sizeof(StackFrame));
+		var frame: *StackFrame = (*StackFrame)frame_ptr;
+		var func_name: u64 = frame->func_name;
+		var func_name_len: u64 = frame->func_name_len;
+		var file_name: u64 = frame->file_name;
+		var file_name_len: u64 = frame->file_name_len;
+		var line: u64 = frame->line;
         
 		emit_stderr("  at ", 5);
 		emit_stderr(func_name, func_name_len);
@@ -175,11 +182,9 @@ func panic() {
 func emit_stderr(s, len) {
 	if (g_capturing_error != 0) {
 		if (g_error_buffer_pos + len < 512) {
-			var i = 0;
-			while (i < len) {
+			for (var i: u64 = 0; i < len; i++) {
 				*(*u8)(g_error_buffer + g_error_buffer_pos) = *(*u8)(s + i);
 				g_error_buffer_pos = g_error_buffer_pos + 1;
-				i = i + 1;
 			}
 		}
 	} else {
@@ -188,7 +193,7 @@ func emit_stderr(s, len) {
 }
 
 func emit_stderr_nl() {
-	var nl = heap_alloc(1);
+	var nl = heap_alloc(sizeof(u8));
 	*(*u8)nl = 10;
 	sys_write(2, nl, 1);
 }
@@ -204,7 +209,7 @@ func warn(msg, len) {
 // ============================================
 
 func emit_char(c) {
-	var buf = heap_alloc(1);
+	var buf = heap_alloc(sizeof(u8));
 	*(*u8)buf = c;
 	sys_write(1, buf, 1);
 }

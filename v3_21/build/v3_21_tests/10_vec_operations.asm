@@ -1995,26 +1995,24 @@ std_hashmap__hashmap_new:
     mov rax, [rbp-40]
     push rax
     mov rax, [rbp-24]
+    push rax
+    pop rax
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-16]
     push rax
     mov rax, [rbp-24]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 8
     pop rbx
     mov [rax], rbx
     mov rax, 0
     push rax
     mov rax, [rbp-24]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-24]
@@ -2058,16 +2056,18 @@ std_hashmap__hashmap_put_internal:
     mov [rbp-24], rdx
     mov [rbp-32], rcx
     mov rax, [rbp-8]
-    mov rax, [rax]
     mov [rbp-40], rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-40]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-48], rax
+    mov rax, [rbp-40]
+    push rax
+    pop rax
+    add rax, 8
+    mov rax, [rax]
+    mov [rbp-56], rax
     mov rax, [rbp-24]
     push rax
     mov rax, [rbp-16]
@@ -2075,22 +2075,22 @@ std_hashmap__hashmap_put_internal:
     pop rdi
     pop rsi
     call std_hashmap__fnv1a_hash
-    mov [rbp-56], rax
-    mov rax, [rbp-56]
+    mov [rbp-64], rax
+    mov rax, [rbp-64]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     mov rbx, rax
     pop rax
     xor rdx, rdx
     div rbx
     mov rax, rdx
-    mov [rbp-64], rax
-    mov rax, 0
     mov [rbp-72], rax
+    mov rax, 0
+    mov [rbp-80], rax
 .L56:
-    mov rax, [rbp-72]
+    mov rax, [rbp-80]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     mov rbx, rax
     pop rax
     cmp rax, rbx
@@ -2098,23 +2098,21 @@ std_hashmap__hashmap_put_internal:
     movzx rax, al
     test rax, rax
     jz .L58
-    mov rax, [rbp-64]
+    mov rax, [rbp-72]
     push rax
-    mov rax, [rbp-40]
+    mov rax, [rbp-48]
     push rax
     pop rdi
     pop rsi
     call std_hashmap__hashmap_entry_ptr
-    mov [rbp-80], rax
-    mov rax, [rbp-80]
-    push rax
-    mov rax, 32
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
     mov [rbp-88], rax
     mov rax, [rbp-88]
+    push rax
+    pop rax
+    add rax, 32
+    mov rax, [rax]
+    mov [rbp-96], rax
+    mov rax, [rbp-96]
     push rax
     mov rax, 0
     mov rbx, rax
@@ -2126,55 +2124,47 @@ std_hashmap__hashmap_put_internal:
     jz .L59
     mov rax, [rbp-16]
     push rax
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
+    push rax
+    pop rax
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-24]
     push rax
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 8
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-32]
     push rax
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     pop rbx
     mov [rax], rbx
-    mov rax, [rbp-56]
+    mov rax, [rbp-64]
     push rax
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
-    mov rax, 24
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 24
     pop rbx
     mov [rax], rbx
     mov rax, 1
     push rax
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
-    mov rax, 32
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 32
     pop rbx
     mov [rax], rbx
-    mov rax, [rbp-8]
+    mov rax, [rbp-40]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     mov rax, [rax]
     push rax
     mov rax, 1
@@ -2182,12 +2172,10 @@ std_hashmap__hashmap_put_internal:
     pop rax
     add rax, rbx
     push rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-40]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     pop rbx
     mov [rax], rbx
     xor eax, eax
@@ -2195,24 +2183,6 @@ std_hashmap__hashmap_put_internal:
     pop rbp
     ret
 .L59:
-    mov rax, [rbp-64]
-    push rax
-    mov rax, 1
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    push rax
-    mov rax, [rbp-48]
-    mov rbx, rax
-    pop rax
-    xor rdx, rdx
-    div rbx
-    mov rax, rdx
-    push rax
-    lea rax, [rbp-64]
-    pop rbx
-    mov [rax], rbx
-.L57:
     mov rax, [rbp-72]
     push rax
     mov rax, 1
@@ -2220,7 +2190,25 @@ std_hashmap__hashmap_put_internal:
     pop rax
     add rax, rbx
     push rax
+    mov rax, [rbp-56]
+    mov rbx, rax
+    pop rax
+    xor rdx, rdx
+    div rbx
+    mov rax, rdx
+    push rax
     lea rax, [rbp-72]
+    pop rbx
+    mov [rax], rbx
+.L57:
+    mov rax, [rbp-80]
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    add rax, rbx
+    push rax
+    lea rax, [rbp-80]
     pop rbx
     mov [rax], rbx
     jmp .L56
@@ -2235,41 +2223,43 @@ std_hashmap__hashmap_grow:
     sub rsp, 2048
     mov [rbp-8], rdi
     mov rax, [rbp-8]
-    mov rax, [rax]
     mov [rbp-16], rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-16]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-24], rax
-    mov rax, [rbp-24]
+    mov rax, [rbp-16]
     push rax
-    mov rax, 2
-    mov rbx, rax
     pop rax
-    imul rax, rbx
+    add rax, 8
+    mov rax, [rax]
     mov [rbp-32], rax
     mov rax, [rbp-32]
     push rax
-    mov rax, 40
+    mov rax, 2
     mov rbx, rax
     pop rax
     imul rax, rbx
     mov [rbp-40], rax
     mov rax, [rbp-40]
     push rax
+    mov rax, 40
+    mov rbx, rax
+    pop rax
+    imul rax, rbx
+    mov [rbp-48], rax
+    mov rax, [rbp-48]
+    push rax
     pop rdi
     call std_io__heap_alloc
-    mov [rbp-48], rax
-    mov rax, 0
     mov [rbp-56], rax
+    mov rax, 0
+    mov [rbp-64], rax
 .L61:
-    mov rax, [rbp-56]
+    mov rax, [rbp-64]
     push rax
-    mov rax, [rbp-40]
+    mov rax, [rbp-48]
     mov rbx, rax
     pop rax
     cmp rax, rbx
@@ -2279,58 +2269,56 @@ std_hashmap__hashmap_grow:
     jz .L63
     mov rax, 0
     push rax
-    mov rax, [rbp-48]
-    push rax
     mov rax, [rbp-56]
+    push rax
+    mov rax, [rbp-64]
     mov rbx, rax
     pop rax
     add rax, rbx
     pop rbx
     mov [rax], bl
 .L62:
-    mov rax, [rbp-56]
+    mov rax, [rbp-64]
     push rax
     mov rax, 1
     mov rbx, rax
     pop rax
     add rax, rbx
     push rax
-    lea rax, [rbp-56]
+    lea rax, [rbp-64]
     pop rbx
     mov [rax], rbx
     jmp .L61
 .L63:
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     push rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-16]
+    push rax
+    pop rax
     pop rbx
     mov [rax], rbx
-    mov rax, [rbp-32]
+    mov rax, [rbp-40]
     push rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-16]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 8
     pop rbx
     mov [rax], rbx
     mov rax, 0
     push rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-16]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     pop rbx
     mov [rax], rbx
     mov rax, 0
-    mov [rbp-64], rax
+    mov [rbp-72], rax
 .L64:
-    mov rax, [rbp-64]
+    mov rax, [rbp-72]
     push rax
-    mov rax, [rbp-24]
+    mov rax, [rbp-32]
     mov rbx, rax
     pop rax
     cmp rax, rbx
@@ -2338,9 +2326,9 @@ std_hashmap__hashmap_grow:
     movzx rax, al
     test rax, rax
     jz .L66
-    mov rax, [rbp-16]
+    mov rax, [rbp-24]
     push rax
-    mov rax, [rbp-64]
+    mov rax, [rbp-72]
     push rax
     mov rax, 40
     mov rbx, rax
@@ -2349,16 +2337,14 @@ std_hashmap__hashmap_grow:
     mov rbx, rax
     pop rax
     add rax, rbx
-    mov [rbp-72], rax
-    mov rax, [rbp-72]
-    push rax
-    mov rax, 32
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
     mov [rbp-80], rax
     mov rax, [rbp-80]
+    push rax
+    pop rax
+    add rax, 32
+    mov rax, [rax]
+    mov [rbp-88], rax
+    mov rax, [rbp-88]
     push rax
     mov rax, 0
     mov rbx, rax
@@ -2368,30 +2354,28 @@ std_hashmap__hashmap_grow:
     movzx rax, al
     test rax, rax
     jz .L67
-    mov rax, [rbp-72]
-    mov rax, [rax]
-    mov [rbp-88], rax
-    mov rax, [rbp-72]
+    mov rax, [rbp-80]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-96], rax
-    mov rax, [rbp-72]
+    mov rax, [rbp-80]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 8
     mov rax, [rax]
     mov [rbp-104], rax
+    mov rax, [rbp-80]
+    push rax
+    pop rax
+    add rax, 16
+    mov rax, [rax]
+    mov [rbp-112], rax
+    mov rax, [rbp-112]
+    push rax
     mov rax, [rbp-104]
     push rax
     mov rax, [rbp-96]
-    push rax
-    mov rax, [rbp-88]
     push rax
     mov rax, [rbp-8]
     push rax
@@ -2402,14 +2386,14 @@ std_hashmap__hashmap_grow:
     call std_hashmap__hashmap_put_internal
 .L67:
 .L65:
-    mov rax, [rbp-64]
+    mov rax, [rbp-72]
     push rax
     mov rax, 1
     mov rbx, rax
     pop rax
     add rax, rbx
     push rax
-    lea rax, [rbp-64]
+    lea rax, [rbp-72]
     pop rbx
     mov [rax], rbx
     jmp .L64
@@ -2427,32 +2411,32 @@ std_hashmap__hashmap_put:
     mov [rbp-24], rdx
     mov [rbp-32], rcx
     mov rax, [rbp-8]
-    mov rax, [rax]
     mov [rbp-40], rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-40]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-48], rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-40]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 8
     mov rax, [rax]
     mov [rbp-56], rax
-    mov rax, [rbp-56]
+    mov rax, [rbp-40]
+    push rax
+    pop rax
+    add rax, 16
+    mov rax, [rax]
+    mov [rbp-64], rax
+    mov rax, [rbp-64]
     push rax
     mov rax, 10
     mov rbx, rax
     pop rax
     imul rax, rbx
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     push rax
     mov rax, 7
     mov rbx, rax
@@ -2469,21 +2453,21 @@ std_hashmap__hashmap_put:
     push rax
     pop rdi
     call std_hashmap__hashmap_grow
-    mov rax, [rbp-8]
-    mov rax, [rax]
+    mov rax, [rbp-40]
     push rax
-    lea rax, [rbp-40]
-    pop rbx
-    mov [rax], rbx
-    mov rax, [rbp-8]
-    push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     push rax
     lea rax, [rbp-48]
+    pop rbx
+    mov [rax], rbx
+    mov rax, [rbp-40]
+    push rax
+    pop rax
+    add rax, 8
+    mov rax, [rax]
+    push rax
+    lea rax, [rbp-56]
     pop rbx
     mov [rax], rbx
 .L69:
@@ -2494,22 +2478,22 @@ std_hashmap__hashmap_put:
     pop rdi
     pop rsi
     call std_hashmap__fnv1a_hash
-    mov [rbp-64], rax
-    mov rax, [rbp-64]
+    mov [rbp-72], rax
+    mov rax, [rbp-72]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     mov rbx, rax
     pop rax
     xor rdx, rdx
     div rbx
     mov rax, rdx
-    mov [rbp-72], rax
-    mov rax, 0
     mov [rbp-80], rax
+    mov rax, 0
+    mov [rbp-88], rax
 .L71:
-    mov rax, [rbp-80]
+    mov rax, [rbp-88]
     push rax
-    mov rax, [rbp-48]
+    mov rax, [rbp-56]
     mov rbx, rax
     pop rax
     cmp rax, rbx
@@ -2517,23 +2501,21 @@ std_hashmap__hashmap_put:
     movzx rax, al
     test rax, rax
     jz .L73
-    mov rax, [rbp-72]
+    mov rax, [rbp-80]
     push rax
-    mov rax, [rbp-40]
+    mov rax, [rbp-48]
     push rax
     pop rdi
     pop rsi
     call std_hashmap__hashmap_entry_ptr
-    mov [rbp-88], rax
-    mov rax, [rbp-88]
-    push rax
-    mov rax, 32
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
     mov [rbp-96], rax
     mov rax, [rbp-96]
+    push rax
+    pop rax
+    add rax, 32
+    mov rax, [rax]
+    mov [rbp-104], rax
+    mov rax, [rbp-104]
     push rax
     mov rax, 0
     mov rbx, rax
@@ -2545,55 +2527,47 @@ std_hashmap__hashmap_put:
     jz .L74
     mov rax, [rbp-16]
     push rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
+    push rax
+    pop rax
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-24]
     push rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 8
     pop rbx
     mov [rax], rbx
     mov rax, [rbp-32]
     push rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     pop rbx
     mov [rax], rbx
-    mov rax, [rbp-64]
+    mov rax, [rbp-72]
     push rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
     push rax
-    mov rax, 24
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 24
     pop rbx
     mov [rax], rbx
     mov rax, 1
     push rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
     push rax
-    mov rax, 32
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 32
     pop rbx
     mov [rax], rbx
-    mov rax, [rbp-8]
+    mov rax, [rbp-40]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     mov rax, [rax]
     push rax
     mov rax, 1
@@ -2601,12 +2575,10 @@ std_hashmap__hashmap_put:
     pop rax
     add rax, rbx
     push rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-40]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     pop rbx
     mov [rax], rbx
     xor eax, eax
@@ -2614,24 +2586,24 @@ std_hashmap__hashmap_put:
     pop rbp
     ret
 .L74:
-    mov rax, [rbp-88]
-    mov rax, [rax]
-    mov [rbp-104], rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-112], rax
+    mov rax, [rbp-96]
+    push rax
+    pop rax
+    add rax, 8
+    mov rax, [rax]
+    mov [rbp-120], rax
     mov rax, [rbp-24]
     push rax
     mov rax, [rbp-16]
     push rax
-    mov rax, [rbp-112]
+    mov rax, [rbp-120]
     push rax
-    mov rax, [rbp-104]
+    mov rax, [rbp-112]
     push rax
     pop rdi
     pop rsi
@@ -2642,12 +2614,10 @@ std_hashmap__hashmap_put:
     jz .L76
     mov rax, [rbp-32]
     push rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     pop rbx
     mov [rax], rbx
     xor eax, eax
@@ -2655,24 +2625,6 @@ std_hashmap__hashmap_put:
     pop rbp
     ret
 .L76:
-    mov rax, [rbp-72]
-    push rax
-    mov rax, 1
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    push rax
-    mov rax, [rbp-48]
-    mov rbx, rax
-    pop rax
-    xor rdx, rdx
-    div rbx
-    mov rax, rdx
-    push rax
-    lea rax, [rbp-72]
-    pop rbx
-    mov [rax], rbx
-.L72:
     mov rax, [rbp-80]
     push rax
     mov rax, 1
@@ -2680,7 +2632,25 @@ std_hashmap__hashmap_put:
     pop rax
     add rax, rbx
     push rax
+    mov rax, [rbp-56]
+    mov rbx, rax
+    pop rax
+    xor rdx, rdx
+    div rbx
+    mov rax, rdx
+    push rax
     lea rax, [rbp-80]
+    pop rbx
+    mov [rax], rbx
+.L72:
+    mov rax, [rbp-88]
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    add rax, rbx
+    push rax
+    lea rax, [rbp-88]
     pop rbx
     mov [rax], rbx
     jmp .L71
@@ -2697,16 +2667,18 @@ std_hashmap__hashmap_get:
     mov [rbp-16], rsi
     mov [rbp-24], rdx
     mov rax, [rbp-8]
-    mov rax, [rax]
     mov [rbp-32], rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-32]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-40], rax
+    mov rax, [rbp-32]
+    push rax
+    pop rax
+    add rax, 8
+    mov rax, [rax]
+    mov [rbp-48], rax
     mov rax, [rbp-24]
     push rax
     mov rax, [rbp-16]
@@ -2714,22 +2686,22 @@ std_hashmap__hashmap_get:
     pop rdi
     pop rsi
     call std_hashmap__fnv1a_hash
-    mov [rbp-48], rax
-    mov rax, [rbp-48]
+    mov [rbp-56], rax
+    mov rax, [rbp-56]
     push rax
-    mov rax, [rbp-40]
+    mov rax, [rbp-48]
     mov rbx, rax
     pop rax
     xor rdx, rdx
     div rbx
     mov rax, rdx
-    mov [rbp-56], rax
-    mov rax, 0
     mov [rbp-64], rax
+    mov rax, 0
+    mov [rbp-72], rax
 .L78:
-    mov rax, [rbp-64]
+    mov rax, [rbp-72]
     push rax
-    mov rax, [rbp-40]
+    mov rax, [rbp-48]
     mov rbx, rax
     pop rax
     cmp rax, rbx
@@ -2737,23 +2709,21 @@ std_hashmap__hashmap_get:
     movzx rax, al
     test rax, rax
     jz .L80
-    mov rax, [rbp-56]
+    mov rax, [rbp-64]
     push rax
-    mov rax, [rbp-32]
+    mov rax, [rbp-40]
     push rax
     pop rdi
     pop rsi
     call std_hashmap__hashmap_entry_ptr
-    mov [rbp-72], rax
-    mov rax, [rbp-72]
-    push rax
-    mov rax, 32
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
     mov [rbp-80], rax
     mov rax, [rbp-80]
+    push rax
+    pop rax
+    add rax, 32
+    mov rax, [rax]
+    mov [rbp-88], rax
+    mov rax, [rbp-88]
     push rax
     mov rax, 0
     mov rbx, rax
@@ -2768,24 +2738,24 @@ std_hashmap__hashmap_get:
     pop rbp
     ret
 .L81:
-    mov rax, [rbp-72]
-    mov rax, [rax]
-    mov [rbp-88], rax
-    mov rax, [rbp-72]
+    mov rax, [rbp-80]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-96], rax
+    mov rax, [rbp-80]
+    push rax
+    pop rax
+    add rax, 8
+    mov rax, [rax]
+    mov [rbp-104], rax
     mov rax, [rbp-24]
     push rax
     mov rax, [rbp-16]
     push rax
-    mov rax, [rbp-96]
+    mov rax, [rbp-104]
     push rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
     push rax
     pop rdi
     pop rsi
@@ -2794,35 +2764,15 @@ std_hashmap__hashmap_get:
     call std_str__str_eq
     test rax, rax
     jz .L83
-    mov rax, [rbp-72]
+    mov rax, [rbp-80]
     push rax
-    mov rax, 16
-    mov rbx, rax
     pop rax
-    add rax, rbx
+    add rax, 16
     mov rax, [rax]
     mov rsp, rbp
     pop rbp
     ret
 .L83:
-    mov rax, [rbp-56]
-    push rax
-    mov rax, 1
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    push rax
-    mov rax, [rbp-40]
-    mov rbx, rax
-    pop rax
-    xor rdx, rdx
-    div rbx
-    mov rax, rdx
-    push rax
-    lea rax, [rbp-56]
-    pop rbx
-    mov [rax], rbx
-.L79:
     mov rax, [rbp-64]
     push rax
     mov rax, 1
@@ -2830,7 +2780,25 @@ std_hashmap__hashmap_get:
     pop rax
     add rax, rbx
     push rax
+    mov rax, [rbp-48]
+    mov rbx, rax
+    pop rax
+    xor rdx, rdx
+    div rbx
+    mov rax, rdx
+    push rax
     lea rax, [rbp-64]
+    pop rbx
+    mov [rax], rbx
+.L79:
+    mov rax, [rbp-72]
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    add rax, rbx
+    push rax
+    lea rax, [rbp-72]
     pop rbx
     mov [rax], rbx
     jmp .L78
@@ -2847,16 +2815,18 @@ std_hashmap__hashmap_has:
     mov [rbp-16], rsi
     mov [rbp-24], rdx
     mov rax, [rbp-8]
-    mov rax, [rax]
     mov [rbp-32], rax
-    mov rax, [rbp-8]
+    mov rax, [rbp-32]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-40], rax
+    mov rax, [rbp-32]
+    push rax
+    pop rax
+    add rax, 8
+    mov rax, [rax]
+    mov [rbp-48], rax
     mov rax, [rbp-24]
     push rax
     mov rax, [rbp-16]
@@ -2864,22 +2834,22 @@ std_hashmap__hashmap_has:
     pop rdi
     pop rsi
     call std_hashmap__fnv1a_hash
-    mov [rbp-48], rax
-    mov rax, [rbp-48]
+    mov [rbp-56], rax
+    mov rax, [rbp-56]
     push rax
-    mov rax, [rbp-40]
+    mov rax, [rbp-48]
     mov rbx, rax
     pop rax
     xor rdx, rdx
     div rbx
     mov rax, rdx
-    mov [rbp-56], rax
-    mov rax, 0
     mov [rbp-64], rax
+    mov rax, 0
+    mov [rbp-72], rax
 .L85:
-    mov rax, [rbp-64]
+    mov rax, [rbp-72]
     push rax
-    mov rax, [rbp-40]
+    mov rax, [rbp-48]
     mov rbx, rax
     pop rax
     cmp rax, rbx
@@ -2887,23 +2857,21 @@ std_hashmap__hashmap_has:
     movzx rax, al
     test rax, rax
     jz .L87
-    mov rax, [rbp-56]
+    mov rax, [rbp-64]
     push rax
-    mov rax, [rbp-32]
+    mov rax, [rbp-40]
     push rax
     pop rdi
     pop rsi
     call std_hashmap__hashmap_entry_ptr
-    mov [rbp-72], rax
-    mov rax, [rbp-72]
-    push rax
-    mov rax, 32
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    mov rax, [rax]
     mov [rbp-80], rax
     mov rax, [rbp-80]
+    push rax
+    pop rax
+    add rax, 32
+    mov rax, [rax]
+    mov [rbp-88], rax
+    mov rax, [rbp-88]
     push rax
     mov rax, 0
     mov rbx, rax
@@ -2918,24 +2886,24 @@ std_hashmap__hashmap_has:
     pop rbp
     ret
 .L88:
-    mov rax, [rbp-72]
-    mov rax, [rax]
-    mov [rbp-88], rax
-    mov rax, [rbp-72]
+    mov rax, [rbp-80]
     push rax
-    mov rax, 8
-    mov rbx, rax
     pop rax
-    add rax, rbx
     mov rax, [rax]
     mov [rbp-96], rax
+    mov rax, [rbp-80]
+    push rax
+    pop rax
+    add rax, 8
+    mov rax, [rax]
+    mov [rbp-104], rax
     mov rax, [rbp-24]
     push rax
     mov rax, [rbp-16]
     push rax
-    mov rax, [rbp-96]
+    mov rax, [rbp-104]
     push rax
-    mov rax, [rbp-88]
+    mov rax, [rbp-96]
     push rax
     pop rdi
     pop rsi
@@ -2949,24 +2917,6 @@ std_hashmap__hashmap_has:
     pop rbp
     ret
 .L90:
-    mov rax, [rbp-56]
-    push rax
-    mov rax, 1
-    mov rbx, rax
-    pop rax
-    add rax, rbx
-    push rax
-    mov rax, [rbp-40]
-    mov rbx, rax
-    pop rax
-    xor rdx, rdx
-    div rbx
-    mov rax, rdx
-    push rax
-    lea rax, [rbp-56]
-    pop rbx
-    mov [rax], rbx
-.L86:
     mov rax, [rbp-64]
     push rax
     mov rax, 1
@@ -2974,7 +2924,25 @@ std_hashmap__hashmap_has:
     pop rax
     add rax, rbx
     push rax
+    mov rax, [rbp-48]
+    mov rbx, rax
+    pop rax
+    xor rdx, rdx
+    div rbx
+    mov rax, rdx
+    push rax
     lea rax, [rbp-64]
+    pop rbx
+    mov [rax], rbx
+.L86:
+    mov rax, [rbp-72]
+    push rax
+    mov rax, 1
+    mov rbx, rax
+    pop rax
+    add rax, rbx
+    push rax
+    lea rax, [rbp-72]
     pop rbx
     mov [rax], rbx
     jmp .L85
